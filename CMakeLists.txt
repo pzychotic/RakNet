@@ -14,4 +14,4 @@ set(CMAKE_DEBUG_POSTFIX "_d")
 option( RAKNET_ENABLE_DLL		"Generate the DLL project if true." 			TRUE )
 option( RAKNET_ENABLE_STATIC	"Generate the static library project if true." 	TRUE )
 
-add_subdirectory(Lib)
+add_subdirectory( Source )
