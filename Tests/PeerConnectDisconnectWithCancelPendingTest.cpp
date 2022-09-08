@@ -48,8 +48,6 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest(DataStructures::List<Rak
 	const int maxConnections=peerNum*3;//Max allowed connections for test set to times 3 to eliminate problem variables
 	RakPeerInterface *peerList[peerNum];//A list of 8 peers
 
-	SystemAddress currentSystem;
-
 	Packet *packet;
 	destroyList.Clear(false,_FILE_AND_LINE_);
 
@@ -120,9 +118,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest(DataStructures::List<Rak
 
 			for (int j=i+1;j<peerNum;j++)//Start at i+1 so don't connect two of the same together.
 			{
-
-				currentSystem.SetBinaryAddress("127.0.0.1");
-				currentSystem.port=60000+j;
+				SystemAddress currentSystem("127.0.0.1", 60000+j);
 
 				peerList[i]->CancelConnectionAttempt(currentSystem);  	//Make sure a connection is not pending before trying to connect.
 
@@ -141,9 +137,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest(DataStructures::List<Rak
 
 				if (peerList[i]->Connect("127.0.0.1", 60000+j, 0,0)!=CONNECTION_ATTEMPT_STARTED)
 				{
-
-					currentSystem.SetBinaryAddress("127.0.0.1");
-					currentSystem.port=60000+j;
+					SystemAddress currentSystem("127.0.0.1", 60000+j);
 
 					peerList[i]->GetSystemList(systemList,guidList);//Get connectionlist
 
@@ -345,9 +339,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest(DataStructures::List<Rak
 
 		for (int j=i+1;j<peerNum;j++)//Start at i+1 so don't connect two of the same together.
 		{
-
-			currentSystem.SetBinaryAddress("127.0.0.1");
-			currentSystem.port=60000+j;
+			SystemAddress currentSystem("127.0.0.1", 60000+j);
 
 			peerList[i]->CancelConnectionAttempt(currentSystem);  	//Make sure a connection is not pending before trying to connect.
 

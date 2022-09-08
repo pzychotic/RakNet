@@ -12,14 +12,11 @@
 
 void ManyClientsOneServerBlockingTest::WaitForConnectionRequestsToComplete(RakPeerInterface **clientList, int clientNum, bool isVerbose)
 {
-	SystemAddress currentSystem;
 	bool msgWasPrinted=false;
 
 	for (int i=0;i<clientNum;i++)
 	{
-
-		currentSystem.SetBinaryAddress("127.0.0.1");
-		currentSystem.port=60000;
+		SystemAddress currentSystem("127.0.0.1", 60000);
 
 		while (CommonFunctions::ConnectionStateMatchesOptions (clientList[i],currentSystem,false,true,true) )
 		{
@@ -210,8 +207,6 @@ int ManyClientsOneServerBlockingTest::RunTest(DataStructures::List<RakString> pa
 	RakPeerInterface *clientList[clientNum];//A list of clients
 	RakPeerInterface *server;
 
-	SystemAddress currentSystem;
-
 	destroyList.Clear(false,_FILE_AND_LINE_);
 
 	//Initializations of the arrays
@@ -276,11 +271,11 @@ int ManyClientsOneServerBlockingTest::RunTest(DataStructures::List<RakString> pa
 
 		//Connect
 
+
 		for (int i=0;i<clientNum;i++)
 		{
+			SystemAddress currentSystem("127.0.0.1", 60000);
 
-			currentSystem.SetBinaryAddress("127.0.0.1");
-			currentSystem.port=60000;
 			if(!CommonFunctions::ConnectionStateMatchesOptions (clientList[i],currentSystem,true,true,true,true) )//Are we connected or is there a pending operation ?
 			{
 
@@ -309,9 +304,7 @@ int ManyClientsOneServerBlockingTest::RunTest(DataStructures::List<RakString> pa
 
 	for (int i=0;i<clientNum;i++)
 	{
-
-		currentSystem.SetBinaryAddress("127.0.0.1");
-		currentSystem.port=60000;
+		SystemAddress currentSystem("127.0.0.1", 60000);
 
 		if(!CommonFunctions::ConnectionStateMatchesOptions (clientList[i],currentSystem,true,true,true,true) )//Are we connected or is there a pending operation ?
 		{

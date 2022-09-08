@@ -12,15 +12,13 @@
 
 void PeerConnectDisconnectTest::WaitForConnectionRequestsToComplete(RakPeerInterface **peerList, int peerNum, bool isVerbose)
 {
-	SystemAddress currentSystem;
 	bool msgWasPrinted=false;
 
 	for (int i=0;i<peerNum;i++)
 	{
 		for (int j=i+1;j<peerNum;j++)//Start at i+1 so don't connect two of the same together.
 		{
-			currentSystem.SetBinaryAddress("127.0.0.1");
-			currentSystem.port=60000+j;
+			SystemAddress currentSystem("127.0.0.1", 60000+j);
 
 			while (CommonFunctions::ConnectionStateMatchesOptions (peerList[i],currentSystem,false,true,true) )
 			{
@@ -143,8 +141,6 @@ int PeerConnectDisconnectTest::RunTest(DataStructures::List<RakString> params,bo
 	const int maxConnections=peerNum*3;//Max allowed connections for test set to times 3 to eliminate problem variables
 	RakPeerInterface *peerList[peerNum];//A list of 8 peers
 
-	SystemAddress currentSystem;
-
 	destroyList.Clear(false,_FILE_AND_LINE_);
 
 	//Initializations of the arrays
@@ -214,9 +210,8 @@ int PeerConnectDisconnectTest::RunTest(DataStructures::List<RakString> params,bo
 
 			for (int j=i+1;j<peerNum;j++)//Start at i+1 so don't connect two of the same together.
 			{
+				SystemAddress currentSystem("127.0.0.1", 60000+j);
 
-				currentSystem.SetBinaryAddress("127.0.0.1");
-				currentSystem.port=60000+j;
 				if(!CommonFunctions::ConnectionStateMatchesOptions (peerList[i],currentSystem,true,true,true,true) )//Are we connected or is there a pending operation ?
 				{
 
@@ -250,8 +245,7 @@ int PeerConnectDisconnectTest::RunTest(DataStructures::List<RakString> params,bo
 
 		for (int j=i+1;j<peerNum;j++)//Start at i+1 so don't connect two of the same together.
 		{
-			currentSystem.SetBinaryAddress("127.0.0.1");
-			currentSystem.port=60000+j;
+			SystemAddress currentSystem("127.0.0.1", 60000+j);
 
 			if(!CommonFunctions::ConnectionStateMatchesOptions (peerList[i],currentSystem,true,true,true,true) )//Are we connected or is there a pending operation ?
 			{

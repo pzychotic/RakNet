@@ -92,7 +92,7 @@ int CrossConnectionConvertTest::RunTest(DataStructures::List<RakString> params,b
 					printf("ID_PING\n");
 				connectionAttemptTime=GetTimeMS()+1000;
 				p->systemAddress.ToString(false,clientIP);
-				clientPort=p->systemAddress.port;
+				clientPort=p->systemAddress.GetPort();
 				gotNotification=false;
 			}
 			else if (p->data[0]==ID_UNCONNECTED_PONG)
@@ -143,7 +143,7 @@ int CrossConnectionConvertTest::RunTest(DataStructures::List<RakString> params,b
 					printf("ID_PING\n");
 				connectionAttemptTime=GetTimeMS()+1000;
 				p->systemAddress.ToString(false,clientIP);
-				clientPort=p->systemAddress.port;
+				clientPort=p->systemAddress.GetPort();
 				gotNotification=false;
 			}
 			else if (p->data[0]==ID_UNCONNECTED_PONG)
@@ -185,14 +185,8 @@ int CrossConnectionConvertTest::RunTest(DataStructures::List<RakString> params,b
 				return 1;
 			}
 
-			SystemAddress sa;
-			sa.SetBinaryAddress(serverIP);
-			sa.port=SERVER_PORT;
-			client->CancelConnectionAttempt(sa);
-
-			sa.SetBinaryAddress(clientIP);
-			sa.port=clientPort;
-			server->CancelConnectionAttempt(sa);
+			client->CancelConnectionAttempt(SystemAddress(serverIP, SERVER_PORT));
+			server->CancelConnectionAttempt(SystemAddress(clientIP, clientPort));
 
 			server->CloseConnection(server->GetSystemAddressFromIndex(0),true,0);
 			client->CloseConnection(client->GetSystemAddressFromIndex(0),true,0);

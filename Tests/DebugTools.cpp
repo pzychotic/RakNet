@@ -24,11 +24,12 @@ DebugTools::~DebugTools(void)
 void DebugTools::ShowError(RakString errorString,bool pause, unsigned int lineNum,const char *fileName)
 {
 	printf("%s\nFile:%s \nLine: %i\n",errorString.C_String(),fileName,lineNum);
+	assert( false );
 
-	if (pause)
-	{
-		printf("Press enter to continue \n");
-		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-		char pauseChar = std::cin.get();
-	}
+	//if (pause)
+	//{
+	//	printf("Press enter to continue \n");
+	//	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+	//	char pauseChar = std::cin.get();
+	//}
 }

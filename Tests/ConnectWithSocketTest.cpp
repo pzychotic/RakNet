@@ -41,14 +41,12 @@ int ConnectWithSocketTest::RunTest(DataStructures::List<RakString> params,bool i
 
 	RakPeerInterface *server,*client;
 
-	DataStructures::List< RakNetSmartPtr< RakNetSocket > > sockets;
+	// ??? cleanup, was RakNetSmartPtr before
+	DataStructures::List< RakNetSocket2* > sockets;
 	TestHelpers::StandardClientPrep(client,destroyList);
 	TestHelpers::StandardServerPrep(server,destroyList);
 
-	SystemAddress serverAddress;
-
-	serverAddress.SetBinaryAddress("127.0.0.1");
-	serverAddress.port=60000;
+	SystemAddress serverAddress("127.0.0.1", 60000);
 
 	printf("Testing normal connect before test\n");
 	if (!TestHelpers::WaitAndConnectTwoPeersLocally(client,server,5000))
@@ -74,11 +72,9 @@ int ConnectWithSocketTest::RunTest(DataStructures::List<RakString> params,bool i
 	printf("Disconnecting client\n");
 	CommonFunctions::DisconnectAndWait(client,"127.0.0.1",60000);
 
-	RakNetSmartPtr<RakNetSocket> theSocket;
-
 	client->GetSockets(sockets);
 
-	theSocket=sockets[0];
+	RakNetSocket2* theSocket =sockets[0];
 
 	RakTimer timer2(5000);
 
@@ -88,7 +84,7 @@ int ConnectWithSocketTest::RunTest(DataStructures::List<RakString> params,bool i
 
 		if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
 		{
-			client->ConnectWithSocket("127.0.0.1",serverAddress.port,0,0,theSocket);
+			client->ConnectWithSocket("127.0.0.1",serverAddress.GetPort(),0,0,theSocket);
 		}
 
 		RakSleep(100);
@@ -129,7 +125,7 @@ int ConnectWithSocketTest::RunTest(DataStructures::List<RakString> params,bool i
 
 		if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
 		{
-			client->ConnectWithSocket("127.0.0.1",serverAddress.port,0,0,theSocket);
+			client->ConnectWithSocket("127.0.0.1",serverAddress.GetPort(),0,0,theSocket);
 		}
 
 		RakSleep(100);

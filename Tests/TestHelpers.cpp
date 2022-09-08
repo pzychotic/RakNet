@@ -57,7 +57,7 @@ bool TestHelpers::WaitAndConnectTwoPeersLocally(RakPeerInterface *connector,RakP
 {
 
 	SystemAddress connecteeAdd=connectee->GetInternalID();
-	return CommonFunctions::WaitAndConnect(connector,"127.0.0.1",connecteeAdd.port,millisecondsToWait);
+	return CommonFunctions::WaitAndConnect(connector,"127.0.0.1",connecteeAdd.GetPort(), millisecondsToWait);
 
 }
 
@@ -65,7 +65,7 @@ bool TestHelpers::WaitAndConnectTwoPeersLocally(RakPeerInterface *connector,RakP
 bool TestHelpers::ConnectTwoPeersLocally(RakPeerInterface *connector,RakPeerInterface *connectee)
 {
 	SystemAddress connecteeAdd=connectee->GetInternalID();
-	return connector->Connect("127.0.0.1",connecteeAdd.port,0,0);
+	return connector->Connect("127.0.0.1",connecteeAdd.GetPort(), 0, 0);
 }
 
 bool TestHelpers::BroadCastTestPacket(RakPeerInterface *sender,PacketReliability rel,PacketPriority pr,int typeNum)//returns send return value
@@ -79,10 +79,7 @@ bool TestHelpers::BroadCastTestPacket(RakPeerInterface *sender,PacketReliability
 bool TestHelpers::SendTestPacketDirected(RakPeerInterface *sender,char * ip,int port,PacketReliability rel,PacketPriority pr,int typeNum)//returns send return value
 {
 
-	SystemAddress recAddress;
-
-	recAddress.SetBinaryAddress(ip);
-	recAddress.port=port;
+	SystemAddress recAddress(ip, port);
 
 	char str2[]="AAAAAAAAAA";
 	str2[0]=typeNum;
