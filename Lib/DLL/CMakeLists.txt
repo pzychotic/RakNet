@@ -8,6 +8,7 @@ include_directories( ${RAKNET_INTERNAL_INCLUDE_DIRS} )
 
 add_library(RakNetDLL SHARED ${ALL_CPP_SRCS} ${ALL_HEADER_SRCS} readme.txt)
 
+target_compile_definitions( RakNetDLL PUBLIC _RAKNET_DLL )
 target_link_libraries (RakNetDLL ${RAKNET_LIBRARY_LIBS})
 
 install(TARGETS RakNetDLL
