@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required( VERSION 3.2 )
 
-project(RakNet)
+project( RakNet )
 
 IF (WIN32 AND NOT UNIX)
 	set(RAKNET_LIBRARY_LIBS ws2_32.lib)
