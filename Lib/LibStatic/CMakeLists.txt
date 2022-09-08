@@ -27,7 +27,6 @@ IF(WIN32 AND NOT UNIX)
 
 ELSE(WIN32 AND NOT UNIX)
 	target_link_libraries (RakNetLibStatic ${RAKNET_LIBRARY_LIBS})
-	#INSTALL(TARGETS RakNetLibStatic DESTINATION ${RakNet_SOURCE_DIR}/Lib/RakNetLibStatic)
 ENDIF(WIN32 AND NOT UNIX)
 
 install(TARGETS RakNetLibStatic 
