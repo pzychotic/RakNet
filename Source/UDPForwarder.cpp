@@ -20,7 +20,6 @@
 #include "DS_OrderedList.h"
 #include "LinuxStrings.h"
 #include "SocketDefines.h"
-#include "VitaIncludes.h"
 #include "errno.h"
 
 #ifndef INVALID_SOCKET

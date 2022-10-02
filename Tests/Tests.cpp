@@ -12,7 +12,6 @@
 
 #include "RakString.h"
 #include "DS_List.h"
-#include "Gets.h"
 
 using namespace RakNet;
 /*
@@ -151,8 +150,6 @@ int main(int argc, char *argv[])
 		printf("\nPassed %i out of %i tests.\n",passedTests,numTests);
 	}
 
-	printf("Press enter to continue \n");
-	Gets(str, sizeof(str));
 	//Cleanup
 	int len=testList.Size();
 
