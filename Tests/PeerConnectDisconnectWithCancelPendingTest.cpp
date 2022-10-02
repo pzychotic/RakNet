@@ -15,12 +15,12 @@ What is being done here is having 8 peers all connect to eachother, disconnect, 
 
 Do this for about 10 seconds. Then allow them all to connect for one last time.
 
-This test also tests the cancelpendingconnections.
+This test also tests the CancelConnectionAttempt.
 
 Also tests nonblocking connects, the simpler one PeerConnectDisconnect tests without it
 
 Good ideas for changes:
-After the last check run a eightpeers like test an add the conditions
+After the last check run a eightpeers like test and add the conditions
 of that test as well.
 
 Make sure that if we initiate the connection we get a proper message
@@ -336,12 +336,16 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest(DataStructures::List<Rak
 
 	for (int i=0;i<peerNum;i++)
 	{
+		for (int j=i+1; j<peerNum; j++)	//Start at i+1 so don't connect two of the same together.
+		{
+			peerList[i]->CancelConnectionAttempt(SystemAddress("127.0.0.1", 60000+j));	//Make sure a connection is not pending before trying to connect.
+		}
+
+		RakSleep(100);
 
 		for (int j=i+1;j<peerNum;j++)//Start at i+1 so don't connect two of the same together.
 		{
 			SystemAddress currentSystem("127.0.0.1", 60000+j);
-
-			peerList[i]->CancelConnectionAttempt(currentSystem);  	//Make sure a connection is not pending before trying to connect.
 
 			if (peerList[i]->Connect("127.0.0.1", 60000+j, 0,0)!=CONNECTION_ATTEMPT_STARTED)
 			{

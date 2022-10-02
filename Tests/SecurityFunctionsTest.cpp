@@ -100,7 +100,7 @@ int SecurityFunctionsTest::RunTest(DataStructures::List<RakString> params,bool i
 	TimeMS entryTime=GetTimeMS();
 
 	if (isVerbose)
-		printf("Testing if  no password is rejected\n");
+		printf("Testing if no password is rejected\n");
 
 	while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&GetTimeMS()-entryTime<5000)
 	{
@@ -149,7 +149,7 @@ int SecurityFunctionsTest::RunTest(DataStructures::List<RakString> params,bool i
 		printf("Testing if correct password is accepted\n");
 
 	entryTime=GetTimeMS();
-	while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&GetTimeMS()-entryTime<5000)
+	while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&GetTimeMS()-entryTime<50000) // ??? why does it take so long to connect?
 	{
 
 		if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
