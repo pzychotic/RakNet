@@ -22,7 +22,6 @@
 #include "RakMemoryOverride.h"
 #include "Export.h"
 #include "DS_List.h"
-#include "RakNetSmartPtr.h"
 #include "RakNetSocket2.h"
 
 namespace RakNet

@@ -12,7 +12,6 @@
 #if _RAKNET_SUPPORT_NatTypeDetectionClient==1
 
 #include "NatTypeDetectionClient.h"
-#include "RakNetSmartPtr.h"
 #include "BitStream.h"
 #include "SocketIncludes.h"
 #include "RakString.h"

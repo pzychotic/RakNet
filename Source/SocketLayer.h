@@ -20,8 +20,6 @@
 
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
-#include "RakNetSmartPtr.h"
-//#include "RakNetSocket.h"
 #include "Export.h"
 #include "MTUSize.h"
 #include "RakString.h"

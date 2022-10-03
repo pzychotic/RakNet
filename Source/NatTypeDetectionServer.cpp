@@ -13,7 +13,6 @@
 
 #include "NatTypeDetectionServer.h"
 #include "SocketLayer.h"
-#include "RakNetSmartPtr.h"
 #include "SocketIncludes.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"

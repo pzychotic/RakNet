@@ -28,8 +28,6 @@
 #include "Export.h"
 #include "RakString.h"
 #include "RakThread.h"
-//#include "RakNetSocket.h"
-#include "RakNetSmartPtr.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"

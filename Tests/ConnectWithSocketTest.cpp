@@ -12,10 +12,9 @@
 
 /*
 Description:
-virtual bool RakPeerInterface::ConnectWithSocket  	(  	const char *   	 host, 		unsigned short  	remotePort, 		const char *  	passwordData, 		int  	passwordDataLength, 		RakNetSmartPtr< RakNetSocket >  	socket, 		unsigned  	sendConnectionAttemptCount = 7, 		unsigned  	timeBetweenSendConnectionAttemptsMS = 500, 		TimeMS  	timeoutTime = 0	  	) 	
-
-virtual void RakPeerInterface::GetSockets  	(  	DataStructures::List< RakNetSmartPtr< RakNetSocket > > &   	 sockets  	 )   	 
-virtual RakNetSmartPtr<RakNetSocket> RakPeerInterface::GetSocket  	(  	const SystemAddress   	 target  	 )   	 [pure virtual]
+virtual ConnectionAttemptResult RakPeerInterface::ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey=0, unsigned sendConnectionAttemptCount=12, unsigned timeBetweenSendConnectionAttemptsMS=500, RakNet::TimeMS timeoutTime=0 )
+virtual void RakPeerInterface::GetSockets( DataStructures::List<RakNetSocket2*>& sockets )
+virtual RakNetSocket2* RakPeerInterface::GetSocket( const SystemAddress target )
 
 Success conditions:
 
@@ -41,7 +40,6 @@ int ConnectWithSocketTest::RunTest(DataStructures::List<RakString> params,bool i
 
 	RakPeerInterface *server,*client;
 
-	// ??? cleanup, was RakNetSmartPtr before
 	DataStructures::List< RakNetSocket2* > sockets;
 	TestHelpers::StandardClientPrep(client,destroyList);
 	TestHelpers::StandardServerPrep(server,destroyList);
