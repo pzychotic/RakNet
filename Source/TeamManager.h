@@ -27,11 +27,12 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "NativeTypes.h"
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_Hash.h"
 #include "DS_OrderedList.h"
+
+#include <stdint.h>
 
 namespace RakNet
 {

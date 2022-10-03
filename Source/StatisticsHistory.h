@@ -20,14 +20,15 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "NativeTypes.h"
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_OrderedList.h"
 #include "RakString.h"
 #include "DS_Queue.h"
 #include "DS_Hash.h"
+
 #include <float.h>
+#include <stdint.h>
 
 namespace RakNet
 {

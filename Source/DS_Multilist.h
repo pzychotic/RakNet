@@ -20,7 +20,8 @@
 #include <string.h> // memmove
 #include "Export.h"
 #include "RakMemoryOverride.h"
-#include "NativeTypes.h"
+
+#include <stdint.h>
 
 
 #ifdef _MSC_VER

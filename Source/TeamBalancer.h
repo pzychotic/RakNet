@@ -23,9 +23,10 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "NativeTypes.h"
 #include "DS_List.h"
 #include "RakString.h"
+
+#include <stdint.h>
 
 namespace RakNet
 {

@@ -16,20 +16,13 @@
 #ifndef __NETWORK_TYPES_H
 #define __NETWORK_TYPES_H
 
-
-
-
-
 #include "RakNetDefines.h"
-#include "NativeTypes.h"
 #include "RakNetTime.h"
 #include "Export.h"
 #include "WindowsIncludes.h"
 #include "SocketIncludes.h"
 
-
-
-
+#include <stdint.h>
 
 namespace RakNet {
 /// Forward declarations

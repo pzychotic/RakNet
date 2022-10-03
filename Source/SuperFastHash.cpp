@@ -9,7 +9,8 @@
  */
 
 #include "SuperFastHash.h"
-#include "NativeTypes.h"
+
+#include <stdint.h>
 #include <stdlib.h>
 
 #if !defined(_WIN32)

@@ -20,7 +20,8 @@
 #include "Export.h"
 #include "Rand.h"
 #include "DS_Queue.h"
-#include "NativeTypes.h"
+
+#include <stdint.h>
 
 namespace RakNet {
 

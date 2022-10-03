@@ -41,10 +41,11 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "NativeTypes.h"
 #include "RakString.h"
 #include "DS_Hash.h"
 #include "DS_Queue.h"
+
+#include <stdint.h>
 
 typedef int64_t FCM2Guid;
 

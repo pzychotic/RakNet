@@ -20,7 +20,8 @@
 #include "Export.h"
 #include "DS_Map.h"
 #include "RakMemoryOverride.h"
-#include "NativeTypes.h"
+
+#include <stdint.h>
 
 #ifdef _STD_STRING_COMPRESSOR
 #include <string>

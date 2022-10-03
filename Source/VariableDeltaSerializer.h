@@ -13,10 +13,11 @@
 
 #include "VariableListDeltaTracker.h"
 #include "DS_MemoryPool.h"
-#include "NativeTypes.h"
 #include "BitStream.h"
 #include "PacketPriority.h"
 #include "DS_OrderedList.h"
+
+#include <stdint.h>
 
 namespace RakNet
 {

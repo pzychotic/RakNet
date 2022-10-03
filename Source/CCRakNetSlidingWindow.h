@@ -42,10 +42,11 @@ else use congestion avoidance
 #ifndef __CONGESTION_CONTROL_SLIDING_WINDOW_H
 #define __CONGESTION_CONTROL_SLIDING_WINDOW_H
 
-#include "NativeTypes.h"
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
 #include "DS_Queue.h"
+
+#include <stdint.h>
 
 /// Sizeof an UDP header in byte
 #define UDP_HEADER_SIZE 28

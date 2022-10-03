@@ -12,7 +12,7 @@
 #define __SUPER_FAST_HASH_H
 
 #include <stdio.h>
-#include "NativeTypes.h"
+#include <stdint.h>
 
 // From http://www.azillionmonkeys.com/qed/hash.html
 // Author of main code is Paul Hsieh 

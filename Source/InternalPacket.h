@@ -19,13 +19,14 @@
 #include "RakNetTypes.h"
 #include "RakMemoryOverride.h"
 #include "RakNetDefines.h"
-#include "NativeTypes.h"
 #include "RakNetDefines.h"
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL!=1
 #include "CCRakNetUDT.h"
 #else
 #include "CCRakNetSlidingWindow.h"
 #endif
+
+#include <stdint.h>
 
 namespace RakNet {
 

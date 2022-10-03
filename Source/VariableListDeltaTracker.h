@@ -8,10 +8,11 @@
  *
  */
 
-#include "NativeTypes.h"
 #include "DS_List.h"
 #include "RakMemoryOverride.h"
 #include "BitStream.h"
+
+#include <stdint.h>
 
 #ifndef __VARIABLE_LIST_DELTA_TRACKER
 #define __VARIABLE_LIST_DELTA_TRACKER

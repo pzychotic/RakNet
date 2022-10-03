@@ -11,8 +11,9 @@
 #ifndef __RAKNET_TIME_H
 #define __RAKNET_TIME_H
 
-#include "NativeTypes.h"
 #include "RakNetDefines.h"
+
+#include <stdint.h>
 
 namespace RakNet {
 
