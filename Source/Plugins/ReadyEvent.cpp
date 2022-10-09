@@ -17,10 +17,6 @@
 #include "MessageIdentifiers.h"
 #include "RakAssert.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 int RakNet::ReadyEvent::RemoteSystemCompByGuid( const RakNetGUID &key, const RemoteSystem &data )
@@ -565,8 +561,5 @@ void ReadyEvent::PushCompletionPacket(unsigned eventId)
 	rakPeerInterface->PushBackPacket(p, false);
 	*/
 }
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

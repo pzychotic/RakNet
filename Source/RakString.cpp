@@ -761,9 +761,6 @@ bool RakString::IPAddressMatch(const char *IP)
 
 	characterIndex = 0;
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 	while ( true )
 	{
 		if (sharedString->c_str[ characterIndex ] == IP[ characterIndex ] )

@@ -77,10 +77,6 @@ STATIC_FACTORY_DEFINITIONS(FileListProgress,FileListProgress)
 STATIC_FACTORY_DEFINITIONS(FLP_Printf,FLP_Printf)
 STATIC_FACTORY_DEFINITIONS(FileList,FileList)
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// First callback called when FileList::AddFilesFromDirectory() starts
 void FLP_Printf::OnAddFilesFromDirectoryStarted(FileList *fileList, char *dir) {
 	(void) fileList;
@@ -724,9 +720,6 @@ void FileList::WriteDataToDisk(const char *applicationDirectory)
 	}
 }
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4996 ) // unlink declared deprecated by Microsoft in order to make it harder to be cross platform.  I don't agree it's deprecated.
-#endif
 void FileList::DeleteFiles(const char *applicationDirectory)
 {
 
@@ -810,9 +803,5 @@ bool FileList::FixEndingSlash(char *str)
 
 	return false;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_FileOperations

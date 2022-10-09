@@ -23,10 +23,6 @@
 #include "RakAssert.h"
 #include "RakAlloca.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 namespace RakNet
 {
 
@@ -1155,9 +1151,5 @@ unsigned int FileListTransfer::GetPendingFilesToAddress(SystemAddress recipient)
 	
 	return 0;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

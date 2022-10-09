@@ -15,10 +15,6 @@
 #ifndef __TABLE_H
 #define __TABLE_H
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 #include "DS_List.h"
 #include "DS_BPlusTree.h"
 #include "RakMemoryOverride.h"
@@ -343,9 +339,5 @@ namespace DataStructures
 		DataStructures::List<ColumnDescriptor> columns;
 	};
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif

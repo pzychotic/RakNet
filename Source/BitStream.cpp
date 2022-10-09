@@ -54,10 +54,6 @@
 
 using namespace RakNet;
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 STATIC_FACTORY_DEFINITIONS(BitStream,BitStream)
 
 BitStream::BitStream()
@@ -1174,9 +1170,5 @@ void BitStream::WriteFloat16( float inOutFloat, float floatMin, float floatMax )
 		percentile=65535.0f;
 	Write((unsigned short)percentile);
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // #if _MSC_VER < 1299 

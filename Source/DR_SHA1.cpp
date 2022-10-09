@@ -40,10 +40,6 @@
 #define S_R3(v,w,x,y,z,i) {z+=(((w|x)&y)|(w&x))+SHABLK(i)+0x8F1BBCDC+ROL32(v,5);w=ROL32(w,30);}
 #define S_R4(v,w,x,y,z,i) {z+=(w^x^y)+SHABLK(i)+0xCA62C1D6+ROL32(v,5);w=ROL32(w,30);}
 
-#pragma warning(push)
-// Disable compiler warning 'Conditional expression is constant'
-#pragma warning(disable: 4127)
-
 CSHA1::CSHA1()
 {
 	m_block = (SHA1_WORKSPACE_BLOCK*)m_workspace;
@@ -308,5 +304,3 @@ void CSHA1::HMAC(unsigned char *sharedKey, int sharedKeyLength, unsigned char *d
 	// 	memset(report,0,128);
 	// 	secondHash.ReportHash( report, 0 );
 }
-
-#pragma warning(pop)

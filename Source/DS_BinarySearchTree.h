@@ -21,11 +21,6 @@
 #include "RakMemoryOverride.h"
 #include "Export.h"
 
-
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
 namespace DataStructures
@@ -463,9 +458,6 @@ namespace DataStructures
 			return current;
 		}
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while ( true )
 		{
 			// Move pointer
@@ -705,9 +697,6 @@ namespace DataStructures
 			// start at the root
 			current = root;
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 			while ( true )    // This loop traverses the tree to find a spot for insertion
 			{
 			
@@ -1134,8 +1123,4 @@ namespace DataStructures
 	
 } // End namespace
 
-#endif
-
-#ifdef _MSC_VER
-#pragma warning( pop )
 #endif

@@ -101,10 +101,6 @@ static const int mtuSizes[NUM_MTU_SIZES]={MAXIMUM_MTU_SIZE, 1200, 576};
 //static const int MAX_OPEN_CONNECTION_REQUESTS=8;
 //static const int TIME_BETWEEN_OPEN_CONNECTION_REQUESTS=500;
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 static RakNetRandom rnr;
@@ -121,9 +117,6 @@ static const unsigned int MAX_OFFLINE_DATA_LENGTH=400; // I set this because I l
 
 // Used to distinguish between offline messages with data, and messages from the reliability layer
 // Should be different than any message that could result from messages from the reliability layer
-#if  !defined(__GNUC__)
-#pragma warning(disable:4309) // 'initializing' : truncation of constant value
-#endif
 // Make sure highest bit is 0, so isValid in DatagramHeaderFormat is false
 static const unsigned char OFFLINE_MESSAGE_DATA_ID[16]={0x00,0xFF,0xFF,0x00,0xFE,0xFE,0xFE,0xFE,0xFD,0xFD,0xFD,0xFD,0x12,0x34,0x56,0x78};
 
@@ -1469,9 +1462,6 @@ uint32_t RakPeer::SendList( const char **data, const int *lengths, const int num
 // If the client is not active this will also return 0, as all waiting packets are flushed when the client is Disconnected
 // This also updates all memory blocks associated with synchronized memory and distributed objects
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#ifdef _MSC_VER
-#pragma warning( disable : 4701 ) // warning C4701: local variable <variable name> may be used without having been initialized
-#endif
 Packet* RakPeer::Receive( void )
 {
 	if ( !( IsActive() ) )
@@ -1720,9 +1710,6 @@ void RakPeer::HandleConnectionCancelQueue( )
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4702 ) // warning C4702: unreachable code
-#endif
 ConnectionState RakPeer::GetConnectionState(const AddressOrGUID systemIdentifier)
 {
 	if (systemIdentifier.systemAddress!=UNASSIGNED_SYSTEM_ADDRESS)
@@ -2020,9 +2007,6 @@ bool RakPeer::IsBanned( const char *IP )
 		{
 			characterIndex = 0;
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 			while ( true )
 			{
 				if ( banList[ banListIndex ]->IP[ characterIndex ] == IP[ characterIndex ] )
@@ -6551,8 +6535,3 @@ void RakPeer::FillIPList(void)
 // #pragma pop_macro("new")
 // #undef RMO_NEW_UNDEF_ALLOCATING_QUEUE
 // #endif
-
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif

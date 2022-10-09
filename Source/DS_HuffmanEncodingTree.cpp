@@ -13,10 +13,6 @@
 #include "BitStream.h"
 #include "RakAssert.h" 
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 HuffmanEncodingTree::HuffmanEncodingTree()
@@ -94,9 +90,6 @@ void HuffmanEncodingTree::GenerateFromFrequencyTable( unsigned int frequencyTabl
 
 	// 2.  While there is more than one tree, take the two smallest trees and merge them so that the two trees are the left and right
 	// children of a new node, where the new node has the weight the sum of the weight of the left and right child nodes.
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 	while ( 1 )
 	{
 		huffmanEncodingTreeNodeList.Beginning();
@@ -271,9 +264,6 @@ void HuffmanEncodingTree::InsertNodeIntoSortedList( HuffmanEncodingTreeNode * no
 	huffmanEncodingTreeNodeList->Beginning();
 
 	unsigned counter = 0;
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 	while ( 1 )
 	{
 		if ( huffmanEncodingTreeNodeList->Peek()->weight < node->weight )
@@ -296,7 +286,3 @@ void HuffmanEncodingTree::InsertNodeIntoSortedList( HuffmanEncodingTreeNode * no
 		}
 	}
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif

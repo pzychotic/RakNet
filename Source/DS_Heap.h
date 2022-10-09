@@ -23,10 +23,6 @@
 #include "Export.h"
 #include "RakAssert.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
 namespace DataStructures
@@ -90,9 +86,6 @@ namespace DataStructures
 			{
 				for (parentIndex = Parent(currentIndex); parentIndex < currentIndex; parentIndex++)
 				{
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 					if (isMaxHeap)
 					{
 						// Every child is less than its parent
@@ -135,9 +128,6 @@ namespace DataStructures
 		while (currentIndex!=0)
 		{
 			parentIndex = Parent(currentIndex);
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 			if (isMaxHeap)
 			{
 				if (heap[parentIndex].weight < weight)
@@ -178,9 +168,6 @@ namespace DataStructures
 		currentWeight=heap[startingIndex].weight;
 		heap.RemoveFromEnd();
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			leftChild=LeftChild(currentIndex);
@@ -297,9 +284,5 @@ namespace DataStructures
 		heap[j]=temp;
 	}
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif

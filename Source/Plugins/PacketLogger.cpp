@@ -27,10 +27,6 @@
 #include "SocketIncludes.h"
 #include "gettimeofday.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace std;
 using namespace RakNet;
 
@@ -470,9 +466,5 @@ void PacketLogger::SetLogDirectMessages(bool send)
 {
 	logDirectMessages=send;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

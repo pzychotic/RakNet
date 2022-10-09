@@ -57,9 +57,6 @@ namespace DataStructures
 		// Has to be a static because the comparison callback for DataStructures::OrderedList is a C function
 		static int NodeComparisonFunc(const key_type &a, const MapNode &b)
 		{
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 			return key_comparison_func(a, b.mapNodeKey);
 		}
 

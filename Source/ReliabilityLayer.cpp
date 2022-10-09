@@ -52,10 +52,6 @@ static const CCTimeType STARTING_TIME_BETWEEN_PACKETS=MAX_TIME_BETWEEN_PACKETS;
 
 typedef uint32_t BitstreamLengthEncoding;
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 //#define PRINT_TO_FILE_RELIABLE_ORDERED_TEST
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
 static unsigned int packetNumber=0;
@@ -224,10 +220,6 @@ struct DatagramHeaderFormat
 		}
 	}
 };
-
-#if  !defined(__GNUC__) && !defined(__ARMCC)
-#pragma warning(disable:4702)   // unreachable code
-#endif
 
 #ifdef _WIN32
 //#define _DEBUG_LOGGER
@@ -549,9 +541,6 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
 		InternalPacket *prev;
 		InternalPacket *iter = resendLinkedListHead;
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			if (iter->data)
@@ -1757,9 +1746,6 @@ void ReliabilityLayer::Update( RakNetSocket2 *s, SystemAddress &systemAddress, i
 				InternalPacket *cur = unreliableLinkedListHead;
 				InternalPacket *end = unreliableLinkedListHead->unreliablePrev;
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 				while (1)
 				{
 					if (time > cur->creationTime+(CCTimeType)unreliableTimeout)
@@ -3966,8 +3952,3 @@ reliabilityHeapWeightType ReliabilityLayer::GetNextWeight(int priorityLevel)
 // #pragma pop_macro("new")
 // #undef RELIABILITY_LAYER_NEW_UNDEF_ALLOCATING_QUEUE
 // #endif
-
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif

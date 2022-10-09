@@ -71,9 +71,6 @@ const char *EmailSender::Send(const char *hostAddress, unsigned short hostPort, 
 	tcpInterface.Send("EHLO\r\n", 6, emailServer,false);
 	const char *response;
 	bool authenticate=false;
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 	while (1)
 	{
 		response=GetResponse(&tcpInterface, emailServer, doPrintf);
@@ -322,9 +319,6 @@ const char *EmailSender::GetResponse(TCPInterface *tcpInterface, const SystemAdd
 	RakNet::Packet *packet;
 	RakNet::TimeMS timeout;
 	timeout=RakNet::GetTimeMS()+5000;
-#ifdef _MSC_VER
-	#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 	while (1)
 	{
 		if (tcpInterface->HasLostConnection()==emailServer)

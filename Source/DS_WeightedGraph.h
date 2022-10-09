@@ -28,10 +28,6 @@
 #include <stdio.h>
 #endif
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
 namespace DataStructures
@@ -155,9 +151,6 @@ namespace DataStructures
 			{
 				adjacencyLists[i]->Delete(node);
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 				if (allow_unlinkedNodes==false && adjacencyLists[i]->Size()==0)
 					removeNodeQueue.Push(adjacencyLists.GetKeyAtIndex(i), _FILE_AND_LINE_ );
 			}
@@ -196,9 +189,6 @@ namespace DataStructures
 		adjacencyLists.Get(node2)->Delete(node1);
 		adjacencyLists.Get(node1)->Delete(node2);
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		if (allow_unlinkedNodes==false) // If we do not allow _unlinked nodes, then if there are no connections, remove the node
 		{
 			if (adjacencyLists.Get(node1)->Size()==0)
@@ -269,9 +259,6 @@ namespace DataStructures
 		vertex=endNode;
 		outputQueue.PushAtHead(vertex, 0, _FILE_AND_LINE_);
 		row--;
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			while (costMatrix[row*adjacencyLists.Size() + col] == currentWeight)
@@ -535,9 +522,5 @@ namespace DataStructures
 #endif
 	}
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif

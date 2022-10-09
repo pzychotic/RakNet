@@ -19,10 +19,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 STATIC_FACTORY_DEFINITIONS(RakNetCommandParser,RakNetCommandParser);
@@ -303,9 +299,5 @@ void RakNetCommandParser::SendHelp(TransportInterface *transport, const SystemAd
 		transport->Send(systemAddress, "Parser not active.  Call SetRakPeerInterface.\r\n");
 	}
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

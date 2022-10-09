@@ -20,10 +20,6 @@
 #include "Export.h"
 #include "RakMemoryOverride.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
 namespace DataStructures
@@ -441,9 +437,6 @@ namespace DataStructures
 			}
 	}
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4701 ) // warning C4701: local variable <variable name> may be used without having been initialized
-#endif
 	template <class CircularLinkedListType>
 		CircularLinkedList<CircularLinkedListType>::CircularLinkedList( const CircularLinkedList& original_copy )
 	{
@@ -527,9 +520,6 @@ namespace DataStructures
 			}
 	}
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4701 ) // warning C4701: local variable <variable name> may be used without having been initialized
-#endif
 	template <class CircularLinkedListType>
 		bool CircularLinkedList<CircularLinkedListType>::operator= ( const CircularLinkedList& original_copy )
 	{
@@ -1250,9 +1240,5 @@ namespace DataStructures
 	}
 
 } // End namespace
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif

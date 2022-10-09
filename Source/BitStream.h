@@ -32,11 +32,6 @@
 #include "RakWString.h"
 #include "RakAssert.h"
 
-
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 // MSWin uses _copysign, others use copysign...
 #ifndef _WIN32
 #define _copysign copysign
@@ -1087,9 +1082,6 @@ namespace RakNet
 	template <class templateType>
 		inline void BitStream::Write(const templateType &inTemplateVar)
 	{
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 		if (sizeof(inTemplateVar)==1)
 			WriteBits( ( unsigned char* ) & inTemplateVar, sizeof( templateType ) * 8, true );
 		else
@@ -1110,9 +1102,6 @@ namespace RakNet
 	template <class templateType>
 	inline void BitStream::WritePtr(templateType *inTemplateVar)
 	{
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 		if (sizeof(templateType)==1)
 			WriteBits( ( unsigned char* ) inTemplateVar, sizeof( templateType ) * 8, true );
 		else
@@ -1281,18 +1270,11 @@ namespace RakNet
 	template <class templateType>
 		inline void BitStream::WriteCompressed(const templateType &inTemplateVar)
 	{
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 		if (sizeof(inTemplateVar)==1)
 			WriteCompressed( ( unsigned char* ) & inTemplateVar, sizeof( templateType ) * 8, true );
 		else
 		{
 #ifndef __BITSTREAM_NATIVE_END
-#ifdef _MSC_VER
-#pragma warning(disable:4244)   // '=' : conversion from 'unsigned long' to 'unsigned short', possible loss of data
-#endif
-
 			if (DoEndianSwap())
 			{
 				unsigned char output[sizeof(templateType)];
@@ -1448,17 +1430,11 @@ namespace RakNet
 	template <class templateType>
 		inline bool BitStream::Read(templateType &outTemplateVar)
 	{
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 		if (sizeof(outTemplateVar)==1)
 			return ReadBits( ( unsigned char* ) &outTemplateVar, sizeof(templateType) * 8, true );
 		else
 		{
 #ifndef __BITSTREAM_NATIVE_END
-#ifdef _MSC_VER
-#pragma warning(disable:4244)   // '=' : conversion from 'unsigned long' to 'unsigned short', possible loss of data
-#endif
 			if (DoEndianSwap())
 			{
 				unsigned char output[sizeof(templateType)];
@@ -1619,9 +1595,6 @@ namespace RakNet
 	template <class templateType>
 		inline bool BitStream::ReadCompressed(templateType &outTemplateVar)
 	{
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 		if (sizeof(outTemplateVar)==1)
 			return ReadCompressed( ( unsigned char* ) &outTemplateVar, sizeof(templateType) * 8, true );
 		else
@@ -2044,10 +2017,6 @@ namespace RakNet
 	}
 
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif
 

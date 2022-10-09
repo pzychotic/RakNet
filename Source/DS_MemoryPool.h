@@ -223,9 +223,6 @@ namespace DataStructures
 		if (availablePagesSize>0)
 		{
 			cur = availablePages;
-#ifdef _MSC_VER
-#pragma warning(disable:4127)   // conditional expression is constant
-#endif
 			while (true) 
 			// do
 			{

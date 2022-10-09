@@ -22,10 +22,6 @@
 
 #define ECHO_INPUT
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 STATIC_FACTORY_DEFINITIONS(TelnetTransport,TelnetTransport);
@@ -366,9 +362,5 @@ bool TelnetTransport::ReassembleLine(TelnetTransport::TelnetClient* remoteClient
 	}
 	return false;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

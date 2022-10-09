@@ -15,10 +15,6 @@
 
 using namespace DataStructures;
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 void ExtendRows(Table::Row* input, int index)
 {
 	(void) index;
@@ -1123,7 +1119,3 @@ Table& Table::operator = ( const Table& input )
 
 	return *this;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif

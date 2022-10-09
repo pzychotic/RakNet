@@ -24,10 +24,6 @@
 
 using namespace RakNet;
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 class DDTCallback : public FileListTransferCBInterface
 {
 public:
@@ -244,9 +240,5 @@ void DirectoryDeltaTransfer::SetDownloadRequestIncrementalReadInterface(Incremen
 	incrementalReadInterface=_incrementalReadInterface;
 	chunkSize=_chunkSize;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

@@ -31,10 +31,6 @@
 
 using namespace RakNet;
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 const unsigned char CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS=255;
 
 int RakNet::RegisteredCommandComp( const char* const & key, const RegisteredCommand &data )
@@ -165,8 +161,3 @@ void CommandParserInterface::ReturnResult(SystemAddress res, const char *command
 	res.ToString(false,addr2);
 	transport->Send(systemAddress, "%s returned %s %s:%i\r\n", command,addr,addr2,res.GetPort());
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
-

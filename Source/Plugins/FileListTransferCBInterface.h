@@ -18,10 +18,6 @@
 #include "Plugins/FileListNodeContext.h"
 #include "RakMemoryOverride.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 namespace RakNet
 {
 
@@ -153,10 +149,6 @@ public:
 };
 
 } // namespace RakNet
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif
 

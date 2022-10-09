@@ -29,10 +29,6 @@
 // Deletion
 // http://dbpubs.stanford.edu:8090/pub/1995-19
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 #include "RakMemoryOverride.h"
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
@@ -347,9 +343,6 @@ namespace DataStructures
 				// The first key in the leaf after shifting is the parent key for the right branch
 				cur->keys[branchIndex]=source->keys[1];
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 				if (order<=3 && dest->size==0)
 				{
 					if (branchIndex==0)
@@ -431,9 +424,6 @@ namespace DataStructures
 				}
 			}
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 			if (order<=3 && branchIndex>0 && cur->children[branchIndex]->isLeaf) // With order==2 it is possible to delete data[0], which is not possible with higher orders.
 				cur->keys[branchIndex-1]=cur->children[branchIndex]->keys[0];
 
@@ -918,9 +908,6 @@ namespace DataStructures
 		lowerBound=0;
 		index = page->size/2;
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			if (key==page->keys[index])
@@ -1069,9 +1056,6 @@ namespace DataStructures
 		RAKNET_DEBUG_PRINTF("\n");
 	}
 }
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif
 

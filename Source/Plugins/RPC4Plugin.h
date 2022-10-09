@@ -27,10 +27,6 @@
 #include "DS_Hash.h"
 #include "DS_OrderedList.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// \defgroup RPC_PLUGIN_GROUP RPC
 /// \brief Remote procedure calls, without external dependencies.
 /// \details This should not be used at the same time as RPC3. This is a less functional version of RPC3, and is here for users that do not want the Boost dependency of RPC3.
@@ -231,10 +227,6 @@ namespace RakNet
 
 } // End namespace
 
-#endif
-
-#ifdef _MSC_VER
-#pragma warning( pop )
 #endif
 
 #endif // _RAKNET_SUPPORT_*

@@ -131,9 +131,6 @@ namespace DataStructures
 		lowerBound=0;
 		index = (int)orderedList.Size()/2;
 
-#ifdef _MSC_VER
-	#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			res = cf(key,orderedList[index]);

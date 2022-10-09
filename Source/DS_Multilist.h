@@ -23,13 +23,6 @@
 
 #include <stdint.h>
 
-
-#ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#pragma warning( disable : 4512 ) // warning C4512: assignment operator could not be generated
-#endif
-
 /// What algorithm to use to store the data for the Multilist
 enum MultilistType
 {
@@ -1254,9 +1247,6 @@ namespace DataStructures
 		lowerBound=0;
 		index = dataSize/2;
 
-#ifdef _MSC_VER
-	#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			if (MLKeyRef<_KeyType>(key) > operator[](index) )
@@ -1643,9 +1633,6 @@ void MultilistUnitTest(void)
 	RakAssert(ml6.Peek()==1);
 }
 
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 */
 
 #endif

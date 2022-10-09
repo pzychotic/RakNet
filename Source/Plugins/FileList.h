@@ -25,10 +25,6 @@
 #include "RakNetTypes.h"
 #include "RakString.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 namespace RakNet
 {
 	class BitStream;
@@ -255,10 +251,6 @@ protected:
 };
 
 } // namespace RakNet
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif
 

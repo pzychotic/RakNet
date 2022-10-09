@@ -21,10 +21,6 @@
 #include <stdarg.h>
 #include "LinuxStrings.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 STATIC_FACTORY_DEFINITIONS(RakNetTransport2,RakNetTransport2);
@@ -131,8 +127,5 @@ void RakNetTransport2::OnNewConnection(const SystemAddress &systemAddress, RakNe
 	(void) isIncoming;
 	newConnections.Push(systemAddress, _FILE_AND_LINE_ );
 }
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

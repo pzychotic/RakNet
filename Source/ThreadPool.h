@@ -18,10 +18,6 @@
 #include "RakThread.h"
 #include "SignaledEvent.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 class ThreadDataInterface
 {
 public:
@@ -198,11 +194,6 @@ protected:
 
 #else
 #include <unistd.h>
-#endif
-
-#ifdef _MSC_VER
-#pragma warning(disable:4127)
-#pragma warning( disable : 4701 )  // potentially uninitialized local variable 'inputData' used
 #endif
 
 template <class ThreadInputType, class ThreadOutputType>
@@ -624,10 +615,6 @@ void ThreadPool<InputType, OutputType>::Resume(void)
 {
 	workingThreadCountMutex.Unlock();
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif
 

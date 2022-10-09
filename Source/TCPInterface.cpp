@@ -53,9 +53,6 @@ namespace RakNet
 RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop);
 RAK_THREAD_DECLARATION(ConnectionAttemptLoop);
 }
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
 
 using namespace RakNet;
 
@@ -1006,10 +1003,6 @@ RAK_THREAD_DECLARATION(RakNet::UpdateTCPInterfaceLoop)
 		tv.tv_sec=0;
 		tv.tv_usec=30000;
 
-
-#ifdef _MSC_VER
-#pragma warning( disable : 4127 ) // warning C4127: conditional expression is constant
-#endif
 		while (1)
 		{
 			// Reset readFD, writeFD, and exceptionFD since select seems to clear it
@@ -1044,11 +1037,6 @@ RAK_THREAD_DECLARATION(RakNet::UpdateTCPInterfaceLoop)
 				}
 				sts->remoteClients[i].isActiveMutex.Unlock();
 			}
-
-#ifdef _MSC_VER
-#pragma warning( disable : 4244 ) // warning C4127: conditional expression is constant
-#endif
-
 
 			selectResult=(int) select__(largestDescriptor+1, &readFD, &writeFD, &exceptionFD, &tv);		
 
@@ -1429,10 +1417,6 @@ int RemoteClient::Recv(char *data, const int dataSize)
 	return recv__(socket, data, dataSize, 0);
 #endif
 }
-#endif
-
-#ifdef _MSC_VER
-#pragma warning( pop )
 #endif
 
 #endif // _RAKNET_SUPPORT_*

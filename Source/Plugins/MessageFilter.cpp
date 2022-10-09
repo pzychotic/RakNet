@@ -19,10 +19,6 @@
 #include "TCPInterface.h"
 #include "BitStream.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 using namespace RakNet;
 
 int RakNet::MessageFilterStrComp( char *const &key,char *const &data )
@@ -409,9 +405,5 @@ void MessageFilter::OnClosedConnection(const SystemAddress &systemAddress, RakNe
 	
 	return RR_CONTINUE_PROCESSING;
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #endif // _RAKNET_SUPPORT_*

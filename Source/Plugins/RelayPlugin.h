@@ -23,10 +23,6 @@
 #include "RakString.h"
 #include "DS_Hash.h"
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 /// \defgroup RELAY_PLUGIN_GROUP RelayPlugin
 /// \brief A simple class to relay messages from one system to another through an intermediary
 /// \ingroup PLUGINS_GROUP
@@ -154,10 +150,6 @@ protected:
 
 } // End namespace
 
-#endif
-
-#ifdef _MSC_VER
-#pragma warning( pop )
 #endif
 
 #endif // _RAKNET_SUPPORT_*

@@ -79,10 +79,6 @@ using namespace pp;
 
 #include <stdio.h>
 
-#ifdef _MSC_VER
-#pragma warning( push )
-#endif
-
 namespace RakNet
 {
 	extern void ProcessNetworkPacket( const SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNet::TimeUS timeRead );
@@ -602,8 +598,3 @@ bool SocketLayer::GetFirstBindableIP(char firstBindable[128], int ipProto)
 	return true;
 
 }
-
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
