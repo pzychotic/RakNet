@@ -1,14 +1,21 @@
-cmake_minimum_required( VERSION 3.2 )
+if( RAKNET_ENABLE_PLUGINS )
+add_subdirectory( Plugins )
+endif()
 
-file( GLOB ALL_HEADER_SRCS  ${RakNet_SOURCE_DIR}/Source/*.h )
-file( GLOB ALL_CPP_SRCS     ${RakNet_SOURCE_DIR}/Source/*.cpp   )
+file( GLOB CURRENT_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/*.h )
+file( GLOB CURRENT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp )
 
-include_directories( ${RakNet_SOURCE_DIR}/Source ) 
+set( TARGET_HEADER ${TARGET_HEADER} ${CURRENT_HEADER} )
+set( TARGET_SOURCE ${TARGET_SOURCE} ${CURRENT_SOURCE} )
+
+include_directories( ${RakNet_SOURCE_DIR}/Source )
+
+source_group( TREE ${RakNet_SOURCE_DIR}/Source PREFIX "Source" FILES ${TARGET_HEADER} ${TARGET_SOURCE} )
 
 # create dynamic library if enabled
 if( RAKNET_ENABLE_DLL )
 
-    add_library( RakNetDLL SHARED ${ALL_CPP_SRCS} ${ALL_HEADER_SRCS} )
+    add_library( RakNetDLL SHARED ${TARGET_HEADER} ${TARGET_SOURCE} )
 
     target_compile_definitions( RakNetDLL PUBLIC _RAKNET_DLL )
     target_link_libraries( RakNetDLL ${RAKNET_LIBRARY_LIBS} )
@@ -23,7 +30,7 @@ endif()
 # create static library if enabled
 if( RAKNET_ENABLE_STATIC )
 
-    add_library( RakNetLibStatic STATIC ${ALL_CPP_SRCS} ${ALL_HEADER_SRCS} )
+    add_library( RakNetLibStatic STATIC ${TARGET_HEADER} ${TARGET_SOURCE} )
 
     target_compile_definitions( RakNetLibStatic PUBLIC _RAKNET_LIB )
     target_link_libraries( RakNetLibStatic ${RAKNET_LIBRARY_LIBS} )
@@ -34,4 +41,4 @@ if( RAKNET_ENABLE_STATIC )
 
 endif()
 
-install( FILES ${ALL_HEADER_SRCS} DESTINATION include/raknet )
+install( FILES ${TARGET_HEADER} DESTINATION include/raknet )

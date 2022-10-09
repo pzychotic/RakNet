@@ -10,7 +10,7 @@
 
 
 #include "PluginInterface2.h"
-#include "PacketizedTCP.h"
+#include "TCPInterface.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 
