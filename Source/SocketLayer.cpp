@@ -17,7 +17,6 @@
 #include "RakAssert.h"
 #include "RakNetTypes.h"
 #include "RakPeer.h"
-#include "GetTime.h"
 #include "LinuxStrings.h"
 #include "SocketDefines.h"
 #if (defined(__GNUC__)  || defined(__GCCXML__)) && !defined(__WIN32__)
@@ -72,16 +71,13 @@ using namespace pp;
 
 
 #if   defined(_WIN32)
-#include "WSAStartupSingleton.h"
 #include "WindowsIncludes.h"
 
 #else
 #include <unistd.h>
 #endif
 
-#include "RakSleep.h"
 #include <stdio.h>
-#include "Itoa.h"
 
 #ifdef _MSC_VER
 #pragma warning( push )

@@ -22,12 +22,10 @@
 #include "PluginInterface2.h"
 #include "CloudCommon.h"
 #include "RakMemoryOverride.h"
-#include "DS_Hash.h"
 
 namespace RakNet
 {
 /// Forward declarations
-class RakPeerInterface;
 class CloudClientCallback;
 
 /// \defgroup CLOUD_GROUP CloudComputing

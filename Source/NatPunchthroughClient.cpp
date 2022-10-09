@@ -18,6 +18,7 @@
 #include "GetTime.h"
 #include "PacketLogger.h"
 #include "Itoa.h"
+#include "RakString.h"
 
 using namespace RakNet;
 

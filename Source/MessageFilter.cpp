@@ -15,7 +15,6 @@
 #include "RakAssert.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
-#include "RakAssert.h"
 #include "RakPeerInterface.h"
 #include "PacketizedTCP.h"
 #include "BitStream.h"

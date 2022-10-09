@@ -22,7 +22,6 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "RakString.h"
 #include "DS_Hash.h"
 #include "CloudCommon.h"
 #include "DS_OrderedList.h"
@@ -34,8 +33,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \brief Zero or more instances of CloudServerQueryFilter can be attached to CloudServer to restrict client queries
 /// All attached instances of CloudServerQueryFilter on each corresponding operation, from all directly connected clients

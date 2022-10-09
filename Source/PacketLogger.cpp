@@ -15,12 +15,9 @@
 #include <cstdlib>
 #include <ctime>
 #include "PacketLogger.h"
-#include "BitStream.h"
-#include "DS_List.h"
 #include "InternalPacket.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
-#include "StringCompressor.h"
 #include "GetTime.h"
 #include <stdio.h>
 #include <string.h>

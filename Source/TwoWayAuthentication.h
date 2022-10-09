@@ -51,8 +51,6 @@ typedef int64_t FCM2Guid;
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \brief Implements two way authentication
 /// \details Given two systems, each of whom known a common password / identifier pair, verify the password without transmitting it

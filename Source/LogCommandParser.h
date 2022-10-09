@@ -23,8 +23,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \brief Adds the ability to send logging output to a remote console
 class RAK_DLL_EXPORT LogCommandParser : public CommandParserInterface

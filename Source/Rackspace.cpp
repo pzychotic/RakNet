@@ -12,7 +12,6 @@
 #if _RAKNET_SUPPORT_Rackspace==1 && _RAKNET_SUPPORT_TCPInterface==1
 
 #include "Rackspace.h"
-#include "RakString.h"
 #include "TCPInterface.h"
 
 using namespace RakNet;

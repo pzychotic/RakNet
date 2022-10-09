@@ -26,8 +26,6 @@
 
 namespace RakNet {
 /// Forward declarations
-class RakPeerInterface;
-class BitStream;
 struct Packet;
 
 enum StartupResult

@@ -44,7 +44,6 @@ else use congestion avoidance
 
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
-#include "DS_Queue.h"
 
 #include <stdint.h>
 

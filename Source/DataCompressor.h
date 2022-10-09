@@ -18,11 +18,12 @@
 #define __DATA_COMPRESSOR_H
 
 #include "RakMemoryOverride.h"
-#include "DS_HuffmanEncodingTree.h"
 #include "Export.h"
 
 namespace RakNet
 {
+
+class BitStream;
 
 /// \brief Does compression on a block of data.  Not very good compression, but it's small and fast so is something you can compute at runtime.
 class RAK_DLL_EXPORT DataCompressor

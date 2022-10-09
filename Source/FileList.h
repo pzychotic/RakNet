@@ -37,7 +37,6 @@ namespace RakNet
 namespace RakNet
 {
 /// Forward declarations
-class RakPeerInterface;
 class FileList;
 
 

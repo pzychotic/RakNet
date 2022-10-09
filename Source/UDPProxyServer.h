@@ -22,6 +22,7 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
+#include "DS_OrderedList.h"
 #include "UDPForwarder.h"
 #include "RakString.h"
 

@@ -24,8 +24,6 @@
 
 namespace RakNet {
 
-class RakPeerInterface;
-
 /// \defgroup READY_EVENT_GROUP ReadyEvent
 /// \brief Peer to peer synchronized ready and unready events
 /// \details

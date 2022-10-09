@@ -18,13 +18,11 @@
 #define __AUTOPATCHER_REPOSITORY_INTERFACE_H
 
 #include "IncrementalReadInterface.h"
-#include "SimpleMutex.h"
 
 namespace RakNet
 {
 /// Forward declarations
 class FileList;
-class BitStream;
 
 /// An interface used by AutopatcherServer to get the data necessary to run an autopatcher.  This is up to you to implement for custom repository solutions.
 class AutopatcherRepositoryInterface : public IncrementalReadInterface

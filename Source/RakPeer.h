@@ -22,9 +22,9 @@
 #include "ReliabilityLayer.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
-#include "SingleProducerConsumer.h"
+//#include "SingleProducerConsumer.h"
 #include "SimpleMutex.h"
-#include "DS_OrderedList.h"
+#include "DS_List.h"
 #include "Export.h"
 #include "RakString.h"
 #include "RakThread.h"
@@ -32,12 +32,11 @@
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
-#include "LocklessTypes.h"
+//#include "LocklessTypes.h"
 #include "DS_Queue.h"
 
 namespace RakNet {
 /// Forward declarations
-class HuffmanEncodingTree;
 class PluginInterface2;
 
 // Sucks but this struct has to be outside the class.  Inside and DevCPP won't let you refer to the struct as RakPeer::RemoteSystemIndex while GCC

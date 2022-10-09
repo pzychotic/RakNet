@@ -12,7 +12,6 @@
 
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL!=1
 
-#include "Rand.h"
 #include "MTUSize.h"
 #include <stdio.h>
 #include <math.h>

@@ -10,7 +10,6 @@
 
 #include "SignaledEvent.h"
 #include "RakAssert.h"
-#include "RakSleep.h"
 
 #if defined(__GNUC__) 
 #include <sys/time.h>

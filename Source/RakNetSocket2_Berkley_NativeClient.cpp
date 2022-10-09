@@ -16,8 +16,6 @@
 // Every platform except windows store 8 and native client supports Berkley sockets
 #if !defined(WINDOWS_STORE_RT)
 
-#include "Itoa.h"
-
 // Shared on most platforms, but excluded from the listed
 
 

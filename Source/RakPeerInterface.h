@@ -29,11 +29,7 @@ namespace RakNet
 // Forward declarations
 class BitStream;
 class PluginInterface2;
-struct RPCMap;
 struct RakNetStatistics;
-struct RakNetBandwidth;
-class RouterInterface;
-class NetworkIDManager;
 
 /// The primary interface for RakNet, RakPeer contains all major functions for the library.
 /// See the individual functions for what the class can do.

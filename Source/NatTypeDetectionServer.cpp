@@ -18,7 +18,7 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 #include "BitStream.h"
-#include "SocketDefines.h"
+#include "RakString.h"
 
 // #define NTDS_VERBOSE
 

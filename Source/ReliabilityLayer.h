@@ -29,15 +29,13 @@
 #include "DR_SHA1.h"
 #include "DS_OrderedList.h"
 #include "DS_RangeList.h"
-#include "DS_BPlusTree.h"
+//#include "DS_BPlusTree.h"
 #include "DS_MemoryPool.h"
 #include "RakNetDefines.h"
 #include "DS_Heap.h"
-#include "BitStream.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
 #include "PluginInterface2.h"
-#include "Rand.h"
 #include "RakNetSocket2.h"
 
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL!=1

@@ -24,14 +24,11 @@
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
 #include "DS_List.h"
-#include "RakString.h"
 
 #include <stdint.h>
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \defgroup TEAM_BALANCER_GROUP TeamBalancer
 /// \brief Set and network team selection (supports peer to peer or client/server)

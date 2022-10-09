@@ -22,15 +22,11 @@
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "DS_List.h"
-#include "DS_WeightedGraph.h"
-#include "GetTime.h"
+#include "DS_OrderedList.h"
 #include "Export.h"
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \brief A one hop connection graph.
 /// \details Sends ID_REMOTE_CONNECTION_LOST, ID_REMOTE_DISCONNECTION_NOTIFICATION, ID_REMOTE_NEW_INCOMING_CONNECTION<BR>

@@ -32,8 +32,6 @@ typedef int64_t FCM2Guid;
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \brief Fully connected mesh plugin, revision 2
 /// \details This will connect RakPeer to all connecting peers, and all peers the connecting peer knows about.<BR>

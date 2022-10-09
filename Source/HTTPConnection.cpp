@@ -17,8 +17,6 @@
 
 #include "TCPInterface.h"
 #include "HTTPConnection.h"
-#include "RakSleep.h"
-#include "RakString.h"
 #include "RakAssert.h"
 #include <string.h>
 #include <stdlib.h>

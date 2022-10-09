@@ -27,10 +27,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class BitStream;
-class RakPeerInterface;
-class RakNetTransport;
 
 /// \defgroup RAKNET_TRANSPORT_GROUP RakNetTransport
 /// \brief UDP based transport implementation for the ConsoleServer

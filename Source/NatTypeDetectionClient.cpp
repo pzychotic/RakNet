@@ -18,7 +18,6 @@
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 #include "SocketLayer.h"
-#include "SocketDefines.h"
 
 using namespace RakNet;
 

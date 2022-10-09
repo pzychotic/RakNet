@@ -36,8 +36,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \defgroup TEAM_MANAGER_GROUP TeamManager
 /// \brief Automates networking and list management for teams

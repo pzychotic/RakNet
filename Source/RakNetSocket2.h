@@ -15,7 +15,8 @@
 #include "MTUSize.h"
 #include "LocklessTypes.h"
 #include "RakThread.h"
-#include "DS_ThreadsafeAllocatingQueue.h"
+#include "DS_Queue.h"
+//#include "DS_ThreadsafeAllocatingQueue.h"
 #include "Export.h"
 
 // For CFSocket

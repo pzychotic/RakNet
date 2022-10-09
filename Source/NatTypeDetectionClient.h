@@ -22,16 +22,13 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "PluginInterface2.h"
-#include "PacketPriority.h"
+#include "SimpleMutex.h"
 #include "SocketIncludes.h"
-#include "DS_OrderedList.h"
-#include "RakString.h"
 #include "NatTypeDetectionCommon.h"
 
 namespace RakNet
 {
 /// Forward declarations
-class RakPeerInterface;
 struct Packet;
 
 	/// \brief Client code for NatTypeDetection

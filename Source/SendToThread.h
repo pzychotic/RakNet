@@ -15,7 +15,6 @@
 
 #ifdef USE_THREADED_SEND
 
-#include "InternalPacket.h"
 #include "SocketLayer.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "ThreadPool.h"

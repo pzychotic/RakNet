@@ -24,7 +24,6 @@
 #include "RakNetTypes.h"
 #include "BitStream.h"
 #include "RakString.h"
-#include "NetworkIDObject.h"
 #include "DS_Hash.h"
 #include "DS_OrderedList.h"
 
@@ -39,9 +38,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
-class NetworkIDManager;
 
 	/// \brief Error codes returned by a remote system as to why an RPC function call cannot execute
 	/// \details Error code follows packet ID ID_RPC_REMOTE_ERROR, that is packet->data[1]<BR>

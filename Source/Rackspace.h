@@ -20,7 +20,7 @@
 #include "Export.h"
 #include "DS_List.h"
 #include "RakNetTypes.h"
-#include "DS_Queue.h"
+//#include "DS_Queue.h"
 #include "RakString.h"
 
 #ifndef __RACKSPACE_H

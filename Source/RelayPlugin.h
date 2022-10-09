@@ -34,9 +34,6 @@
 namespace RakNet
 {
 
-/// Forward declarations
-class RakPeerInterface;
-
 enum RelayPluginEnums
 {
 	// Server handled messages

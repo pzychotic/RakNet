@@ -21,7 +21,6 @@
 
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "PacketPriority.h"
 #include "Export.h"
 #include "UDPForwarder.h"
 #include "MessageIdentifiers.h"
@@ -30,8 +29,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 struct Router2DebugInterface
 {

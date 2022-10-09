@@ -24,6 +24,7 @@
 namespace RakNet {
 
 /// Forward declarations
+class BitStream;
 class RakPeerInterface;
 class TCPInterface;
 struct Packet;

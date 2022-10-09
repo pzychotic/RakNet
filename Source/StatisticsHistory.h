@@ -32,8 +32,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 // Type used to track values. If needed, change to double and recompile
 typedef double SHValueType;

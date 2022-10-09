@@ -25,8 +25,6 @@
 
 namespace RakNet
 {
-/// Forward declarations
-class RakPeerInterface;
 
 /// \defgroup PACKETLOGGER_GROUP PacketLogger
 /// \brief Print out incoming messages to a target destination

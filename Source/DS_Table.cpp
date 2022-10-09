@@ -12,8 +12,6 @@
 #include "DS_OrderedList.h"
 #include <string.h>
 #include "RakAssert.h"
-#include "RakAssert.h"
-#include "Itoa.h"
 
 using namespace DataStructures;
 

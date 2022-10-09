@@ -32,25 +32,18 @@
 // #endif
 
 #include <time.h>
-#include <ctype.h> // toupper
 #include <string.h>
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
-#include "DS_HuffmanEncodingTree.h"
 #include "Rand.h"
 #include "PluginInterface2.h"
 #include "StringCompressor.h"
 #include "StringTable.h"
-#include "NetworkIDObject.h"
 #include "RakNetTypes.h"
-#include "DR_SHA1.h"
 #include "RakSleep.h"
 #include "RakAssert.h"
 #include "RakNetVersion.h"
-#include "NetworkIDManager.h"
 #include "gettimeofday.h"
-#include "SignaledEvent.h"
-#include "SuperFastHash.h"
 #include "RakAlloca.h"
 #include "WSAStartupSingleton.h"
 #include "PacketLogger.h"

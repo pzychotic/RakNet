@@ -22,7 +22,6 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "PluginInterface2.h"
-#include "PacketPriority.h"
 #include "SocketIncludes.h"
 #include "DS_OrderedList.h"
 #include "RakString.h"
@@ -30,7 +29,6 @@
 namespace RakNet
 {
 /// Forward declarations
-class RakPeerInterface;
 struct Packet;
 #if _RAKNET_SUPPORT_PacketLogger==1
 class PacketLogger;

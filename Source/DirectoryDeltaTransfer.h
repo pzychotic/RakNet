@@ -24,7 +24,6 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "PluginInterface2.h"
-#include "DS_Map.h"
 #include "PacketPriority.h"
 
 /// \defgroup DIRECTORY_DELTA_TRANSFER_GROUP DirectoryDeltaTransfer
@@ -51,11 +50,8 @@
 namespace RakNet
 {
 /// Forward declarations
-class RakPeerInterface;
 class FileList;
 struct Packet;
-struct InternalPacket;
-struct DownloadRequest;
 class FileListTransfer;
 class FileListTransferCBInterface;
 class FileListProgress;

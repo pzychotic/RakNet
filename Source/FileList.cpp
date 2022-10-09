@@ -41,7 +41,6 @@
 #include "BitStream.h"
 #include "FileOperations.h"
 #include "SuperFastHash.h"
-#include "RakAssert.h"
 #include "LinuxStrings.h"
 
 #define MAX_FILENAME_LENGTH 512

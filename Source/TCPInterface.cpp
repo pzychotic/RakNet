@@ -32,7 +32,6 @@
 #include <string.h>
 #include "RakAssert.h"
 #include <stdio.h>
-#include "RakAssert.h"
 #include "RakSleep.h"
 #include "StringCompressor.h"
 #include "StringTable.h"

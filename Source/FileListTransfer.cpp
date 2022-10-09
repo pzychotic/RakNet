@@ -12,7 +12,6 @@
 #if _RAKNET_SUPPORT_FileListTransfer==1 && _RAKNET_SUPPORT_FileOperations==1
 
 #include "FileListTransfer.h"
-#include "DS_HuffmanEncodingTree.h"
 #include "FileListTransferCBInterface.h"
 #include "StringCompressor.h"
 #include "FileList.h"
@@ -20,7 +19,6 @@
 #include "MessageIdentifiers.h"
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
-#include "RakNetStatistics.h"
 #include "IncrementalReadInterface.h"
 #include "RakAssert.h"
 #include "RakAlloca.h"
