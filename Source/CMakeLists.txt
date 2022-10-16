@@ -15,14 +15,14 @@ source_group( TREE ${RakNet_SOURCE_DIR}/Source PREFIX "Source" FILES ${TARGET_HE
 # create dynamic library if enabled
 if( RAKNET_ENABLE_DLL )
 
-    add_library( RakNetDLL SHARED ${TARGET_HEADER} ${TARGET_SOURCE} )
+    add_library( RakNet SHARED ${TARGET_HEADER} ${TARGET_SOURCE} )
 
-    target_compile_definitions( RakNetDLL PUBLIC _RAKNET_DLL )
-    target_link_libraries( RakNetDLL ${RAKNET_LIBRARY_LIBS} )
+    target_compile_definitions( RakNet PUBLIC _RAKNET_DLL )
+    target_link_libraries( RakNet ${RAKNET_LIBRARY_LIBS} )
 
-    install( TARGETS RakNetDLL
-        RUNTIME DESTINATION bin
-        ARCHIVE DESTINATION lib
+    install( TARGETS RakNet
+        RUNTIME DESTINATION bin/$<LOWER_CASE:$<CONFIG>>
+        ARCHIVE DESTINATION lib/$<LOWER_CASE:$<CONFIG>>
     )
 
 endif()
@@ -30,13 +30,13 @@ endif()
 # create static library if enabled
 if( RAKNET_ENABLE_STATIC )
 
-    add_library( RakNetLibStatic STATIC ${TARGET_HEADER} ${TARGET_SOURCE} )
+    add_library( RakNetStatic STATIC ${TARGET_HEADER} ${TARGET_SOURCE} )
 
-    target_compile_definitions( RakNetLibStatic PUBLIC _RAKNET_LIB )
-    target_link_libraries( RakNetLibStatic ${RAKNET_LIBRARY_LIBS} )
+    target_compile_definitions( RakNetStatic PUBLIC _RAKNET_LIB )
+    target_link_libraries( RakNetStatic ${RAKNET_LIBRARY_LIBS} )
 
-    install( TARGETS RakNetLibStatic
-        ARCHIVE DESTINATION lib
+    install( TARGETS RakNetStatic
+        ARCHIVE DESTINATION lib/$<LOWER_CASE:$<CONFIG>>
     )
 
 endif()
