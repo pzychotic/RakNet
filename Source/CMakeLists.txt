@@ -41,4 +41,4 @@ if( RAKNET_ENABLE_STATIC )
 
 endif()
 
-install( FILES ${TARGET_HEADER} DESTINATION include/raknet )
+install( FILES ${CURRENT_HEADER} DESTINATION include/RakNet )
