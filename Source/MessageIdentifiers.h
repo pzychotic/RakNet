@@ -16,9 +16,7 @@
 #ifndef __MESSAGE_IDENTIFIERS_H
 #define __MESSAGE_IDENTIFIERS_H 
 
-#if defined(RAKNET_USE_CUSTOM_PACKET_IDS)
-#include "CustomPacketIdentifiers.h"
-#else
+namespace RakNet {
 
 enum OutOfBandIdentifiers
 {
@@ -349,7 +347,7 @@ enum DefaultMessageIDTypes
 	///
 	/// Connect as follows:
 	///
-	/// RakNet::BitStream bs(packet->data, packet->length, false);
+	/// BitStream bs(packet->data, packet->length, false);
 	/// bs.IgnoreBytes(sizeof(MessageID));
 	/// RakNetGUID endpointGuid;
 	/// bs.Read(endpointGuid);
@@ -385,7 +383,7 @@ enum DefaultMessageIDTypes
 
 	/// The password we used to challenge the other system passed, meaning the other system has called TwoWayAuthentication::AddPassword() with the same password we passed to TwoWayAuthentication::Challenge()
 	/// You can read the identifier used to challenge as follows:
-	/// RakNet::BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(RakNet::MessageID)); RakNet::RakString password; bs.Read(password);
+	/// BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(RakNet::MessageID)); RakString password; bs.Read(password);
 	ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_SUCCESS,
 	ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS,
 	/// A remote system sent us a challenge using TwoWayAuthentication::Challenge(), and the challenge failed.
@@ -393,11 +391,11 @@ enum DefaultMessageIDTypes
 	ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_FAILURE,
 	/// The other system did not add the password we used to TwoWayAuthentication::AddPassword()
 	/// You can read the identifier used to challenge as follows:
-	/// RakNet::BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(MessageID)); RakNet::RakString password; bs.Read(password);
+	/// BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(MessageID)); RakString password; bs.Read(password);
 	ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_FAILURE,
 	/// The other system did not respond within a timeout threshhold. Either the other system is not running the plugin or the other system was blocking on some operation for a long time.
 	/// You can read the identifier used to challenge as follows:
-	/// RakNet::BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(MessageID)); RakNet::RakString password; bs.Read(password);
+	/// BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(MessageID)); RakString password; bs.Read(password);
 	ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT,
 	/// \internal
 	ID_TWO_WAY_AUTHENTICATION_NEGOTIATION,
@@ -429,9 +427,8 @@ enum DefaultMessageIDTypes
 	// For the user to use.  Start your first enumeration at this value.
 	ID_USER_PACKET_ENUM
 	//-------------------------------------------------------------------------------------------------------------
- 
 };
 
-#endif // RAKNET_USE_CUSTOM_PACKET_IDS
+} // namespace RakNet
 
 #endif

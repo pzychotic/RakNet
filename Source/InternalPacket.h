@@ -128,4 +128,3 @@ struct InternalPacket : public InternalPacketFixedSizeTransmissionHeader
 } // namespace RakNet
 
 #endif
-

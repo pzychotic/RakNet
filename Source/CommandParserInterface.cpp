@@ -29,11 +29,11 @@
 
 #include "LinuxStrings.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 const unsigned char CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS=255;
 
-int RakNet::RegisteredCommandComp( const char* const & key, const RegisteredCommand &data )
+int RegisteredCommandComp( const char* const & key, const RegisteredCommand &data )
 {
 	return _stricmp(key,data.command);
 }
@@ -161,3 +161,5 @@ void CommandParserInterface::ReturnResult(SystemAddress res, const char *command
 	res.ToString(false,addr2);
 	transport->Send(systemAddress, "%s returned %s %s:%i\r\n", command,addr,addr2,res.GetPort());
 }
+
+} // namespace RakNet

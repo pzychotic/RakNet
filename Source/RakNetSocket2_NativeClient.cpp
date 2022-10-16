@@ -17,6 +17,8 @@
 
 using namespace pp;
 
+namespace RakNet {
+
 RNS2BindResult RNS2_NativeClient::Bind( NativeClientBindParameters *bindParameters, const char *file, unsigned int line )
 {
 	memcpy(&binding, bindParameters, sizeof(NativeClientBindParameters));
@@ -159,6 +161,8 @@ void RNS2_NativeClient::IssueReceiveCall(void)
 		((PPB_UDPSocket_Private_0_4*) Module::Get()->GetBrowserInterface(PPB_UDPSOCKET_PRIVATE_INTERFACE_0_4))->RecvFrom(rns2Socket, recvFromStruct->data, MAXIMUM_MTU_SIZE, cc);
 	}	
 }
+
+} // namespace RakNet
 
 #endif // defined(__native_client__)
 

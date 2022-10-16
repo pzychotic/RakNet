@@ -22,7 +22,7 @@
 
 #define ECHO_INPUT
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(TelnetTransport,TelnetTransport);
 
@@ -362,5 +362,7 @@ bool TelnetTransport::ReassembleLine(TelnetTransport::TelnetClient* remoteClient
 	}
 	return false;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

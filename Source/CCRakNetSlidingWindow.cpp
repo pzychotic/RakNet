@@ -12,14 +12,6 @@
 
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL==1
 
-static const double UNSET_TIME_US=-1;
-
-#if CC_TIME_TYPE_BYTES==4
-static const CCTimeType SYN=10;
-#else
-static const CCTimeType SYN=10000;
-#endif
-
 #include "MTUSize.h"
 #include <stdio.h>
 #include <cmath>
@@ -27,7 +19,15 @@ static const CCTimeType SYN=10000;
 #include "RakAssert.h"
 #include "RakAlloca.h"
 
-using namespace RakNet;
+namespace RakNet {
+
+static const double UNSET_TIME_US=-1;
+
+#if CC_TIME_TYPE_BYTES==4
+static const CCTimeType SYN=10;
+#else
+static const CCTimeType SYN=10000;
+#endif
 
 // ****************************************************** PUBLIC METHODS ******************************************************
 
@@ -368,5 +368,8 @@ bool CCRakNetSlidingWindow::IsInSlowStart(void) const
 {
 	return cwnd <= ssThresh || ssThresh==0;
 }
+
+} // namespace RakNet
+
 // ----------------------------------------------------------------------------------------------------------------------------
 #endif

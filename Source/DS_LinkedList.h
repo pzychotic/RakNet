@@ -22,8 +22,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	// Prototype to prevent error in CircularLinkedList class when a reference is made to a LinkedList class
 	template <class LinkedListType>
 	class RAK_DLL_EXPORT LinkedList;
@@ -1239,6 +1239,6 @@ namespace DataStructures
 		return this->operator--();
 	}
 
-} // End namespace
+} } // namespace RakNet::DataStructures
 
 #endif

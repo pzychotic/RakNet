@@ -20,7 +20,7 @@
 #include "RakAssert.h"
 #include "RakAlloca.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 static const double UNSET_TIME_US=-1;
 static const double CWND_MIN_THRESHOLD=2.0;
@@ -803,5 +803,7 @@ void CCRakNetUDT::SetTimeBetweenSendsLimit(unsigned int bitsPerSecond)
 		SND=limit;
 }
 */
+
+} // namespace RakNet
 
 #endif

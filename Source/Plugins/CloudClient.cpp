@@ -16,7 +16,7 @@
 #include "BitStream.h"
 #include "RakPeerInterface.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(CloudClient,CloudClient);
 
@@ -37,7 +37,7 @@ void CloudClient::Post(CloudKey *cloudKey, const unsigned char *data, uint32_t d
 {
 	RakAssert(cloudKey);
 	
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_POST_REQUEST);
 	cloudKey->Serialize(true,&bsOut);
 	if (data==0)
@@ -49,7 +49,7 @@ void CloudClient::Post(CloudKey *cloudKey, const unsigned char *data, uint32_t d
 }
 void CloudClient::Release(DataStructures::List<CloudKey> &keys, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_RELEASE_REQUEST);
 	RakAssert(keys.Size() < (uint16_t)-1 );
 	bsOut.WriteCasted<uint16_t>(keys.Size());
@@ -61,7 +61,7 @@ void CloudClient::Release(DataStructures::List<CloudKey> &keys, RakNetGUID syste
 }
 bool CloudClient::Get(CloudQuery *keyQuery, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_GET_REQUEST);
 	keyQuery->Serialize(true, &bsOut);
 	bsOut.WriteCasted<uint16_t>(0); // Specific systems
@@ -70,7 +70,7 @@ bool CloudClient::Get(CloudQuery *keyQuery, RakNetGUID systemIdentifier)
 }
 bool CloudClient::Get(CloudQuery *keyQuery, DataStructures::List<RakNetGUID> &specificSystems, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_GET_REQUEST);
 	keyQuery->Serialize(true, &bsOut);
 	bsOut.WriteCasted<uint16_t>(specificSystems.Size());
@@ -84,7 +84,7 @@ bool CloudClient::Get(CloudQuery *keyQuery, DataStructures::List<RakNetGUID> &sp
 }
 bool CloudClient::Get(CloudQuery *keyQuery, DataStructures::List<CloudQueryRow*> &specificSystems, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_GET_REQUEST);
 	keyQuery->Serialize(true, &bsOut);
 	bsOut.WriteCasted<uint16_t>(specificSystems.Size());
@@ -107,7 +107,7 @@ bool CloudClient::Get(CloudQuery *keyQuery, DataStructures::List<CloudQueryRow*>
 }
 void CloudClient::Unsubscribe(DataStructures::List<CloudKey> &keys, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_UNSUBSCRIBE_REQUEST);
 	RakAssert(keys.Size() < (uint16_t)-1 );
 	bsOut.WriteCasted<uint16_t>(keys.Size());
@@ -120,7 +120,7 @@ void CloudClient::Unsubscribe(DataStructures::List<CloudKey> &keys, RakNetGUID s
 }
 void CloudClient::Unsubscribe(DataStructures::List<CloudKey> &keys, DataStructures::List<RakNetGUID> &specificSystems, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_UNSUBSCRIBE_REQUEST);
 	RakAssert(keys.Size() < (uint16_t)-1 );
 	bsOut.WriteCasted<uint16_t>(keys.Size());
@@ -138,7 +138,7 @@ void CloudClient::Unsubscribe(DataStructures::List<CloudKey> &keys, DataStructur
 }
 void CloudClient::Unsubscribe(DataStructures::List<CloudKey> &keys, DataStructures::List<CloudQueryRow*> &specificSystems, RakNetGUID systemIdentifier)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_UNSUBSCRIBE_REQUEST);
 	RakAssert(keys.Size() < (uint16_t)-1 );
 	bsOut.WriteCasted<uint16_t>(keys.Size());
@@ -178,7 +178,7 @@ void CloudClient::OnGetReponse(Packet *packet, CloudClientCallback *_callback, C
 
 	CloudQueryResult cloudQueryResult;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	cloudQueryResult.Serialize(false,&bsIn,_allocator);
 	bool deallocateRowsAfterReturn=true;
@@ -198,7 +198,7 @@ void CloudClient::OnGetReponse(CloudQueryResult *cloudQueryResult, Packet *packe
 	if (_allocator==0)
 		_allocator=allocator;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	cloudQueryResult->Serialize(false,&bsIn,_allocator);
 }
@@ -212,7 +212,7 @@ void CloudClient::OnSubscriptionNotification(Packet *packet, CloudClientCallback
 	bool wasUpdated=false;
 	CloudQueryRow row;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	bsIn.Read(wasUpdated);
 	row.Serialize(false,&bsIn,_allocator);
@@ -228,7 +228,7 @@ void CloudClient::OnSubscriptionNotification(bool *wasUpdated, CloudQueryRow *ro
 	if (_allocator==0)
 		_allocator=allocator;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	bool b=false;
 	bsIn.Read(b);
@@ -252,4 +252,7 @@ void CloudClient::DeallocateWithDefaultAllocator(CloudQueryRow *row)
 {
 	allocator->DeallocateRowData(row->data);
 }
+
+} // namespace RakNet
+
 #endif

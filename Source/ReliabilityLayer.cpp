@@ -24,7 +24,7 @@
 #endif
 #include <math.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 // Can't figure out which library has this function on the PS3
 double Ceil(double d) {if (((double)((int)d))==d) return d; return (int) (d+1.0);}
@@ -35,8 +35,6 @@ double Ceil(double d) {if (((double)((int)d))==d) return d; return (int) (d+1.0)
 // #define RELIABILITY_LAYER_NEW_UNDEF_ALLOCATING_QUEUE
 // #endif
 
-
-//#define _DEBUG_LOGGER
 
 #if CC_TIME_TYPE_BYTES==4
 static const CCTimeType MAX_TIME_BETWEEN_PACKETS= 350; // 350 milliseconds
@@ -135,7 +133,7 @@ struct DatagramHeaderFormat
 			sizeof(float)*1;
 	}
 
-	void Serialize(RakNet::BitStream *b)
+	void Serialize(BitStream *b)
 	{
 		// Not endian safe
 		//		RakAssert(GetDataHeaderByteLength()==sizeof(DatagramHeaderFormat));
@@ -176,7 +174,7 @@ struct DatagramHeaderFormat
 			b->Write(datagramNumber);
 		}
 	}
-	void Deserialize(RakNet::BitStream *b)
+	void Deserialize(BitStream *b)
 	{
 		// Not endian safe
 		//		b->ReadAlignedBytes((unsigned char*) this, sizeof(DatagramHeaderFormat));
@@ -221,21 +219,7 @@ struct DatagramHeaderFormat
 	}
 };
 
-#ifdef _WIN32
-//#define _DEBUG_LOGGER
-#ifdef _DEBUG_LOGGER
-#include "WindowsIncludes.h"
-#endif
-#endif
-
-//#define DEBUG_SPLIT_PACKET_PROBLEMS
-#if defined (DEBUG_SPLIT_PACKET_PROBLEMS)
-static int waitFlag=-1;
-#endif
-
-using namespace RakNet;
-
-int RakNet::SplitPacketChannelComp( SplitPacketIdType const &key, SplitPacketChannel* const &data )
+int SplitPacketChannelComp( SplitPacketIdType const &key, SplitPacketChannel* const &data )
 {
 #if PREALLOCATE_LARGE_MESSAGES==1
 	if (key < data->returnedPacket->splitPacketId)
@@ -671,7 +655,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 	}
 #endif
 
-	RakNet::BitStream socketData( (unsigned char*) buffer, length, false ); // Convert the incoming data to a bitstream for easy parsing
+	BitStream socketData( (unsigned char*) buffer, length, false ); // Convert the incoming data to a bitstream for easy parsing
 	//	time = RakNet::GetTimeUS();
 
 	// Set to the current time if it is not zero, and we get incoming data
@@ -2236,7 +2220,7 @@ void ReliabilityLayer::Update( RakNetSocket2 *s, SystemAddress &systemAddress, i
 //-------------------------------------------------------------------------------------------------------
 // Writes a bitstream to the socket
 //-------------------------------------------------------------------------------------------------------
-void ReliabilityLayer::SendBitStream( RakNetSocket2 *s, SystemAddress &systemAddress, RakNet::BitStream *bitStream, RakNetRandom *rnr, CCTimeType currentTime)
+void ReliabilityLayer::SendBitStream( RakNetSocket2 *s, SystemAddress &systemAddress, BitStream *bitStream, RakNetRandom *rnr, CCTimeType currentTime)
 {
 	(void) systemAddress;
 	(void) rnr;
@@ -2599,7 +2583,7 @@ BitSize_t ReliabilityLayer::GetMessageHeaderLengthBits( const InternalPacket *co
 //-------------------------------------------------------------------------------------------------------
 // Parse an internalPacket and create a bitstream to represent this data
 //-------------------------------------------------------------------------------------------------------
-BitSize_t ReliabilityLayer::WriteToBitStreamFromInternalPacket( RakNet::BitStream *bitStream, const InternalPacket *const internalPacket, CCTimeType curTime )
+BitSize_t ReliabilityLayer::WriteToBitStreamFromInternalPacket( BitStream *bitStream, const InternalPacket *const internalPacket, CCTimeType curTime )
 {
 	(void) curTime;
 
@@ -2671,7 +2655,7 @@ BitSize_t ReliabilityLayer::WriteToBitStreamFromInternalPacket( RakNet::BitStrea
 //-------------------------------------------------------------------------------------------------------
 // Parse a bitstream and create an internal packet to represent this data
 //-------------------------------------------------------------------------------------------------------
-InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( RakNet::BitStream *bitStream, CCTimeType time )
+InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream *bitStream, CCTimeType time )
 {
 	bool bitStreamSucceeded;
 	InternalPacket* internalPacket;
@@ -3472,7 +3456,7 @@ void ReliabilityLayer::PushPacket(CCTimeType time, InternalPacket *internalPacke
 // 	if (internalPacket->data[0]==0)
 // 	{
 // 		RakNet::TimeMS t;
-// 		RakNet::BitStream bs(internalPacket->data+1,sizeof(t),false);
+// 		BitStream bs(internalPacket->data+1,sizeof(t),false);
 // 		bs.Read(t);
 // 		RakNet::TimeMS curTime=RakNet::GetTimeMS();
 // 		RakNet::TimeMS diff = curTime-t;
@@ -3952,3 +3936,5 @@ reliabilityHeapWeightType ReliabilityLayer::GetNextWeight(int priorityLevel)
 // #pragma pop_macro("new")
 // #undef RELIABILITY_LAYER_NEW_UNDEF_ALLOCATING_QUEUE
 // #endif
+
+} // namespace RakNet

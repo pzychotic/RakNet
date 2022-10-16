@@ -15,9 +15,9 @@
 #include "SocketLayer.h"
 #include "SocketIncludes.h"
 
-using namespace RakNet;
+namespace RakNet {
 
-bool RakNet::CanConnect(NATTypeDetectionResult type1, NATTypeDetectionResult type2)
+bool CanConnect(NATTypeDetectionResult type1, NATTypeDetectionResult type2)
 {
 	/// If one system is NAT_TYPE_SYMMETRIC, the other must be NAT_TYPE_ADDRESS_RESTRICTED or less
 	/// If one system is NAT_TYPE_PORT_RESTRICTED, the other must be NAT_TYPE_PORT_RESTRICTED or less
@@ -37,7 +37,7 @@ bool RakNet::CanConnect(NATTypeDetectionResult type1, NATTypeDetectionResult typ
 	return connectionGraph[(int) type1][(int) type2];
 }
 
-const char *RakNet::NATTypeDetectionResultToString(NATTypeDetectionResult type)
+const char* NATTypeDetectionResultToString(NATTypeDetectionResult type)
 {
 	switch (type)
 	{
@@ -66,7 +66,7 @@ const char *RakNet::NATTypeDetectionResultToString(NATTypeDetectionResult type)
 // None and relaxed can connect to anything
 // Moderate can connect to moderate or less
 // Strict can connect to relaxed or less
-const char *RakNet::NATTypeDetectionResultToStringFriendly(NATTypeDetectionResult type)
+const char* NATTypeDetectionResultToStringFriendly(NATTypeDetectionResult type)
 {
 	switch (type)
 	{
@@ -93,7 +93,7 @@ const char *RakNet::NATTypeDetectionResultToStringFriendly(NATTypeDetectionResul
 }
 
 
-RakNetSocket2* RakNet::CreateNonblockingBoundSocket(const char *bindAddr
+RakNetSocket2* CreateNonblockingBoundSocket(const char *bindAddr
 #ifdef __native_client__
 											,_PP_Instance_ chromeInstance
 #endif
@@ -178,7 +178,7 @@ RakNetSocket2* RakNet::CreateNonblockingBoundSocket(const char *bindAddr
 }
 
 /*
-int RakNet::NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RNS2EventHandler *eventHandler)
+int NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RNS2EventHandler *eventHandler)
 {
 #if defined(__native_client__)
 	RakAssert("TODO" && 0);
@@ -204,5 +204,7 @@ int RakNet::NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &se
 #endif
 }
 */
+
+} // namespace RakNet
 
 #endif // #if _RAKNET_SUPPORT_NatTypeDetectionServer==1 || _RAKNET_SUPPORT_NatTypeDetectionClient==1

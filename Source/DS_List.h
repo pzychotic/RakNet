@@ -28,8 +28,8 @@ static const unsigned int MAX_UNSIGNED_LONG = 4294967295U;
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/// \brief Array based implementation of a list.
 	/// \note ONLY USE THIS FOR SHALLOW COPIES.  I don't bother with operator= to improve performance.
 	template <class list_type>
@@ -520,6 +520,6 @@ namespace DataStructures
 		}
 	}
 	
-} // End namespace
+} } // namespace RakNet::DataStructures
 
 #endif

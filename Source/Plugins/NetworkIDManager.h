@@ -21,8 +21,7 @@
 #include "RakMemoryOverride.h"
 #include "Rand.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// Increase this value if you plan to have many persistent objects
 /// This value must match on all systems

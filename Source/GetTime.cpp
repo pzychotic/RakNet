@@ -18,32 +18,25 @@
 
 #include "GetTime.h"
 
-
-
-
 #if defined(_WIN32)
 //DWORD mProcMask;
 //DWORD mSysMask;
 //HANDLE mThread;
-
-
-
-
-
-
-
-
-
 #else
 #include <sys/time.h>
 #include <unistd.h>
 RakNet::TimeUS initialTime;
 #endif
 
+#if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
+#include "SimpleMutex.h"
+#endif
+
+namespace RakNet {
+
 static bool initialized=false;
 
 #if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
-#include "SimpleMutex.h"
 RakNet::TimeUS lastNormalizedReturnedValue=0;
 RakNet::TimeUS lastNormalizedInputValue=0;
 /// This constraints timer forward jumps to 1 second, and does not let it jump backwards
@@ -52,7 +45,7 @@ RakNet::TimeUS lastNormalizedInputValue=0;
 RakNet::TimeUS NormalizeTime(RakNet::TimeUS timeIn)
 {
 	RakNet::TimeUS diff, lastNormalizedReturnedValueCopy;
-	static RakNet::SimpleMutex mutex;
+	static SimpleMutex mutex;
 	
 	mutex.Lock();
 	if (timeIn>=lastNormalizedInputValue)
@@ -81,53 +74,6 @@ RakNet::TimeMS RakNet::GetTimeMS( void )
 {
 	return (RakNet::TimeMS)(GetTimeUS()/1000);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #if   defined(_WIN32)
 RakNet::TimeUS GetTimeUS_Windows( void )
@@ -198,12 +144,6 @@ RakNet::TimeUS GetTimeUS_Linux( void )
 
 RakNet::TimeUS RakNet::GetTimeUS( void )
 {
-
-
-
-
-
-
 #if   defined(_WIN32)
 	return GetTimeUS_Windows();
 #else
@@ -222,3 +162,5 @@ bool RakNet::LessThan(RakNet::Time a, RakNet::Time b)
 	const RakNet::Time halfSpan = ((RakNet::Time)(const RakNet::Time)-1)/(RakNet::Time)2;
 	return b!=a && b-a<halfSpan;
 }
+
+} // namespace RakNet

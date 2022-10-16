@@ -23,8 +23,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/// \brief A queue implemented using a linked list.  Rarely used.
 	template <class QueueType>
 	class RAK_DLL_EXPORT QueueLinkedList
@@ -105,6 +105,7 @@ namespace DataStructures
 	{
 		data.Clear();
 	}
-} // End namespace
+
+} } // namespace RakNet::DataStructures
 
 #endif

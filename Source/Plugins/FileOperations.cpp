@@ -24,6 +24,8 @@
 #endif
 #include "errno.h"
 
+namespace RakNet {
+
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif
@@ -162,5 +164,6 @@ unsigned int GetFileLength(const char *path)
 
 }
 
-#endif // _RAKNET_SUPPORT_FileOperations
+} // namespace RakNet
 
+#endif // _RAKNET_SUPPORT_FileOperations

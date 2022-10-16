@@ -40,7 +40,7 @@
 #include "SuperFastHash.h"
 #include <stdlib.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 const char *IPV6_LOOPBACK="::1";
 const char *IPV4_LOOPBACK="127.0.0.1";
@@ -69,7 +69,7 @@ void AddressOrGUID::ToString(bool writePort, char *dest) const
 		return rakNetGuid.ToString(dest);
 	return systemAddress.ToString(writePort,dest);
 }
-bool RakNet::NonNumericHostString( const char *host )
+bool NonNumericHostString( const char *host )
 {
 	// Return false if IP address. Return true if domain
 	unsigned int i=0;
@@ -767,3 +767,5 @@ unsigned long RakNetGUID::ToUint32( const RakNetGUID &g )
 {
 	return ((unsigned long) (g.g >> 32)) ^ ((unsigned long) (g.g & 0xFFFFFFFF));
 }
+
+} // namespace RakNet

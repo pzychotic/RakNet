@@ -21,7 +21,7 @@
 #include "WindowsIncludes.h"
 #endif
 
-using namespace RakNet;
+namespace RakNet {
 
 PacketOutputWindowLogger::PacketOutputWindowLogger()
 {
@@ -34,11 +34,11 @@ void PacketOutputWindowLogger::WriteLog(const char *str)
 #if defined(_WIN32)
 
 	#if defined(UNICODE)
-		RakNet::RakWString str2 = str;
+		RakWString str2 = str;
 		str2+="\n";
 		OutputDebugString(str2.C_String());
 	#else
-		RakNet::RakString str2 = str;
+		RakString str2 = str;
 		str2+="\n";
 		OutputDebugString(str2.C_String());
 	#endif
@@ -48,5 +48,7 @@ void PacketOutputWindowLogger::WriteLog(const char *str)
 // /DS_APR
 #endif
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

@@ -34,8 +34,7 @@
 
 #include <stdint.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \defgroup TEAM_MANAGER_GROUP TeamManager
 /// \brief Automates networking and list management for teams
@@ -564,7 +563,7 @@ protected:
 
 
 	// Send a message to all participants
-	void BroadcastToParticipants(RakNet::BitStream *bsOut, RakNetGUID exclusionGuid);
+	void BroadcastToParticipants(BitStream *bsOut, RakNetGUID exclusionGuid);
 	void BroadcastToParticipants(unsigned char *data, const int length, RakNetGUID exclusionGuid);
 
 	// 1. If can join a team:
@@ -699,18 +698,18 @@ protected:
 	virtual PluginReceiveResult OnReceive(Packet *packet);
 	virtual void OnClosedConnection(const SystemAddress &systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
 	virtual void OnNewConnection(const SystemAddress &systemAddress, RakNetGUID rakNetGUID, bool isIncoming);
-	void Send( const RakNet::BitStream * bitStream, const AddressOrGUID systemIdentifier, bool broadcast );
+	void Send( const BitStream * bitStream, const AddressOrGUID systemIdentifier, bool broadcast );
 
-	void EncodeTeamFullOrLocked(RakNet::BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team);
-	void DecomposeTeamFullOrLocked(RakNet::BitStream *bsIn, TM_World **world, TM_TeamMember **teamMember, TM_Team **team,
+	void EncodeTeamFullOrLocked(BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team);
+	void DecomposeTeamFullOrLocked(BitStream *bsIn, TM_World **world, TM_TeamMember **teamMember, TM_Team **team,
 		uint16_t &currentMembers, uint16_t &memberLimitIncludingBalancing, bool &balancingIsActive, JoinPermissions &joinPermissions);
-	void ProcessTeamAssigned(RakNet::BitStream *bsIn);
+	void ProcessTeamAssigned(BitStream *bsIn);
 
-	void EncodeTeamAssigned(RakNet::BitStream *bitStream, TM_TeamMember *teamMember);
+	void EncodeTeamAssigned(BitStream *bitStream, TM_TeamMember *teamMember);
 	void RemoveFromTeamsRequestedAndAddTeam(TM_TeamMember *teamMember, TM_Team *team, bool isTeamSwitch, TM_Team *teamToLeave);
 
 	void PushTeamAssigned(TM_TeamMember *teamMember);
-	void PushBitStream(RakNet::BitStream *bitStream);
+	void PushBitStream(BitStream *bitStream);
 	void OnUpdateListsToNoTeam(Packet *packet, TM_World *world);
 	void OnUpdateTeamsRequestedToAny(Packet *packet, TM_World *world);
 	void OnJoinAnyTeam(Packet *packet, TM_World *world);
@@ -726,13 +725,13 @@ protected:
 	void OnSetBalanceTeamsInitial(Packet *packet, TM_World *world);
 
 
-	void EncodeTeamFull(RakNet::BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team);
-	void EncodeTeamLocked(RakNet::BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team);
+	void EncodeTeamFull(BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team);
+	void EncodeTeamLocked(BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team);
 
 	/// \brief When you get ID_TEAM_BALANCER_TEAM_ASSIGNED, pass the packet to this function to read out parameters
 	/// \param[in] A packet where packet->data[0]==ID_TEAM_BALANCER_TEAM_ASSIGNED
 	/// \return true on success, false on read error
-	void DecodeTeamAssigned(RakNet::BitStream *bsIn, TM_World **world, TM_TeamMember **teamMember, NoTeamId &noTeamSubcategory,
+	void DecodeTeamAssigned(BitStream *bsIn, TM_World **world, TM_TeamMember **teamMember, NoTeamId &noTeamSubcategory,
 		JoinTeamType &joinTeamType, DataStructures::List<TM_Team *> &newTeam,
 		DataStructures::List<TM_Team *> &teamsLeft, DataStructures::List<TM_Team *> &teamsJoined);
 
@@ -753,4 +752,3 @@ protected:
 #endif // __TEAM_MANAGER_H
 
 #endif // _RAKNET_SUPPORT_*
-

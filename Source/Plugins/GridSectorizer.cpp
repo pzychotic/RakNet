@@ -13,6 +13,8 @@
 //#include <stdlib.h>
 #include <math.h>
 
+namespace RakNet {
+
 GridSectorizer::GridSectorizer()
 {
 	grid=0;
@@ -199,3 +201,5 @@ void GridSectorizer::Clear(void)
 	for (cur=0; cur<count;cur++)
 		grid[cur].Clear(true, _FILE_AND_LINE_);
 }
+
+} // namespace RakNet

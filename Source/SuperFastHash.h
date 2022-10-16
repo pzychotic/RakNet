@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+namespace RakNet {
+
 // From http://www.azillionmonkeys.com/qed/hash.html
 // Author of main code is Paul Hsieh 
 // I just added some convenience functions
@@ -23,5 +25,7 @@ uint32_t SuperFastHash (const char * data, int length);
 uint32_t SuperFastHashIncremental (const char * data, int len, unsigned int lastHash );
 uint32_t SuperFastHashFile (const char * filename);
 uint32_t SuperFastHashFilePtr (FILE *fp);
+
+} // namespace RakNet
 
 #endif

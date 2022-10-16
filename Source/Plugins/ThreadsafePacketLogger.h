@@ -22,8 +22,7 @@
 #include "Plugins/PacketLogger.h"
 #include "SingleProducerConsumer.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \ingroup PACKETLOGGER_GROUP
 /// \brief Same as PacketLogger, but writes output in the user thread.

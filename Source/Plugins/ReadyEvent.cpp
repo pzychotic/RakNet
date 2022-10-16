@@ -17,9 +17,9 @@
 #include "MessageIdentifiers.h"
 #include "RakAssert.h"
 
-using namespace RakNet;
+namespace RakNet {
 
-int RakNet::ReadyEvent::RemoteSystemCompByGuid( const RakNetGUID &key, const RemoteSystem &data )
+int ReadyEvent::RemoteSystemCompByGuid( const RakNetGUID &key, const RemoteSystem &data )
 {
 	if (key < data.rakNetGuid)
 		return -1;
@@ -29,7 +29,7 @@ int RakNet::ReadyEvent::RemoteSystemCompByGuid( const RakNetGUID &key, const Rem
 		return 1;
 }
 
-int RakNet::ReadyEvent::ReadyEventNodeComp( const int &key, ReadyEvent::ReadyEventNode * const &data )
+int ReadyEvent::ReadyEventNodeComp( const int &key, ReadyEvent::ReadyEventNode * const &data )
 {
 	if (key < data->eventId)
 		return -1;
@@ -320,7 +320,7 @@ bool ReadyEvent::AddToWaitListInternal(unsigned eventIndex, RakNetGUID guid)
 }
 void ReadyEvent::OnReadyEventForceAllSet(Packet *packet)
 {
-	RakNet::BitStream incomingBitStream(packet->data, packet->length, false);
+	BitStream incomingBitStream(packet->data, packet->length, false);
 	incomingBitStream.IgnoreBits(8);
 	int eventId;
 	incomingBitStream.Read(eventId);
@@ -338,7 +338,7 @@ void ReadyEvent::OnReadyEventForceAllSet(Packet *packet)
 }
 void ReadyEvent::OnReadyEventPacketUpdate(Packet *packet)
 {
-	RakNet::BitStream incomingBitStream(packet->data, packet->length, false);
+	BitStream incomingBitStream(packet->data, packet->length, false);
 	incomingBitStream.IgnoreBits(8);
 	int eventId;
 	incomingBitStream.Read(eventId);
@@ -368,7 +368,7 @@ void ReadyEvent::OnReadyEventPacketUpdate(Packet *packet)
 }
 void ReadyEvent::OnReadyEventQuery(Packet *packet)
 {
-	RakNet::BitStream incomingBitStream(packet->data, packet->length, false);
+	BitStream incomingBitStream(packet->data, packet->length, false);
 	incomingBitStream.IgnoreBits(8);
 	int eventId;
 	incomingBitStream.Read(eventId);
@@ -499,7 +499,7 @@ void ReadyEvent::UpdateReadyStatus(unsigned eventIndex)
 void ReadyEvent::SendReadyUpdate(unsigned eventIndex, unsigned systemIndex, bool forceIfNotDefault)
 {
 	ReadyEventNode *ren = readyEventNodeList[eventIndex];
-	RakNet::BitStream bs;
+	BitStream bs;
 	// I do this rather than write true or false, so users that do not use BitStreams can still read the data
 	if ((ren->eventStatus!=ren->systemList[systemIndex].lastSentStatus) ||
 		(forceIfNotDefault && ren->eventStatus!=ID_READY_EVENT_UNSET))
@@ -523,7 +523,7 @@ void ReadyEvent::BroadcastReadyUpdate(unsigned eventIndex, bool forceIfNotDefaul
 }
 void ReadyEvent::SendReadyStateQuery(unsigned eventId, RakNetGUID guid)
 {
-	RakNet::BitStream bs;
+	BitStream bs;
 	bs.Write((MessageID)ID_READY_EVENT_QUERY);
 	bs.Write(eventId);
 	SendUnified(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, channel, guid, false);
@@ -554,12 +554,14 @@ void ReadyEvent::PushCompletionPacket(unsigned eventId)
 	/*
 	// Pass a packet to the user that we are now completed, as setting ourselves to signaled was the last thing being waited on
 	Packet *p = AllocatePacketUnified(sizeof(MessageID)+sizeof(int));
-	RakNet::BitStream bs(p->data, sizeof(MessageID)+sizeof(int), false);
+	BitStream bs(p->data, sizeof(MessageID)+sizeof(int), false);
 	bs.SetWriteOffset(0);
 	bs.Write((MessageID)ID_READY_EVENT_ALL_SET);
 	bs.Write(eventId);
 	rakPeerInterface->PushBackPacket(p, false);
 	*/
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

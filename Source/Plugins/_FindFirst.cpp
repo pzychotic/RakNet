@@ -2,6 +2,7 @@
 * Original file by the_viking, fixed by R√¥mulo Fernandes, fixed by Emmanuel Nars
 * Should emulate windows finddata structure
 */
+
 #if (defined(__GNUC__)  || defined(__GCCXML__)) && !defined(_WIN32)
 #include "Plugins/_FindFirst.h"
 #include "DS_List.h"
@@ -11,7 +12,7 @@
 #include <fnmatch.h>
 
 
-static DataStructures::List< _findinfo_t* > fileInfo;
+static RakNet::DataStructures::List< _findinfo_t* > fileInfo;
 	
 #include "RakMemoryOverride.h"
 #include "RakAssert.h"
@@ -57,36 +58,6 @@ long _findfirst(const char *name, _finddata_t *f)
         if (_findnext(ret, f) == -1) return -1;
         else return ret;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 int _findnext(long h, _finddata_t *f)
 {

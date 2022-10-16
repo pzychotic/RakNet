@@ -14,7 +14,7 @@
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 PluginInterface2::PluginInterface2()
 {
@@ -27,7 +27,7 @@ PluginInterface2::~PluginInterface2()
 {
 
 }
-void PluginInterface2::SendUnified( const RakNet::BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast )
+void PluginInterface2::SendUnified( const BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast )
 {
 	if (rakPeerInterface)
 	{
@@ -219,3 +219,5 @@ RakNetGUID PluginInterface2::GetMyGUIDUnified(void) const
 		return rakPeerInterface->GetMyGUID();
 	return UNASSIGNED_RAKNET_GUID;
 }
+
+} // namespace RakNet

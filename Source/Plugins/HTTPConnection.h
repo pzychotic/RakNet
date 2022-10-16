@@ -25,8 +25,8 @@
 #include "RakNetTypes.h"
 #include "DS_Queue.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class TCPInterface;
 struct SystemAddress;
@@ -70,7 +70,7 @@ public:
 
     /// Get one result from the server
 	/// \pre HasResult must return true
-    RakNet::RakString Read(void);
+    RakString Read(void);
 
 	/// Call periodically to do time-based updates
 	void Update(void);
@@ -105,12 +105,12 @@ public:
 
 		operator int () const { return code; }
 
-		RakNet::RakString data;
+		RakString data;
 		int code;  // ResponseCodes
     };
 
     /// Queued events of failed exchanges with the HTTP server
-    bool HasBadResponse(int *code, RakNet::RakString *data);
+    bool HasBadResponse(int *code, RakString *data);
 
 	/// Returns false if the connection is not doing anything else
 	bool IsBusy(void) const;
@@ -120,9 +120,9 @@ public:
 
 	struct OutgoingCommand
 	{
-		RakNet::RakString remotePath;
-		RakNet::RakString data;
-		RakNet::RakString contentType;
+		RakString remotePath;
+		RakString data;
+		RakString contentType;
 		bool isPost;
 	};
 
@@ -132,7 +132,7 @@ public:
 private:
     SystemAddress server;
     TCPInterface *tcp;
-	RakNet::RakString host;
+	RakString host;
 	unsigned short port;
 	DataStructures::Queue<BadResponse> badResponses;
 
@@ -145,8 +145,8 @@ private:
 		CS_PROCESSING,
 	} connectionState;
 
-	RakNet::RakString incomingData;
-	DataStructures::Queue<RakNet::RakString> results;
+	RakString incomingData;
+	DataStructures::Queue<RakString> results;
 
 	void CloseConnection();
 	
@@ -158,7 +158,7 @@ private:
 		RAK_HTTP_REQUEST_SENT,
 		RAK_HTTP_IDLE } state;
 
-    RakNet::RakString outgoing, incoming, path, contentType;
+    RakString outgoing, incoming, path, contentType;
     void Process(Packet *packet); // the workhorse
     
     // this helps check the various status lists in TCPInterface

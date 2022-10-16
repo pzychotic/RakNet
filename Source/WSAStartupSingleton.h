@@ -11,6 +11,8 @@
 #ifndef __WSA_STARTUP_SINGLETON_H
 #define __WSA_STARTUP_SINGLETON_H
 
+namespace RakNet {
+
 class WSAStartupSingleton
 {
 public:
@@ -22,5 +24,7 @@ public:
 protected:
 	static int refCount;
 };
+
+} // namespace RakNet
 
 #endif

@@ -15,23 +15,15 @@
 
 #if   defined(_WIN32)
 #include "WindowsIncludes.h"
-
-
-
 #else
 	#include <pthread.h>
 	#include <sys/types.h>
 	#include "SimpleMutex.h"
-
-
-
-
 #endif
 
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 class RAK_DLL_EXPORT SignaledEvent
 {
@@ -47,11 +39,6 @@ public:
 protected:
 #ifdef _WIN32
 	HANDLE eventList;
-
-
-
-
-
 #else
 	SimpleMutex isSignaledMutex;
 	bool isSignaled;

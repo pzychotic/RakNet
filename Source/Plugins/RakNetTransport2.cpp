@@ -21,7 +21,7 @@
 #include <stdarg.h>
 #include "LinuxStrings.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(RakNetTransport2,RakNetTransport2);
 
@@ -60,7 +60,7 @@ void RakNetTransport2::Send( SystemAddress systemAddress, const char *data, ... 
 	va_end(ap);
 	text[REMOTE_MAX_TEXT_INPUT-1]=0;
 
-	RakNet::BitStream str;
+	BitStream str;
 	str.Write((MessageID)ID_TRANSPORT_STRING);
 	str.Write(text, (int) strlen(text));
 	str.Write((unsigned char) 0); // Null terminate the string
@@ -127,5 +127,7 @@ void RakNetTransport2::OnNewConnection(const SystemAddress &systemAddress, RakNe
 	(void) isIncoming;
 	newConnections.Push(systemAddress, _FILE_AND_LINE_ );
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

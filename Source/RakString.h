@@ -25,8 +25,8 @@
 #include "WindowsIncludes.h"
 #endif
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class SimpleMutex;
 class BitStream;
@@ -84,7 +84,7 @@ public:
 	void DeallocWideChar(WCHAR * w);
 
 	void FromWideChar(const wchar_t *source);
-	static RakNet::RakString FromWideChar_S(const wchar_t *source);
+	static RakString FromWideChar_S(const wchar_t *source);
 #endif
 	
 	/// String class find replacement
@@ -143,7 +143,7 @@ public:
 	void SetChar( unsigned index, unsigned char c );
 
 	/// Replace character at index with string s
-	void SetChar( unsigned index, RakNet::RakString s );
+	void SetChar( unsigned index, RakString s );
 
 	/// Make sure string is no longer than \a length
 	void Truncate(unsigned int length);
@@ -171,7 +171,7 @@ public:
 
 	/// Create a RakString with a value, without doing printf style parsing
 	/// Equivalent to assignment operator
-	static RakNet::RakString NonVariadic(const char *str);
+	static RakString NonVariadic(const char *str);
 
 	/// Hash the string into an unsigned int
 	static unsigned long ToInteger(const char *str);
@@ -214,37 +214,37 @@ public:
 	bool IsEmailAddress(void) const;
 
 	/// URL Encode the string. See http://www.codeguru.com/cpp/cpp/cpp_mfc/article.php/c4029/
-	RakNet::RakString& URLEncode(void);
+	RakString& URLEncode(void);
 
 	/// URL decode the string
-	RakNet::RakString& URLDecode(void);
+	RakString& URLDecode(void);
 
 	/// https://servers.api.rackspacecloud.com/v1.0 to https://,  servers.api.rackspacecloud.com, /v1.0
-	void SplitURI(RakNet::RakString &header, RakNet::RakString &domain, RakNet::RakString &path);
+	void SplitURI(RakString &header, RakString &domain, RakString &path);
 
 	/// Scan for quote, double quote, and backslash and prepend with backslash
-	RakNet::RakString& SQLEscape(void);
+	RakString& SQLEscape(void);
 
 	/// Format as a POST command that can be sent to a webserver
 	/// \param[in] uri For example, masterserver2.raknet.com/testServer
 	/// \param[in] contentType For example, text/plain; charset=UTF-8
 	/// \param[in] body Body of the post
 	/// \return Formatted string
-	static RakNet::RakString FormatForPOST(const char* uri, const char* contentType, const char* body, const char* extraHeaders="");
-	static RakNet::RakString FormatForPUT(const char* uri, const char* contentType, const char* body, const char* extraHeaders="");
+	static RakString FormatForPOST(const char* uri, const char* contentType, const char* body, const char* extraHeaders="");
+	static RakString FormatForPUT(const char* uri, const char* contentType, const char* body, const char* extraHeaders="");
 
 	/// Format as a GET command that can be sent to a webserver
 	/// \param[in] uri For example, masterserver2.raknet.com/testServer?__gameId=comprehensivePCGame
 	/// \return Formatted string
-	static RakNet::RakString FormatForGET(const char* uri, const char* extraHeaders="");
+	static RakString FormatForGET(const char* uri, const char* extraHeaders="");
 
 	/// Format as a DELETE command that can be sent to a webserver
 	/// \param[in] uri For example, masterserver2.raknet.com/testServer?__gameId=comprehensivePCGame&__rowId=1
 	/// \return Formatted string
-	static RakNet::RakString FormatForDELETE(const char* uri, const char* extraHeaders="");
+	static RakString FormatForDELETE(const char* uri, const char* extraHeaders="");
 
 	/// Fix to be a file path, ending with /
-	RakNet::RakString& MakeFilePath(void);
+	RakString& MakeFilePath(void);
 
 	/// RakString uses a freeList of old no-longer used strings
 	/// Call this function to clear this memory on shutdown
@@ -334,7 +334,7 @@ public:
 	static void UnlockMutex(void);
 
 protected:
-	static RakNet::RakString FormatForPUTOrPost(const char* type, const char* uri, const char* contentType, const char* body, const char* extraHeaders);
+	static RakString FormatForPUTOrPost(const char* type, const char* uri, const char* contentType, const char* body, const char* extraHeaders);
 	void Allocate(size_t len);
 	void Assign(const char *str);
 	void Assign(const char *str, va_list ap);
@@ -346,9 +346,9 @@ protected:
 	void Realloc(SharedString *sharedString, size_t bytes);
 };
 
-}
+const RakString RAK_DLL_EXPORT operator+(const RakString &lhs, const RakString &rhs);
 
-const RakNet::RakString RAK_DLL_EXPORT operator+(const RakNet::RakString &lhs, const RakNet::RakString &rhs);
+} // namespace RakNet
 
 
 #endif

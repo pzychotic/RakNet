@@ -17,8 +17,7 @@
 #include "RakNetTypes.h"
 #include "RakString.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 class BitStream;
 struct CloudQueryRow;
@@ -46,12 +45,12 @@ public:
 struct RAK_DLL_EXPORT CloudKey
 {
 	CloudKey() {}
-	CloudKey(RakNet::RakString _primaryKey, uint32_t _secondaryKey) : primaryKey(_primaryKey), secondaryKey(_secondaryKey) {}
+	CloudKey(RakString _primaryKey, uint32_t _secondaryKey) : primaryKey(_primaryKey), secondaryKey(_secondaryKey) {}
 	~CloudKey() {}
 
 	/// Identifies the primary key. This is intended to be a major category, such as the name of the application
 	/// Must be non-empty
-	RakNet::RakString primaryKey;
+	RakString primaryKey;
 
 	/// Identifies the secondary key. This is intended to be a subcategory enumeration, such as PLAYER_LIST or RUNNING_SCORES
 	uint32_t secondaryKey;
@@ -143,7 +142,7 @@ struct RAK_DLL_EXPORT CloudQueryResult
 	void SerializeCloudQueryRows(bool writeToBitstream, uint32_t &numRows, BitStream *bitStream, CloudAllocator *allocator);
 };
 
-} // Namespace RakNet
+} // namespace RakNet
 
 #endif // __CLOUD_COMMON_H
 

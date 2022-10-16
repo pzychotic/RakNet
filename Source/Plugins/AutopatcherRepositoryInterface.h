@@ -19,8 +19,8 @@
 
 #include "Plugins/IncrementalReadInterface.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class FileList;
 
@@ -54,7 +54,7 @@ public:
 	/// \param[out] whenPatched time in seconds since epoch when patched. Use time() function to get this in C
 	/// \return true on success, false on failure
 	virtual bool GetMostRecentChangelistWithPatches(
-		RakNet::RakString &applicationName,
+		RakString &applicationName,
 		FileList *patchedFiles,
 		FileList *updatedFiles,
 		FileList *addedOrModifiedFileHashes,
@@ -72,4 +72,3 @@ public:
 } // namespace RakNet
 
 #endif
-

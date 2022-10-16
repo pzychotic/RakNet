@@ -21,8 +21,7 @@
 #include "CommandParserInterface.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \brief Adds the ability to send logging output to a remote console
 class RAK_DLL_EXPORT LogCommandParser : public CommandParserInterface

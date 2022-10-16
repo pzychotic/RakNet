@@ -32,8 +32,7 @@
 /// \details This should not be used at the same time as RPC3. This is a less functional version of RPC3, and is here for users that do not want the Boost dependency of RPC3.
 /// \ingroup PLUGINS_GROUP
 
-namespace RakNet
-{
+namespace RakNet {
 
 	/// \brief Error codes returned by a remote system as to why an RPC function call cannot execute
 	/// \details Error code follows packet ID ID_RPC_REMOTE_ERROR, that is packet->data[1]<BR>
@@ -50,13 +49,13 @@ namespace RakNet
 	{
 	public:
 		/// \brief Queue a call to RPC4::RegisterFunction() globally. Actual call occurs once RPC4 is attached to an instance of RakPeer or TCPInterface.
-		RPC4GlobalRegistration(const char* uniqueID, void ( *functionPointer ) ( RakNet::BitStream *userData, Packet *packet ));
+		RPC4GlobalRegistration(const char* uniqueID, void ( *functionPointer ) ( BitStream *userData, Packet *packet ));
 
 		/// \brief Queue a call to RPC4::RegisterSlot() globally. Actual call occurs once RPC4 is attached to an instance of RakPeer or TCPInterface.
-		RPC4GlobalRegistration(const char* uniqueID, void ( *functionPointer ) ( RakNet::BitStream *userData, Packet *packet ), int callPriority);
+		RPC4GlobalRegistration(const char* uniqueID, void ( *functionPointer ) ( BitStream *userData, Packet *packet ), int callPriority);
 
 		/// \brief Queue a call to RPC4::RegisterBlockingFunction() globally. Actual call occurs once RPC4 is attached to an instance of RakPeer or TCPInterface.
-		RPC4GlobalRegistration(const char* uniqueID, void ( *functionPointer ) ( RakNet::BitStream *userData, RakNet::BitStream *returnData, Packet *packet ));
+		RPC4GlobalRegistration(const char* uniqueID, void ( *functionPointer ) ( BitStream *userData, BitStream *returnData, Packet *packet ));
 
 		/// \brief Queue a call to RPC4::RegisterLocalCallback() globally. Actual call occurs once RPC4 is attached to an instance of RakPeer or TCPInterface.
 		RPC4GlobalRegistration(const char* uniqueID, MessageID messageId);
@@ -87,17 +86,17 @@ namespace RakNet
 		/// \param[in] uniqueID Identifier to be associated with \a functionPointer. If this identifier is already in use, the call will return false.
 		/// \param[in] functionPointer C function pointer to be called
 		/// \return True if the hash of uniqueID is not in use, false otherwise.
-		bool RegisterFunction(const char* uniqueID, void ( *functionPointer ) ( RakNet::BitStream *userData, Packet *packet ));
+		bool RegisterFunction(const char* uniqueID, void ( *functionPointer ) ( BitStream *userData, Packet *packet ));
 
 		/// Register a slot, which is a function pointer to one or more implementations that supports this function signature
 		/// When a signal occurs, all slots with the same identifier are called.
 		/// \param[in] sharedIdentifier A string to identify the slot. Recommended to be the same as the name of the function.
 		/// \param[in] functionPtr Pointer to the function. For C, just pass the name of the function. For C++, use ARPC_REGISTER_CPP_FUNCTION
 		/// \param[in] callPriority Slots are called by order of the highest callPriority first. For slots with the same priority, they are called in the order they are registered
-		void RegisterSlot(const char *sharedIdentifier, void ( *functionPointer ) ( RakNet::BitStream *userData, Packet *packet ), int callPriority);
+		void RegisterSlot(const char *sharedIdentifier, void ( *functionPointer ) ( BitStream *userData, Packet *packet ), int callPriority);
 
 		/// \brief Same as \a RegisterFunction, but is called with CallBlocking() instead of Call() and returns a value to the caller
-		bool RegisterBlockingFunction(const char* uniqueID, void ( *functionPointer ) ( RakNet::BitStream *userData, RakNet::BitStream *returnData, Packet *packet ));
+		bool RegisterBlockingFunction(const char* uniqueID, void ( *functionPointer ) ( BitStream *userData, BitStream *returnData, Packet *packet ));
 
 		/// \deprecated Use RegisterSlot and invoke on self only when the packet you want arrives
 		/// When a RakNet Packet with the specified identifier is returned, execute CallLoopback() on a function previously registered with RegisterFunction()
@@ -128,7 +127,7 @@ namespace RakNet
 		/// Send to the attached instance of RakPeer. See RakPeerInterface::SendLoopback()
 		/// \param[in] Identifier originally passed to RegisterFunction() on the local system
 		/// \param[in] bitStream bitStream encoded data to send to the function callback
-		void CallLoopback( const char* uniqueID, RakNet::BitStream * bitStream );
+		void CallLoopback( const char* uniqueID, BitStream * bitStream );
 
 		/// \deprecated, use Signal()
 		/// Send to the specified remote instance of RakPeer.
@@ -139,7 +138,7 @@ namespace RakNet
 		/// \param[in] orderingChannel See RakPeerInterface::Send()
 		/// \param[in] systemIdentifier See RakPeerInterface::Send()
 		/// \param[in] broadcast See RakPeerInterface::Send()
-		void Call( const char* uniqueID, RakNet::BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
+		void Call( const char* uniqueID, BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
 
 		/// \brief Same as call, but don't return until the remote system replies.
 		/// Broadcasting parameter does not exist, this can only call one remote system
@@ -152,7 +151,7 @@ namespace RakNet
 		/// \param[in] systemIdentifier See RakPeerInterface::Send()
 		/// \param[out] returnData Written to by the function registered with RegisterBlockingFunction.
 		/// \return true if successfully called. False on disconnect, function not registered, or not connected to begin with
-		bool CallBlocking( const char* uniqueID, RakNet::BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, RakNet::BitStream *returnData );
+		bool CallBlocking( const char* uniqueID, BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, BitStream *returnData );
 
 		/// Calls zero or more functions identified by sharedIdentifier registered with RegisterSlot()
 		/// \param[in] sharedIdentifier parameter of the same name passed to RegisterSlot() on the remote system
@@ -163,7 +162,7 @@ namespace RakNet
 		/// \param[in] systemIdentifier See RakPeerInterface::Send()
 		/// \param[in] broadcast See RakPeerInterface::Send()
 		/// \param[in] invokeLocal If true, also sends to self.
-		void Signal(const char *sharedIdentifier, RakNet::BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool invokeLocal);
+		void Signal(const char *sharedIdentifier, BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool invokeLocal);
 
 		/// If called while processing a slot, no further slots for the currently executing signal will be executed
 		void InterruptSignal(void);
@@ -172,7 +171,7 @@ namespace RakNet
 		struct LocalCallback
 		{
 			MessageID messageId;
-			DataStructures::OrderedList<RakNet::RakString,RakNet::RakString> functions;
+			DataStructures::OrderedList<RakString,RakString> functions;
 		};
 		static int LocalCallbackComp(const MessageID &key, LocalCallback* const &data );
 
@@ -181,14 +180,14 @@ namespace RakNet
 		struct LocalSlotObject
 		{
 			LocalSlotObject() {}
-			LocalSlotObject(unsigned int _registrationCount,int _callPriority, void ( *_functionPointer ) ( RakNet::BitStream *userData, Packet *packet ))
+			LocalSlotObject(unsigned int _registrationCount,int _callPriority, void ( *_functionPointer ) ( BitStream *userData, Packet *packet ))
 			{registrationCount=_registrationCount;callPriority=_callPriority;functionPointer=_functionPointer;}
 			~LocalSlotObject() {}
 
 			// Used so slots are called in the order they are registered
 			unsigned int registrationCount;
 			int callPriority;
-			void ( *functionPointer ) ( RakNet::BitStream *userData, Packet *packet );
+			void ( *functionPointer ) ( BitStream *userData, Packet *packet );
 		};
 
 		static int LocalSlotObjectComp( const LocalSlotObject &key, const LocalSlotObject &data );
@@ -198,7 +197,7 @@ namespace RakNet
 		{
 			DataStructures::OrderedList<LocalSlotObject,LocalSlotObject,LocalSlotObjectComp> slotObjects;
 		};
-		DataStructures::Hash<RakNet::RakString, LocalSlot*,256, RakNet::RakString::ToInteger> localSlots;
+		DataStructures::Hash<RakString, LocalSlot*,256, RakString::ToInteger> localSlots;
 
 	protected:
 
@@ -208,11 +207,11 @@ namespace RakNet
 		virtual void OnAttach(void);
 		virtual PluginReceiveResult OnReceive(Packet *packet);
 
-		DataStructures::Hash<RakNet::RakString, void ( * ) ( RakNet::BitStream *, Packet * ),64, RakNet::RakString::ToInteger> registeredNonblockingFunctions;
-		DataStructures::Hash<RakNet::RakString, void ( * ) ( RakNet::BitStream *, RakNet::BitStream *, Packet * ),64, RakNet::RakString::ToInteger> registeredBlockingFunctions;
+		DataStructures::Hash<RakString, void ( * ) ( BitStream *, Packet * ),64, RakString::ToInteger> registeredNonblockingFunctions;
+		DataStructures::Hash<RakString, void ( * ) ( BitStream *, BitStream *, Packet * ),64, RakString::ToInteger> registeredBlockingFunctions;
 		DataStructures::OrderedList<MessageID,LocalCallback*,RPC4::LocalCallbackComp> localCallbacks;
 
-		RakNet::BitStream blockingReturnValue;
+		BitStream blockingReturnValue;
 		bool gotBlockingReturnValue;
 
 		DataStructures::HashIndex GetLocalSlotIndex(const char *sharedIdentifier);
@@ -222,10 +221,10 @@ namespace RakNet
 
 		bool interruptSignal;
 
-		void InvokeSignal(DataStructures::HashIndex functionIndex, RakNet::BitStream *serializedParameters, Packet *packet);
+		void InvokeSignal(DataStructures::HashIndex functionIndex, BitStream *serializedParameters, Packet *packet);
 	};
 
-} // End namespace
+} // namespace RakNet
 
 #endif
 

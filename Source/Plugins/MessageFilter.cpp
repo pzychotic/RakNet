@@ -19,14 +19,14 @@
 #include "TCPInterface.h"
 #include "BitStream.h"
 
-using namespace RakNet;
+namespace RakNet {
 
-int RakNet::MessageFilterStrComp( char *const &key,char *const &data )
+int MessageFilterStrComp( char *const &key,char *const &data )
 {
 	return strcmp(key,data);
 }
 
-int RakNet::FilterSetComp( const int &key, FilterSet * const &data )
+int FilterSetComp( const int &key, FilterSet * const &data )
 {
 	if (key < data->filterSetID)
 		return -1;
@@ -389,9 +389,9 @@ void MessageFilter::OnClosedConnection(const SystemAddress &systemAddress, RakNe
 		}
 		if (packet->data[0]==ID_RPC_PLUGIN)
 		{
-			RakNet::BitStream bsIn(packet->data,packet->length,false);
+			BitStream bsIn(packet->data,packet->length,false);
 			bsIn.IgnoreBytes(2);
-			RakNet::RakString functionName;
+			RakString functionName;
 			bsIn.ReadCompressed(functionName);
 			if (systemList.ItemAtIndex(index).filter->allowedRPC4.HasData(functionName)==false)
 			{
@@ -405,5 +405,7 @@ void MessageFilter::OnClosedConnection(const SystemAddress &systemAddress, RakNe
 	
 	return RR_CONTINUE_PROCESSING;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

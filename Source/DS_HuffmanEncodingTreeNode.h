@@ -15,6 +15,8 @@
 #ifndef __HUFFMAN_ENCODING_TREE_NODE
 #define __HUFFMAN_ENCODING_TREE_NODE
 
+namespace RakNet {
+
 struct HuffmanEncodingTreeNode
 {
 	unsigned char value;
@@ -23,5 +25,7 @@ struct HuffmanEncodingTreeNode
 	HuffmanEncodingTreeNode *right;
 	HuffmanEncodingTreeNode *parent;
 };
+
+} // namespace RakNet
 
 #endif

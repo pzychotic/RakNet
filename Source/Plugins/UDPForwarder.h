@@ -32,8 +32,7 @@
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "Plugins/UDPProxyCommon.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 enum UDPForwarderResult
 {
@@ -148,11 +147,10 @@ protected:
 //	SimpleMutex forwardListNotUpdatedMutex;
 
 	unsigned short maxForwardEntries;
-	RakNet::LocklessUint32_t isRunning, threadRunning;
-
+	LocklessUint32_t isRunning, threadRunning;
 };
 
-} // End namespace
+} // namespace RakNet
 
 #endif
 

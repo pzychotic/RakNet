@@ -20,8 +20,7 @@
 #include "RakMemoryOverride.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 class BitStream;
 
@@ -32,8 +31,8 @@ public:
 	// GetInstance() and DestroyInstance(instance*)
 	STATIC_FACTORY_DECLARATIONS(DataCompressor)
 
-	static void Compress( unsigned char *userData, unsigned sizeInBytes, RakNet::BitStream * output );
-	static unsigned DecompressAndAllocate( RakNet::BitStream * input, unsigned char **output );
+	static void Compress( unsigned char *userData, unsigned sizeInBytes, BitStream* output );
+	static unsigned DecompressAndAllocate( BitStream* input, unsigned char **output );
 };
 
 } // namespace RakNet

@@ -26,8 +26,7 @@
 #ifndef __RACKSPACE_H
 #define __RACKSPACE_H
 
-namespace RakNet
-{
+namespace RakNet {
 
 	class TCPInterface;
 	struct Packet;
@@ -203,13 +202,13 @@ namespace RakNet
 		/// \param[in] name Name of the server. Only alphanumeric characters, periods, and hyphens are valid. Server Name cannot start or end with a period or hyphen.
 		/// \param[in] imageId Which image (harddrive contents, including OS) to use
 		/// \param[in] flavorId Which flavor (hardware config) to use, primarily how much memory is available.
-		void CreateServer(RakNet::RakString name, RakNet::RakString imageId, RakNet::RakString flavorId);
+		void CreateServer(RakString name, RakString imageId, RakString flavorId);
 
 		/// \brief Get details on a particular server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnGetServerDetailsResult()
 		/// \param[in] serverId Which server to get details on. You can call ListServers() to get the list of active servers.
-		void GetServerDetails(RakNet::RakString serverId);
+		void GetServerDetails(RakString serverId);
 
 		/// \brief Changes the name or password for a server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
@@ -217,47 +216,47 @@ namespace RakNet
 		/// \param[in] serverId Which server to get details on. You can call ListServers() to get the list of active servers.
 		/// \param[in] newName The new server name. Leave blank to leave unchanged. Only alphanumeric characters, periods, and hyphens are valid. Server Name cannot start or end with a period or hyphen.
 		/// \param[in] newPassword The new server password. Leave blank to leave unchanged.
-		void UpdateServerNameOrPassword(RakNet::RakString serverId, RakNet::RakString newName, RakNet::RakString newPassword);
+		void UpdateServerNameOrPassword(RakString serverId, RakString newName, RakString newPassword);
 
 		/// \brief Deletes a server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnDeleteServerResult()
 		/// \param[in] serverId Which server to get details on. You can call ListServers() to get the list of active servers.
-		void DeleteServer(RakNet::RakString serverId);
+		void DeleteServer(RakString serverId);
 		
 		/// \brief Lists the IP addresses available to a server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnListServerAddressesResult()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
-		void ListServerAddresses(RakNet::RakString serverId);
+		void ListServerAddresses(RakString serverId);
 
 		/// \brief Shares an IP address with a server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnShareServerAddressResult()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
 		/// \param[in] ipAddress Which IP address. You can call ListServerAddresses() to get the list of addresses for the specified server
-		void ShareServerAddress(RakNet::RakString serverId, RakNet::RakString ipAddress);
+		void ShareServerAddress(RakString serverId, RakString ipAddress);
 
 		/// \brief Stops sharing an IP address with a server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnDeleteServerAddressResult()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
 		/// \param[in] ipAddress Which IP address. You can call ListServerAddresses() to get the list of addresses for the specified server
-		void DeleteServerAddress(RakNet::RakString serverId, RakNet::RakString ipAddress);
+		void DeleteServerAddress(RakString serverId, RakString ipAddress);
 
 		/// \brief Reboots a server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnRebootServerResult()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
 		/// \param[in] rebootType Should be either "HARD" or "SOFT"
-		void RebootServer(RakNet::RakString serverId, RakNet::RakString rebootType);
+		void RebootServer(RakString serverId, RakString rebootType);
 
 		/// \brief Rebuilds a server with a different image (harddrive contents)
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnRebuildServerResult()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
 		/// \param[in] imageId Which image (harddrive contents, including OS) to use
-		void RebuildServer(RakNet::RakString serverId, RakNet::RakString imageId);
+		void RebuildServer(RakString serverId, RakString imageId);
 
 		/// \brief Changes the hardware configuration of a server. This does not take effect until you call ConfirmResizedServer()
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
@@ -265,21 +264,21 @@ namespace RakNet
 		/// \sa RevertResizedServer()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
 		/// \param[in] flavorId Which flavor (hardware config) to use, primarily how much memory is available.
-		void ResizeServer(RakNet::RakString serverId, RakNet::RakString flavorId);
+		void ResizeServer(RakString serverId, RakString flavorId);
 
 		/// \brief Confirm a resize for the specified server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnConfirmResizedServerResult()
 		/// \sa ResizeServer()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
-		void ConfirmResizedServer(RakNet::RakString serverId);
+		void ConfirmResizedServer(RakString serverId);
 
 		/// \brief Reverts a resize for the specified server
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnRevertResizedServerResult()
 		/// \sa ResizeServer()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
-		void RevertResizedServer(RakNet::RakString serverId);
+		void RevertResizedServer(RakString serverId);
 
 		/// \brief List all flavors (hardware configs, primarily memory)
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
@@ -291,7 +290,7 @@ namespace RakNet
 		/// \sa RackspaceEventCallback::OnGetFlavorDetailsResult()
 		/// \sa ListFlavors()
 		/// \param[in] flavorId Which flavor (hardware config)
-		void GetFlavorDetails(RakNet::RakString flavorId);
+		void GetFlavorDetails(RakString flavorId);
 
 		/// \brief List all images (software configs, including operating systems), which includes images you create yourself
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
@@ -305,21 +304,21 @@ namespace RakNet
 		/// \sa ListImages()
 		/// \param[in] serverId Which server to operate on. You can call ListServers() to get the list of active servers.
 		/// \param[in] imageName What to call this image
-		void CreateImage(RakNet::RakString serverId, RakNet::RakString imageName);
+		void CreateImage(RakString serverId, RakString imageName);
 
 		/// \brief Get extended details about a particular image
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnGetImageDetailsResult()
 		/// \sa ListImages()
 		/// \param[in] imageId Which image
-		void GetImageDetails(RakNet::RakString imageId);
+		void GetImageDetails(RakString imageId);
 
 		/// \brief Delete a custom image created with CreateImage()
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
 		/// \sa RackspaceEventCallback::OnDeleteImageResult()
 		/// \sa ListImages()
 		/// \param[in] imageId Which image
-		void DeleteImage(RakNet::RakString imageId);
+		void DeleteImage(RakString imageId);
 
 		/// \brief List IP groups
 		/// \sa http://docs.rackspacecloud.com/servers/api/v1.0/cs-devguide-20110112.pdf
@@ -332,11 +331,11 @@ namespace RakNet
 		void ListSharedIPGroupsWithDetails(void);
 
 		// I don't know what this does
-		void CreateSharedIPGroup(RakNet::RakString name, RakNet::RakString optionalServerId);
+		void CreateSharedIPGroup(RakString name, RakString optionalServerId);
 		// I don't know what this does
-		void GetSharedIPGroupDetails(RakNet::RakString groupId);
+		void GetSharedIPGroupDetails(RakString groupId);
 		// I don't know what this does
-		void DeleteSharedIPGroup(RakNet::RakString groupId);
+		void DeleteSharedIPGroup(RakString groupId);
 
 		/// \brief Adds a callback to the list of callbacks to be called when any of the above functions finish executing
 		/// The callbacks are called in the order they are added
@@ -358,7 +357,7 @@ namespace RakNet
 
 		/// \brief Mostly for internal use, but you can use it to execute an operation with more complex xml if desired
 		/// See the Rackspace.cpp on how to use it
-		void AddOperation(RackspaceOperationType type, RakNet::RakString httpCommand, RakNet::RakString operation, RakNet::RakString xml);
+		void AddOperation(RackspaceOperationType type, RakString httpCommand, RakString operation, RakString xml);
 	protected:
 
 		DataStructures::List<Rackspace2EventCallback*> eventCallbacks;
@@ -366,13 +365,13 @@ namespace RakNet
 		struct RackspaceOperation
 		{
 			RackspaceOperationType type;
-		//	RakNet::RakString stringInfo;
+		//	RakString stringInfo;
 			SystemAddress connectionAddress;
 			bool isPendingAuthentication;
-			RakNet::RakString incomingStream;
-			RakNet::RakString httpCommand;
-			RakNet::RakString operation;
-			RakNet::RakString xml;
+			RakString incomingStream;
+			RakString httpCommand;
+			RakString operation;
+			RakString xml;
 		};
 
 		TCPInterface *tcpInterface;
@@ -384,26 +383,24 @@ namespace RakNet
 		bool HasOperationOfType(RackspaceOperationType t);
 		unsigned int GetOperationOfTypeIndex(RackspaceOperationType t);
 
-		RakNet::RakString serverManagementURL;
-		RakNet::RakString serverManagementDomain;
-		RakNet::RakString serverManagementPath;
-		RakNet::RakString storageURL;
-		RakNet::RakString storageDomain;
-		RakNet::RakString storagePath;
-		RakNet::RakString cdnManagementURL;
-		RakNet::RakString cdnManagementDomain;
-		RakNet::RakString cdnManagementPath;
+		RakString serverManagementURL;
+		RakString serverManagementDomain;
+		RakString serverManagementPath;
+		RakString storageURL;
+		RakString storageDomain;
+		RakString storagePath;
+		RakString cdnManagementURL;
+		RakString cdnManagementDomain;
+		RakString cdnManagementPath;
 
-		RakNet::RakString storageToken;
-		RakNet::RakString authToken;
-		RakNet::RakString rackspaceCloudUsername;
-		RakNet::RakString apiAccessKey;
+		RakString storageToken;
+		RakString authToken;
+		RakString rackspaceCloudUsername;
+		RakString apiAccessKey;
 
 		bool ExecuteOperation(RackspaceOperation &ro);
-		void ReadLine(const char *data, const char *stringStart, RakNet::RakString &output);
+		void ReadLine(const char *data, const char *stringStart, RakString &output);
 		bool ConnectToServerManagementDomain(RackspaceOperation &ro);
-
-
 	};
 
 } // namespace RakNet

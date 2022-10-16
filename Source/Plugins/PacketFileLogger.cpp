@@ -13,7 +13,7 @@
 #include "Plugins/PacketFileLogger.h"
 #include "GetTime.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 PacketFileLogger::PacketFileLogger()
 {
@@ -51,5 +51,7 @@ void PacketFileLogger::WriteLog(const char *str)
 		fflush(packetLogFile);
 	}
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

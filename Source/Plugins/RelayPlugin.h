@@ -27,8 +27,7 @@
 /// \brief A simple class to relay messages from one system to another through an intermediary
 /// \ingroup PLUGINS_GROUP
 
-namespace RakNet
-{
+namespace RakNet {
 
 enum RelayPluginEnums
 {
@@ -141,14 +140,14 @@ protected:
 	void OnJoinGroupRequestFromClient(Packet *packet);
 	void OnLeaveGroupRequestFromClient(Packet *packet);
 
-	DataStructures::Hash<RakString, StrAndGuidAndRoom*, 8096, RakNet::RakString::ToInteger> strToGuidHash;
-	DataStructures::Hash<RakNetGUID, StrAndGuidAndRoom*, 8096, RakNet::RakNetGUID::ToUint32> guidToStrHash;
+	DataStructures::Hash<RakString, StrAndGuidAndRoom*, 8096, RakString::ToInteger> strToGuidHash;
+	DataStructures::Hash<RakNetGUID, StrAndGuidAndRoom*, 8096, RakNetGUID::ToUint32> guidToStrHash;
 	DataStructures::List<RP_Group*> chatRooms;
 	bool acceptAddParticipantRequests;
 
 };
 
-} // End namespace
+} // namespace RakNet
 
 #endif
 

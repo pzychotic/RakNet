@@ -47,6 +47,8 @@ else use congestion avoidance
 
 #include <stdint.h>
 
+namespace RakNet {
+
 /// Sizeof an UDP header in byte
 #define UDP_HEADER_SIZE 28
 
@@ -75,8 +77,6 @@ typedef double BytesPerMicrosecond;
 typedef double BytesPerSecond;
 typedef double MicrosecondsPerByte;
 
-namespace RakNet
-{
 
 class CCRakNetSlidingWindow
 {
@@ -213,7 +213,7 @@ class CCRakNetSlidingWindow
 
 };
 
-}
+} // namespace RakNet
 
 #endif
 

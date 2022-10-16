@@ -14,7 +14,7 @@
 #include "Plugins/ThreadsafePacketLogger.h"
 #include <string.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 ThreadsafePacketLogger::ThreadsafePacketLogger()
 {
@@ -44,5 +44,7 @@ void ThreadsafePacketLogger::AddToLog(const char *str)
 	strcpy(*msg, str);
 	logMessages.WriteUnlock();
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

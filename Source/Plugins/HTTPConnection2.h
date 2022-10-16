@@ -27,8 +27,8 @@
 #include "PluginInterface2.h"
 #include "SimpleMutex.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class TCPInterface;
 struct SystemAddress;

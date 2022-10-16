@@ -24,8 +24,8 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class TransportInterface;
 class CommandParserInterface;

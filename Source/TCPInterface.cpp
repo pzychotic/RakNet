@@ -48,13 +48,11 @@
 #ifdef _WIN32
 #include "WSAStartupSingleton.h"
 #endif
-namespace RakNet
-{
+
+namespace RakNet {
+
 RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop);
 RAK_THREAD_DECLARATION(ConnectionAttemptLoop);
-}
-
-using namespace RakNet;
 
 STATIC_FACTORY_DEFINITIONS(TCPInterface,TCPInterface);
 
@@ -67,7 +65,7 @@ TCPInterface::TCPInterface()
 	remoteClientsLength=0;
 
 	StringCompressor::AddReference();
-	RakNet::StringTable::AddReference();
+	StringTable::AddReference();
 
 #if OPEN_SSL_CLIENT_SUPPORT==1
 	ctx=0;
@@ -88,7 +86,7 @@ TCPInterface::~TCPInterface()
 	RakNet::OP_DELETE_ARRAY(remoteClients,_FILE_AND_LINE_);
 
 	StringCompressor::RemoveReference();
-	RakNet::StringTable::RemoveReference();
+	StringTable::RemoveReference();
 }
 #if !defined(WINDOWS_STORE_RT)
 bool TCPInterface::CreateListenSocket(unsigned short port, unsigned short maxIncomingConnections, unsigned short socketFamily, const char *bindAddress)
@@ -226,7 +224,7 @@ bool TCPInterface::Start(unsigned short port, unsigned short maxIncomingConnecti
 
 
 
-	errorCode = RakNet::RakThread::Create(UpdateTCPInterfaceLoop, this, threadPriority);
+	errorCode = RakThread::Create(UpdateTCPInterfaceLoop, this, threadPriority);
 
 
 	if (errorCode!=0)
@@ -402,7 +400,7 @@ SystemAddress TCPInterface::Connect(const char* host, unsigned short remotePort,
 
 
 
-		errorCode = RakNet::RakThread::Create(ConnectionAttemptLoop, s, threadPriority);
+		errorCode = RakThread::Create(ConnectionAttemptLoop, s, threadPriority);
 
 		if (errorCode!=0)
 		{
@@ -882,7 +880,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect(const char* host, unsigned short remot
 #endif  // __native_client__
 }
 
-RAK_THREAD_DECLARATION(RakNet::ConnectionAttemptLoop)
+RAK_THREAD_DECLARATION(ConnectionAttemptLoop)
 {
 
 
@@ -930,7 +928,7 @@ RAK_THREAD_DECLARATION(RakNet::ConnectionAttemptLoop)
 
 }
 
-RAK_THREAD_DECLARATION(RakNet::UpdateTCPInterfaceLoop)
+RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 {
 
 
@@ -1418,5 +1416,7 @@ int RemoteClient::Recv(char *data, const int dataSize)
 #endif
 }
 #endif
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

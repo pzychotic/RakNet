@@ -16,11 +16,11 @@
 #include "MessageIdentifiers.h"
 #include "BitStream.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(ConnectionGraph2,ConnectionGraph2)
 
-int RakNet::ConnectionGraph2::RemoteSystemComp( const RakNetGUID &key, RemoteSystem * const &data )
+int ConnectionGraph2::RemoteSystemComp( const RakNetGUID &key, RemoteSystem * const &data )
 {
 	if (key < data->guid)
 		return -1;
@@ -29,7 +29,7 @@ int RakNet::ConnectionGraph2::RemoteSystemComp( const RakNetGUID &key, RemoteSys
 	return 0;
 }
 
-int RakNet::ConnectionGraph2::SystemAddressAndGuidComp( const SystemAddressAndGuid &key, const SystemAddressAndGuid &data )
+int ConnectionGraph2::SystemAddressAndGuidComp( const SystemAddressAndGuid &key, const SystemAddressAndGuid &data )
 {
 	if (key.guid<data.guid)
 		return -1;
@@ -172,7 +172,7 @@ RakNetGUID ConnectionGraph2::GetLowestAveragePingSystem(void) const
 void ConnectionGraph2::OnClosedConnection(const SystemAddress &systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
 {
 	// Send notice to all existing connections
-	RakNet::BitStream bs;
+	BitStream bs;
 	if (lostConnectionReason==LCR_CONNECTION_LOST)
 		bs.Write((MessageID)ID_REMOTE_CONNECTION_LOST);
 	else
@@ -200,7 +200,7 @@ bool ConnectionGraph2::GetAutoProcessNewConnections(void) const
 void ConnectionGraph2::AddParticipant(const SystemAddress &systemAddress, RakNetGUID rakNetGUID)
 {
 	// Relay the new connection to other systems.
-	RakNet::BitStream bs;
+	BitStream bs;
 	bs.Write((MessageID)ID_REMOTE_NEW_INCOMING_CONNECTION);
 	bs.Write((uint32_t)1);
 	bs.Write(systemAddress);
@@ -269,7 +269,7 @@ PluginReceiveResult ConnectionGraph2::OnReceive(Packet *packet)
 		unsigned idx = remoteSystems.GetIndexFromKey(packet->guid, &objectExists);
 		if (objectExists)
 		{
-			RakNet::BitStream bs(packet->data,packet->length,false);
+			BitStream bs(packet->data,packet->length,false);
 			bs.IgnoreBytes(1);
 			SystemAddressAndGuid saag;
 			bs.Read(saag.systemAddress);
@@ -286,7 +286,7 @@ PluginReceiveResult ConnectionGraph2::OnReceive(Packet *packet)
 		if (objectExists)
 		{
 			uint32_t numAddresses;
-			RakNet::BitStream bs(packet->data,packet->length,false);
+			BitStream bs(packet->data,packet->length,false);
 			bs.IgnoreBytes(1);
 			bs.Read(numAddresses);
 			for (unsigned int idx2=0; idx2 < numAddresses; idx2++)
@@ -305,5 +305,7 @@ PluginReceiveResult ConnectionGraph2::OnReceive(Packet *packet)
 	
 	return RR_CONTINUE_PROCESSING;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

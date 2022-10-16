@@ -10,7 +10,7 @@
 
 #include "LocklessTypes.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 LocklessUint32_t::LocklessUint32_t()
 {
@@ -50,3 +50,5 @@ uint32_t LocklessUint32_t::Decrement(void)
 	return __sync_fetch_and_add (&value, (uint32_t) -1);
 #endif
 }
+
+} // namespace RakNet

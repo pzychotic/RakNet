@@ -11,6 +11,8 @@
 #include "DR_SHA1.h"
 #include <stdlib.h>
 
+namespace RakNet {
+
 #define SHA1_MAX_FILE_BUFFER (32 * 20 * 820)
 
 // Rotate p_val32 by p_nBits bits to the left
@@ -303,3 +305,5 @@ void CSHA1::HMAC(unsigned char *sharedKey, int sharedKeyLength, unsigned char *d
 	// 	memset(report,0,128);
 	// 	secondHash.ReportHash( report, 0 );
 }
+
+} // namespace RakNet

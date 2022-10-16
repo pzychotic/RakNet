@@ -47,8 +47,8 @@
 /// While pathToApplication can be anything you want, applicationSubdirectory must match either partially or fully between systems.
 /// \ingroup DIRECTORY_DELTA_TRANSFER_GROUP
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class FileList;
 struct Packet;

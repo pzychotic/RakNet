@@ -19,7 +19,7 @@
 #include "CCRakNetSlidingWindow.h"
 #endif
 
-using namespace RakNet;
+namespace RakNet {
 
 int SendToThread::refCount=0;
 DataStructures::ThreadsafeAllocatingQueue<SendToThread::SendToThreadBlock> SendToThread::objectQueue;
@@ -83,4 +83,7 @@ void SendToThread::ProcessBlock(SendToThread::SendToThreadBlock* threadedSend)
 	RakAssert(threadedSend->dataWriteOffset>0 && threadedSend->dataWriteOffset<=MAXIMUM_MTU_SIZE-UDP_HEADER_SIZE);
 	threadPool.AddInput(SendToWorkerThread,threadedSend);
 }
+
+} // namespace RakNet
+
 #endif

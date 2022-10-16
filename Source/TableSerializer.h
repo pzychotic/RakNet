@@ -15,34 +15,30 @@
 #include "DS_Table.h"
 #include "Export.h"
 
-namespace RakNet
-{
-	class BitStream;
-}
+namespace RakNet {
 
-namespace RakNet
-{
+class BitStream;
 
 class RAK_DLL_EXPORT TableSerializer
 {
 public:
-	static void SerializeTable(DataStructures::Table *in, RakNet::BitStream *out);
+	static void SerializeTable(DataStructures::Table *in, BitStream *out);
 	static bool DeserializeTable(unsigned char *serializedTable, unsigned int dataLength, DataStructures::Table *out);
-	static bool DeserializeTable(RakNet::BitStream *in, DataStructures::Table *out);
-	static void SerializeColumns(DataStructures::Table *in, RakNet::BitStream *out);
-	static void SerializeColumns(DataStructures::Table *in, RakNet::BitStream *out, DataStructures::List<int> &skipColumnIndices);
-	static bool DeserializeColumns(RakNet::BitStream *in, DataStructures::Table *out);	
-	static void SerializeRow(DataStructures::Table::Row *in, unsigned keyIn, const DataStructures::List<DataStructures::Table::ColumnDescriptor> &columns, RakNet::BitStream *out);
-	static void SerializeRow(DataStructures::Table::Row *in, unsigned keyIn, const DataStructures::List<DataStructures::Table::ColumnDescriptor> &columns, RakNet::BitStream *out, DataStructures::List<int> &skipColumnIndices);
-	static bool DeserializeRow(RakNet::BitStream *in, DataStructures::Table *out);
-	static void SerializeCell(RakNet::BitStream *out, DataStructures::Table::Cell *cell, DataStructures::Table::ColumnType columnType);
-	static bool DeserializeCell(RakNet::BitStream *in, DataStructures::Table::Cell *cell, DataStructures::Table::ColumnType columnType);
-	static void SerializeFilterQuery(RakNet::BitStream *in, DataStructures::Table::FilterQuery *query);
+	static bool DeserializeTable(BitStream *in, DataStructures::Table *out);
+	static void SerializeColumns(DataStructures::Table *in, BitStream *out);
+	static void SerializeColumns(DataStructures::Table *in, BitStream *out, DataStructures::List<int> &skipColumnIndices);
+	static bool DeserializeColumns(BitStream *in, DataStructures::Table *out);	
+	static void SerializeRow(DataStructures::Table::Row *in, unsigned keyIn, const DataStructures::List<DataStructures::Table::ColumnDescriptor> &columns, BitStream *out);
+	static void SerializeRow(DataStructures::Table::Row *in, unsigned keyIn, const DataStructures::List<DataStructures::Table::ColumnDescriptor> &columns, BitStream *out, DataStructures::List<int> &skipColumnIndices);
+	static bool DeserializeRow(BitStream *in, DataStructures::Table *out);
+	static void SerializeCell(BitStream *out, DataStructures::Table::Cell *cell, DataStructures::Table::ColumnType columnType);
+	static bool DeserializeCell(BitStream *in, DataStructures::Table::Cell *cell, DataStructures::Table::ColumnType columnType);
+	static void SerializeFilterQuery(BitStream *in, DataStructures::Table::FilterQuery *query);
 	// Note that this allocates query->cell->c!
-	static bool DeserializeFilterQuery(RakNet::BitStream *out, DataStructures::Table::FilterQuery *query);
-	static void SerializeFilterQueryList(RakNet::BitStream *in, DataStructures::Table::FilterQuery *query, unsigned int numQueries, unsigned int maxQueries);
+	static bool DeserializeFilterQuery(BitStream *out, DataStructures::Table::FilterQuery *query);
+	static void SerializeFilterQueryList(BitStream *in, DataStructures::Table::FilterQuery *query, unsigned int numQueries, unsigned int maxQueries);
 	// Note that this allocates queries, cells, and query->cell->c!. Use DeallocateQueryList to free.
-	static bool DeserializeFilterQueryList(RakNet::BitStream *out, DataStructures::Table::FilterQuery **query, unsigned int *numQueries, unsigned int maxQueries, int allocateExtraQueries=0);
+	static bool DeserializeFilterQueryList(BitStream *out, DataStructures::Table::FilterQuery **query, unsigned int *numQueries, unsigned int maxQueries, int allocateExtraQueries=0);
 	static void DeallocateQueryList(DataStructures::Table::FilterQuery *query, unsigned int numQueries);
 };
 
@@ -196,7 +192,7 @@ void main(void)
 		RAKNET_DEBUG_PRINTF("%s\n", out);
 	}
 
-	RakNet::BitStream bs;
+	BitStream bs;
 	RAKNET_DEBUG_PRINTF("PreSerialize:\n");
 	for (i=0; i < table.GetRowCount(); i++)
 	{

@@ -17,14 +17,12 @@
 
 #include "Export.h"
 
-extern "C" {
-char * FormatString(const char *format, ...);
-}
-// Threadsafe
-extern "C" {
-char * FormatStringTS(char *output, const char *format, ...);
-}
+namespace RakNet {
 
+char * FormatString(const char *format, ...);
+char * FormatStringTS(char *output, const char *format, ...);
+
+} // namespace RakNet
 
 #endif
 

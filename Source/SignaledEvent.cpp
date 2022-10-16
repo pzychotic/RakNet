@@ -16,11 +16,7 @@
 #include <unistd.h>
 #endif
 
-using namespace RakNet;
-
-
-
-
+namespace RakNet {
 
 SignaledEvent::SignaledEvent()
 {
@@ -43,15 +39,6 @@ void SignaledEvent::InitEvent(void)
 		eventList=CreateEventEx(0, 0, 0, 0);
 #elif defined(_WIN32)
 		eventList=CreateEvent(0, false, false, 0);
-
-
-
-
-
-
-
-
-
 #else
 
 #if !defined(ANDROID)
@@ -73,15 +60,6 @@ void SignaledEvent::CloseEvent(void)
 		CloseHandle(eventList);
 		eventList=INVALID_HANDLE_VALUE;
 	}
-
-
-
-
-
-
-
-
-
 #else
 	pthread_cond_destroy(&eventList);
 	pthread_mutex_destroy(&hMutex);
@@ -96,16 +74,6 @@ void SignaledEvent::SetEvent(void)
 {
 #ifdef _WIN32
 	::SetEvent(eventList);
-
-
-
-
-
-
-
-
-
-
 #else
 	// Different from SetEvent which stays signaled.
 	// We have to record manually that the event was signaled
@@ -127,47 +95,6 @@ void SignaledEvent::WaitOnEvent(int timeoutMs)
 //		false,
 //		timeoutMs);
 	WaitForSingleObjectEx(eventList,timeoutMs,FALSE);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #else
 
 	// If was previously set signaled, just unset and return
@@ -179,29 +106,9 @@ void SignaledEvent::WaitOnEvent(int timeoutMs)
 		return;
 	}
 	isSignaledMutex.Unlock();
-
-	
-
 	//struct timespec   ts;
 
 	// Else wait for SetEvent to be called
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 		struct timespec   ts;
 
 		int rc;
@@ -261,3 +168,5 @@ void SignaledEvent::WaitOnEvent(int timeoutMs)
 
 #endif
 }
+
+} // namespace RakNet

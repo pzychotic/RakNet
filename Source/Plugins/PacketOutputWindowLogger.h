@@ -21,8 +21,7 @@
 
 #include "Plugins/PacketLogger.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \ingroup PACKETLOGGER_GROUP
 /// \brief Packetlogger that outputs to the output window in the debugger. Windows only.

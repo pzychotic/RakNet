@@ -26,8 +26,7 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
 
 	/// \brief Holds a set of columns, a set of rows, and rows times columns cells.
 	/// \details The table data structure is useful if you want to store a set of structures and perform queries on those structures.<BR>
@@ -120,7 +119,7 @@ namespace DataStructures
 		struct RAK_DLL_EXPORT Row
 		{
 			// list of cells
-			DataStructures::List<Cell*> cells;
+			List<Cell*> cells;
 
 			/// Numeric
 			void UpdateCell(unsigned columnIndex, double value);
@@ -229,8 +228,8 @@ namespace DataStructures
 		/// \param[in] initialCellValues Initial values to give the row (optional)
 		/// \return The newly added row
 		Table::Row* AddRow(unsigned rowId);
-		Table::Row* AddRow(unsigned rowId, DataStructures::List<Cell> &initialCellValues);
-		Table::Row* AddRow(unsigned rowId, DataStructures::List<Cell*> &initialCellValues, bool copyCells=false);
+		Table::Row* AddRow(unsigned rowId, List<Cell> &initialCellValues);
+		Table::Row* AddRow(unsigned rowId, List<Cell*> &initialCellValues, bool copyCells=false);
 
 		/// \brief Removes a row specified by rowId.
 		/// \param[in] rowId The ID of the row
@@ -310,13 +309,13 @@ namespace DataStructures
 		void PrintRow(char *out, int outLength, char columnDelineator, bool printDelineatorForBinary, Table::Row* inputRow) const;
 
 		/// \brief Direct access to make things easier.
-		const DataStructures::List<ColumnDescriptor>& GetColumns(void) const;
+		const List<ColumnDescriptor>& GetColumns(void) const;
 
 		/// \brief Direct access to make things easier.
-		const DataStructures::BPlusTree<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER>& GetRows(void) const;
+		const BPlusTree<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER>& GetRows(void) const;
 
 		/// \brief Get the head of a linked list containing all the row data.
-		DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> * GetListHead(void);
+		Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> * GetListHead(void);
 
 		/// \brief Get the first free row id.
 		/// This could be made more efficient.
@@ -325,19 +324,20 @@ namespace DataStructures
 		Table& operator = ( const Table& input );
 
 	protected:
-		Table::Row* AddRowColumns(unsigned rowId, Row *row, DataStructures::List<unsigned> columnIndices);
+		Table::Row* AddRowColumns(unsigned rowId, Row *row, List<unsigned> columnIndices);
 
 		void DeleteRow(Row *row);
 
-		void QueryRow(DataStructures::List<unsigned> &inclusionFilterColumnIndices, DataStructures::List<unsigned> &columnIndicesToReturn, unsigned key, Table::Row* row, FilterQuery *inclusionFilters, Table *result);
+		void QueryRow(List<unsigned> &inclusionFilterColumnIndices, List<unsigned> &columnIndicesToReturn, unsigned key, Table::Row* row, FilterQuery *inclusionFilters, Table *result);
 
 		// 16 is arbitrary and is the order of the BPlus tree.  Higher orders are better for searching while lower orders are better for
 		// Insertions and deletions.
-		DataStructures::BPlusTree<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> rows;
+		BPlusTree<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> rows;
 
 		// Columns in the table.
-		DataStructures::List<ColumnDescriptor> columns;
+		List<ColumnDescriptor> columns;
 	};
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

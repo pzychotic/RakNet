@@ -13,11 +13,11 @@
 #include "RakAssert.h"
 #include <string.h> // Use string.h rather than memory.h for a console
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(DataCompressor,DataCompressor)
 
-void DataCompressor::Compress( unsigned char *userData, unsigned sizeInBytes, RakNet::BitStream * output )
+void DataCompressor::Compress( unsigned char *userData, unsigned sizeInBytes, BitStream* output )
 {
 	// Don't use this for small files as you will just make them bigger!
 	RakAssert(sizeInBytes > 2048);
@@ -45,7 +45,7 @@ void DataCompressor::Compress( unsigned char *userData, unsigned sizeInBytes, Ra
 	output->SetWriteOffset(writeOffset2);
 }
 
-unsigned DataCompressor::DecompressAndAllocate( RakNet::BitStream * input, unsigned char **output )
+unsigned DataCompressor::DecompressAndAllocate( BitStream* input, unsigned char **output )
 {
 	HuffmanEncodingTree tree;
 	unsigned int bitsUsed, destinationSizeInBytes;
@@ -71,3 +71,5 @@ unsigned DataCompressor::DecompressAndAllocate( RakNet::BitStream * input, unsig
 	RakAssert(decompressedBytes==destinationSizeInBytes);
 	return destinationSizeInBytes;
 }
+
+} // namespace RakNet

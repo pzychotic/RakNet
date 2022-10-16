@@ -33,8 +33,7 @@ using namespace Windows::Storage::Streams;
 //using namespace Platform::Collections;
 //using namespace Windows::Foundation::Collections;
 
-namespace RakNet
-{
+namespace RakNet {
 
 public ref class OutputStreamAndDataWriter sealed
 {
@@ -77,9 +76,6 @@ private:
 
 	void EchoMessage(Windows::Networking::Sockets::DatagramSocketMessageReceivedEventArgs^ eventArguments);
 };
-}
-
-using namespace RakNet;
 
 ListenerContext::ListenerContext(Windows::Networking::Sockets::DatagramSocket^ listener)
 {
@@ -123,10 +119,10 @@ OutputStreamAndDataWriter ^ListenerContext::GetOutputStreamAndDataWriter(uint64_
 	char portStr[32];
 	_itoa(port, portStr, 10);
 
-	RakNet::RakString rs1(buf);
+	RakString rs1(buf);
 	WCHAR *w_char1 = rs1.ToWideChar();
 	HostName ^hostName = ref new HostName(ref new Platform::String(w_char1));
-	RakNet::RakString rs2(portStr);
+	RakString rs2(portStr);
 	WCHAR *w_char2 = rs2.ToWideChar();
 	task< IOutputStream^ > op(listener->GetOutputStreamAsync(hostName, ref new Platform::String(w_char2)));
 	op.wait();
@@ -230,7 +226,7 @@ void ListenerContext::OnMessage(Windows::Networking::Sockets::DatagramSocket^ so
 void ListenerContext::EchoMessage(DatagramSocketMessageReceivedEventArgs^ eventArguments)
 {
 }
-RakNet::DataStructures::List<RNS2_WindowsStore8*> RNS2_WindowsStore8::rns2List;
+DataStructures::List<RNS2_WindowsStore8*> RNS2_WindowsStore8::rns2List;
 SimpleMutex RNS2_WindowsStore8::rns2ListMutex;
 RNS2_WindowsStore8::RNS2_WindowsStore8()
 {
@@ -327,7 +323,7 @@ void RNS2_WindowsStore8::DomainNameToIP( const char *domainName, char ip[65] ) {
 //	std::wstring wid_str = std::wstring(s_str.begin(), s_str.end());
 //	const wchar_t* w_char = wid_str.c_str();
 
-	RakNet::RakString rs(domainName);
+	RakString rs(domainName);
 	WCHAR *w_char = rs.ToWideChar();
 	
 //	DatagramSocket ^listener = ref new DatagramSocket();
@@ -457,6 +453,8 @@ int RNS2_WindowsStore8::WinRTIOCTLSocket(Windows::Networking::Sockets::DatagramS
 int RNS2_WindowsStore8::WinRTGetSockName(Windows::Networking::Sockets::DatagramSocket ^s,
 	struct sockaddr *name,
 	socklen_t* namelen) {RakAssert("WinRTGetSockName Unsupported" && 0); return 0;}
+
+} // namespace RakNet
 
 #endif // WINDOWS_STORE_RT
 

@@ -23,8 +23,7 @@
 
 #define REMOTE_MAX_TEXT_INPUT 2048
 
-namespace RakNet
-{
+namespace RakNet {
 
 class CommandParserInterface;
 
@@ -88,4 +87,3 @@ protected:
 } // namespace RakNet
 
 #endif
-

@@ -17,8 +17,6 @@
 #include <stdio.h>
 #include <string.h> // memcpy
 
-using namespace RakNet;
-
 #ifdef _WIN32
 #else
 #include <unistd.h>
@@ -51,6 +49,8 @@ using namespace RakNet;
 #ifndef INVALID_SOCKET
 #define INVALID_SOCKET -1
 #endif
+
+namespace RakNet {
 
 void RakNetSocket2Allocator::DeallocRNS2(RakNetSocket2 *s) {RakNet::OP_DELETE(s,_FILE_AND_LINE_);}
 RakNetSocket2::RakNetSocket2() {eventHandler=0;}
@@ -400,7 +400,7 @@ int RNS2_Berkley::CreateRecvPollingThread(int threadPriority)
 
 
 
-	int errorCode = RakNet::RakThread::Create(RecvFromLoop, this, threadPriority);
+	int errorCode = RakThread::Create(RecvFromLoop, this, threadPriority);
 
 	return errorCode;
 }
@@ -519,3 +519,5 @@ void RNS2_Linux::GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS
 #endif // Linux
 
 #endif //  defined(__native_client__)
+
+} // namespace RakNet

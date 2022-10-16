@@ -23,8 +23,7 @@
 #include "PluginInterface2.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \defgroup PACKETLOGGER_GROUP PacketLogger
 /// \brief Print out incoming messages to a target destination

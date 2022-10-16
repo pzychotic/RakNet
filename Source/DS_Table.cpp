@@ -13,7 +13,8 @@
 #include <string.h>
 #include "RakAssert.h"
 
-using namespace DataStructures;
+namespace RakNet { namespace DataStructures {
+
 
 void ExtendRows(Table::Row* input, int index)
 {
@@ -157,29 +158,29 @@ void Table::Cell::Get(char *output, int *outputLength)
 	if (outputLength)
 		*outputLength=(int) i;
 }
-RakNet::RakString Table::Cell::ToString(ColumnType columnType)
+RakString Table::Cell::ToString(ColumnType columnType)
 {
 	if (isEmpty)
-		return RakNet::RakString();
+		return RakString();
 
 	if (columnType==NUMERIC)
 	{
-		return RakNet::RakString("%f", i);
+		return RakString("%f", i);
 	}
 	else if (columnType==STRING)
 	{
-		return RakNet::RakString(c);
+		return RakString(c);
 	}
 	else if (columnType==BINARY)
 	{
-		return RakNet::RakString("<Binary>");
+		return RakString("<Binary>");
 	}
 	else if (columnType==POINTER)
 	{
-		return RakNet::RakString("%p", ptr);
+		return RakString("%p", ptr);
 	}
 
-	return RakNet::RakString();
+	return RakString();
 }
 Table::Cell::Cell(double numericValue, char *charValue, void *ptr, ColumnType type)
 {
@@ -293,7 +294,7 @@ void Table::RemoveColumn(unsigned columnIndex)
 
 	// Remove this index from each row.
 	int i;
-	DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
+	Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
 	while (cur)
 	{
 		for (i=0; i < cur->size; i++)
@@ -353,7 +354,7 @@ Table::Row* Table::AddRow(unsigned rowId)
 		newRow->cells.Insert( RakNet::OP_NEW<Table::Cell>(_FILE_AND_LINE_), _FILE_AND_LINE_ );
 	return newRow;
 }
-Table::Row* Table::AddRow(unsigned rowId, DataStructures::List<Cell> &initialCellValues)
+Table::Row* Table::AddRow(unsigned rowId, List<Cell> &initialCellValues)
 {
 	Row *newRow = RakNet::OP_NEW<Row>( _FILE_AND_LINE_ );
 	unsigned rowIndex;
@@ -372,7 +373,7 @@ Table::Row* Table::AddRow(unsigned rowId, DataStructures::List<Cell> &initialCel
 	rows.Insert(rowId, newRow);
 	return newRow;
 }
-Table::Row* Table::AddRow(unsigned rowId, DataStructures::List<Cell*> &initialCellValues, bool copyCells)
+Table::Row* Table::AddRow(unsigned rowId, List<Cell*> &initialCellValues, bool copyCells)
 {
 	Row *newRow = RakNet::OP_NEW<Row>( _FILE_AND_LINE_ );
 	unsigned rowIndex;
@@ -395,7 +396,7 @@ Table::Row* Table::AddRow(unsigned rowId, DataStructures::List<Cell*> &initialCe
 	rows.Insert(rowId, newRow);
 	return newRow;
 }
-Table::Row* Table::AddRowColumns(unsigned rowId, Row *row, DataStructures::List<unsigned> columnIndices)
+Table::Row* Table::AddRowColumns(unsigned rowId, Row *row, List<unsigned> columnIndices)
 {
 	Row *newRow = RakNet::OP_NEW<Row>( _FILE_AND_LINE_ );
 	unsigned columnIndex;
@@ -431,7 +432,7 @@ bool Table::RemoveRow(unsigned rowId)
 void Table::RemoveRows(Table *tableContainingRowIDs)
 {
 	unsigned i;
-	DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = tableContainingRowIDs->GetRows().GetListHead();
+	Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = tableContainingRowIDs->GetRows().GetListHead();
 	while (cur)
 	{
 		for (i=0; i < (unsigned)cur->size; i++)
@@ -568,7 +569,7 @@ Table::Row* Table::GetRowByID(unsigned rowId) const
 
 Table::Row* Table::GetRowByIndex(unsigned rowIndex, unsigned *key) const
 {
-	DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
+	Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
 	while (cur)
 	{
 		if (rowIndex < (unsigned)cur->size)
@@ -589,7 +590,7 @@ Table::Row* Table::GetRowByIndex(unsigned rowIndex, unsigned *key) const
 void Table::QueryTable(unsigned *columnIndicesSubset, unsigned numColumnSubset, FilterQuery *inclusionFilters, unsigned numInclusionFilters, unsigned *rowIds, unsigned numRowIDs, Table *result)
 {
 	unsigned i;
-	DataStructures::List<unsigned> columnIndicesToReturn;
+	List<unsigned> columnIndicesToReturn;
 
 	// Clear the result table.
 	result->Clear();
@@ -617,7 +618,7 @@ void Table::QueryTable(unsigned *columnIndicesSubset, unsigned numColumnSubset, 
 	}
 
 	// Get the column indices of the filter queries.
-	DataStructures::List<unsigned> inclusionFilterColumnIndices;
+	List<unsigned> inclusionFilterColumnIndices;
 	if (inclusionFilters && numInclusionFilters>0)
 	{
 		for (i=0; i < numInclusionFilters; i++)
@@ -634,7 +635,7 @@ void Table::QueryTable(unsigned *columnIndicesSubset, unsigned numColumnSubset, 
 	if (rowIds==0 || numRowIDs==0)
 	{
 		// All rows
-		DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
+		Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
 		while (cur)
 		{
 			for (i=0; i < (unsigned)cur->size; i++)
@@ -658,7 +659,7 @@ void Table::QueryTable(unsigned *columnIndicesSubset, unsigned numColumnSubset, 
 	}
 }
 
-void Table::QueryRow(DataStructures::List<unsigned> &inclusionFilterColumnIndices, DataStructures::List<unsigned> &columnIndicesToReturn, unsigned key, Table::Row* row, FilterQuery *inclusionFilters, Table *result)
+void Table::QueryRow(List<unsigned> &inclusionFilterColumnIndices, List<unsigned> &columnIndicesToReturn, unsigned key, Table::Row* row, FilterQuery *inclusionFilters, Table *result)
 {
 	bool pass=false;
 	unsigned columnIndex;
@@ -817,8 +818,8 @@ void Table::QueryRow(DataStructures::List<unsigned> &inclusionFilterColumnIndice
 
 static Table::SortQuery *_sortQueries;
 static unsigned _numSortQueries;
-static DataStructures::List<unsigned> *_columnIndices;
-static DataStructures::List<Table::ColumnDescriptor> *_columns;
+static List<unsigned> *_columnIndices;
+static List<Table::ColumnDescriptor> *_columns;
 int RowSort(Table::Row* const &first, Table::Row* const &second) // first is the one inserting, second is the one already there.
 {
 	unsigned i, columnIndex;
@@ -878,7 +879,7 @@ void Table::SortTable(Table::SortQuery *sortQueries, unsigned numSortQueries, Ta
 {
 	unsigned i;
 	unsigned outLength;
-	DataStructures::List<unsigned> columnIndices;
+	List<unsigned> columnIndices;
 	_sortQueries=sortQueries;
 	_numSortQueries=numSortQueries;
 	_columnIndices=&columnIndices;
@@ -896,7 +897,7 @@ void Table::SortTable(Table::SortQuery *sortQueries, unsigned numSortQueries, Ta
 			columnIndices.Insert((unsigned)-1, _FILE_AND_LINE_); // Means don't check this column
 	}
 
-	DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur;
+	Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur;
 	cur = rows.GetListHead();
 	if (anyValid==false)
 	{
@@ -913,7 +914,7 @@ void Table::SortTable(Table::SortQuery *sortQueries, unsigned numSortQueries, Ta
 	}
 
 	// Start adding to ordered list.
-	DataStructures::OrderedList<Row*, Row*, RowSort> orderedList;
+	OrderedList<Row*, Row*, RowSort> orderedList;
 	while (cur)
 	{
 		for (i=0; i < (unsigned)cur->size; i++)
@@ -1053,11 +1054,11 @@ const List<Table::ColumnDescriptor>& Table::GetColumns(void) const
 {
 	return columns;
 }
-const DataStructures::BPlusTree<unsigned, Table::Row*, _TABLE_BPLUS_TREE_ORDER>& Table::GetRows(void) const
+const BPlusTree<unsigned, Table::Row*, _TABLE_BPLUS_TREE_ORDER>& Table::GetRows(void) const
 {
 	return rows;
 }
-DataStructures::Page<unsigned, DataStructures::Table::Row*, _TABLE_BPLUS_TREE_ORDER> * Table::GetListHead(void)
+Page<unsigned, Table::Row*, _TABLE_BPLUS_TREE_ORDER> * Table::GetListHead(void)
 {
 	return rows.GetListHead();
 }
@@ -1066,7 +1067,7 @@ unsigned Table::GetAvailableRowId(void) const
 	bool setKey=false;
 	unsigned key=0;
 	int i;
-	DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
+	Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = rows.GetListHead();
 	
 	while (cur)
 	{
@@ -1106,7 +1107,7 @@ Table& Table::operator = ( const Table& input )
 	for (i=0; i < input.GetColumnCount(); i++)
 		AddColumn(input.ColumnName(i), input.GetColumnType(i));
 
-	DataStructures::Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = input.GetRows().GetListHead();
+	Page<unsigned, Row*, _TABLE_BPLUS_TREE_ORDER> *cur = input.GetRows().GetListHead();
 	while (cur)
 	{
 		for (i=0; i < (unsigned int) cur->size; i++)
@@ -1119,3 +1120,5 @@ Table& Table::operator = ( const Table& input )
 
 	return *this;
 }
+
+} } // namespace RakNet::DataStructures

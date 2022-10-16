@@ -10,21 +10,14 @@
 
 #include "WSAStartupSingleton.h"
 
-
-
-
-
 #if   defined(_WIN32) && !defined(WINDOWS_STORE_RT)
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
-
-
-
-
 #endif
 #include "RakNetDefines.h"
 #include <stdio.h>
+
+namespace RakNet {
 
 int WSAStartupSingleton::refCount=0;
 
@@ -38,10 +31,6 @@ void WSAStartupSingleton::AddRef(void)
 	
 	if (refCount!=1)
 		return;
-
-
-
-
 
 	WSADATA winsockInfo;
 	if ( WSAStartup( MAKEWORD( 2, 2 ), &winsockInfo ) != 0 )
@@ -75,11 +64,8 @@ void WSAStartupSingleton::Deref(void)
 	
 	WSACleanup();
 
-
-
-
-
-	
 	refCount=0;
 #endif
 }
+
+} //namespace RakNet

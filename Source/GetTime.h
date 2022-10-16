@@ -19,8 +19,8 @@
 #include "Export.h"
 #include "RakNetTime.h" // For RakNet::TimeMS
 
-namespace RakNet
-{
+namespace RakNet {
+
 	/// Same as GetTimeMS
 	/// Holds the time in either a 32 or 64 bit variable, depending on __GET_TIME_64BIT
 	RakNet::Time RAK_DLL_EXPORT GetTime( void );
@@ -37,6 +37,7 @@ namespace RakNet
 	extern RAK_DLL_EXPORT bool GreaterThan(RakNet::Time a, RakNet::Time b);
 	/// a < b?
 	extern RAK_DLL_EXPORT bool LessThan(RakNet::Time a, RakNet::Time b);
-}
+
+} // namespace RakNet
 
 #endif

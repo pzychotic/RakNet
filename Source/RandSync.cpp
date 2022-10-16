@@ -13,8 +13,7 @@
 #include <limits>
 #include <limits.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 RakNetRandomSync::RakNetRandomSync()
 {
@@ -80,12 +79,12 @@ void RakNetRandomSync::SetCallCount( uint32_t i )
 {
 	callCount = i;
 }
-void RakNetRandomSync::SerializeConstruction(RakNet::BitStream *constructionBitstream)
+void RakNetRandomSync::SerializeConstruction(BitStream *constructionBitstream)
 {
 	constructionBitstream->Write(seed);
 	constructionBitstream->Write(callCount);
 }
-bool RakNetRandomSync::DeserializeConstruction(RakNet::BitStream *constructionBitstream)
+bool RakNetRandomSync::DeserializeConstruction(BitStream *constructionBitstream)
 {
 	uint32_t _seed;
 	uint32_t _skipValues;
@@ -95,11 +94,11 @@ bool RakNetRandomSync::DeserializeConstruction(RakNet::BitStream *constructionBi
 		SeedMT(_seed, _skipValues);
 	return success;
 }
-void RakNetRandomSync::Serialize(RakNet::BitStream *outputBitstream)
+void RakNetRandomSync::Serialize(BitStream *outputBitstream)
 {
 	outputBitstream->Write(callCount);
 }
-void RakNetRandomSync::Deserialize(RakNet::BitStream *outputBitstream)
+void RakNetRandomSync::Deserialize(BitStream *outputBitstream)
 {
 	uint32_t _callCount;
 	outputBitstream->Read(_callCount);

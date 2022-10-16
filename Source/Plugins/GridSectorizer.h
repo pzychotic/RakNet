@@ -21,6 +21,8 @@
 #include "DS_List.h"
 #endif
 
+namespace RakNet {
+
 class GridSectorizer
 {
 public:
@@ -74,5 +76,7 @@ protected:
 	DataStructures::List<void*>* grid;
 #endif
 };
+
+} // namespace RakNet
 
 #endif

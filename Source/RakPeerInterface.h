@@ -24,8 +24,8 @@
 #include "DS_List.h"
 #include "RakNetSocket2.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 // Forward declarations
 class BitStream;
 class PluginInterface2;
@@ -209,12 +209,12 @@ public:
 	/// \param[in] forceReceipt If 0, will automatically determine the receipt number to return. If non-zero, will return what you give it.
 	/// \return 0 on bad input. Otherwise a number that identifies this message. If \a reliability is a type that returns a receipt, on a later call to Receive() you will get ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS with bytes 1-4 inclusive containing this number
 	/// \note COMMON MISTAKE: When writing the first byte, bitStream->Write((unsigned char) ID_MY_TYPE) be sure it is casted to a byte, and you are not writing a 4 byte enumeration.
-	virtual uint32_t Send( const RakNet::BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber=0 )=0;
+	virtual uint32_t Send( const BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber=0 )=0;
 
 	/// Sends multiple blocks of data, concatenating them automatically.
 	///
 	/// This is equivalent to:
-	/// RakNet::BitStream bs;
+	/// BitStream bs;
 	/// bs.WriteAlignedBytes(block1, blockLength1);
 	/// bs.WriteAlignedBytes(block2, blockLength2);
 	/// bs.WriteAlignedBytes(block3, blockLength3);
@@ -526,7 +526,7 @@ public:
 	virtual void GetSockets( DataStructures::List<RakNetSocket2* > &sockets )=0;
 	virtual void ReleaseSockets( DataStructures::List<RakNetSocket2* > &sockets )=0;
 
-	virtual void WriteOutOfBandHeader(RakNet::BitStream *bitStream)=0;
+	virtual void WriteOutOfBandHeader(BitStream *bitStream)=0;
 
 	/// If you need code to run in the same thread as RakNet's update thread, this function can be used for that
 	/// \param[in] _userUpdateThreadPtr C callback function

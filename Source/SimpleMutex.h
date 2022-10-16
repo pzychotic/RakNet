@@ -30,8 +30,7 @@
 #endif
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \brief An easy to use mutex.
 /// 
@@ -53,18 +52,10 @@ public:
 	// Unlocks the mutex.
 	void Unlock(void);
 
-
-
-
-
-
-
 private:
 	void Init(void);
 #ifdef _WIN32
 	CRITICAL_SECTION criticalSection; /// Docs say this is faster than a mutex for single process access
-
-
 #else
 	pthread_mutex_t hMutex;
 #endif
@@ -75,4 +66,3 @@ private:
 } // namespace RakNet
 
 #endif
-

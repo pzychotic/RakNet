@@ -21,8 +21,8 @@
 #include "CommandParserInterface.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 class RakPeerInterface;
 
 /// \brief This allows a console client to call most of the functions in RakPeer
@@ -56,7 +56,7 @@ public:
 
 	/// Records the instance of RakPeer to perform the desired commands on
 	/// \param[in] rakPeer The RakPeer instance, or a derived class (e.g. RakPeer or RakPeer)
-	void SetRakPeerInterface(RakNet::RakPeerInterface *rakPeer);
+	void SetRakPeerInterface(RakPeerInterface *rakPeer);
 protected:
 
 	/// Which instance of RakPeer we are working on.  Set from SetRakPeerInterface()

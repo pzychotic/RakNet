@@ -21,8 +21,8 @@
 #include "DS_OrderedList.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class TransportInterface;
 
@@ -144,4 +144,3 @@ protected:
 } // namespace RakNet
 
 #endif
-

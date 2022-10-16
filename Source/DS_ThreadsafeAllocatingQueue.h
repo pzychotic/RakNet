@@ -25,8 +25,7 @@
 // #define RMO_NEW_UNDEF_ALLOCATING_QUEUE
 // #endif
 
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
 
 template <class structureType>
 class RAK_DLL_EXPORT ThreadsafeAllocatingQueue
@@ -49,9 +48,9 @@ public:
 protected:
 
 	mutable MemoryPool<structureType> memoryPool;
-	RakNet::SimpleMutex memoryPoolMutex;
+	SimpleMutex memoryPoolMutex;
 	Queue<structureType*> queue;
-	RakNet::SimpleMutex queueMutex;
+	SimpleMutex queueMutex;
 };
 	
 template <class structureType>
@@ -173,8 +172,7 @@ unsigned int ThreadsafeAllocatingQueue<structureType>::Size( void )
 	return s;
 }
 
-}
-
+} } // namespace RakNet::DataStructures
 
 // #if defined(RMO_NEW_UNDEF_ALLOCATING_QUEUE)
 // #pragma pop_macro("new")

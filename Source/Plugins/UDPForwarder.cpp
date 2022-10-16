@@ -25,13 +25,11 @@
 #define INVALID_SOCKET -1
 #endif
 
-using namespace RakNet;
+namespace RakNet {
+
 static const unsigned short DEFAULT_MAX_FORWARD_ENTRIES=64;
 
-namespace RakNet
-{
-	RAK_THREAD_DECLARATION(UpdateUDPForwarderGlobal);
-}
+RAK_THREAD_DECLARATION(UpdateUDPForwarderGlobal);
 
 UDPForwarder::ForwardEntry::ForwardEntry()
 {
@@ -75,7 +73,7 @@ void UDPForwarder::Startup(void)
 
 
 
-	errorCode = RakNet::RakThread::Create(UpdateUDPForwarderGlobal, this);
+	errorCode = RakThread::Create(UpdateUDPForwarderGlobal, this);
 
 	if ( errorCode != 0 )
 	{
@@ -595,14 +593,9 @@ void UDPForwarder::UpdateUDPForwarder(void)
 	}
 }
 
-namespace RakNet {
 RAK_THREAD_DECLARATION(UpdateUDPForwarderGlobal)
 {
-
-
-
 	UDPForwarder * udpForwarder = ( UDPForwarder * ) arguments;
-
 
 	udpForwarder->threadRunning.Increment();
 	while (udpForwarder->isRunning.GetValue()>0)
@@ -618,13 +611,8 @@ RAK_THREAD_DECLARATION(UpdateUDPForwarderGlobal)
 			RakSleep(0);
 	}
 	udpForwarder->threadRunning.Decrement();
-	
-
-
 
 	return 0;
-
-
 }
 
 } // namespace RakNet

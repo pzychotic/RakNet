@@ -15,6 +15,8 @@
 
 #if !defined(WINDOWS_STORE_RT) && !defined(__native_client__)
 
+namespace RakNet {
+
 #if RAKNET_SUPPORT_IPV6==1
 
 void PrepareAddrInfoHints2(addrinfo *hints)
@@ -48,7 +50,6 @@ void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_I
 			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)aip->ai_addr;
 			memcpy(&addresses[idx].address.addr4,ipv6,sizeof(sockaddr_in6));
 		}
-
 	}
 
 	freeaddrinfo(servinfo); // free the linked-list
@@ -67,9 +68,6 @@ void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_I
 #endif
 void GetMyIP_Windows_Linux_IPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 {
-
-
-
 	int idx=0;
 	char ac[ 80 ];
 	int err = gethostname( ac, sizeof( ac ) );
@@ -96,7 +94,6 @@ void GetMyIP_Windows_Linux_IPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTER
 		addresses[idx]=UNASSIGNED_SYSTEM_ADDRESS;
 		idx++;
 	}
-
 }
 
 #endif // RAKNET_SUPPORT_IPV6==1
@@ -111,6 +108,7 @@ void GetMyIP_Windows_Linux( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_I
 	#endif
 }
 
+} // namespace RakNet
 
 #endif // Windows and Linux
 

@@ -16,7 +16,7 @@
 #include "RakNetStatistics.h"
 #include "RakPeerInterface.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(StatisticsHistory,StatisticsHistory);
 STATIC_FACTORY_DEFINITIONS(StatisticsHistoryPlugin,StatisticsHistoryPlugin);
@@ -257,7 +257,7 @@ void StatisticsHistory::GetUniqueKeyList(DataStructures::List<RakString> &keys)
 	{
 		TrackedObject *to = objects[idx];
 		DataStructures::List<TimeAndValueQueue*> itemList;
-		DataStructures::List<RakNet::RakString> keyList;
+		DataStructures::List<RakString> keyList;
 		to->dataQueues.GetAsList(itemList, keyList, _FILE_AND_LINE_);
 		for (unsigned int k=0; k < keyList.Size(); k++)
 		{
@@ -823,5 +823,7 @@ void StatisticsHistoryPlugin::OnNewConnection(const SystemAddress &systemAddress
 	}
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_StatisticsHistory==1

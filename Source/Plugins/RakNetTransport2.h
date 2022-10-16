@@ -25,8 +25,7 @@
 #include "PluginInterface2.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \defgroup RAKNET_TRANSPORT_GROUP RakNetTransport
 /// \brief UDP based transport implementation for the ConsoleServer

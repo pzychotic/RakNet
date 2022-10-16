@@ -41,8 +41,8 @@
 #include <openssl/err.h>
 #endif
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 struct RemoteClient;
 
@@ -148,7 +148,7 @@ protected:
 	// Plugins
 	DataStructures::List<PluginInterface2*> messageHandlerList;
 
-	RakNet::LocklessUint32_t isStarted, threadRunning;
+	LocklessUint32_t isStarted, threadRunning;
 	__TCPSOCKET__ listenSocket;
 
 	DataStructures::Queue<Packet*> headPush, tailPush;
@@ -260,4 +260,3 @@ struct RemoteClient
 #endif
 
 #endif // _RAKNET_SUPPORT_*
-

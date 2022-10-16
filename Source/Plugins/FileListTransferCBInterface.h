@@ -18,8 +18,7 @@
 #include "Plugins/FileListNodeContext.h"
 #include "RakMemoryOverride.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \brief Used by FileListTransfer plugin as a callback for when we get a file.
 /// \details You get the last file when fileIndex==numberOfFilesInThisSet
@@ -151,4 +150,3 @@ public:
 } // namespace RakNet
 
 #endif
-

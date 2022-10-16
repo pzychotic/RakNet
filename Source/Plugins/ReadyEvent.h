@@ -12,7 +12,6 @@
 /// \brief Ready event plugin.  This enables a set of systems to create a signal event, set this signal as ready or unready, and to trigger the event when all systems are ready
 ///
 
-
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_ReadyEvent==1
 

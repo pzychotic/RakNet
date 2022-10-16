@@ -17,6 +17,14 @@
 #include "Export.h"
 #include "RakThread.h"
 #include "SignaledEvent.h"
+#include "RakSleep.h"
+
+#ifdef _WIN32
+#else
+#include <unistd.h>
+#endif
+
+namespace RakNet {
 
 class ThreadDataInterface
 {
@@ -146,7 +154,7 @@ struct RAK_DLL_EXPORT ThreadPool
 protected:
 	// It is valid to cancel input before it is processed.  To do so, lock the inputQueue with inputQueueMutex,
 	// Scan the list, and remove the item you don't want.
-	RakNet::SimpleMutex inputQueueMutex, outputQueueMutex, workingThreadCountMutex, runThreadsMutex;
+	SimpleMutex inputQueueMutex, outputQueueMutex, workingThreadCountMutex, runThreadsMutex;
 
 	void* (*perThreadDataFactory)();
 	void (*perThreadDataDestructor)(void*);
@@ -179,22 +187,14 @@ protected:
 	/// \internal
 	int numThreadsWorking;
 	/// \internal
-	RakNet::SimpleMutex numThreadsRunningMutex;
+	SimpleMutex numThreadsRunningMutex;
 
-	RakNet::SignaledEvent quitAndIncomingDataEvents;
+	SignaledEvent quitAndIncomingDataEvents;
 
 // #if defined(SN_TARGET_PSP2)
-// 	RakNet::RakThread::UltUlThreadRuntime *runtime;
+// 	RakThread::UltUlThreadRuntime *runtime;
 // #endif
 };
-
-#include "ThreadPool.h"
-#include "RakSleep.h"
-#ifdef _WIN32
-
-#else
-#include <unistd.h>
-#endif
 
 template <class ThreadInputType, class ThreadOutputType>
 RAK_THREAD_DECLARATION(WorkerThread)
@@ -206,9 +206,6 @@ void* WorkerThread( void* arguments )
 #endif
 */
 {
-
-
-
 	ThreadPool<ThreadInputType, ThreadOutputType> *threadPool = (ThreadPool<ThreadInputType, ThreadOutputType>*) arguments;
 
 
@@ -292,11 +289,7 @@ void* WorkerThread( void* arguments )
 	else if (threadPool->threadDataInterface)
 		threadPool->threadDataInterface->PerThreadDestructor(perThreadData, threadPool->tdiContext);
 
-
-
-
 	return 0;
-
 }
 template <class InputType, class OutputType>
 ThreadPool<InputType, OutputType>::ThreadPool()
@@ -320,7 +313,7 @@ bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSi
 	(void) stackSize;
 
 // #if defined(SN_TARGET_PSP2)
-// 	runtime = RakNet::RakThread::AllocRuntime(numThreads);
+// 	runtime = RakThread::AllocRuntime(numThreads);
 // #endif
 
 	runThreadsMutex.Lock();
@@ -352,7 +345,7 @@ bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSi
 
 
 
-		errorCode = RakNet::RakThread::Create(WorkerThread<InputType, OutputType>, this);
+		errorCode = RakThread::Create(WorkerThread<InputType, OutputType>, this);
 
 		if (errorCode!=0)
 		{
@@ -408,7 +401,7 @@ void ThreadPool<InputType, OutputType>::StopThreads(void)
 	quitAndIncomingDataEvents.CloseEvent();
 
 // #if defined(SN_TARGET_PSP2)
-// 	RakNet::RakThread::DeallocRuntime(runtime);
+// 	RakThread::DeallocRuntime(runtime);
 // 	runtime=0;
 // #endif
 
@@ -616,5 +609,6 @@ void ThreadPool<InputType, OutputType>::Resume(void)
 	workingThreadCountMutex.Unlock();
 }
 
-#endif
+} // namespace RakNet
 
+#endif

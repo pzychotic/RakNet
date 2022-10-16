@@ -27,8 +27,8 @@
 #include "DS_Queue.h"
 #include "DS_OrderedList.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 	/// When NAT Punchthrough fails, it is possible to use a non-NAT system to forward messages from us to the recipient, and vice-versa
 	/// The class to forward messages is UDPForwarder, and it is triggered over the network via the UDPProxyServer plugin.
 	/// The UDPProxyClient connects to UDPProxyCoordinator to get a list of servers running UDPProxyServer, and the coordinator will relay our forwarding request
@@ -46,7 +46,7 @@ namespace RakNet
 		/// For UDPProxyServers logging in remotely, they must pass a password to UDPProxyServer::LoginToCoordinator(). It must match the password set here.
 		/// If no password is set, they cannot login remotely.
 		/// By default, no password is set
-		void SetRemoteLoginPassword(RakNet::RakString password);
+		void SetRemoteLoginPassword(RakString password);
 
 		/// \internal
 		virtual void Update(void);
@@ -75,7 +75,7 @@ namespace RakNet
 			SystemAddress requestingAddress; // Which system originally sent the network message to start forwarding
 			SystemAddress currentlyAttemptedServerAddress;
 			DataStructures::Queue<SystemAddress> remainingServersToTry;
-			RakNet::BitStream serverSelectionBitstream;
+			BitStream serverSelectionBitstream;
 
 			DataStructures::List<ServerWithPing> sourceServerPings, targetServerPings;
 			RakNet::TimeMS timeRequestedPings;
@@ -106,11 +106,10 @@ namespace RakNet
 		//DataStructures::Multilist<ML_ORDERED_LIST, ForwardingRequest*, SenderAndTargetAddress> forwardingRequestList;
 		DataStructures::OrderedList<SenderAndTargetAddress, ForwardingRequest*, ForwardingRequestComp> forwardingRequestList;
 
-		RakNet::RakString remoteLoginPassword;
-
+		RakString remoteLoginPassword;
 	};
 
-} // End namespace
+} // namespace RakNet
 
 #endif
 

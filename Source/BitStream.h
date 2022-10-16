@@ -37,8 +37,8 @@
 #define _copysign copysign
 #endif
 
-namespace RakNet
-{
+namespace RakNet {
+
 	/// This class allows you to write and read native types as a string of bits.  BitStream is used extensively throughout RakNet and is designed to be used by users as well.
 	/// \sa BitStreamSample.txt
 	class RAK_DLL_EXPORT BitStream
@@ -62,7 +62,7 @@ namespace RakNet
 		/// You shouldn't call Write functions with \a _copyData as false, as this will write to unallocated memory
 		/// 99% of the time you will use this function to cast Packet::data to a bitstream for reading, in which case you should write something as follows:
 		/// \code
-		/// RakNet::BitStream bs(packet->data, packet->length, false);
+		/// BitStream bs(packet->data, packet->length, false);
 		/// \endcode
 		/// \param[in] _data An array of bytes.
 		/// \param[in] lengthInBytes Size of the \a _data.
@@ -2016,7 +2016,7 @@ namespace RakNet
 		return in;
 	}
 
-}
+} // namespace RakNet
 
 #endif
 

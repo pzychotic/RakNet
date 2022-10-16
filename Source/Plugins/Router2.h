@@ -27,8 +27,7 @@
 #include "DS_List.h"
 #include "SimpleMutex.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 struct Router2DebugInterface
 {
@@ -67,7 +66,7 @@ public:
 	///
 	/// On ID_ROUTER_2_FORWARDING_ESTABLISHED, EstablishRouting as follows:
 	///
-	/// RakNet::BitStream bs(packet->data, packet->length, false);
+	/// BitStream bs(packet->data, packet->length, false);
 	/// bs.IgnoreBytes(sizeof(MessageID));
 	/// RakNetGUID endpointGuid;
 	/// bs.Read(endpointGuid);
@@ -193,7 +192,7 @@ protected:
 	unsigned short socketFamily;
 };
 
-}
+} // namespace RakNet
 
 #endif
 

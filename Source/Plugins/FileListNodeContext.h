@@ -17,6 +17,8 @@
 
 #include "BitStream.h"
 
+namespace RakNet {
+
 struct FileListNodeContext
 {
 	FileListNodeContext() {dataPtr=0; dataLength=0;}
@@ -31,7 +33,7 @@ struct FileListNodeContext
 	unsigned int dataLength;
 };
 
-inline RakNet::BitStream& operator<<(RakNet::BitStream& out, FileListNodeContext& in)
+inline BitStream& operator<<(BitStream& out, FileListNodeContext& in)
 {
 	out.Write(in.op);
 	out.Write(in.flnc_extraData1);
@@ -39,7 +41,7 @@ inline RakNet::BitStream& operator<<(RakNet::BitStream& out, FileListNodeContext
 	out.Write(in.flnc_extraData3);
 	return out;
 }
-inline RakNet::BitStream& operator>>(RakNet::BitStream& in, FileListNodeContext& out)
+inline BitStream& operator>>(BitStream& in, FileListNodeContext& out)
 {
 	in.Read(out.op);
 	bool success = in.Read(out.flnc_extraData1);
@@ -53,5 +55,7 @@ inline RakNet::BitStream& operator>>(RakNet::BitStream& in, FileListNodeContext&
 	assert(success);
 	return in;
 }
+
+} // namespace RakNet
 
 #endif

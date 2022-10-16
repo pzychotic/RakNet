@@ -14,7 +14,7 @@
 #include "LogCommandParser.h"
 #include <stdio.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 PacketConsoleLogger::PacketConsoleLogger()
 {
@@ -32,5 +32,7 @@ void PacketConsoleLogger::WriteLog(const char *str)
 	if (logCommandParser)
 		logCommandParser->WriteLog("PacketConsoleLogger", str);
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

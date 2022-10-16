@@ -189,6 +189,8 @@
 #endif
 #endif
 
+namespace RakNet {
+
 ///////////////////////////////////////////////////////////////////////////
 // Define variable types
 
@@ -301,5 +303,7 @@ private:
 	UINT_8 m_workspace[64];
 	SHA1_WORKSPACE_BLOCK* m_block; // SHA1 pointer to the byte array above
 };
+
+} // namespace RakNet
 
 #endif // SHA1_H_A545E61D43E9404E8D736869AB3CBFE7

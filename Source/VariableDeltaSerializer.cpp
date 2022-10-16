@@ -10,7 +10,7 @@
 
 #include "VariableDeltaSerializer.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 VariableDeltaSerializer::VariableDeltaSerializer() {didComparisonThisTick=false;}
 VariableDeltaSerializer::~VariableDeltaSerializer() {RemoveRemoteSystemVariableHistory();}
@@ -151,7 +151,7 @@ void VariableDeltaSerializer::RemoveRemoteSystemVariableHistory(RakNetGUID guid)
 	}
 }
 
-int RakNet::VariableDeltaSerializer::UpdatedVariablesListPtrComp( const uint32_t &key, ChangedVariablesList* const &data )
+int VariableDeltaSerializer::UpdatedVariablesListPtrComp( const uint32_t &key, ChangedVariablesList* const &data )
 {
 	if (key<data->sendReceipt)
 		return -1;
@@ -283,3 +283,5 @@ void VariableDeltaSerializer::OnPreSerializeTick(void)
 {
 	didComparisonThisTick=false;
 }
+
+} // namespace RakNet

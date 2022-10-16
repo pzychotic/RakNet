@@ -40,10 +40,10 @@ public:
 	uint32_t GetCallCount( void ) const;
 	void SetCallCount( uint32_t i );
 
-	virtual void SerializeConstruction(RakNet::BitStream *constructionBitstream);
-	virtual bool DeserializeConstruction(RakNet::BitStream *constructionBitstream);
-	virtual void Serialize(RakNet::BitStream *outputBitstream);
-	virtual void Deserialize(RakNet::BitStream *outputBitstream);
+	virtual void SerializeConstruction(BitStream *constructionBitstream);
+	virtual bool DeserializeConstruction(BitStream *constructionBitstream);
+	virtual void Serialize(BitStream *outputBitstream);
+	virtual void Deserialize(BitStream *outputBitstream);
 
 protected:
 	void Skip( uint32_t count );
@@ -53,7 +53,7 @@ protected:
 	uint32_t usedValueBufferCount;
 	RakNetRandom rnr;
 };
-} // namespace RakNet
 
+} // namespace RakNet
 
 #endif

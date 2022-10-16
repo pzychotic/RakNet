@@ -19,7 +19,7 @@
 #include "MessageIdentifiers.h"
 #include "SocketLayer.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(NatTypeDetectionClient,NatTypeDetectionClient);
 
@@ -64,7 +64,7 @@ void NatTypeDetectionClient::DetectNATType(SystemAddress _serverAddress)
 
 	serverAddress=_serverAddress;
 
-	RakNet::BitStream bs;
+	BitStream bs;
 	bs.Write((unsigned char)ID_NAT_TYPE_DETECTION_REQUEST);
 	bs.Write(true); // IsRequest
 	bs.Write(c2->GetBoundAddress().GetPort());
@@ -86,7 +86,7 @@ void NatTypeDetectionClient::OnCompletion(NATTypeDetectionResult result)
 	if (result!=NAT_TYPE_PORT_RESTRICTED && result!=NAT_TYPE_SYMMETRIC)
 	{
 		// Otherwise tell the server we got this message, so it stops sending tests to us
-		RakNet::BitStream bs;
+		BitStream bs;
 		bs.Write((unsigned char)ID_NAT_TYPE_DETECTION_REQUEST);
 		bs.Write(false); // Done
 		rakPeerInterface->Send(&bs,HIGH_PRIORITY,RELIABLE,0,serverAddress,false);
@@ -176,9 +176,9 @@ void NatTypeDetectionClient::OnDetach(void)
 }
 void NatTypeDetectionClient::OnTestPortRestricted(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
-	RakNet::RakString s3p4StrAddress;
+	RakString s3p4StrAddress;
 	bsIn.Read(s3p4StrAddress);
 	unsigned short s3p4Port;
 	bsIn.Read(s3p4Port);
@@ -190,7 +190,7 @@ void NatTypeDetectionClient::OnTestPortRestricted(Packet *packet)
 
 	// Send off the RakNet socket to the specified address, message is unformatted
 	// Server does this twice, so don't have to unduly worry about packetloss
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID) NAT_TYPE_PORT_RESTRICTED);
 	bsOut.Write(rakPeerInterface->GetGuidFromSystemAddress(UNASSIGNED_SYSTEM_ADDRESS));
 //	SocketLayer::SendTo_PC( sockets[0], (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), s3p4Addr, __FILE__, __LINE__ );
@@ -238,5 +238,7 @@ void NatTypeDetectionClient::OnRNS2Recv(RNS2RecvStruct *recvStruct)
 	bufferedPackets.Push(recvStruct,_FILE_AND_LINE_);
 	bufferedPacketsMutex.Unlock();
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

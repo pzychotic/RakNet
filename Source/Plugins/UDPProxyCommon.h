@@ -11,6 +11,8 @@
 #ifndef __UDP_PROXY_COMMON_H
 #define __UDP_PROXY_COMMON_H
 
+namespace RakNet {
+
 // System flow:
 /*
 UDPProxyClient: End user
@@ -63,5 +65,7 @@ enum UDPProxyMessages
 
 
 #define UDP_FORWARDER_MAXIMUM_TIMEOUT (60000 * 10)
+
+} // namespace RakNet
 
 #endif

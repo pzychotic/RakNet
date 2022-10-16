@@ -22,8 +22,8 @@
 #include "RakMemoryOverride.h"
 #include "RakAssert.h"
 
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	template <class range_type>
 	struct RangeNode
     {
@@ -55,18 +55,18 @@ namespace DataStructures
 		void Clear(void);
 		unsigned Size(void) const;
 		unsigned RangeSum(void) const;
-		RakNet::BitSize_t Serialize(RakNet::BitStream *in, RakNet::BitSize_t maxBits, bool clearSerialized);
-		bool Deserialize(RakNet::BitStream *out);
+		BitSize_t Serialize(BitStream *in, BitSize_t maxBits, bool clearSerialized);
+		bool Deserialize(BitStream *out);
 
 		DataStructures::OrderedList<range_type, RangeNode<range_type> , RangeNodeComp<range_type> > ranges;
 	};
 
 	template <class range_type>
-	RakNet::BitSize_t RangeList<range_type>::Serialize(RakNet::BitStream *in, RakNet::BitSize_t maxBits, bool clearSerialized)
+	BitSize_t RangeList<range_type>::Serialize(BitStream *in, BitSize_t maxBits, bool clearSerialized)
 	{
 		RakAssert(ranges.Size() < (unsigned short)-1);
-		RakNet::BitStream tempBS;
-		RakNet::BitSize_t bitsWritten;
+		BitStream tempBS;
+		BitSize_t bitsWritten;
 		unsigned short countWritten;
 		unsigned i;
 		countWritten=0;
@@ -92,7 +92,7 @@ namespace DataStructures
 		}
 
 		in->AlignWriteToByteBoundary();
-		RakNet::BitSize_t before=in->GetWriteOffset();
+		BitSize_t before=in->GetWriteOffset();
 		in->Write(countWritten);
 		bitsWritten+=in->GetWriteOffset()-before;
 	//	RAKNET_DEBUG_PRINTF("%i ", in->GetNumberOfBitsUsed());
@@ -112,7 +112,7 @@ namespace DataStructures
 		return bitsWritten;
 	}
 	template <class range_type>
-	bool RangeList<range_type>::Deserialize(RakNet::BitStream *out)
+	bool RangeList<range_type>::Deserialize(BitStream *out)
 	{
 		ranges.Clear(true, _FILE_AND_LINE_);
 		unsigned short count;
@@ -238,6 +238,6 @@ namespace DataStructures
         return sum;
 	}
 
-}
+} } // namespace RakNet::DataStructures
 
 #endif

@@ -26,8 +26,8 @@ static const int MINIMUM_LIST_SIZE=8;
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/// \brief A single producer consumer implementation without critical sections.
 	template <class SingleProducerConsumerType>
 	class RAK_DLL_EXPORT SingleProducerConsumer
@@ -262,6 +262,7 @@ namespace DataStructures
 	{
 		return readAheadPointer!=readPointer;
 	}	
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

@@ -47,8 +47,6 @@
 #define MAX_FILENAME_LENGTH 512
 static const unsigned HASH_LENGTH=4;
 
-using namespace RakNet;
-
 // alloca
 
 #if   defined(_WIN32)
@@ -66,6 +64,8 @@ using namespace RakNet;
 #endif
 
 #include "RakAlloca.h"
+
+namespace RakNet {
 
 //int RAK_DLL_EXPORT FileListNodeComp( char * const &key, const FileListNode &data )
 //{
@@ -309,8 +309,8 @@ void FileList::AddFilesFromDirectory(const char *applicationDirectory, const cha
 						fclose(fp);
 
 						unsigned int hash = SuperFastHash(fileData+HASH_LENGTH, fileInfo.size);
-						if (RakNet::BitStream::DoEndianSwap())
-							RakNet::BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
+						if (BitStream::DoEndianSwap())
+							BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
 						memcpy(fileData, &hash, HASH_LENGTH);
 
 						//					sha1.Reset();
@@ -328,8 +328,8 @@ void FileList::AddFilesFromDirectory(const char *applicationDirectory, const cha
 //					sha1.Final();
 
 					unsigned int hash = SuperFastHashFile(fullPath);
-					if (RakNet::BitStream::DoEndianSwap())
-						RakNet::BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
+					if (BitStream::DoEndianSwap())
+						BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
 
 					// Hash only
 				//	AddFile((const char*)fullPath+rootLen, (const char*)sha1.GetHash(), HASH_LENGTH, fileInfo.size, context);
@@ -381,7 +381,7 @@ void FileList::Clear(void)
 	}
 	fileList.Clear(false, _FILE_AND_LINE_);
 }
-void FileList::Serialize(RakNet::BitStream *outBitStream)
+void FileList::Serialize(BitStream *outBitStream)
 {
 	outBitStream->WriteCompressed(fileList.Size());
 	unsigned i;
@@ -405,7 +405,7 @@ void FileList::Serialize(RakNet::BitStream *outBitStream)
 			outBitStream->WriteCompressed(fileList[i].fileLengthBytes);
 	}
 }
-bool FileList::Deserialize(RakNet::BitStream *inBitStream)
+bool FileList::Deserialize(BitStream *inBitStream)
 {
 	bool b, dataLenNonZero=false, fileLenMatchesDataLen=false;
 	char filename[512];
@@ -579,8 +579,8 @@ void FileList::ListMissingOrChangedFiles(const char *applicationDirectory, FileL
 //				rakFree_Ex(fileData, _FILE_AND_LINE_ );
 
 				unsigned int hash = SuperFastHashFilePtr(fp);
-				if (RakNet::BitStream::DoEndianSwap())
-					RakNet::BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
+				if (BitStream::DoEndianSwap())
+					BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
 
 				//if (fileLength != fileList[i].fileLength || memcmp( sha1.GetHash(), fileList[i].data, HASH_LENGTH)!=0)
 				if (fileLength != fileList[i].fileLengthBytes || memcmp( &hash, fileList[i].data, HASH_LENGTH)!=0)
@@ -630,8 +630,8 @@ void FileList::PopulateDataFromDisk(const char *applicationDirectory, bool write
 //						sha1.Update((unsigned char*)fileList[i].data+HASH_LENGTH, fileList[i].fileLength);
 //						sha1.Final();
 						unsigned int hash = SuperFastHash(fileList[i].data+HASH_LENGTH, fileList[i].fileLengthBytes);
-						if (RakNet::BitStream::DoEndianSwap())
-							RakNet::BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
+						if (BitStream::DoEndianSwap())
+							BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
 //						memcpy(fileList[i].data, sha1.GetHash(), HASH_LENGTH);
 						memcpy(fileList[i].data, &hash, HASH_LENGTH);
 					}
@@ -649,8 +649,8 @@ void FileList::PopulateDataFromDisk(const char *applicationDirectory, bool write
 				//		sha1.Update((unsigned char*)fileList[i].data, fileList[i].fileLength);
 				//		sha1.Final();
 						unsigned int hash = SuperFastHash(fileList[i].data, fileList[i].fileLengthBytes);
-						if (RakNet::BitStream::DoEndianSwap())
-							RakNet::BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
+						if (BitStream::DoEndianSwap())
+							BitStream::ReverseBytesInPlace((unsigned char*) &hash, sizeof(hash));
 						// memcpy(fileList[i].data, sha1.GetHash(), HASH_LENGTH);
 						memcpy(fileList[i].data, &hash, HASH_LENGTH);
 					}
@@ -803,5 +803,7 @@ bool FileList::FixEndingSlash(char *str)
 
 	return false;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_FileOperations

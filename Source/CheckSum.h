@@ -18,6 +18,8 @@
 
 #include "RakMemoryOverride.h"
 
+namespace RakNet {
+
 /// Generates and validates checksums
 class CheckSum
 {
@@ -59,5 +61,7 @@ protected:
 	unsigned short c2;
 	unsigned int sum;
 };
+
+} // namespace RakNet
 
 #endif

@@ -11,15 +11,10 @@
 #ifndef __RAK_ITOA_H
 #define __RAK_ITOA_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace RakNet {
 
 char* Itoa( int value, char* result, int base );
 
-#ifdef __cplusplus
-}
-#endif
-
+} // namespace RakNet
 
 #endif

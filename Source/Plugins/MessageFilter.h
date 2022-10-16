@@ -27,8 +27,8 @@
 /// MessageIdentifier (ID_*) values shoudln't go higher than this.  Change it if you do.
 #define MESSAGE_FILTER_MAX_MESSAGE_ID 256
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class RakPeerInterface;
 
@@ -50,7 +50,7 @@ struct FilterSet
 	void *timeoutUserData;
 	int filterSetID;
 	bool allowedIDs[MESSAGE_FILTER_MAX_MESSAGE_ID];
-	DataStructures::OrderedList<RakNet::RakString,RakNet::RakString> allowedRPC4;
+	DataStructures::OrderedList<RakString,RakString> allowedRPC4;
 };
 
 /// \internal Has to be public so some of the shittier compilers can use it.

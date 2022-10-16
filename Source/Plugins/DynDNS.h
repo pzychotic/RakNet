@@ -22,8 +22,7 @@
 
 #include "RakString.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 class TCPInterface;
 
@@ -73,14 +72,14 @@ public:
 	// Output
 	bool IsRunning(void) const {return connectPhase!=CP_IDLE;}
 	bool IsCompleted(void) const {return connectPhase==CP_IDLE;}
-	RakNet::DynDnsResultCode GetCompletedResultCode(void) {return result;}
+	DynDnsResultCode GetCompletedResultCode(void) {return result;}
 	const char *GetCompletedDescription(void) const {return resultDescription;}
 	bool WasResultSuccessful(void) const {return result==RC_SUCCESS || result==RC_DNS_ALREADY_SET || result==RC_NO_CHANGE;}
 	char *GetMyPublicIP(void) const {return (char*) myIPStr;} // We get our public IP as part of the process. This is valid once completed
 
 protected:
 	void Stop(void);
-	void SetCompleted(RakNet::DynDnsResultCode _result, const char *_resultDescription) {Stop(); result=_result; resultDescription=_resultDescription;}
+	void SetCompleted(DynDnsResultCode _result, const char *_resultDescription) {Stop(); result=_result; resultDescription=_resultDescription;}
 
 	enum ConnectPhase
 	{
@@ -92,14 +91,14 @@ protected:
 	};
 
 	TCPInterface *tcp;
-	RakNet::RakString getString;
+	RakString getString;
 	SystemAddress serverAddress;
 	ConnectPhase connectPhase;
-	RakNet::RakString host;
+	RakString host;
 	RakNet::Time phaseTimeout;
 	SystemAddress checkIpAddress;
 	const char *resultDescription;
-	RakNet::DynDnsResultCode result;
+	DynDnsResultCode result;
 	char myIPStr[32];
 };
 

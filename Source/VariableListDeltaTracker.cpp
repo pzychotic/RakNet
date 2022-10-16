@@ -10,7 +10,7 @@
 
 #include "VariableListDeltaTracker.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 VariableListDeltaTracker::VariableListDeltaTracker() {nextWriteIndex=0;}
 VariableListDeltaTracker::~VariableListDeltaTracker()
@@ -48,3 +48,5 @@ VariableListDeltaTracker::VariableLastValueNode::VariableLastValueNode(const uns
 VariableListDeltaTracker::VariableLastValueNode::~VariableLastValueNode()
 {
 }
+
+} // namespace RakNet

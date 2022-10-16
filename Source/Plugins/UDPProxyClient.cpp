@@ -18,7 +18,8 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 
-using namespace RakNet;
+namespace RakNet {
+
 static const int DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR=1000;
 
 // bool operator<( const DataStructures::MLKeyRef<UDPProxyClient::ServerWithPing> &inputKey, const UDPProxyClient::ServerWithPing &cls ) {return inputKey.Get().serverAddress < cls.serverAddress;}
@@ -39,7 +40,7 @@ void UDPProxyClient::SetResultHandler(UDPProxyClientResultHandler *rh)
 {
 	resultHandler=rh;
 }
-bool UDPProxyClient::RequestForwarding(SystemAddress proxyCoordinator, SystemAddress sourceAddress, RakNetGUID targetGuid, RakNet::TimeMS timeoutOnNoDataMS, RakNet::BitStream *serverSelectionBitstream)
+bool UDPProxyClient::RequestForwarding(SystemAddress proxyCoordinator, SystemAddress sourceAddress, RakNetGUID targetGuid, RakNet::TimeMS timeoutOnNoDataMS, BitStream *serverSelectionBitstream)
 {
 	// Return false if not connected 
 	ConnectionState cs = rakPeerInterface->GetConnectionState(proxyCoordinator);
@@ -71,7 +72,7 @@ bool UDPProxyClient::RequestForwarding(SystemAddress proxyCoordinator, SystemAdd
 
 	return true;
 }
-bool UDPProxyClient::RequestForwarding(SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, RakNet::BitStream *serverSelectionBitstream)
+bool UDPProxyClient::RequestForwarding(SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, BitStream *serverSelectionBitstream)
 {
 	// Return false if not connected 
 	ConnectionState cs = rakPeerInterface->GetConnectionState(proxyCoordinator);
@@ -137,7 +138,7 @@ PluginReceiveResult UDPProxyClient::OnReceive(Packet *packet)
 			{
 				if (psg->serversToPing[idx2].serverAddress==packet->systemAddress)
 				{
-					RakNet::BitStream bsIn(packet->data,packet->length,false);
+					BitStream bsIn(packet->data,packet->length,false);
 					bsIn.IgnoreBytes(sizeof(MessageID));
 					RakNet::TimeMS sentTime;
 					bsIn.Read(sentTime);
@@ -181,7 +182,7 @@ PluginReceiveResult UDPProxyClient::OnReceive(Packet *packet)
 			{
 				RakNetGUID targetGuid;
 				SystemAddress senderAddress, targetAddress;
-				RakNet::BitStream incomingBs(packet->data, packet->length, false);
+				BitStream incomingBs(packet->data, packet->length, false);
 				incomingBs.IgnoreBytes(sizeof(MessageID)*2);
 				incomingBs.Read(senderAddress);
 				incomingBs.Read(targetAddress);
@@ -194,7 +195,7 @@ PluginReceiveResult UDPProxyClient::OnReceive(Packet *packet)
 				case ID_UDP_PROXY_IN_PROGRESS:
 					{
 						unsigned short forwardingPort;
-						RakNet::RakString serverIP;
+						RakString serverIP;
 						incomingBs.Read(serverIP);
 						incomingBs.Read(forwardingPort);
 						if (packet->data[1]==ID_UDP_PROXY_FORWARDING_SUCCEEDED)
@@ -247,7 +248,7 @@ void UDPProxyClient::OnRakPeerShutdown(void)
 }
 void UDPProxyClient::OnPingServers(Packet *packet)
 {
-	RakNet::BitStream incomingBs(packet->data, packet->length, false);
+	BitStream incomingBs(packet->data, packet->length, false);
 	incomingBs.IgnoreBytes(2);
 
 	PingServerGroup *psg = RakNet::OP_NEW<PingServerGroup>(_FILE_AND_LINE_);
@@ -308,6 +309,6 @@ void UDPProxyClient::Clear(void)
 	pingServerGroups.Clear(false, _FILE_AND_LINE_);
 }
 
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*
-

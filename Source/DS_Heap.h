@@ -25,8 +25,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	template <class weight_type, class data_type, bool isMaxHeap>
 	class RAK_DLL_EXPORT Heap
 	{
@@ -58,7 +58,7 @@ namespace DataStructures
 		unsigned RightChild(const unsigned i) const;
 		unsigned Parent(const unsigned i) const;
 		void Swap(const unsigned i, const unsigned j);
-		DataStructures::List<HeapNode> heap;
+		List<HeapNode> heap;
 		bool optimizeNextSeriesPush;
 	};
 
@@ -283,6 +283,7 @@ namespace DataStructures
 		heap[i]=heap[j];
 		heap[j]=temp;
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

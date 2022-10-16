@@ -23,8 +23,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/**
 	 * \brief A binary search tree and an AVL balanced binary search tree.
 	 * \details
@@ -945,7 +945,7 @@ namespace DataStructures
 			
 			else
 			{
-				DataStructures::QueueLinkedList<node *> tree_queue;
+				QueueLinkedList<node *> tree_queue;
 				
 				// Add the root of the tree I am copying from
 				tree_queue.Push( root );
@@ -989,7 +989,7 @@ namespace DataStructures
 		
 		else
 		{
-			DataStructures::QueueLinkedList<node *> tree_queue;
+			QueueLinkedList<node *> tree_queue;
 			
 			// Add the root of the tree I am copying from
 			tree_queue.Push( original_copy.root );
@@ -1041,7 +1041,7 @@ namespace DataStructures
 		
 		else
 		{
-			DataStructures::QueueLinkedList<node *> tree_queue;
+			QueueLinkedList<node *> tree_queue;
 			
 			// Add the root of the tree I am copying from
 			tree_queue.Push( original_copy.root );
@@ -1121,6 +1121,6 @@ namespace DataStructures
 		}
 	}
 	
-} // End namespace
+} } // namespace RakNet::DataStructures
 
 #endif

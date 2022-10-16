@@ -31,8 +31,7 @@
 /// If the data is smaller than this value, an allocation is avoid. However, this value exists for every row
 #define CLOUD_SERVER_DATA_STACK_SIZE 32
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \brief Zero or more instances of CloudServerQueryFilter can be attached to CloudServer to restrict client queries
 /// All attached instances of CloudServerQueryFilter on each corresponding operation, from all directly connected clients
@@ -328,7 +327,6 @@ protected:
 
 	SystemAddress forceAddress;
 };
-
 
 } // namespace RakNet
 

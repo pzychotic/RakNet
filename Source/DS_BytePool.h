@@ -23,8 +23,8 @@
 // #define _DISABLE_BYTE_POOL
 // #define _THREADSAFE_BYTE_POOL
 
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	// Allocate some number of bytes from pools.  Uses the heap if necessary.
 	class RAK_DLL_EXPORT BytePool
 	{
@@ -48,6 +48,7 @@ namespace DataStructures
 		SimpleMutex mutex8192;
 #endif
 	};
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

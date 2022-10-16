@@ -14,6 +14,8 @@
 #include <stdarg.h>
 #include "LinuxStrings.h"
 
+namespace RakNet {
+
 char * FormatString(const char *format, ...)
 {
 	static int textIndex=0;
@@ -38,3 +40,5 @@ char * FormatStringTS(char *output, const char *format, ...)
 	va_end(ap);
 	return output;
 }
+
+} // namespace RakNet

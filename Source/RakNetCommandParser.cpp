@@ -19,7 +19,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(RakNetCommandParser,RakNetCommandParser);
 
@@ -68,7 +68,7 @@ RakNetCommandParser::RakNetCommandParser()
 RakNetCommandParser::~RakNetCommandParser()
 {
 }
-void RakNetCommandParser::SetRakPeerInterface(RakNet::RakPeerInterface *rakPeer)
+void RakNetCommandParser::SetRakPeerInterface(RakPeerInterface *rakPeer)
 {
 	peer=rakPeer;
 }
@@ -82,7 +82,7 @@ bool RakNetCommandParser::OnCommand(const char *command, unsigned numParameters,
 
 	if (strcmp(command, "Startup")==0)
 	{
-		RakNet::SocketDescriptor socketDescriptor((unsigned short)atoi(parameterList[1]), parameterList[2]);
+		SocketDescriptor socketDescriptor((unsigned short)atoi(parameterList[1]), parameterList[2]);
 		ReturnResult(peer->Startup((unsigned short)atoi(parameterList[0]), &socketDescriptor, 1), command, transport, systemAddress);
 	}
 	else if (strcmp(command, "InitializeSecurity")==0)
@@ -119,7 +119,7 @@ bool RakNetCommandParser::OnCommand(const char *command, unsigned numParameters,
 	}
 	else if (strcmp(command, "Connect")==0)
 	{
-		ReturnResult(peer->Connect(parameterList[0], (unsigned short)atoi(parameterList[1]),parameterList[2],atoi(parameterList[3]))==RakNet::CONNECTION_ATTEMPT_STARTED, command, transport, systemAddress);
+		ReturnResult(peer->Connect(parameterList[0], (unsigned short)atoi(parameterList[1]),parameterList[2],atoi(parameterList[3]))==CONNECTION_ATTEMPT_STARTED, command, transport, systemAddress);
 	}
 	else if (strcmp(command, "Disconnect")==0)
 	{
@@ -299,5 +299,7 @@ void RakNetCommandParser::SendHelp(TransportInterface *transport, const SystemAd
 		transport->Send(systemAddress, "Parser not active.  Call SetRakPeerInterface.\r\n");
 	}
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

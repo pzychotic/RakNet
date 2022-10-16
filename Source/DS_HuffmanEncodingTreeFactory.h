@@ -20,6 +20,7 @@
 #include "RakMemoryOverride.h"
 
 namespace RakNet {
+
 /// Forward declarations
 class HuffmanEncodingTree;
 

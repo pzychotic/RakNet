@@ -24,8 +24,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	struct HashIndex
 	{
 		unsigned int primaryIndex;
@@ -54,7 +54,7 @@ namespace DataStructures
 		bool HasData(key_type key);
 		data_type& ItemAtIndex(const HashIndex &index);
 		key_type  KeyAtIndex(const HashIndex &index);
-		void GetAsList(DataStructures::List<data_type> &itemList,DataStructures::List<key_type > &keyList,const char *file, unsigned int line) const;
+		void GetAsList(List<data_type> &itemList,List<key_type > &keyList,const char *file, unsigned int line) const;
 		unsigned int Size(void) const;
 
 		/// \brief Clear the list		
@@ -325,7 +325,7 @@ namespace DataStructures
 	}
 
 	template <class key_type, class data_type, unsigned int HASH_SIZE, unsigned long (*hashFunction)(const key_type &) >
-	void Hash<key_type, data_type, HASH_SIZE, hashFunction>::GetAsList(DataStructures::List<data_type> &itemList,DataStructures::List<key_type > &keyList,const char *file, unsigned int line) const
+	void Hash<key_type, data_type, HASH_SIZE, hashFunction>::GetAsList(List<data_type> &itemList,List<key_type > &keyList,const char *file, unsigned int line) const
 	{
 		if (nodeList==0)
 			return;
@@ -353,5 +353,7 @@ namespace DataStructures
 	{
 		return size;
 	}
-}
+
+} } // namespace RakNet::DataStructures
+
 #endif

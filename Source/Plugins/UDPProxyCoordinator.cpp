@@ -20,11 +20,11 @@
 #include "GetTime.h"
 #include "UDPForwarder.h"
 
+namespace RakNet {
+
 // Larger than the client version
 static const int DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME=2000;
 static const int DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR=DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME+1000;
-
-using namespace RakNet;
 
 // bool operator<( const DataStructures::MLKeyRef<unsigned short> &inputKey, const UDPProxyCoordinator::ServerWithPing &cls ) {return inputKey.Get() < cls.ping;}
 // bool operator>( const DataStructures::MLKeyRef<unsigned short> &inputKey, const UDPProxyCoordinator::ServerWithPing &cls ) {return inputKey.Get() > cls.ping;}
@@ -77,7 +77,7 @@ UDPProxyCoordinator::~UDPProxyCoordinator()
 {
 	Clear();
 }
-void UDPProxyCoordinator::SetRemoteLoginPassword(RakNet::RakString password)
+void UDPProxyCoordinator::SetRemoteLoginPassword(RakString password)
 {
 	remoteLoginPassword=password;
 }
@@ -172,7 +172,7 @@ void UDPProxyCoordinator::OnClosedConnection(const SystemAddress &systemAddress,
 }
 void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator(Packet *packet)
 {
-	RakNet::BitStream incomingBs(packet->data, packet->length, false);
+	BitStream incomingBs(packet->data, packet->length, false);
 	incomingBs.IgnoreBytes(2);
 	SystemAddress sourceAddress;
 	incomingBs.Read(sourceAddress);
@@ -200,7 +200,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator(Packet *pac
 	if (hasServerSelectionBitstream)
 		incomingBs.Read(&(fw->serverSelectionBitstream));
 
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 	SenderAndTargetAddress sata;
 	sata.senderClientAddress=sourceAddress;
 	sata.targetClientAddress=targetAddress;
@@ -292,7 +292,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator(Packet *pac
 
 void UDPProxyCoordinator::SendForwardingRequest(SystemAddress sourceAddress, SystemAddress targetAddress, SystemAddress serverAddress, RakNet::TimeMS timeoutOnNoDataMS)
 {
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 	// Send request to desired server
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_GENERAL);
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_FORWARDING_REQUEST_FROM_COORDINATOR_TO_SERVER);
@@ -303,11 +303,11 @@ void UDPProxyCoordinator::SendForwardingRequest(SystemAddress sourceAddress, Sys
 }
 void UDPProxyCoordinator::OnLoginRequestFromServerToCoordinator(Packet *packet)
 {
-	RakNet::BitStream incomingBs(packet->data, packet->length, false);
+	BitStream incomingBs(packet->data, packet->length, false);
 	incomingBs.IgnoreBytes(2);
-	RakNet::RakString password;
+	RakString password;
 	incomingBs.Read(password);
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 
 	if (remoteLoginPassword.IsEmpty())
 	{
@@ -345,7 +345,7 @@ void UDPProxyCoordinator::OnLoginRequestFromServerToCoordinator(Packet *packet)
 }
 void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator(Packet *packet)
 {
-	RakNet::BitStream incomingBs(packet->data, packet->length, false);
+	BitStream incomingBs(packet->data, packet->length, false);
 	incomingBs.IgnoreBytes(2);
 	SenderAndTargetAddress sata;
 	incomingBs.Read(sata.senderClientAddress);
@@ -379,7 +379,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator(Packet *packe
 	unsigned short forwardingPort;
 	incomingBs.Read(forwardingPort);
 
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 	if (success==UDPFORWARDER_SUCCESS)
 	{
 		outgoingBs.Write((MessageID)ID_UDP_PROXY_GENERAL);
@@ -432,7 +432,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator(Packet *packe
 }
 void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator(Packet *packet)
 {
-	RakNet::BitStream incomingBs(packet->data, packet->length, false);
+	BitStream incomingBs(packet->data, packet->length, false);
 	incomingBs.IgnoreBytes(2);
 	unsigned short serversToPingSize;
 	SystemAddress serverAddress;
@@ -516,7 +516,7 @@ void UDPProxyCoordinator::TryNextServer(SenderAndTargetAddress sata, ForwardingR
 }
 void UDPProxyCoordinator::SendAllBusy(SystemAddress senderClientAddress, SystemAddress targetClientAddress, RakNetGUID targetClientGuid, SystemAddress requestingAddress)
 {
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_GENERAL);
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_ALL_SERVERS_BUSY);
 	outgoingBs.Write(senderClientAddress);
@@ -564,5 +564,7 @@ void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry(void)
 		remainingServersToTry.Push(swpList[idx].serverAddress, _FILE_AND_LINE_ );
 	}
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

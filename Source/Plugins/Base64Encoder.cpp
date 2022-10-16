@@ -11,6 +11,8 @@
 #include "Plugins/Base64Encoder.h"
 #include "RakMemoryOverride.h"
 
+namespace RakNet {
+
 const char *Base64Map(void) {return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";}
 const char *base64Map = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -93,3 +95,5 @@ int Base64Encoding(const unsigned char *inputData, int dataLength, char **output
 	*outputData = (char*) rakMalloc_Ex(dataLength * 2 + 6, _FILE_AND_LINE_);
 	return Base64Encoding(inputData, dataLength, *outputData);
 }
+
+} // namespace RakNet

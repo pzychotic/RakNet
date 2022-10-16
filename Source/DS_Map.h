@@ -27,8 +27,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/// The default comparison has to be first so it can be called as a default parameter.
 	/// It then is followed by MapNode, followed by NodeComparisonFunc
 	template <class key_type>
@@ -42,7 +42,7 @@ namespace DataStructures
 	class RAK_DLL_EXPORT Map
 	{
 	public:
-		static void IMPLEMENT_DEFAULT_COMPARISON(void) {DataStructures::defaultMapKeyComparison<key_type>(key_type(),key_type());}
+		static void IMPLEMENT_DEFAULT_COMPARISON(void) {defaultMapKeyComparison<key_type>(key_type(),key_type());}
 
 		struct MapNode
 		{
@@ -54,7 +54,7 @@ namespace DataStructures
 			data_type mapNodeData;
 		};
 
-		// Has to be a static because the comparison callback for DataStructures::OrderedList is a C function
+		// Has to be a static because the comparison callback for OrderedList is a C function
 		static int NodeComparisonFunc(const key_type &a, const MapNode &b)
 		{
 			return key_comparison_func(a, b.mapNodeKey);
@@ -83,7 +83,7 @@ namespace DataStructures
 		unsigned Size(void) const;
 
 	protected:
-		DataStructures::OrderedList< key_type,MapNode,&Map::NodeComparisonFunc > mapNodeList;
+		OrderedList< key_type,MapNode,&Map::NodeComparisonFunc > mapNodeList;
 
 		void SaveLastSearch(const key_type &key, unsigned index) const;
 		bool HasSavedSearchResult(const key_type &key) const;
@@ -320,6 +320,7 @@ namespace DataStructures
 		return false;
 		// return lastSearchIndexValid && key_comparison_func(key,lastSearchKey)==0;
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

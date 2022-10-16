@@ -30,13 +30,13 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	template <class node_type, class weight_type, bool allow_unlinkedNodes>
 	class RAK_DLL_EXPORT WeightedGraph
 	{
 	public:
-		static void IMPLEMENT_DEFAULT_COMPARISON(void) {DataStructures::defaultMapKeyComparison<node_type>(node_type(),node_type());}
+		static void IMPLEMENT_DEFAULT_COMPARISON(void) {defaultMapKeyComparison<node_type>(node_type(),node_type());}
 
 		WeightedGraph();
 		~WeightedGraph();
@@ -49,8 +49,8 @@ namespace DataStructures
 		bool HasConnection(const node_type &node1, const node_type &node2);
 		void Print(void);
 		void Clear(void);
-		bool GetShortestPath(DataStructures::List<node_type> &path, node_type startNode, node_type endNode, weight_type INFINITE_WEIGHT);
-		bool GetSpanningTree(DataStructures::Tree<node_type> &outTree, DataStructures::List<node_type> *inputNodes, node_type startNode, weight_type INFINITE_WEIGHT );
+		bool GetShortestPath(List<node_type> &path, node_type startNode, node_type endNode, weight_type INFINITE_WEIGHT);
+		bool GetSpanningTree(Tree<node_type> &outTree, List<node_type> *inputNodes, node_type startNode, weight_type INFINITE_WEIGHT );
 		unsigned GetNodeCount(void) const;
 		unsigned GetConnectionCount(unsigned nodeIndex) const;
 		void GetConnectionAtIndex(unsigned nodeIndex, unsigned connectionIndex, node_type &outNode, weight_type &outWeight) const;
@@ -60,7 +60,7 @@ namespace DataStructures
 		void ClearDijkstra(void);
 		void GenerateDisjktraMatrix(node_type startNode, weight_type INFINITE_WEIGHT);
 
-		DataStructures::Map<node_type, DataStructures::Map<node_type, weight_type> *> adjacencyLists;
+		Map<node_type, Map<node_type, weight_type> *> adjacencyLists;
 
 		// All these variables are for path finding with Dijkstra
 		// 08/23/06 Won't compile as a DLL inside this struct
@@ -68,15 +68,15 @@ namespace DataStructures
 	//	{
 			bool isValidPath;
 			node_type rootNode;
-			DataStructures::OrderedList<node_type, node_type> costMatrixIndices;
+			OrderedList<node_type, node_type> costMatrixIndices;
 			weight_type *costMatrix;
 			node_type *leastNodeArray;
 	//	} dijkstra;
 
 		struct NodeAndParent
 		{
-			DataStructures::Tree<node_type>*node;
-			DataStructures::Tree<node_type>*parent;
+			Tree<node_type>*node;
+			Tree<node_type>*parent;
 		};
 	};
 
@@ -132,14 +132,14 @@ namespace DataStructures
 	template <class node_type, class weight_type, bool allow_unlinkedNodes>
 		void WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::AddNode(const node_type &node)
 	{
-		adjacencyLists.SetNew(node, RakNet::OP_NEW<DataStructures::Map<node_type, weight_type> >( _FILE_AND_LINE_) );
+		adjacencyLists.SetNew(node, RakNet::OP_NEW<Map<node_type, weight_type> >( _FILE_AND_LINE_) );
 	}
 
 	template <class node_type, class weight_type, bool allow_unlinkedNodes>
 		void WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::RemoveNode(const node_type &node)
 	{
 		unsigned i;
-		DataStructures::Queue<node_type> removeNodeQueue;
+		Queue<node_type> removeNodeQueue;
 
 		removeNodeQueue.Push(node, _FILE_AND_LINE_ );
 		while (removeNodeQueue.Size())
@@ -212,7 +212,7 @@ namespace DataStructures
 	}
 
 	template <class node_type, class weight_type, bool allow_unlinkedNodes>
-		bool WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::GetShortestPath(DataStructures::List<node_type> &path, node_type startNode, node_type endNode, weight_type INFINITE_WEIGHT)
+		bool WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::GetShortestPath(List<node_type> &path, node_type startNode, node_type endNode, weight_type INFINITE_WEIGHT)
 	{
 		path.Clear(false, _FILE_AND_LINE_);
 		if (startNode==endNode)
@@ -232,7 +232,7 @@ namespace DataStructures
 		bool objectExists;
 		unsigned col,row;
 		weight_type currentWeight;
-		DataStructures::Queue<node_type> outputQueue;
+		Queue<node_type> outputQueue;
 		col=costMatrixIndices.GetIndexFromKey(endNode, &objectExists);
 		if (costMatrixIndices.Size()<2)
 		{
@@ -313,11 +313,11 @@ namespace DataStructures
 	}
 
 	template <class node_type, class weight_type, bool allow_unlinkedNodes>
-	bool WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::GetSpanningTree(DataStructures::Tree<node_type> &outTree, DataStructures::List<node_type> *inputNodes, node_type startNode, weight_type INFINITE_WEIGHT )
+	bool WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::GetSpanningTree(Tree<node_type> &outTree, List<node_type> *inputNodes, node_type startNode, weight_type INFINITE_WEIGHT )
 	{
 		// Find the shortest path from the start node to each of the input nodes.  Add this path to a new WeightedGraph if the result is reachable
-		DataStructures::List<node_type> path;
-		DataStructures::WeightedGraph<node_type, weight_type, allow_unlinkedNodes> outGraph;
+		List<node_type> path;
+		WeightedGraph<node_type, weight_type, allow_unlinkedNodes> outGraph;
 		bool res;
 		unsigned i,j;
 		for (i=0; i < inputNodes->Size(); i++)
@@ -334,9 +334,9 @@ namespace DataStructures
 		}
 
 		// Copy the graph to a tree.
-		DataStructures::Queue<NodeAndParent> nodesToProcess;
-		DataStructures::Tree<node_type> *current;
-		DataStructures::Map<node_type, weight_type> *adjacencyList;
+		Queue<NodeAndParent> nodesToProcess;
+		Tree<node_type> *current;
+		Map<node_type, weight_type> *adjacencyList;
 		node_type key;
 		NodeAndParent nap, nap2;
 		outTree.DeleteDecendants();
@@ -348,7 +348,7 @@ namespace DataStructures
 
 		for (i=0; i < adjacencyList->Size(); i++)
 		{
-			nap2.node=RakNet::OP_NEW<DataStructures::Tree<node_type> >( _FILE_AND_LINE_ );
+			nap2.node=RakNet::OP_NEW<Tree<node_type> >( _FILE_AND_LINE_ );
 			nap2.node->data=adjacencyList->GetKeyAtIndex(i);
 			nap2.parent=current;
 			nodesToProcess.Push(nap2, _FILE_AND_LINE_ );
@@ -366,7 +366,7 @@ namespace DataStructures
 				key=adjacencyList->GetKeyAtIndex(i);
 				if (key!=nap.parent->data)
 				{
-					nap2.node=RakNet::OP_NEW<DataStructures::Tree<node_type> >( _FILE_AND_LINE_ );
+					nap2.node=RakNet::OP_NEW<Tree<node_type> >( _FILE_AND_LINE_ );
 					nap2.node->data=key;
 					nap2.parent=current;
 					nodesToProcess.Push(nap2, _FILE_AND_LINE_ );
@@ -392,9 +392,9 @@ namespace DataStructures
 		node_type adjacentKey;
 		unsigned adjacentIndex;
 		weight_type edgeWeight, currentNodeWeight, adjacentNodeWeight;
-		DataStructures::Map<node_type, weight_type> *adjacencyList;
-		DataStructures::Heap<weight_type, node_type, false> minHeap;
-		DataStructures::Map<node_type, weight_type> openSet;
+		Map<node_type, weight_type> *adjacencyList;
+		Heap<weight_type, node_type, false> minHeap;
+		Map<node_type, weight_type> openSet;
 
 		for (col=0; col < adjacencyLists.Size(); col++)
 		{
@@ -521,6 +521,7 @@ namespace DataStructures
 		}
 #endif
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

@@ -15,6 +15,8 @@
 */
 #include "CheckSum.h"
 
+namespace RakNet {
+
 /****************************************************************************
 *        CheckSum::add
 * Inputs:
@@ -105,3 +107,5 @@ void CheckSum::Add ( unsigned char *b, unsigned int length )
 
 		;
 } // CheckSum::add(LPunsigned char, unsigned int)
+
+} // namespace RakNet

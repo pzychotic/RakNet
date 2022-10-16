@@ -17,7 +17,7 @@
 #include "RakAssert.h"
 #include "RakAlloca.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 NetworkIDObject::NetworkIDObject()
 {
@@ -89,3 +89,5 @@ void* NetworkIDObject::GetParent( void ) const
 {
 	return parent;
 }
+
+} // namespace RakNet

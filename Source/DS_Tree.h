@@ -25,8 +25,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	template <class TreeType>
 	class RAK_DLL_EXPORT Tree
 	{
@@ -34,12 +34,12 @@ namespace DataStructures
 		Tree();
 		Tree(TreeType &inputData);
 		~Tree();
-		void LevelOrderTraversal(DataStructures::List<Tree*> &output);
+		void LevelOrderTraversal(List<Tree*> &output);
 		void AddChild(TreeType &newData);
 		void DeleteDecendants(void);
 
 		TreeType data;
-		DataStructures::List<Tree *> children;
+		List<Tree *> children;
 	};
 
 	template <class TreeType>
@@ -61,11 +61,11 @@ namespace DataStructures
 	}
 
 	template <class TreeType>
-	void Tree<TreeType>::LevelOrderTraversal(DataStructures::List<Tree*> &output)
+	void Tree<TreeType>::LevelOrderTraversal(List<Tree*> &output)
 	{
 		unsigned i;
 		Tree<TreeType> *node;
-		DataStructures::Queue<Tree<TreeType>*> queue;
+		Queue<Tree<TreeType>*> queue;
 
 		for (i=0; i < children.Size(); i++)
 			queue.Push(children[i]);
@@ -89,7 +89,7 @@ namespace DataStructures
 	void Tree<TreeType>::DeleteDecendants(void)
 	{
 		/*
-        DataStructures::List<Tree*> output;
+        List<Tree*> output;
 		LevelOrderTraversal(output);
 		unsigned i;
 		for (i=0; i < output.Size(); i++)
@@ -101,6 +101,7 @@ namespace DataStructures
 		for (i=0; i < children.Size(); i++)
 			RakNet::OP_DELETE(children[i], _FILE_AND_LINE_);
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

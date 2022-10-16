@@ -33,8 +33,8 @@
 // Buffalo WHR-HP-G54 OK
 // Netgear WGR614 ok
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 struct Packet;
 #if _RAKNET_SUPPORT_PacketLogger==1

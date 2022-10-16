@@ -19,8 +19,7 @@
 
 #include <stdint.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \brief Class to compare memory values of variables in a current state to a prior state
 /// Results of the comparisons will be written to a bitStream, such that only changed variables get written<BR>
@@ -245,7 +244,7 @@ protected:
 	DataStructures::MemoryPool<ChangedVariablesList> updatedVariablesMemoryPool;
 
 	bool didComparisonThisTick;
-	RakNet::BitStream identicalSerializationBs;
+	BitStream identicalSerializationBs;
 
 	void FreeVarsAssociatedWithReceipt(RakNetGUID guid, uint32_t receiptId);
 	void DirtyAndFreeVarsAssociatedWithReceipt(RakNetGUID guid, uint32_t receiptId);
@@ -263,6 +262,6 @@ protected:
 
 };
 
-}
+} // namespace RakNet
 
 #endif

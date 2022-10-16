@@ -27,17 +27,11 @@
 #include <string>
 #endif
 
-/// Forward declaration
-namespace RakNet
-{
-	class BitStream;
-	class RakString;
-};
+namespace RakNet {
 
-
-namespace RakNet
-{
 /// Forward declarations
+class BitStream;
+class RakString;
 class HuffmanEncodingTree;
 
 /// \brief Writes and reads strings to and from bitstreams.
@@ -68,27 +62,27 @@ public:
 	/// \param[in] maxCharsToWrite The max number of bytes to write of \a input.  Use 0 to mean no limit.
 	/// \param[out] output The bitstream to write the compressed string to
 	/// \param[in] languageID Which language to use
-	void EncodeString( const char *input, int maxCharsToWrite, RakNet::BitStream *output, uint8_t languageId=0 );
+	void EncodeString( const char *input, int maxCharsToWrite, BitStream *output, uint8_t languageId=0 );
 	
 	/// Writes input to output, uncompressed.  Takes care of the null terminator for you.
 	/// \param[out] output A block of bytes to receive the output
 	/// \param[in] maxCharsToWrite Size, in bytes, of \a output .  A NULL terminator will always be appended to the output string.  If the maxCharsToWrite is not large enough, the string will be truncated.
 	/// \param[in] input The bitstream containing the compressed string
 	/// \param[in] languageID Which language to use
-	bool DecodeString( char *output, int maxCharsToWrite, RakNet::BitStream *input, uint8_t languageId=0 );
+	bool DecodeString( char *output, int maxCharsToWrite, BitStream *input, uint8_t languageId=0 );
 
 #ifdef _CSTRING_COMPRESSOR
-	void EncodeString( const CString &input, int maxCharsToWrite, RakNet::BitStream *output, uint8_t languageId=0 );
-	bool DecodeString( CString &output, int maxCharsToWrite, RakNet::BitStream *input, uint8_t languageId=0 );
+	void EncodeString( const CString &input, int maxCharsToWrite, BitStream *output, uint8_t languageId=0 );
+	bool DecodeString( CString &output, int maxCharsToWrite, BitStream *input, uint8_t languageId=0 );
 #endif
 
 #ifdef _STD_STRING_COMPRESSOR
-	void EncodeString( const std::string &input, int maxCharsToWrite, RakNet::BitStream *output, uint8_t languageId=0 );
-	bool DecodeString( std::string *output, int maxCharsToWrite, RakNet::BitStream *input, uint8_t languageId=0 );
+	void EncodeString( const std::string &input, int maxCharsToWrite, BitStream *output, uint8_t languageId=0 );
+	bool DecodeString( std::string *output, int maxCharsToWrite, BitStream *input, uint8_t languageId=0 );
 #endif
 
-	void EncodeString( const RakNet::RakString *input, int maxCharsToWrite, RakNet::BitStream *output, uint8_t languageId=0 );
-	bool DecodeString( RakNet::RakString *output, int maxCharsToWrite, RakNet::BitStream *input, uint8_t languageId=0 );
+	void EncodeString( const RakString *input, int maxCharsToWrite, BitStream *output, uint8_t languageId=0 );
+	bool DecodeString( RakString *output, int maxCharsToWrite, BitStream *input, uint8_t languageId=0 );
 
 	/// Used so I can allocate and deallocate this singleton at runtime
 	static void AddReference(void);

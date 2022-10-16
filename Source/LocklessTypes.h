@@ -20,8 +20,7 @@
 
 #include <stdint.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 class RAK_DLL_EXPORT LocklessUint32_t
 {
@@ -46,6 +45,6 @@ protected:
 #endif
 };
 
-}
+} // namespace RakNet
 
 #endif

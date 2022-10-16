@@ -13,6 +13,10 @@
 
 #include "Export.h"
 
+namespace RakNet {
+
 void RAK_DLL_EXPORT RakSleep(unsigned int ms);
+
+} // namespace RakNet
 
 #endif

@@ -20,8 +20,8 @@
 #include "RakMemoryOverride.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class NetworkIDManager;
 

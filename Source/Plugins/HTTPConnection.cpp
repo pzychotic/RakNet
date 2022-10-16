@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(HTTPConnection,HTTPConnection);
 
@@ -58,7 +58,7 @@ void HTTPConnection::Get(const char *path)
 	outgoingCommand.Push(op, _FILE_AND_LINE_ );
 }
 
-bool HTTPConnection::HasBadResponse(int *code, RakNet::RakString *data)
+bool HTTPConnection::HasBadResponse(int *code, RakString *data)
 {
     if(badResponses.IsEmpty())
         return false;
@@ -199,12 +199,12 @@ RakString HTTPConnection::Read(void)
 	if (results.IsEmpty())
 		return RakString();
 
-	RakNet::RakString resultStr = results.Pop();
+	RakString resultStr = results.Pop();
     // const char *start_of_body = strstr(resultStr.C_String(), "\r\n\r\n");
 	const char *start_of_body = strpbrk(resultStr.C_String(), "\001\002\003%");
     
     if(start_of_body)
-		return RakNet::RakString::NonVariadic(start_of_body);
+		return RakString::NonVariadic(start_of_body);
 	else
 		return resultStr;
 }
@@ -232,7 +232,7 @@ void HTTPConnection::ProcessTCPPacket(Packet *packet)
 			}
 		}
 
-		RakNet::RakString incomingTemp = RakNet::RakString::NonVariadic((const char*) packet->data);
+		RakString incomingTemp = RakString::NonVariadic((const char*) packet->data);
 		incomingTemp.URLDecode();
 		incomingData += incomingTemp;
 
@@ -304,5 +304,6 @@ HTTPConnection::~HTTPConnection(void)
 		tcp->CloseConnection(server);
 }
 
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

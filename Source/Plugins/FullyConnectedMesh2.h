@@ -28,10 +28,9 @@
 
 #include <stdint.h>
 
-typedef int64_t FCM2Guid;
+namespace RakNet {
 
-namespace RakNet
-{
+typedef int64_t FCM2Guid;
 
 /// \brief Fully connected mesh plugin, revision 2
 /// \details This will connect RakPeer to all connecting peers, and all peers the connecting peer knows about.<BR>
@@ -52,7 +51,7 @@ public:
 	/// \note This will not work on any console. It will also not work if NAT punchthrough is needed. Generally, this should be false and you should connect manually. It is here for legacy reasons.
 	/// \param[in] attemptConnection If true, we try to connect to any systems we are notified about with ID_REMOTE_NEW_INCOMING_CONNECTION, which comes from the ConnectionGraph2 plugin. Defaults to true.
 	/// \param[in] pw The password to use to connect with. Only used if \a attemptConnection is true
-	void SetConnectOnNewRemoteConnection(bool attemptConnection, RakNet::RakString pw);
+	void SetConnectOnNewRemoteConnection(bool attemptConnection, RakString pw);
 
 	/// \brief The connected host is whichever system we are connected to that has been running the longest.
 	/// \details Will return UNASSIGNED_RAKNET_GUID if we are not connected to anyone, or if we are connected and are calculating the host
@@ -184,7 +183,7 @@ public:
 	/// \code
 	/// bool thisSystemAccepted;
 	/// DataStructures::List<RakNetGUID> systemsAccepted;
-	/// RakNet::BitStream additionalData;
+	/// BitStream additionalData;
 	/// fullyConnectedMesh->GetVerifiedJoinAcceptedAdditionalData(packet, &thisSystemAccepted, systemsAccepted, &additionalData);
 	/// \endcode
 	/// \param[in] packet Packet containing the ID_FCM2_VERIFIED_JOIN_ACCEPTED message
@@ -203,21 +202,21 @@ public:
 	virtual void GetVerifiedJoinRejectedAdditionalData(Packet *packet, BitStream *additionalData);
 
 	/// Override to write data when ID_FCM2_VERIFIED_JOIN_CAPABLE is sent
-	virtual void WriteVJCUserData(RakNet::BitStream *bsOut) {(void) bsOut;}
+	virtual void WriteVJCUserData(BitStream *bsOut) {(void) bsOut;}
 
 	/// Use to read data written from WriteVJCUserData()
 	/// \code
-	/// RakNet::BitStream bsIn(packet->data,packet->length,false);
+	/// BitStream bsIn(packet->data,packet->length,false);
 	/// FullyConnectedMesh2::SkipToVJCUserData(&bsIn);
 	/// // Your code here
-	static void SkipToVJCUserData(RakNet::BitStream *bsIn);
+	static void SkipToVJCUserData(BitStream *bsIn);
 
 	/// Write custom user data to be sent with ID_FCM2_VERIFIED_JOIN_START, per user
 	/// \param[out] bsOut Write your data here, if any. Has to match what is read by ReadVJSUserData
 	/// \param[in] userGuid The RakNetGuid of the user you are writing for
 	/// \param[in] userContext The data set with SetMyContext() for that system. May be empty. To properly write userContext, you will need to first write userContext->GetNumberOfBitsUsed(), followed by bsOut->Write(userContext);
-	//virtual void WriteVJSUserData(RakNet::BitStream *bsOut, RakNetGUID userGuid, BitStream *userContext) {(void) bsOut; (void) userGuid; (void) userContext;}
-	virtual void WriteVJSUserData(RakNet::BitStream *bsOut, RakNetGUID userGuid) {(void) bsOut; (void) userGuid;}
+	//virtual void WriteVJSUserData(BitStream *bsOut, RakNetGUID userGuid, BitStream *userContext) {(void) bsOut; (void) userGuid; (void) userContext;}
+	virtual void WriteVJSUserData(BitStream *bsOut, RakNetGUID userGuid) {(void) bsOut; (void) userGuid;}
 
 	/// \internal
 	RakNet::TimeUS GetElapsedRuntime(void);
@@ -304,10 +303,10 @@ protected:
 	unsigned int GetJoinsInProgressIndex(RakNetGUID requester) const;
 	void UpdateVerifiedJoinInProgressMember(const AddressOrGUID systemIdentifier, RakNetGUID guidToAssign, JoinInProgressState newState);
 	bool ProcessVerifiedJoinInProgressIfCompleted(VerifiedJoinInProgress *vjip);
-	void ReadVerifiedJoinInProgressMember(RakNet::BitStream *bsIn, VerifiedJoinInProgressMember *vjipm);
+	void ReadVerifiedJoinInProgressMember(BitStream *bsIn, VerifiedJoinInProgressMember *vjipm);
 	unsigned int GetVerifiedJoinInProgressMemberIndex(const AddressOrGUID systemIdentifier, VerifiedJoinInProgress *vjip);
 	void DecomposeJoinCapable(Packet *packet, VerifiedJoinInProgress *vjip);
-	void WriteVerifiedJoinCapable(RakNet::BitStream *bsOut, VerifiedJoinInProgress *vjip);
+	void WriteVerifiedJoinCapable(BitStream *bsOut, VerifiedJoinInProgress *vjip);
 	void CategorizeVJIP(VerifiedJoinInProgress *vjip,
 		DataStructures::List<RakNetGUID> &participatingMembersOnClientSucceeded,
 		DataStructures::List<RakNetGUID> &participatingMembersOnClientFailed,
@@ -338,7 +337,7 @@ protected:
 	RakNetGUID hostRakNetGuid;
 	FCM2Guid hostFCM2Guid;
 
-	RakNet::RakString connectionPassword;
+	RakString connectionPassword;
 	bool connectOnNewRemoteConnections;
 
 	DataStructures::List<VerifiedJoinInProgress*> joinsInProgress;

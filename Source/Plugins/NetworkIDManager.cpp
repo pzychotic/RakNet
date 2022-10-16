@@ -17,7 +17,7 @@
 //#include "SuperFastHash.h"
 #include "RakPeerInterface.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(NetworkIDManager,NetworkIDManager)
 
@@ -128,3 +128,5 @@ void NetworkIDManager::StopTrackingNetworkIDObject(NetworkIDObject *networkIdObj
 
 	RakAssert("NetworkIDManager::StopTrackingNetworkIDObject didn't find object" && 0);
 }
+
+} // namespace RakNet

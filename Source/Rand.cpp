@@ -42,6 +42,8 @@
 #include <string.h>
 #include "Rand.h"
 
+namespace RakNet {
+
 //
 // uint32 must be an unsigned integer type capable of holding at least 32
 // bits; exactly 32 should be fastest, but 64 is better on an Alpha with
@@ -61,8 +63,6 @@
 static unsigned int _state[ N + 1 ];     // state vector + 1 extra to not violate ANSI C
 static unsigned int *_next;        // next random value is computed from here
 static int _left = -1; // can *next++ this many times before reloading
-
-using namespace RakNet;
 
 void seedMT( unsigned int seed, unsigned int *state, unsigned int *&next, int &left );
 unsigned int reloadMT( unsigned int *state, unsigned int *&next, int &left );
@@ -253,6 +253,8 @@ void RakNetRandom::FillBufferMT( void *buffer, unsigned int bytes )
 	fillBufferMT(buffer, bytes, state, next, left);
 }
 
+} // namespace RakNet
+
 /*
 int main(void)
 {
@@ -271,4 +273,3 @@ return(EXIT_SUCCESS);
 }
 
 */
-

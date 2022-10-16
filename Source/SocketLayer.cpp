@@ -23,8 +23,6 @@
 #include <netdb.h>
 #endif
 
-using namespace RakNet;
-
 /*
 #if defined(__native_client__)
 using namespace pp;
@@ -58,18 +56,6 @@ using namespace pp;
 
 #endif
 
-
-
-
-
-
-
-
-
-
-
-
-
 #if   defined(_WIN32)
 #include "WindowsIncludes.h"
 
@@ -79,17 +65,11 @@ using namespace pp;
 
 #include <stdio.h>
 
-namespace RakNet
-{
+namespace RakNet {
+
 	extern void ProcessNetworkPacket( const SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNet::TimeUS timeRead );
 	//extern void ProcessNetworkPacket( const SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNetSocket* rakNetSocket, RakNet::TimeUS timeRead );
-}
 
-#ifdef _DEBUG
-#include <stdio.h>
-#endif
-
- 
 
 // http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#ip4to6
 // http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#getaddrinfo
@@ -173,14 +153,10 @@ void SocketLayer::SetSocketOptions( __UDPSOCKET__ listenSocket, bool blockingSoc
 }
  
 
-RakNet::RakString SocketLayer::GetSubNetForSocketAndIp(__UDPSOCKET__ inSock, RakNet::RakString inIpString)
+RakString SocketLayer::GetSubNetForSocketAndIp(__UDPSOCKET__ inSock, RakString inIpString)
 {
-	RakNet::RakString netMaskString;
-	RakNet::RakString ipString;
-
-
-
-
+	RakString netMaskString;
+	RakString ipString;
 
 #if   defined(WINDOWS_STORE_RT)
 	RakAssert("Not yet supported" && 0);
@@ -596,5 +572,6 @@ bool SocketLayer::GetFirstBindableIP(char firstBindable[128], int ipProto)
 // 	);
 	ipList[l].ToString(false,firstBindable);
 	return true;
-
 }
+
+} // namespace RakNet

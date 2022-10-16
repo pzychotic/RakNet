@@ -23,8 +23,7 @@
 #include "DS_ByteQueue.h"
 #include "DS_Map.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 class RAK_DLL_EXPORT PacketizedTCP : public TCPInterface
 {

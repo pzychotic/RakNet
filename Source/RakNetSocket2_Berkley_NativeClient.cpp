@@ -16,6 +16,8 @@
 // Every platform except windows store 8 and native client supports Berkley sockets
 #if !defined(WINDOWS_STORE_RT)
 
+namespace RakNet {
+
 // Shared on most platforms, but excluded from the listed
 
 
@@ -100,8 +102,7 @@ void DomainNameToIP_Berkley( const char *domainName, char ip[65] )
 #endif
 }
 
-
-
+} // namespace RakNet
 
 #endif // !defined(WINDOWS_STORE_RT) && !defined(__native_client__)
 

@@ -16,13 +16,7 @@
 #include "rdlmalloc.h"
 #endif
 
-
-
-
-
-
-
-using namespace RakNet;
+namespace RakNet {
 
 #if _USE_RAK_MEMORY_OVERRIDE==1
 	#if defined(malloc)
@@ -51,16 +45,16 @@ void DefaultOutOfMemoryHandler(const char *file, const long line)
 	RakAssert(0);
 }
 
-void * (*rakMalloc) (size_t size) = RakNet::_RakMalloc;
-void* (*rakRealloc) (void *p, size_t size) = RakNet::_RakRealloc;
-void (*rakFree) (void *p) = RakNet::_RakFree;
-void* (*rakMalloc_Ex) (size_t size, const char *file, unsigned int line) = RakNet::_RakMalloc_Ex;
-void* (*rakRealloc_Ex) (void *p, size_t size, const char *file, unsigned int line) = RakNet::_RakRealloc_Ex;
-void (*rakFree_Ex) (void *p, const char *file, unsigned int line) = RakNet::_RakFree_Ex;
+void * (*rakMalloc) (size_t size) = _RakMalloc;
+void* (*rakRealloc) (void *p, size_t size) = _RakRealloc;
+void (*rakFree) (void *p) = _RakFree;
+void* (*rakMalloc_Ex) (size_t size, const char *file, unsigned int line) = _RakMalloc_Ex;
+void* (*rakRealloc_Ex) (void *p, size_t size, const char *file, unsigned int line) = _RakRealloc_Ex;
+void (*rakFree_Ex) (void *p, const char *file, unsigned int line) = _RakFree_Ex;
 void (*notifyOutOfMemory) (const char *file, const long line)=DefaultOutOfMemoryHandler;
-void * (*dlMallocMMap) (size_t size) = RakNet::_DLMallocMMap;
-void * (*dlMallocDirectMMap) (size_t size) = RakNet::_DLMallocDirectMMap;
-int (*dlMallocMUnmap) (void* ptr, size_t size) = RakNet::_DLMallocMUnmap;
+void * (*dlMallocMMap) (size_t size) = _DLMallocMMap;
+void * (*dlMallocDirectMMap) (size_t size) = _DLMallocDirectMMap;
+int (*dlMallocMUnmap) (void* ptr, size_t size) = _DLMallocMUnmap;
 
 void SetMalloc( void* (*userFunction)(size_t size) )
 {
@@ -138,22 +132,22 @@ int (*GetDLMallocMUnmap())(void* ptr, size_t size)
 {
 	return dlMallocMUnmap;
 }
-void* RakNet::_RakMalloc (size_t size)
+void* _RakMalloc (size_t size)
 {
 	return malloc(size);
 }
 
-void* RakNet::_RakRealloc (void *p, size_t size)
+void* _RakRealloc (void *p, size_t size)
 {
 	return realloc(p,size);
 }
 
-void RakNet::_RakFree (void *p)
+void _RakFree (void *p)
 {
 	free(p);
 }
 
-void* RakNet::_RakMalloc_Ex (size_t size, const char *file, unsigned int line)
+void* _RakMalloc_Ex (size_t size, const char *file, unsigned int line)
 {
 	(void) file;
 	(void) line;
@@ -161,7 +155,7 @@ void* RakNet::_RakMalloc_Ex (size_t size, const char *file, unsigned int line)
 	return malloc(size);
 }
 
-void* RakNet::_RakRealloc_Ex (void *p, size_t size, const char *file, unsigned int line)
+void* _RakRealloc_Ex (void *p, size_t size, const char *file, unsigned int line)
 {
 	(void) file;
 	(void) line;
@@ -169,7 +163,7 @@ void* RakNet::_RakRealloc_Ex (void *p, size_t size, const char *file, unsigned i
 	return realloc(p,size);
 }
 
-void RakNet::_RakFree_Ex (void *p, const char *file, unsigned int line)
+void _RakFree_Ex (void *p, const char *file, unsigned int line)
 {
 	(void) file;
 	(void) line;
@@ -177,15 +171,15 @@ void RakNet::_RakFree_Ex (void *p, const char *file, unsigned int line)
 	free(p);
 }
 #ifdef _RAKNET_SUPPORT_DL_MALLOC
-void * RakNet::_DLMallocMMap (size_t size)
+void * _DLMallocMMap (size_t size)
 {
 	return RAK_MMAP_DEFAULT(size);
 }
-void * RakNet::_DLMallocDirectMMap (size_t size)
+void * _DLMallocDirectMMap (size_t size)
 {
 	return RAK_DIRECT_MMAP_DEFAULT(size);
 }
-int RakNet::_DLMallocMUnmap (void *p, size_t size)
+int _DLMallocMUnmap (void *p, size_t size)
 {
 	return RAK_MUNMAP_DEFAULT(p,size);
 }
@@ -265,9 +259,9 @@ void FreeRakNetFixedHeap(void)
 	SetFree_Ex(_RakFree_Ex);
 }
 #else
-void * RakNet::_DLMallocMMap (size_t size) {(void) size; return 0;}
-void * RakNet::_DLMallocDirectMMap (size_t size) {(void) size; return 0;}
-int RakNet::_DLMallocMUnmap (void *p, size_t size) {(void) size; (void) p; return 0;}
+void * _DLMallocMMap (size_t size) {(void) size; return 0;}
+void * _DLMallocDirectMMap (size_t size) {(void) size; return 0;}
+int _DLMallocMUnmap (void *p, size_t size) {(void) size; (void) p; return 0;}
 void* _DLMalloc(size_t size) {(void) size; return 0;}
 void* _DLRealloc(void *p, size_t size) {(void) p; (void) size; return 0;}
 void _DLFree(void *p) {(void) p;}
@@ -304,3 +298,5 @@ void FreeRakNetFixedHeap(void) {}
 	#undef RMO_FREE_UNDEF
 	#endif
 #endif
+
+} // namespace RakNet

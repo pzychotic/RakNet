@@ -22,8 +22,8 @@
 #include "WindowsIncludes.h"
 #endif
 
-namespace RakNet
-{
+namespace RakNet {
+
 	/// \brief String class for Unicode
 	class RAK_DLL_EXPORT RakWString
 	{
@@ -115,9 +115,9 @@ namespace RakNet
 		size_t c_strCharLength;
 	};
 
-}
 
-const RakNet::RakWString RAK_DLL_EXPORT operator+(const RakNet::RakWString &lhs, const RakNet::RakWString &rhs);
+const RakWString RAK_DLL_EXPORT operator+(const RakWString &lhs, const RakWString &rhs);
 
+} // namespace RakNet
 
 #endif

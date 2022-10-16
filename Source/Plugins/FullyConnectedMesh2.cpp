@@ -23,7 +23,7 @@
 #include "Rand.h"
 #include "DS_OrderedList.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 int FCM2ParticipantComp( FullyConnectedMesh2::FCM2Participant * const &key, FullyConnectedMesh2::FCM2Participant * const &data )
 {
@@ -220,7 +220,7 @@ void FullyConnectedMesh2::SetMyContext(BitStream *userContext)
 		userContext->ResetReadPointer();
 	}
 
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_FCM2_UPDATE_USER_CONTEXT);
 	bsOut.Write(myContext);
 	myContext.ResetReadPointer();
@@ -280,8 +280,8 @@ PluginReceiveResult FullyConnectedMesh2::OnReceive(Packet *packet)
 	case ID_NAT_TARGET_NOT_CONNECTED:
 	case ID_NAT_CONNECTION_TO_TARGET_LOST:
 		{
-			RakNet::RakNetGUID g;
-			RakNet::BitStream b(packet->data, packet->length, false);
+			RakNetGUID g;
+			BitStream b(packet->data, packet->length, false);
 			b.IgnoreBits(8); // Ignore the ID_...
 			b.Read(g);
 			UpdateVerifiedJoinInProgressMember(g, UNASSIGNED_RAKNET_GUID, JIPS_FAILED);
@@ -437,7 +437,7 @@ void FullyConnectedMesh2::Clear(void)
 void FullyConnectedMesh2::PushNewHost(const RakNetGUID &guid, RakNetGUID oldHost)
 {
 	Packet *p = AllocatePacketUnified(sizeof(MessageID)+sizeof(oldHost));
-	RakNet::BitStream bs(p->data,p->length,false);
+	BitStream bs(p->data,p->length,false);
 	bs.SetWriteOffset(0);
 	bs.Write((MessageID)ID_FCM2_NEW_HOST);
 	bs.Write(oldHost);
@@ -454,7 +454,7 @@ void FullyConnectedMesh2::SendFCMGuidRequest(RakNetGUID rakNetGuid)
 	if (rakNetGuid==rakPeerInterface->GetGuidFromSystemAddress(UNASSIGNED_SYSTEM_ADDRESS))
 		return;
 
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_FCM2_REQUEST_FCMGUID);
 	if (ourFCMGuid==0)
 	{
@@ -473,7 +473,7 @@ void FullyConnectedMesh2::SendFCMGuidRequest(RakNetGUID rakNetGuid)
 }
 void FullyConnectedMesh2::SendOurFCMGuid(SystemAddress addr)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_FCM2_INFORM_FCMGUID);
 	RakAssert(ourFCMGuid!=0); // Can't inform others of our FCM2Guid if it's unset!
 	bsOut.Write(ourFCMGuid);
@@ -484,7 +484,7 @@ void FullyConnectedMesh2::SendOurFCMGuid(SystemAddress addr)
 }
 void FullyConnectedMesh2::SendConnectionCountResponse(SystemAddress addr, unsigned int responseTotalConnectionCount)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_FCM2_RESPOND_CONNECTION_COUNT);
 	bsOut.Write(responseTotalConnectionCount);
 	//bsOut.Write(myContext);
@@ -530,7 +530,7 @@ void FullyConnectedMesh2::CalculateHost(RakNetGUID *rakNetGuid, FCM2Guid *fcm2Gu
 }
 void FullyConnectedMesh2::OnRequestFCMGuid(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	bool hasRemoteFCMGuid=false;
 	bsIn.Read(hasRemoteFCMGuid);
@@ -601,7 +601,7 @@ void FullyConnectedMesh2::OnRequestFCMGuid(Packet *packet)
 /*
 void FullyConnectedMesh2::OnUpdateUserContext(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	BitStream remoteContext;
 	bsIn.Read(remoteContext);
@@ -619,7 +619,7 @@ void FullyConnectedMesh2::OnUpdateUserContext(Packet *packet)
 */
 void FullyConnectedMesh2::OnRespondConnectionCount(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	unsigned int responseTotalConnectionCount;
 	bsIn.Read(responseTotalConnectionCount);
@@ -661,7 +661,7 @@ void FullyConnectedMesh2::OnRespondConnectionCount(Packet *packet)
 }
 void FullyConnectedMesh2::OnInformFCMGuid(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 
 	FCM2Guid theirFCMGuid;
@@ -679,7 +679,7 @@ void FullyConnectedMesh2::OnInformFCMGuid(Packet *packet)
 	{
 		// 1/19/2010 - Relay increased total connection count in case new participant only connects to part of the mesh
 		unsigned int idx;
-		RakNet::BitStream bsOut;
+		BitStream bsOut;
 		bsOut.Write((MessageID)ID_FCM2_UPDATE_MIN_TOTAL_CONNECTION_COUNT);
 		bsOut.Write(totalConnectionCount);
 		for (idx=0; idx < fcm2ParticipantList.Size(); idx++)
@@ -701,7 +701,7 @@ void FullyConnectedMesh2::OnInformFCMGuid(Packet *packet)
 }
 void FullyConnectedMesh2::OnUpdateMinTotalConnectionCount(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	unsigned int newMin;
 	bsIn.Read(newMin);
@@ -748,7 +748,7 @@ void FullyConnectedMesh2::IncrementTotalConnectionCount(unsigned int i)
 		//	printf("totalConnectionCount=%i\n",i);
 	}
 }
-void FullyConnectedMesh2::SetConnectOnNewRemoteConnection(bool attemptConnection, RakNet::RakString pw)
+void FullyConnectedMesh2::SetConnectOnNewRemoteConnection(bool attemptConnection, RakString pw)
 {
 	connectOnNewRemoteConnections=attemptConnection;
 	connectionPassword=pw;
@@ -757,7 +757,7 @@ void FullyConnectedMesh2::SetConnectOnNewRemoteConnection(bool attemptConnection
 void FullyConnectedMesh2::ConnectToRemoteNewIncomingConnections(Packet *packet)
 {
 	unsigned int count;
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	bsIn.Read(count);
 	SystemAddress remoteAddress;
@@ -852,7 +852,7 @@ void FullyConnectedMesh2::RespondOnVerifiedJoinCapable(Packet *packet, bool acce
 	RakAssert(participatingMembersOnClientFailed.Size()==0);
 	RakAssert(participatingMembersNotOnClient.Size()==0);
 	
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	if (accept)
 	{
 		bsOut.Write((MessageID)ID_FCM2_VERIFIED_JOIN_ACCEPTED);
@@ -921,7 +921,7 @@ void FullyConnectedMesh2::GetVerifiedJoinAcceptedAdditionalData(Packet *packet, 
 {
 	systemsAccepted.Clear(true, _FILE_AND_LINE_);
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	RakNetGUID systemToAddGuid;
 	bsIn.Read(systemToAddGuid);
@@ -952,7 +952,7 @@ void FullyConnectedMesh2::GetVerifiedJoinAcceptedAdditionalData(Packet *packet, 
 }
 void FullyConnectedMesh2::GetVerifiedJoinRejectedAdditionalData(Packet *packet, BitStream *additionalData)
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	if (additionalData)
 	{
@@ -962,7 +962,7 @@ void FullyConnectedMesh2::GetVerifiedJoinRejectedAdditionalData(Packet *packet, 
 }
 PluginReceiveResult FullyConnectedMesh2::OnVerifiedJoinStart(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 
 	unsigned short listSize;
@@ -1040,7 +1040,7 @@ PluginReceiveResult FullyConnectedMesh2::OnVerifiedJoinStart(Packet *packet)
 		//vjip->sentResults=true;
 
 		// Send back result
-		RakNet::BitStream bsOut;
+		BitStream bsOut;
 		bsOut.Write((MessageID)ID_FCM2_VERIFIED_JOIN_CAPABLE);
 		bsOut.WriteCasted<unsigned short>(0);
 		WriteVJCUserData(&bsOut);
@@ -1071,7 +1071,7 @@ PluginReceiveResult FullyConnectedMesh2::OnVerifiedJoinStart(Packet *packet)
 
 	return RR_CONTINUE_PROCESSING;
 }
-void FullyConnectedMesh2::SkipToVJCUserData(RakNet::BitStream *bsIn)
+void FullyConnectedMesh2::SkipToVJCUserData(BitStream *bsIn)
 {
 	bsIn->IgnoreBytes(sizeof(MessageID));
 	unsigned short listSize;
@@ -1085,7 +1085,7 @@ void FullyConnectedMesh2::SkipToVJCUserData(RakNet::BitStream *bsIn)
 }
 void FullyConnectedMesh2::DecomposeJoinCapable(Packet *packet, VerifiedJoinInProgress *vjip)
 {
-	RakNet::BitStream bsIn(packet->data,packet->length,false);
+	BitStream bsIn(packet->data,packet->length,false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 
 	unsigned short listSize;
@@ -1330,7 +1330,7 @@ bool FullyConnectedMesh2::ProcessVerifiedJoinInProgressIfCompleted(VerifiedJoinI
 	//vjip->sentResults=true;
 	return true;
 }
-void FullyConnectedMesh2::WriteVerifiedJoinCapable(RakNet::BitStream *bsOut, VerifiedJoinInProgress *vjip)
+void FullyConnectedMesh2::WriteVerifiedJoinCapable(BitStream *bsOut, VerifiedJoinInProgress *vjip)
 {
 	bsOut->Write((MessageID) ID_FCM2_VERIFIED_JOIN_CAPABLE);
 	bsOut->WriteCasted<unsigned short>(vjip->vjipMembers.Size());
@@ -1343,7 +1343,7 @@ void FullyConnectedMesh2::WriteVerifiedJoinCapable(RakNet::BitStream *bsOut, Ver
 	}
 }
 
-void FullyConnectedMesh2::ReadVerifiedJoinInProgressMember(RakNet::BitStream *bsIn, VerifiedJoinInProgressMember *vjipm)
+void FullyConnectedMesh2::ReadVerifiedJoinInProgressMember(BitStream *bsIn, VerifiedJoinInProgressMember *vjipm)
 {
 	bsIn->Read(vjipm->guid);
 	bsIn->Read(vjipm->systemAddress);
@@ -1419,5 +1419,7 @@ void FullyConnectedMesh2::CategorizeVJIP(VerifiedJoinInProgress *vjip,
 		}
 	}
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

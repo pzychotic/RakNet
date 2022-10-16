@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include "Itoa.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 //DataStructures::MemoryPool<RakString::SharedString> RakString::pool;
 RakString::SharedString RakString::emptyString={0,0,0,(char*) "",(char*) ""};
@@ -33,7 +33,7 @@ class RakStringCleanup
 public:
 	~RakStringCleanup()
 	{
-		RakNet::RakString::FreeMemoryNoMutex();
+		RakString::FreeMemoryNoMutex();
 	}
 };
 
@@ -45,7 +45,7 @@ SimpleMutex& GetPoolMutex(void)
 	return poolMutex;
 }
 
-int RakNet::RakString::RakStringComp( RakString const &key, RakString const &data )
+int RakString::RakStringComp( RakString const &key, RakString const &data )
 {
 	return key.StrCmp(data);
 }
@@ -275,7 +275,7 @@ bool RakString::operator!=(char *str) const
 {
 	return strcmp(sharedString->c_str,str)!=0;
 }
-const RakNet::RakString operator+(const RakNet::RakString &lhs, const RakNet::RakString &rhs)
+const RakString operator+(const RakString &lhs, const RakString &rhs)
 {
 	if (lhs.IsEmpty() && rhs.IsEmpty())
 	{
@@ -441,12 +441,12 @@ void RakString::SetChar( unsigned index, unsigned char c )
 	Clone();
 	sharedString->c_str[index]=c;
 }
-void RakString::SetChar( unsigned index, RakNet::RakString s )
+void RakString::SetChar( unsigned index, RakString s )
 {
 	RakAssert(index < GetLength());
 	Clone();
-	RakNet::RakString firstHalf = SubStr(0, index);
-	RakNet::RakString secondHalf = SubStr(index+1, (unsigned int)-1);
+	RakString firstHalf = SubStr(0, index);
+	RakString secondHalf = SubStr(index+1, (unsigned int)-1);
 	*this = firstHalf;
 	*this += s;
 	*this += secondHalf;
@@ -533,9 +533,9 @@ void RakString::FromWideChar(const wchar_t *source)
 
 
 }
-RakNet::RakString RakString::FromWideChar_S(const wchar_t *source)
+RakString RakString::FromWideChar_S(const wchar_t *source)
 {
-	RakNet::RakString rs;
+	RakString rs;
 	rs.FromWideChar(source);
 	return rs;
 }
@@ -851,7 +851,7 @@ bool RakString::IsEmailAddress(void) const
 	// There's more I could check, but this is good enough
 	return true;
 }
-RakNet::RakString& RakString::URLEncode(void)
+RakString& RakString::URLEncode(void)
 {
 	RakString result;
 	size_t strLen = strlen(sharedString->c_str);
@@ -887,7 +887,7 @@ RakNet::RakString& RakString::URLEncode(void)
 	*this = result;
 	return *this;
 }
-RakNet::RakString& RakString::URLDecode(void)
+RakString& RakString::URLDecode(void)
 {
 	RakString result;
 	size_t strLen = strlen(sharedString->c_str);
@@ -936,7 +936,7 @@ RakNet::RakString& RakString::URLDecode(void)
 	*this = result;
 	return *this;
 }
-void RakString::SplitURI(RakNet::RakString &header, RakNet::RakString &domain, RakNet::RakString &path)
+void RakString::SplitURI(RakString &header, RakString &domain, RakString &path)
 {
 	header.Clear();
 	domain.Clear();
@@ -989,7 +989,7 @@ void RakString::SplitURI(RakNet::RakString &header, RakNet::RakString &domain, R
 	}
 	pathOutput[outputIndex]=0;
 }
-RakNet::RakString& RakString::SQLEscape(void)
+RakString& RakString::SQLEscape(void)
 {
 	int strLen=(int)GetLength();
 	int escapedCharacterCount=0;
@@ -1025,12 +1025,12 @@ RakNet::RakString& RakString::SQLEscape(void)
 	}
 	return *this;
 }
-RakNet::RakString RakString::FormatForPUTOrPost(const char* type, const char* uri, const char* contentType, const char* body, const char* extraHeaders)
+RakString RakString::FormatForPUTOrPost(const char* type, const char* uri, const char* contentType, const char* body, const char* extraHeaders)
 {
 	RakString out;
 	RakString host;
 	RakString remotePath;
-	RakNet::RakString header;
+	RakString header;
 	RakString uriRs;
 	uriRs = uri;
 	uriRs.SplitURI(header, host, remotePath);
@@ -1093,8 +1093,8 @@ RakString RakString::FormatForGET(const char* uri, const char* extraHeaders)
 	RakString out;
 	RakString host;
 	RakString remotePath;
-	RakNet::RakString header;
-	RakNet::RakString uriRs;
+	RakString header;
+	RakString uriRs;
 	uriRs = uri;
 
 	uriRs.SplitURI(header, host, remotePath);
@@ -1129,8 +1129,8 @@ RakString RakString::FormatForDELETE(const char* uri, const char* extraHeaders)
 	RakString out;
 	RakString host;
 	RakString remotePath;
-	RakNet::RakString header;
-	RakNet::RakString uriRs;
+	RakString header;
+	RakString uriRs;
 	uriRs = uri;
 
 	uriRs.SplitURI(header, host, remotePath);
@@ -1162,12 +1162,12 @@ RakString RakString::FormatForDELETE(const char* uri, const char* extraHeaders)
 
 	return out;
 }
-RakNet::RakString& RakString::MakeFilePath(void)
+RakString& RakString::MakeFilePath(void)
 {
 	if (IsEmpty())
 		return *this;
 
-	RakNet::RakString fixedString = *this;
+	RakString fixedString = *this;
 	fixedString.Clone();
 	for (int i=0; fixedString.sharedString->c_str[i]; i++)
 	{
@@ -1413,7 +1413,7 @@ void RakString::Assign(const char *str, va_list ap)
 		buffSize*=2;
 	}
 }
-RakNet::RakString RakString::Assign(const char *str,size_t pos, size_t n )
+RakString RakString::Assign(const char *str,size_t pos, size_t n )
 {
 	size_t incomingLen=strlen(str);
 
@@ -1440,9 +1440,9 @@ RakNet::RakString RakString::Assign(const char *str,size_t pos, size_t n )
 	return (*this);
 }
 
-RakNet::RakString RakString::NonVariadic(const char *str)
+RakString RakString::NonVariadic(const char *str)
 {
-	RakNet::RakString rs;
+	RakString rs;
 	rs=str;
 	return rs;
 }
@@ -1558,6 +1558,8 @@ void RakString::UnlockMutex(void)
 {
 	GetPoolMutex().Unlock();
 }
+
+} // namespace RakNet
 
 /*
 #include "RakString.h"

@@ -41,6 +41,6 @@ public:
 		
 private:
 	DataStructures::List <RakString> errorList;
-	DataStructures::List <RakNet::RakPeerInterface *> destroyList;
+	DataStructures::List <RakPeerInterface *> destroyList;
 
 };

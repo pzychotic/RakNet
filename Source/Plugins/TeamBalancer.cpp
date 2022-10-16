@@ -17,7 +17,7 @@
 #include "RakPeerInterface.h"
 #include "Rand.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 enum TeamBalancerOperations
 {
@@ -881,5 +881,7 @@ bool TeamBalancer::TeamsWouldBeEvenOnSwitch(TeamId t1, TeamId t2)
 	return TeamWouldBeOverpopulatedOnAddition(t1, teamMembers.Size()-1)==false &&
 		TeamWouldBeUnderpopulatedOnLeave(t2, teamMembers.Size()-1)==false;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

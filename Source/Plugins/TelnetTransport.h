@@ -23,8 +23,8 @@
 #include "DS_List.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class TCPInterface;
 struct TelnetClient;

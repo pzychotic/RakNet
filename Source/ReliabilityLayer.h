@@ -53,7 +53,7 @@
 
 namespace RakNet {
 
-	/// Forward declarations
+/// Forward declarations
 class PluginInterface2;
 class RakNetRandom;
 typedef uint64_t reliabilityHeapWeightType;
@@ -288,22 +288,22 @@ public:
 	//void SetDoFastThroughputReactions(bool fast);
 
 	// Encoded as numMessages[unsigned int], message1BitLength[unsigned int], message1Data (aligned), ...
-	//void GetUndeliveredMessages(RakNet::BitStream *messages, int MTUSize);
+	//void GetUndeliveredMessages(BitStream *messages, int MTUSize);
 
 private:
 	/// Send the contents of a bitstream to the socket
 	/// \param[in] s The socket used for sending data
 	/// \param[in] systemAddress The address and port to send to
 	/// \param[in] bitStream The data to send.
-	void SendBitStream( RakNetSocket2 *s, SystemAddress &systemAddress, RakNet::BitStream *bitStream, RakNetRandom *rnr, CCTimeType currentTime);
+	void SendBitStream( RakNetSocket2 *s, SystemAddress &systemAddress, BitStream *bitStream, RakNetRandom *rnr, CCTimeType currentTime);
 
 	///Parse an internalPacket and create a bitstream to represent this data
 	/// \return Returns number of bits used
-	BitSize_t WriteToBitStreamFromInternalPacket( RakNet::BitStream *bitStream, const InternalPacket *const internalPacket, CCTimeType curTime );
+	BitSize_t WriteToBitStreamFromInternalPacket( BitStream *bitStream, const InternalPacket *const internalPacket, CCTimeType curTime );
 
 
 	/// Parse a bitstream and create an internal packet to represent this data
-	InternalPacket* CreateInternalPacketFromBitStream( RakNet::BitStream *bitStream, CCTimeType time );
+	InternalPacket* CreateInternalPacketFromBitStream( BitStream *bitStream, CCTimeType time );
 
 	/// Does what the function name says
 	unsigned RemovePacketFromResendListAndDeleteOlderReliableSequenced( const MessageNumberType messageNumber, CCTimeType time, DataStructures::List<PluginInterface2*> &messageHandlerList, const SystemAddress &systemAddress );
@@ -483,7 +483,7 @@ private:
 	MessageNumberType sendReliableMessageNumberIndex;
 	MessageNumberType internalOrderIndex;
 	//unsigned int windowSize;
-	//RakNet::BitStream updateBitStream;
+	//BitStream updateBitStream;
 	bool deadConnection, cheater;
 	SplitPacketIdType splitPacketId;
 	RakNet::TimeMS timeoutTime; // How long to wait in MS before timing someone out
@@ -591,9 +591,9 @@ private:
 
 	
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL==1
-	RakNet::CCRakNetSlidingWindow congestionManager;
+	CCRakNetSlidingWindow congestionManager;
 #else
-	RakNet::CCRakNetUDT congestionManager;
+	CCRakNetUDT congestionManager;
 #endif
 
 

@@ -14,8 +14,7 @@
 #include "Plugins/FileListNodeContext.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 class RAK_DLL_EXPORT IncrementalReadInterface
 {

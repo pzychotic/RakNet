@@ -30,8 +30,7 @@
 #include <float.h>
 #include <stdint.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 // Type used to track values. If needed, change to double and recompile
 typedef double SHValueType;
@@ -189,7 +188,7 @@ protected:
 		TrackedObject();
 		~TrackedObject();
 		TrackedObjectData trackedObjectData;
-		DataStructures::Hash<RakNet::RakString, TimeAndValueQueue*, 32, RakNet::RakString::ToInteger> dataQueues;
+		DataStructures::Hash<RakString, TimeAndValueQueue*, 32, RakString::ToInteger> dataQueues;
 	};
 
 	DataStructures::OrderedList<uint64_t, TrackedObject*,TrackedObjectComp> objects;

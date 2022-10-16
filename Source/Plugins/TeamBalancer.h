@@ -27,8 +27,7 @@
 
 #include <stdint.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \defgroup TEAM_BALANCER_GROUP TeamBalancer
 /// \brief Set and network team selection (supports peer to peer or client/server)
@@ -194,7 +193,6 @@ protected:
 	void SwapTeamMembersByRequest(unsigned int memberIndex1, unsigned int memberIndex2);
 	void RemoveByGuid(RakNetGUID rakNetGUID);
 	bool TeamsWouldBeEvenOnSwitch(TeamId t1, TeamId t2);
-
 };
 
 } // namespace RakNet

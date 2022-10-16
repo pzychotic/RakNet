@@ -20,8 +20,8 @@
 
 #include "Plugins/PacketLogger.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class LogCommandParser;
 

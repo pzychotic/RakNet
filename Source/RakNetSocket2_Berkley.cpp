@@ -18,6 +18,8 @@
 
 #include "Itoa.h"
 
+namespace RakNet {
+
 void RNS2_Berkley::SetSocketOptions(void)
 {
 	int r;
@@ -48,9 +50,6 @@ void RNS2_Berkley::SetNonBlockingSocket(unsigned long nonblocking)
 #ifdef _WIN32
 		int res = ioctlsocket__( rns2Socket, FIONBIO, &nonblocking );
 		RakAssert(res==0);
-
-
-
 #else
 	if (nonblocking)
 		fcntl( rns2Socket, F_SETFL, O_NONBLOCK );
@@ -89,13 +88,7 @@ void RNS2_Berkley::GetSystemAddressIPV4 ( RNS2Socket rns2Socket, SystemAddress *
 
 	if (systemAddressOut->address.addr4.sin_addr.s_addr == INADDR_ANY)
 	{
-
-
-
-
-
 			systemAddressOut->address.addr4.sin_addr.s_addr=inet_addr__("127.0.0.1");
-
 	}
 }
 void RNS2_Berkley::GetSystemAddressIPV4And6 ( RNS2Socket rns2Socket, SystemAddress *systemAddressOut )
@@ -174,19 +167,9 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4( RNS2_BerkleyBindParameters *bindPar
 	// Fill in the rest of the address structure
 	boundAddress.address.addr4.sin_family = AF_INET;
 	
-
-
-
-
 	if (bindParameters->hostAddress && bindParameters->hostAddress[0])
 	{
-
-
-
-
-
 		boundAddress.address.addr4.sin_addr.s_addr = inet_addr__( bindParameters->hostAddress );
-
 	}
 	else
 	{
@@ -194,23 +177,11 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4( RNS2_BerkleyBindParameters *bindPar
 		boundAddress.address.addr4.sin_addr.s_addr = INADDR_ANY;
 	}
 
-
-
-
-
 	// bind our name to the socket
 	ret = bind__( rns2Socket, ( struct sockaddr * ) &boundAddress.address.addr4, sizeof( boundAddress.address.addr4 ) );
 
 	if ( ret <= -1 )
 	{
-
-
-
-
-
-
-
-
 #if defined(_WIN32)
 		closesocket__(rns2Socket);
 		return BR_FAILED_TO_BIND_SOCKET;
@@ -296,24 +267,6 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters *bin
 		if (rns2Socket == -1)
 			return BR_FAILED_TO_BIND_SOCKET;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 		ret = bind__(rns2Socket, aip->ai_addr, (int) aip->ai_addrlen );
 		if (ret>=0)
 		{
@@ -356,26 +309,12 @@ void RNS2_Berkley::RecvFromBlockingIPV4And6(RNS2RecvStruct *recvFromStruct)
 	int dataOutSize;
 	const int flag=0;
 
-
-
-
-
-
-
-
-
-
-
 	{
 		sockLen=sizeof(their_addr);
 		sockAddrPtr=(sockaddr*) &their_addr;
 	}
 
-
-
-
 	dataOutSize=MAXIMUM_MTU_SIZE;
-
 
 	recvFromStruct->bytesRead = recvfrom__(rns2Socket, recvFromStruct->data, dataOutSize, flag, sockAddrPtr, socketlenPtr );
 
@@ -396,26 +335,9 @@ void RNS2_Berkley::RecvFromBlockingIPV4And6(RNS2RecvStruct *recvFromStruct)
 	}	
 #endif
 
-
-
-
-
-
-
-
-
-
 	if (recvFromStruct->bytesRead<=0)
 		return;
 	recvFromStruct->timeRead=RakNet::GetTimeUS();
-
-
-
-
-
-
-
-
 
 	{
 		if (their_addr.ss_family==AF_INET)
@@ -446,26 +368,6 @@ void RNS2_Berkley::RecvFromBlockingIPV4(RNS2RecvStruct *recvFromStruct)
 	sockaddr_in sa;
 	memset(&sa,0,sizeof(sockaddr_in));
 	const int flag=0;
-	
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 	{
 		sockLen=sizeof(sa);
@@ -475,14 +377,6 @@ void RNS2_Berkley::RecvFromBlockingIPV4(RNS2RecvStruct *recvFromStruct)
 	}
 
 	recvFromStruct->bytesRead = recvfrom__( GetSocket(), recvFromStruct->data, sizeof(recvFromStruct->data), flag, sockAddrPtr, socketlenPtr );
-
-
-
-
-
-
-
-
 
 	if (recvFromStruct->bytesRead<=0)
 	{
@@ -516,16 +410,7 @@ void RNS2_Berkley::RecvFromBlockingIPV4(RNS2RecvStruct *recvFromStruct)
 	}
 	recvFromStruct->timeRead=RakNet::GetTimeUS();
 
-
-
-
-
-
-
-
-
 	{
-		
 		recvFromStruct->systemAddress.SetPortNetworkOrder( sa.sin_port );
 		recvFromStruct->systemAddress.address.addr4.sin_addr.s_addr=sa.sin_addr.s_addr;
 	}
@@ -541,6 +426,8 @@ void RNS2_Berkley::RecvFromBlocking(RNS2RecvStruct *recvFromStruct)
 	return RecvFromBlockingIPV4(recvFromStruct);
 #endif
 }
+
+} // namespace RakNet
 
 #endif // !defined(WINDOWS_STORE_RT) && !defined(__native_client__)
 

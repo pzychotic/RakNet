@@ -21,12 +21,6 @@
 #include "RakNetDefines.h"
 #include <new>
 
-
-
-
-
-
-
 #include "RakAlloca.h"
 
 // #if _USE_RAK_MEMORY_OVERRIDE==1
@@ -37,6 +31,8 @@
 // 	#endif
 // #endif
 
+
+namespace RakNet {
 
 // These pointers are statically and globally defined in RakMemoryOverride.cpp
 // Change them to point to your own allocators if you want.
@@ -74,9 +70,6 @@ extern RAK_DLL_EXPORT void (*GetFree_Ex()) (void *p, const char *file, unsigned 
 extern RAK_DLL_EXPORT void *(*GetDLMallocMMap())(size_t size);
 extern RAK_DLL_EXPORT void *(*GetDLMallocDirectMMap())(size_t size);
 extern RAK_DLL_EXPORT int (*GetDLMallocMUnmap())(void* ptr, size_t size);
-
-namespace RakNet
-{
 
 	template <class Type>
 	RAK_DLL_EXPORT Type* OP_NEW(const char *file, unsigned int line)
@@ -221,18 +214,18 @@ namespace RakNet
 	void RAK_DLL_EXPORT * _DLMallocDirectMMap (size_t size);
 	int RAK_DLL_EXPORT _DLMallocMUnmap (void *p, size_t size);
 
-}
-
 // Call to make RakNet allocate a large block of memory, and do all subsequent allocations in that memory block
 // Initial and reallocations will be done through whatever function is pointed to by yourMMapFunction, and yourDirectMMapFunction (default is malloc)
 // Allocations will be freed through whatever function is pointed to by yourMUnmapFunction (default free)
 void UseRaknetFixedHeap(size_t initialCapacity,
-						void * (*yourMMapFunction) (size_t size) = RakNet::_DLMallocMMap,
-						void * (*yourDirectMMapFunction) (size_t size) = RakNet::_DLMallocDirectMMap,
-						int (*yourMUnmapFunction) (void *p, size_t size) = RakNet::_DLMallocMUnmap);
+						void * (*yourMMapFunction) (size_t size) = _DLMallocMMap,
+						void * (*yourDirectMMapFunction) (size_t size) = _DLMallocDirectMMap,
+						int (*yourMUnmapFunction) (void *p, size_t size) = _DLMallocMUnmap);
 
 // Free memory allocated from UseRaknetFixedHeap
 void FreeRakNetFixedHeap(void);
+
+} // namespace RakNet
 
 // #if _USE_RAK_MEMORY_OVERRIDE==1
 // 	#if defined(RMO_NEW_UNDEF)

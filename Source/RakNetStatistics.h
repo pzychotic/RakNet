@@ -21,8 +21,7 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 enum RNSPerSecondMetrics
 {

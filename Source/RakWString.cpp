@@ -14,7 +14,7 @@
 #include <wchar.h>
 #include <stdlib.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 // From http://www.joelonsoftware.com/articles/Unicode.html
 // Only code points 128 and above are stored using 2, 3, in fact, up to 6 bytes.
@@ -386,6 +386,8 @@ bool RakWString::Deserialize(wchar_t *str, BitStream *bs)
 	}
 	return true;
 }
+
+} // namespace RakNet
 
 /*
 RakNet::BitStream bsTest;

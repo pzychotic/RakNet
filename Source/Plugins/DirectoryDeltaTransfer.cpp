@@ -22,7 +22,7 @@
 #include "BitStream.h"
 #include "MessageIdentifiers.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 class DDTCallback : public FileListTransferCBInterface
 {
@@ -164,7 +164,7 @@ unsigned short DirectoryDeltaTransfer::DownloadFromSubdirectory(FileList &localF
 	unsigned short setId = fileListTransfer->SetupReceive(transferCallback, true, host);
 
 	// Send to the host, telling it to process this request
-	RakNet::BitStream outBitstream;
+	BitStream outBitstream;
 	outBitstream.Write((MessageID)ID_DDT_DOWNLOAD_REQUEST);
 	outBitstream.Write(setId);
 	StringCompressor::Instance()->EncodeString(subdir, 256, &outBitstream);
@@ -193,7 +193,7 @@ void DirectoryDeltaTransfer::OnDownloadRequest(Packet *packet)
 {
 	char subdir[256];
 	char remoteSubdir[256];
-	RakNet::BitStream inBitstream(packet->data, packet->length, false);
+	BitStream inBitstream(packet->data, packet->length, false);
 	FileList remoteFileHash;
 	FileList delta;
 	unsigned short setId;
@@ -240,5 +240,7 @@ void DirectoryDeltaTransfer::SetDownloadRequestIncrementalReadInterface(Incremen
 	incrementalReadInterface=_incrementalReadInterface;
 	chunkSize=_chunkSize;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

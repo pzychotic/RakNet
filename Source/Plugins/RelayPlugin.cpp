@@ -16,7 +16,7 @@
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(RelayPlugin,RelayPlugin);
 
@@ -429,4 +429,7 @@ void RelayPlugin::OnLeaveGroupRequestFromClient(Packet *packet)
 	if (strAndGuidSender)
 		LeaveGroup(strAndGuidSender);
 }
+
+} // namespace RakNet
+
 #endif // _RAKNET_SUPPORT_*

@@ -26,13 +26,13 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	template <class channel_key_type, class heap_data_type, int (*channel_key_comparison_func)(const channel_key_type&, const channel_key_type&)=defaultMapKeyComparison<channel_key_type> >
 	class RAK_DLL_EXPORT OrderedChannelHeap
 	{
 	public:
-		static void IMPLEMENT_DEFAULT_COMPARISON(void) {DataStructures::defaultMapKeyComparison<channel_key_type>(channel_key_type(),channel_key_type());}
+		static void IMPLEMENT_DEFAULT_COMPARISON(void) {defaultMapKeyComparison<channel_key_type>(channel_key_type(),channel_key_type());}
 
 		OrderedChannelHeap();
 		~OrderedChannelHeap();
@@ -49,7 +49,7 @@ namespace DataStructures
 
 		struct QueueAndWeight
 		{
-			DataStructures::Queue<double> randResultQueue;
+			Queue<double> randResultQueue;
 			double weight;
 			bool signalDeletion;
 		};
@@ -63,8 +63,8 @@ namespace DataStructures
 		};
 
 	protected:
-		DataStructures::Map<channel_key_type, QueueAndWeight*, channel_key_comparison_func> map;
-		DataStructures::Heap<double, HeapChannelAndData, true> heap;
+		Map<channel_key_type, QueueAndWeight*, channel_key_comparison_func> map;
+		Heap<double, HeapChannelAndData, true> heap;
 		void GreatestRandResult(void);
 	};
 
@@ -246,6 +246,7 @@ namespace DataStructures
 		map.Clear(_FILE_AND_LINE_);
 		heap.Clear(_FILE_AND_LINE_);
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif

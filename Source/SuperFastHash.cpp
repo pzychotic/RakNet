@@ -27,6 +27,8 @@
 	+(uint32_t)(((const uint8_t *)(d))[0]) )
 #endif
 
+namespace RakNet {
+
 static const int INCREMENTAL_READ_BLOCK=65536;
 
 uint32_t SuperFastHash (const char * data, int length)
@@ -128,3 +130,5 @@ uint32_t SuperFastHashFilePtr (FILE *fp)
 	}
 	return lastHash;
 }
+
+} // namespace RakNet

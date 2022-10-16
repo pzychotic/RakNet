@@ -26,8 +26,8 @@
 #include "SimpleMutex.h"
 #include "SocketIncludes.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 struct Packet;
 
@@ -86,8 +86,7 @@ struct Packet;
 	};
 
 
-}
-
+} // namespace RakNet
 
 #endif
 

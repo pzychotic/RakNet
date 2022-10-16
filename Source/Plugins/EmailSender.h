@@ -24,8 +24,8 @@
 #include "Rand.h"
 #include "TCPInterface.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Forward declarations
 class FileList;
 class TCPInterface;
@@ -60,6 +60,5 @@ protected:
 } // namespace RakNet
 
 #endif
-
 
 #endif // _RAKNET_SUPPORT_*

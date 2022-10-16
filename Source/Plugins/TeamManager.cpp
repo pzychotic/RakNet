@@ -16,8 +16,7 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 
-using namespace RakNet;
-
+namespace RakNet {
 
 enum TeamManagerOperations
 {
@@ -1644,7 +1643,7 @@ void TM_World::GetSortedJoinRequests(DataStructures::OrderedList<TM_World::JoinR
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TM_World::BroadcastToParticipants(RakNet::BitStream *bsOut, RakNetGUID exclusionGuid)
+void TM_World::BroadcastToParticipants(BitStream *bsOut, RakNetGUID exclusionGuid)
 {
 	for (unsigned int i=0; i < participants.Size(); i++)
 	{
@@ -1745,7 +1744,7 @@ int TM_World::JoinSpecificTeam(TM_TeamMember *teamMember, TM_Team *team, bool is
 
 					// Send ID_TEAM_BALANCER_TEAM_ASSIGNED to all, for swapped member
 					// Calling function sends ID_RUN_RemoveFromTeamsRequestedAndAddTeam which pushes ID_TEAM_BALANCER_TEAM_ASSIGNED for teamMember
-					RakNet::BitStream bitStream;
+					BitStream bitStream;
 					bitStream.WriteCasted<MessageID>(ID_TEAM_BALANCER_TEAM_ASSIGNED);
 					teamManager->EncodeTeamAssigned(&bitStream, swappingMember);
 					BroadcastToParticipants(&bitStream, UNASSIGNED_RAKNET_GUID);
@@ -1901,7 +1900,7 @@ void TeamManager::SetTopology(TMTopology _topology)
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::EncodeTeamFull(RakNet::BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team)
+void TeamManager::EncodeTeamFull(BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team)
 {
 	bitStream->WriteCasted<MessageID>(ID_TEAM_BALANCER_REQUESTED_TEAM_FULL);
 	EncodeTeamFullOrLocked(bitStream, teamMember, team);
@@ -1920,7 +1919,7 @@ void TeamManager::DecomposeTeamFull(Packet *packet,
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::EncodeTeamLocked(RakNet::BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team)
+void TeamManager::EncodeTeamLocked(BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team)
 {
 	bitStream->WriteCasted<MessageID>(ID_TEAM_BALANCER_REQUESTED_TEAM_LOCKED);
 	EncodeTeamFullOrLocked(bitStream, teamMember, team);
@@ -1928,7 +1927,7 @@ void TeamManager::EncodeTeamLocked(RakNet::BitStream *bitStream, TM_TeamMember *
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::EncodeTeamFullOrLocked(RakNet::BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team)
+void TeamManager::EncodeTeamFullOrLocked(BitStream *bitStream, TM_TeamMember *teamMember, TM_Team *team)
 {
 	bitStream->Write(teamMember->world->GetWorldId());
 	bitStream->Write(teamMember->GetNetworkID());
@@ -1941,7 +1940,7 @@ void TeamManager::EncodeTeamFullOrLocked(RakNet::BitStream *bitStream, TM_TeamMe
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::DecomposeTeamFullOrLocked(RakNet::BitStream *bsIn, TM_World **world, TM_TeamMember **teamMember, TM_Team **team,
+void TeamManager::DecomposeTeamFullOrLocked(BitStream *bsIn, TM_World **world, TM_TeamMember **teamMember, TM_Team **team,
 							   uint16_t &currentMembers, uint16_t &memberLimitIncludingBalancing, bool &balancingIsActive, JoinPermissions &joinPermissions)
 {
 	WorldId worldId;
@@ -1981,7 +1980,7 @@ void TeamManager::DecomposeTeamLocked(Packet *packet,
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::EncodeTeamAssigned(RakNet::BitStream *bitStream, TM_TeamMember *teamMember)
+void TeamManager::EncodeTeamAssigned(BitStream *bitStream, TM_TeamMember *teamMember)
 {
 	bitStream->Write(teamMember->world->GetWorldId());
 	bitStream->Write(teamMember->GetNetworkID());
@@ -1996,7 +1995,7 @@ void TeamManager::EncodeTeamAssigned(RakNet::BitStream *bitStream, TM_TeamMember
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::ProcessTeamAssigned(RakNet::BitStream *bsIn)
+void TeamManager::ProcessTeamAssigned(BitStream *bsIn)
 {
 	TM_World *world;
 	TM_TeamMember *teamMember;
@@ -2033,7 +2032,7 @@ void TeamManager::DecodeTeamAssigned(Packet *packet, TM_World **world, TM_TeamMe
 	WorldId worldId;
 	NetworkID teamMemberId;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	bsIn.Read(worldId);
 	bsIn.Read(teamMemberId);
@@ -2055,7 +2054,7 @@ void TeamManager::DecodeTeamCancelled(Packet *packet, TM_World **world, TM_TeamM
 	WorldId worldId;
 	NetworkID teamMemberId;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	bsIn.Read(worldId);
 	bsIn.Read(teamMemberId);
@@ -2278,7 +2277,7 @@ void TeamManager::OnNewConnection(const SystemAddress &systemAddress, RakNetGUID
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::Send( const RakNet::BitStream * bitStream, const AddressOrGUID systemIdentifier, bool broadcast )
+void TeamManager::Send( const BitStream * bitStream, const AddressOrGUID systemIdentifier, bool broadcast )
 {
 	SendUnified(bitStream,HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemIdentifier, broadcast);
 }
@@ -2310,7 +2309,7 @@ void TeamManager::RemoveFromTeamsRequestedAndAddTeam(TM_TeamMember *teamMember, 
 void TeamManager::PushTeamAssigned(TM_TeamMember *teamMember)
 {
 	// Push ID_TEAM_BALANCER_TEAM_ASSIGNED locally
-	RakNet::BitStream bitStream;
+	BitStream bitStream;
 	bitStream.WriteCasted<MessageID>(ID_TEAM_BALANCER_TEAM_ASSIGNED);
 	EncodeTeamAssigned(&bitStream, teamMember);
 
@@ -2319,7 +2318,7 @@ void TeamManager::PushTeamAssigned(TM_TeamMember *teamMember)
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void TeamManager::PushBitStream(RakNet::BitStream *bitStream)
+void TeamManager::PushBitStream(BitStream *bitStream)
 {
 	Packet *p = AllocatePacketUnified(bitStream->GetNumberOfBytesUsed());
 	memcpy(p->data, bitStream->GetData(), bitStream->GetNumberOfBytesUsed());
@@ -2410,7 +2409,7 @@ void TeamManager::OnJoinAnyTeam(Packet *packet, TM_World *world)
 			// Send to sender ID_TEAM_BALANCER_TEAM_ASSIGNED
 			if (packet->guid!=GetMyGUIDUnified())
 			{
-				RakNet::BitStream bitStream;
+				BitStream bitStream;
 				bitStream.WriteCasted<MessageID>(ID_TEAM_BALANCER_TEAM_ASSIGNED);
 				EncodeTeamAssigned(&bitStream, teamMember);
 				SendUnified(&bitStream, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->guid, false);
@@ -2529,7 +2528,7 @@ void TeamManager::OnJoinRequestedTeam(Packet *packet, TM_World *world)
 			// Send to sender ID_TEAM_BALANCER_TEAM_ASSIGNED
 			if (packet->guid!=GetMyGUIDUnified())
 			{
-				RakNet::BitStream bitStream;
+				BitStream bitStream;
 				bitStream.WriteCasted<MessageID>(ID_TEAM_BALANCER_TEAM_ASSIGNED);
 				EncodeTeamAssigned(&bitStream, teamMember);
 				SendUnified(&bitStream, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->guid, false);
@@ -2849,5 +2848,6 @@ void TeamManager::OnSetBalanceTeamsInitial(Packet *packet, TM_World *world)
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#endif // _RAKNET_SUPPORT_TeamManager==1
+} // namespace RakNet
 
+#endif // _RAKNET_SUPPORT_TeamManager==1

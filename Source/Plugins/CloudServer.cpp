@@ -17,6 +17,8 @@
 #include "BitStream.h"
 #include "RakPeerInterface.h"
 
+namespace RakNet {
+
 enum ServerToServerCommands
 {
 	STSC_PROCESS_GET_REQUEST,
@@ -28,8 +30,6 @@ enum ServerToServerCommands
 	STSC_REMOVE_SUBSCRIBED_KEY,
 	STSC_DATA_CHANGED,
 };
-
-using namespace RakNet;
 
 int CloudServer::RemoteServerComp(const RakNetGUID &key, RemoteServer* const &data )
 {
@@ -238,7 +238,7 @@ PluginReceiveResult CloudServer::OnReceive(Packet *packet)
 }
 void CloudServer::OnPostRequest(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	CloudKey key;
 	key.Serialize(false,&bsIn);
@@ -436,7 +436,7 @@ void CloudServer::OnPostRequest(Packet *packet)
 }
 void CloudServer::OnReleaseRequest(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 
 	uint16_t keyCount;
@@ -527,7 +527,7 @@ void CloudServer::OnReleaseRequest(Packet *packet)
 }
 void CloudServer::OnGetRequest(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 	uint16_t specificSystemsCount;
 	CloudKey cloudKey;
@@ -571,7 +571,7 @@ void CloudServer::OnGetRequest(Packet *packet)
 	}
 	else
 	{
-		RakNet::BitStream bsOut;
+		BitStream bsOut;
 		bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 		bsOut.Write((MessageID)STSC_PROCESS_GET_REQUEST);
 		getRequest->cloudQueryWithAddresses.Serialize(true, &bsOut);
@@ -718,7 +718,7 @@ void CloudServer::OnGetRequest(Packet *packet)
 }
 void CloudServer::OnUnsubscribeRequest(Packet *packet)
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID));
 
 	DataStructures::HashIndex remoteSystemIndex = remoteSystems.GetIndexOf(packet->guid);
@@ -793,7 +793,7 @@ void CloudServer::OnServerToServerGetRequest(Packet *packet)
 	if (objectExists==false)
 		return;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	CloudQueryWithAddresses cloudQueryWithAddresses;
@@ -805,7 +805,7 @@ void CloudServer::OnServerToServerGetRequest(Packet *packet)
 	DataStructures::List<CloudKey> cloudKeyResultList;
 	ProcessCloudQueryWithAddresses(cloudQueryWithAddresses, cloudDataResultList, cloudKeyResultList);
 
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_PROCESS_GET_RESPONSE);
 	bsOut.Write(requestId);
@@ -824,7 +824,7 @@ void CloudServer::OnServerToServerGetResponse(Packet *packet)
 	if (remoteServer==0)
 		return;
 
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	uint32_t requestId;
@@ -1066,7 +1066,7 @@ void CloudServer::WriteCloudQueryRowFromResultList(unsigned int i, DataStructure
 }
 void CloudServer::NotifyClientSubscribersOfDataChange( CloudData *cloudData, CloudKey &key, DataStructures::OrderedList<RakNetGUID, RakNetGUID> &subscribers, bool wasUpdated )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID) ID_CLOUD_SUBSCRIPTION_NOTIFICATION);
 	bsOut.Write(wasUpdated);
 	CloudQueryRow row;
@@ -1087,7 +1087,7 @@ void CloudServer::NotifyClientSubscribersOfDataChange( CloudData *cloudData, Clo
 }
 void CloudServer::NotifyClientSubscribersOfDataChange( CloudQueryRow *row, DataStructures::OrderedList<RakNetGUID, RakNetGUID> &subscribers, bool wasUpdated )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID) ID_CLOUD_SUBSCRIPTION_NOTIFICATION);
 	bsOut.Write(wasUpdated);
 	row->Serialize(true,&bsOut,0);
@@ -1102,7 +1102,7 @@ void CloudServer::NotifyServerSubscribersOfDataChange( CloudData *cloudData, Clo
 {
 	// Find every server that has subscribed
 	// Send them change notifications
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_DATA_CHANGED);
 	bsOut.Write(wasUpdated);
@@ -1164,7 +1164,7 @@ void CloudServer::GetRemoteServers(DataStructures::List<RakNetGUID> &remoteServe
 }
 void CloudServer::ProcessAndTransmitGetRequest(GetRequest *getRequest)
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID) ID_CLOUD_GET_RESPONSE);
 
 	//	BufferedGetResponseFromServer getResponse;
@@ -1299,7 +1299,7 @@ void CloudServer::ProcessCloudQueryWithAddresses( CloudServer::CloudQueryWithAdd
 }
 void CloudServer::SendUploadedAndSubscribedKeysToServer( RakNetGUID systemAddress )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_ADD_UPLOADED_AND_SUBSCRIBED_KEYS);
 	bsOut.WriteCasted<uint16_t>(dataRepository.Size());
@@ -1328,7 +1328,7 @@ void CloudServer::SendUploadedAndSubscribedKeysToServer( RakNetGUID systemAddres
 }
 void CloudServer::SendUploadedKeyToServers( CloudKey &cloudKey )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_ADD_UPLOADED_KEY);
 	cloudKey.Serialize(true, &bsOut);
@@ -1337,7 +1337,7 @@ void CloudServer::SendUploadedKeyToServers( CloudKey &cloudKey )
 }
 void CloudServer::SendSubscribedKeyToServers( CloudKey &cloudKey )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_ADD_SUBSCRIBED_KEY);
 	cloudKey.Serialize(true, &bsOut);
@@ -1346,7 +1346,7 @@ void CloudServer::SendSubscribedKeyToServers( CloudKey &cloudKey )
 }
 void CloudServer::RemoveUploadedKeyFromServers( CloudKey &cloudKey )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_REMOVE_UPLOADED_KEY);
 	cloudKey.Serialize(true, &bsOut);
@@ -1355,7 +1355,7 @@ void CloudServer::RemoveUploadedKeyFromServers( CloudKey &cloudKey )
 }
 void CloudServer::RemoveSubscribedKeyFromServers( CloudKey &cloudKey )
 {
-	RakNet::BitStream bsOut;
+	BitStream bsOut;
 	bsOut.Write((MessageID)ID_CLOUD_SERVER_TO_SERVER_COMMAND);
 	bsOut.Write((MessageID)STSC_REMOVE_SUBSCRIBED_KEY);
 	cloudKey.Serialize(true, &bsOut);
@@ -1364,7 +1364,7 @@ void CloudServer::RemoveSubscribedKeyFromServers( CloudKey &cloudKey )
 }
 void CloudServer::OnSendUploadedAndSubscribedKeysToServer( Packet *packet )
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	bool objectExists;
@@ -1407,7 +1407,7 @@ void CloudServer::OnSendUploadedAndSubscribedKeysToServer( Packet *packet )
 }
 void CloudServer::OnSendUploadedKeyToServers( Packet *packet )
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	bool objectExists;
@@ -1426,7 +1426,7 @@ void CloudServer::OnSendUploadedKeyToServers( Packet *packet )
 }
 void CloudServer::OnSendSubscribedKeyToServers( Packet *packet )
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	bool objectExists;
@@ -1447,7 +1447,7 @@ void CloudServer::OnSendSubscribedKeyToServers( Packet *packet )
 }
 void CloudServer::OnRemoveUploadedKeyFromServers( Packet *packet )
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	bool objectExists;
@@ -1465,7 +1465,7 @@ void CloudServer::OnRemoveUploadedKeyFromServers( Packet *packet )
 }
 void CloudServer::OnRemoveSubscribedKeyFromServers( Packet *packet )
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	bool objectExists;
@@ -1483,7 +1483,7 @@ void CloudServer::OnRemoveSubscribedKeyFromServers( Packet *packet )
 }
 void CloudServer::OnServerDataChanged( Packet *packet )
 {
-	RakNet::BitStream bsIn(packet->data, packet->length, false);
+	BitStream bsIn(packet->data, packet->length, false);
 	bsIn.IgnoreBytes(sizeof(MessageID)*2);
 
 	bool objectExists;
@@ -1681,5 +1681,7 @@ void CloudServer::RemoveAllQueryFilters(void)
 {
 	queryFilters.Clear(true, _FILE_AND_LINE_);
 }
+
+} // namespace RakNet
 
 #endif

@@ -33,17 +33,12 @@ pthread_cond_t fakeCond = PTHREAD_COND_INITIALIZER;
 using namespace ThreadEmulation;
 #endif
 
+namespace RakNet {
+
 void RakSleep(unsigned int ms)
 {
 #ifdef _WIN32
 	Sleep(ms);
-
-
-
-
-
-
-
 #else
 	//Single thread sleep code thanks to Furquan Shaikh, http://somethingswhichidintknow.blogspot.com/2009/09/sleep-in-pthread.html
 	//Modified slightly from the original
@@ -69,3 +64,5 @@ void RakSleep(unsigned int ms)
 	pthread_mutex_unlock(&fakeMutex);
 #endif
 }
+
+} // namespace RakNet

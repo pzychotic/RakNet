@@ -19,8 +19,8 @@
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "ThreadPool.h"
 
-namespace RakNet
-{
+namespace RakNet {
+
 class SendToThread
 {
 public:
@@ -48,8 +48,8 @@ protected:
 	static ThreadPool<SendToThreadBlock*,SendToThreadBlock*> threadPool;
 
 };
-}
 
+} // namespace RakNet
 
 #endif
 

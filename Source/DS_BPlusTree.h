@@ -33,8 +33,8 @@
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/// Used in the BPlusTree.  Used for both leaf and index nodes.
 	/// Don't use a constructor or destructor, due to the memory pool I am using
 	template <class KeyType, class DataType, int order>
@@ -886,7 +886,7 @@ namespace DataStructures
 		unsigned BPlusTree<KeyType, DataType, order>::Size(void) const
 	{
 		unsigned int count=0;
-		DataStructures::Page<KeyType, DataType, order> *cur = GetListHead();
+		Page<KeyType, DataType, order> *cur = GetListHead();
 		while (cur)
 		{
 			count+=cur->size;
@@ -932,8 +932,8 @@ namespace DataStructures
 	template<class KeyType, class DataType, int order>
 		void BPlusTree<KeyType, DataType, order>::FreePages(void)
 	{
-		DataStructures::Queue<DataStructures::Page<KeyType, DataType, order> *> queue;
-		DataStructures::Page<KeyType, DataType, order> *ptr;
+		Queue<Page<KeyType, DataType, order> *> queue;
+		Page<KeyType, DataType, order> *ptr;
 		int i;
 		queue.Push(root, _FILE_AND_LINE_ );
 		while (queue.Size())
@@ -962,7 +962,7 @@ namespace DataStructures
 		void BPlusTree<KeyType, DataType, order>::ForEachLeaf(void (*func)(Page<KeyType, DataType, order> * leaf, int index))
 	{
 		int count=0;
-		DataStructures::Page<KeyType, DataType, order> *cur = GetListHead();
+		Page<KeyType, DataType, order> *cur = GetListHead();
 		while (cur)
 		{
 			func(cur, count++);
@@ -973,7 +973,7 @@ namespace DataStructures
 		void BPlusTree<KeyType, DataType, order>::ForEachData(void (*func)(DataType input, int index))
 	{
 		int count=0,i;
-		DataStructures::Page<KeyType, DataType, order> *cur = GetListHead();
+		Page<KeyType, DataType, order> *cur = GetListHead();
 		while (cur)
 		{
 			for (i=0; i < cur->size; i++)
@@ -1018,10 +1018,10 @@ namespace DataStructures
 	template<class KeyType, class DataType, int order>
 	void BPlusTree<KeyType, DataType, order>::PrintGraph(void)
 	{
-		DataStructures::Queue<DataStructures::Page<KeyType, DataType, order> *> queue;
+		Queue<Page<KeyType, DataType, order> *> queue;
 		queue.Push(root,_FILE_AND_LINE_);
 		queue.Push(0,_FILE_AND_LINE_);
-		DataStructures::Page<KeyType, DataType, order> *ptr;
+		Page<KeyType, DataType, order> *ptr;
 		int i,j;
 		if (root)
 		{
@@ -1055,7 +1055,8 @@ namespace DataStructures
 		}
 		RAKNET_DEBUG_PRINTF("\n");
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif
 

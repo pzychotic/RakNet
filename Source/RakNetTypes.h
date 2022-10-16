@@ -25,6 +25,7 @@
 #include <stdint.h>
 
 namespace RakNet {
+
 /// Forward declarations
 struct Packet;
 

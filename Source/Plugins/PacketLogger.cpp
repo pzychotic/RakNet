@@ -27,8 +27,7 @@
 #include "SocketIncludes.h"
 #include "gettimeofday.h"
 
-using namespace std;
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(PacketLogger,PacketLogger);
 
@@ -466,5 +465,7 @@ void PacketLogger::SetLogDirectMessages(bool send)
 {
 	logDirectMessages=send;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

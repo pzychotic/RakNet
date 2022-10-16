@@ -21,22 +21,16 @@
 #include "TCPInterface.h"
 #include "GetTime.h"
 #include "BitStream.h"
+#include "RakSleep.h"
 #include <stdio.h>
 
-
-
-
-
-#include "RakSleep.h"
-
-using namespace RakNet;
-
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(EmailSender,EmailSender);
 
 const char *EmailSender::Send(const char *hostAddress, unsigned short hostPort, const char *sender, const char *recipient, const char *senderName, const char *recipientName, const char *subject, const char *body, FileList *attachedFiles, bool doPrintf, const char *password)
 {
-	RakNet::Packet *packet;
+	Packet *packet;
 	char query[1024];
 	TCPInterface tcpInterface;
 	SystemAddress emailServer;
@@ -100,7 +94,7 @@ const char *EmailSender::Send(const char *hostAddress, unsigned short hostPort, 
 		if (password==0)
 			return "Password needed";
 		char *outputData = RakNet::OP_NEW_ARRAY<char >((const int) (strlen(sender)+strlen(password)+2)*3, _FILE_AND_LINE_ );
-		RakNet::BitStream bs;
+		BitStream bs;
 		char zero=0;
 		bs.Write(&zero,1);
 		bs.Write(sender,(const unsigned int)strlen(sender));
@@ -316,7 +310,7 @@ const char *EmailSender::Send(const char *hostAddress, unsigned short hostPort, 
 
 const char *EmailSender::GetResponse(TCPInterface *tcpInterface, const SystemAddress &emailServer, bool doPrintf)
 {
-	RakNet::Packet *packet;
+	Packet *packet;
 	RakNet::TimeMS timeout;
 	timeout=RakNet::GetTimeMS()+5000;
 	while (1)
@@ -366,5 +360,6 @@ const char *EmailSender::GetResponse(TCPInterface *tcpInterface, const SystemAdd
 	}
 }
 
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

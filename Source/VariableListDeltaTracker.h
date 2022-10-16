@@ -17,8 +17,8 @@
 #ifndef __VARIABLE_LIST_DELTA_TRACKER
 #define __VARIABLE_LIST_DELTA_TRACKER
 
-namespace RakNet
-{
+namespace RakNet {
+
 /// Class to write a series of variables, copy the contents to memory, and return if the newly written value is different than what was last written
 /// Can also encode the reads, writes, and results directly to/from a bitstream
 class VariableListDeltaTracker
@@ -38,7 +38,7 @@ public:
 	template <class VarType>
 	bool WriteVar(const VarType &varData)
 	{
-		RakNet::BitStream temp;
+		BitStream temp;
 		temp.Write(varData);
 		if (nextWriteIndex>=variableList.Size())
 		{
@@ -69,7 +69,7 @@ public:
 	}
 	/// Calls WriteVar. If the variable has changed, writes true, and writes the variable. Otherwise writes false.
 	template <class VarType>
-	bool WriteVarToBitstream(const VarType &varData, RakNet::BitStream *bitStream)
+	bool WriteVarToBitstream(const VarType &varData, BitStream *bitStream)
 	{
 		bool wasDifferent = WriteVar(varData);
 		bitStream->Write(wasDifferent);
@@ -82,7 +82,7 @@ public:
 	}
 	/// Calls WriteVarToBitstream(). Additionally, adds the boolean result of WriteVar() to boolean bit array
 	template <class VarType>
-	bool WriteVarToBitstream(const VarType &varData, RakNet::BitStream *bitStream, unsigned char *bArray, unsigned short writeOffset)
+	bool WriteVarToBitstream(const VarType &varData, BitStream *bitStream, unsigned char *bArray, unsigned short writeOffset)
 	{
 		if (WriteVarToBitstream(varData,bitStream)==true)
 		{
@@ -106,7 +106,7 @@ public:
 
 	/// Paired with a call to WriteVarToBitstream(), will read a variable if it had changed. Otherwise the values remains the same.
 	template <class VarType>
-	static bool ReadVarFromBitstream(VarType &varData, RakNet::BitStream *bitStream)
+	static bool ReadVarFromBitstream(VarType &varData, BitStream *bitStream)
 	{
 		bool wasWritten;
 		if (bitStream->Read(wasWritten)==false)
@@ -141,7 +141,6 @@ protected:
 	unsigned int nextWriteIndex;
 };
 
-
-}
+} // namespace RakNet
 
 #endif

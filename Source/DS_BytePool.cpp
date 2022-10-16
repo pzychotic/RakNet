@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #endif
 
-using namespace DataStructures;
+namespace RakNet { namespace DataStructures {
 
 BytePool::BytePool()
 {
@@ -157,3 +157,5 @@ void BytePool::Clear(const char *file, unsigned int line)
 	pool8192.Clear(file, line);
 #endif
 }
+
+} } // namespace RakNet::DataStructures

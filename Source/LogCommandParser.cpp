@@ -22,7 +22,7 @@
 
 #include "LinuxStrings.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(LogCommandParser,LogCommandParser);
 
@@ -277,5 +277,7 @@ void LogCommandParser::OnTransportChange(TransportInterface *transport)
 	// I don't want users to have to pass TransportInterface *transport to Log.
 	trans=transport;
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

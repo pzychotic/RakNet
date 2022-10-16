@@ -17,7 +17,7 @@
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(UDPProxyServer,UDPProxyServer);
 
@@ -38,7 +38,7 @@ void UDPProxyServer::SetResultHandler(UDPProxyServerResultHandler *rh)
 {
 	resultHandler=rh;
 }
-bool UDPProxyServer::LoginToCoordinator(RakNet::RakString password, SystemAddress coordinatorAddress)
+bool UDPProxyServer::LoginToCoordinator(RakString password, SystemAddress coordinatorAddress)
 {
 	unsigned int insertionIndex;
 	bool objectExists;
@@ -48,7 +48,7 @@ bool UDPProxyServer::LoginToCoordinator(RakNet::RakString password, SystemAddres
 	loggedInCoordinators.GetIndexFromKey(coordinatorAddress,&objectExists);
 	if (objectExists==true)
 		return false;
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_GENERAL);
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_LOGIN_REQUEST_FROM_SERVER_TO_COORDINATOR);
 	outgoingBs.Write(password);
@@ -90,9 +90,9 @@ PluginReceiveResult UDPProxyServer::OnReceive(Packet *packet)
 				{
 					loggingInCoordinators.RemoveAtIndex(removalIndex);
 
-					RakNet::BitStream incomingBs(packet->data, packet->length, false);
+					BitStream incomingBs(packet->data, packet->length, false);
 					incomingBs.IgnoreBytes(2);
-					RakNet::RakString password;
+					RakString password;
 					incomingBs.Read(password);
 					switch (packet->data[1])
 					{
@@ -154,7 +154,7 @@ void UDPProxyServer::OnDetach(void)
 void UDPProxyServer::OnForwardingRequestFromCoordinatorToServer(Packet *packet)
 {
 	SystemAddress sourceAddress, targetAddress;
-	RakNet::BitStream incomingBs(packet->data, packet->length, false);
+	BitStream incomingBs(packet->data, packet->length, false);
 	incomingBs.IgnoreBytes(2);
 	incomingBs.Read(sourceAddress);
 	incomingBs.Read(targetAddress);
@@ -164,7 +164,7 @@ void UDPProxyServer::OnForwardingRequestFromCoordinatorToServer(Packet *packet)
 
 	unsigned short forwardingPort=0;
 	UDPForwarderResult success = udpForwarder.StartForwarding(sourceAddress, targetAddress, timeoutOnNoDataMS, 0, socketFamily, &forwardingPort, 0);
-	RakNet::BitStream outgoingBs;
+	BitStream outgoingBs;
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_GENERAL);
 	outgoingBs.Write((MessageID)ID_UDP_PROXY_FORWARDING_REPLY_FROM_SERVER_TO_COORDINATOR);
 	outgoingBs.Write(sourceAddress);
@@ -174,5 +174,7 @@ void UDPProxyServer::OnForwardingRequestFromCoordinatorToServer(Packet *packet)
 	outgoingBs.Write(forwardingPort);
 	rakPeerInterface->Send(&outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false);
 }
+
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_*

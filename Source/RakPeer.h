@@ -36,6 +36,7 @@
 #include "DS_Queue.h"
 
 namespace RakNet {
+
 /// Forward declarations
 class PluginInterface2;
 
@@ -238,12 +239,12 @@ public:
 	/// \param[in] forceReceipt If 0, will automatically determine the receipt number to return. If non-zero, will return what you give it.
 	/// \return 0 on bad input. Otherwise a number that identifies this message. If \a reliability is a type that returns a receipt, on a later call to Receive() you will get ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS with bytes 1-4 inclusive containing this number
 	/// \note COMMON MISTAKE: When writing the first byte, bitStream->Write((unsigned char) ID_MY_TYPE) be sure it is casted to a byte, and you are not writing a 4 byte enumeration.
-	uint32_t Send( const RakNet::BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber=0 );
+	uint32_t Send( const BitStream * bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber=0 );
 
 	/// \brief Sends multiple blocks of data, concatenating them automatically.
 	///
 	/// This is equivalent to:
-	/// RakNet::BitStream bs;
+	/// BitStream bs;
 	/// bs.WriteAlignedBytes(block1, blockLength1);
 	/// bs.WriteAlignedBytes(block2, blockLength2);
 	/// bs.WriteAlignedBytes(block3, blockLength3);
@@ -567,7 +568,7 @@ public:
 	virtual void ReleaseSockets( DataStructures::List<RakNetSocket2* > &sockets );
 
 	/// \internal
-	virtual void WriteOutOfBandHeader(RakNet::BitStream *bitStream);
+	virtual void WriteOutOfBandHeader(BitStream *bitStream);
 
 	/// If you need code to run in the same thread as RakNet's update thread, this function can be used for that
 	/// \param[in] _userUpdateThreadPtr C callback function
@@ -751,7 +752,7 @@ protected:
 	///true if the peer thread is active. 
 	volatile bool isMainLoopThreadActive;
 	
-	// RakNet::LocklessUint32_t isRecvFromLoopThreadActive;
+	//LocklessUint32_t isRecvFromLoopThreadActive;
 
 
 	bool occasionalPing;  /// Do we occasionally ping the other systems?*/
@@ -762,7 +763,7 @@ protected:
 	//unsigned short remoteSystemListSize;
 	///Store the maximum incoming connection allowed 
 	unsigned int maximumIncomingConnections;
-	RakNet::BitStream offlinePingResponse;
+	BitStream offlinePingResponse;
 	///Local Player ID
 	// SystemAddress mySystemAddress[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
 	char incomingPassword[256];
@@ -899,9 +900,9 @@ protected:
 	// DataStructures::ThreadsafeAllocatingQueue<RNS2RecvStruct> bufferedPackets;
 
 	DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsFreePool;
-	RakNet::SimpleMutex bufferedPacketsFreePoolMutex;
+	SimpleMutex bufferedPacketsFreePoolMutex;
 	DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsQueue;
-	RakNet::SimpleMutex bufferedPacketsQueueMutex;
+	SimpleMutex bufferedPacketsQueueMutex;
 
 	virtual void DeallocRNS2RecvStruct(RNS2RecvStruct *s, const char *file, unsigned int line);
 	virtual RNS2RecvStruct *AllocRNS2RecvStruct(const char *file, unsigned int line);
@@ -932,7 +933,7 @@ protected:
 	void ClearBufferedPackets(void);
 	void ClearSocketQueryOutput(void);
 	void ClearRequestedConnectionList(void);
-	void AddPacketToProducer(RakNet::Packet *p);
+	void AddPacketToProducer(Packet *p);
 	unsigned int GenerateSeedFromGuid(void);
 	RakNet::Time GetClockDifferentialInt(RemoteSystemStruct *remoteSystem) const;
 	SimpleMutex securityExceptionMutex;
@@ -946,7 +947,7 @@ protected:
 	void DerefAllSockets(void);
 	unsigned int GetRakNetSocketFromUserConnectionSocketIndex(unsigned int userIndex) const;
 	// Used for RPC replies
-	RakNet::BitStream *replyFromTargetBS;
+	BitStream *replyFromTargetBS;
 	SystemAddress replyFromTargetPlayer;
 	bool replyFromTargetBroadcast;
 
@@ -977,7 +978,7 @@ protected:
 	bool (*incomingDatagramEventHandler)(RNS2RecvStruct *);
 
 	// Systems in this list will not go through the secure connection process, even when secure connections are turned on. Wildcards are accepted.
-	DataStructures::List<RakNet::RakString> securityExceptionList;
+	DataStructures::List<RakString> securityExceptionList;
 
 	SystemAddress ipList[ MAXIMUM_NUMBER_OF_INTERNAL_IDS ];
 

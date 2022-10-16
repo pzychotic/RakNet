@@ -23,6 +23,10 @@
 
 #include <stdint.h>
 
+/// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
+/// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
+namespace RakNet { namespace DataStructures {
+
 /// What algorithm to use to store the data for the Multilist
 enum MultilistType
 {
@@ -38,10 +42,6 @@ enum MultilistType
 	ML_VARIABLE_DURING_RUNTIME
 };
 
-/// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
-/// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
-namespace DataStructures
-{
 	/// Can be used with Multilist::ForEach
 	/// Assuming the Multilist holds pointers, will delete those pointers
 	template <class templateType>
@@ -76,9 +76,9 @@ namespace DataStructures
 	/// 1. _DataType is a pointer to a class or structure
 	/// 2. The key is a member variable of _DataType
 	#define DEFINE_MULTILIST_PTR_TO_MEMBER_COMPARISONS( _CLASS_NAME_, _KEY_TYPE_, _MEMBER_VARIABLE_NAME_ ) \
-	bool operator<( const DataStructures::MLKeyRef<_KEY_TYPE_> &inputKey, const _CLASS_NAME_ *cls ) {return inputKey.Get() < cls->_MEMBER_VARIABLE_NAME_;} \
-	bool operator>( const DataStructures::MLKeyRef<_KEY_TYPE_> &inputKey, const _CLASS_NAME_ *cls ) {return inputKey.Get() > cls->_MEMBER_VARIABLE_NAME_;} \
-	bool operator==( const DataStructures::MLKeyRef<_KEY_TYPE_> &inputKey, const _CLASS_NAME_ *cls ) {return inputKey.Get() == cls->_MEMBER_VARIABLE_NAME_;}
+	bool operator<( const MLKeyRef<_KEY_TYPE_> &inputKey, const _CLASS_NAME_ *cls ) {return inputKey.Get() < cls->_MEMBER_VARIABLE_NAME_;} \
+	bool operator>( const MLKeyRef<_KEY_TYPE_> &inputKey, const _CLASS_NAME_ *cls ) {return inputKey.Get() > cls->_MEMBER_VARIABLE_NAME_;} \
+	bool operator==( const MLKeyRef<_KEY_TYPE_> &inputKey, const _CLASS_NAME_ *cls ) {return inputKey.Get() == cls->_MEMBER_VARIABLE_NAME_;}
 
 	typedef uint32_t DefaultIndexType;
 
@@ -1306,7 +1306,8 @@ namespace DataStructures
 		for ( i = index; i < dataSize-1; i++ )
 			data[i]=data[i+1];
 	}
-};
+
+} } // namespace RakNet::DataStructures
 
 /*
 struct KeyAndValue

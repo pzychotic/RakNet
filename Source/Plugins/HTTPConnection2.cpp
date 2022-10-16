@@ -14,7 +14,7 @@
 #include "Plugins/HTTPConnection2.h"
 #include "TCPInterface.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(HTTPConnection2,HTTPConnection2);
 
@@ -617,5 +617,7 @@ void HTTPConnection2::SendRequest(Request *request)
 {
 	tcpInterface->Send(request->stringToTransmit.C_String(), (unsigned int) request->stringToTransmit.GetLength(), request->hostCompletedAddress, false);
 }
+
+} // namespace RakNet
 
 #endif // #if _RAKNET_SUPPORT_HTTPConnection2==1 && _RAKNET_SUPPORT_TCPInterface==1

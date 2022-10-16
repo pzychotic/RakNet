@@ -14,9 +14,9 @@
 #include "Plugins/CloudCommon.h"
 #include "BitStream.h"
 
-using namespace RakNet;
+namespace RakNet {
 
-int RakNet::CloudKeyComp(const CloudKey &key, const CloudKey &data)
+int CloudKeyComp(const CloudKey &key, const CloudKey &data)
 {
 	if (key.primaryKey < data.primaryKey)
 		return -1;
@@ -165,5 +165,7 @@ void CloudQueryResult::Serialize(bool writeToBitstream, BitStream *bitStream, Cl
 	SerializeNumRows(writeToBitstream, numRows, bitStream);
 	SerializeCloudQueryRows(writeToBitstream, numRows, bitStream, allocator);
 }
+
+} // namespace RakNet
 
 #endif // #if _RAKNET_SUPPORT_CloudMemoryClient==1 || _RAKNET_SUPPORT_CloudMemoryServer==1

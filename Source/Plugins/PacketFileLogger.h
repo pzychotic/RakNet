@@ -22,12 +22,11 @@
 #include "Plugins/PacketLogger.h"
 #include <stdio.h>
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \ingroup PACKETLOGGER_GROUP
 /// \brief Packetlogger that outputs to a file
-class RAK_DLL_EXPORT  PacketFileLogger : public PacketLogger
+class RAK_DLL_EXPORT PacketFileLogger : public PacketLogger
 {
 public:
 	PacketFileLogger();

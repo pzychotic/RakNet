@@ -13,8 +13,7 @@
 #include <stdlib.h> // realloc
 #include <stdio.h>
 
-
-using namespace DataStructures;
+namespace RakNet { namespace DataStructures {
 
 ByteQueue::ByteQueue()
 {
@@ -135,3 +134,5 @@ void ByteQueue::Print(void)
 		RAKNET_DEBUG_PRINTF("%i ", data[i]);
 	RAKNET_DEBUG_PRINTF("\n");
 }
+
+} } // namespace RakNet::DataStructures

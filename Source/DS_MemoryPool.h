@@ -29,8 +29,8 @@
 
 //#define _DISABLE_MEMORY_POOL
 
-namespace DataStructures
-{
+namespace RakNet { namespace DataStructures {
+
 	/// Very fast memory pool for allocating and deallocating structures that don't have constructors or destructors.
 	/// Contains a list of pages, each of which has an array of the user structures
 	template <class MemoryBlockType>
@@ -294,7 +294,8 @@ namespace DataStructures
 		page->prev=prev;
 		return true;
 	}
-}
+
+} } // namespace RakNet::DataStructures
 
 #endif
 

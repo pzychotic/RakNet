@@ -14,13 +14,14 @@
 #include <stdio.h>
 #include "BitStream.h"
 #include "StringCompressor.h"
-using namespace RakNet;
+
+namespace RakNet {
 
 StringTable* StringTable::instance=0;
 int StringTable::referenceCount=0;
 
 
-int RakNet::StrAndBoolComp( char *const &key, const StrAndBool &data )
+int StrAndBoolComp( char *const &key, const StrAndBool &data )
 {
 	return strcmp(key,(const char*)data.str);
 }
@@ -87,7 +88,7 @@ void StringTable::AddString(const char *str, bool copyString)
 	RakAssert(orderedStringList.Size() < (StringTableType)-1);	
 	
 }
-void StringTable::EncodeString( const char *input, int maxCharsToWrite, RakNet::BitStream *output )
+void StringTable::EncodeString( const char *input, int maxCharsToWrite, BitStream *output )
 {
 	unsigned index;
 	bool objectExists;
@@ -106,7 +107,7 @@ void StringTable::EncodeString( const char *input, int maxCharsToWrite, RakNet::
 	}
 }
 
-bool StringTable::DecodeString( char *output, int maxCharsToWrite, RakNet::BitStream *input )
+bool StringTable::DecodeString( char *output, int maxCharsToWrite, BitStream *input )
 {
 	bool hasIndex=false;
 	RakAssert(maxCharsToWrite>0);
@@ -148,3 +149,5 @@ void StringTable::LogStringNotFound(const char *strName)
 	RAKNET_DEBUG_PRINTF("Efficiency Warning! Unregistered String %s sent to StringTable.\n", strName);
 #endif
 }
+
+} // namespace RakNet

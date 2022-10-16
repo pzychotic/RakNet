@@ -25,25 +25,20 @@
 #include "RakNetTypes.h"
 #include "RakString.h"
 
-namespace RakNet
-{
-	class BitStream;
-}
+namespace RakNet {
 
-namespace RakNet
-{
 /// Forward declarations
+class BitStream;
 class FileList;
-
 
 /// Represents once instance of a file
 struct FileListNode
 {
 	/// Name of the file
-	RakNet::RakString filename;
+	RakString filename;
 
 	/// Full path to the file, which may be different than filename
-	RakNet::RakString fullPathToFile;
+	RakString fullPathToFile;
 
 	/// File data (may be null if not ready)
 	char *data;
@@ -168,10 +163,10 @@ public:
 	void Clear(void);
 
 	/// Write all encoded data into a bitstream
-	void Serialize(RakNet::BitStream *outBitStream);
+	void Serialize(BitStream *outBitStream);
 
 	/// Read all encoded data from a bitstream. Clear() is called before deserializing.
-	bool Deserialize(RakNet::BitStream *inBitStream);
+	bool Deserialize(BitStream *inBitStream);
 
 	/// \brief Given the existing set of files, search applicationDirectory for the same files.
 	/// \details For each file that is missing or different, add that file to \a missingOrChangedFiles. Note: the file contents are not written, and only the hash if written if \a alwaysWriteHash is true

@@ -11,6 +11,8 @@
 #ifndef __AUTOPATCHER_PATCH_CONTEXT_H
 #define __AUTOPATCHER_PATCH_CONTEXT_H
 
+namespace RakNet {
+
 enum PatchContext
 {
 	PC_HASH_1_WITH_PATCH,
@@ -24,5 +26,7 @@ enum PatchContext
 	PC_NOTICE_FILE_DOWNLOADED,
 	PC_NOTICE_FILE_DOWNLOADED_PATCH,
 };
+
+} // namespace RakNet
 
 #endif

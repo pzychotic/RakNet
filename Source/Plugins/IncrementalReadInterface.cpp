@@ -11,7 +11,7 @@
 #include "Plugins/IncrementalReadInterface.h"
 #include <stdio.h>
 
-using namespace RakNet;
+namespace RakNet {
 
 unsigned int IncrementalReadInterface::GetFilePart( const char *filename, unsigned int startReadBytes, unsigned int numBytesToRead, void *preallocatedDestination, FileListNodeContext context)
 {
@@ -23,3 +23,5 @@ unsigned int IncrementalReadInterface::GetFilePart( const char *filename, unsign
 	fclose(fp);
 	return numRead;
 }
+
+} // namespace RakNet

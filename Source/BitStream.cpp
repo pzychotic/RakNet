@@ -52,7 +52,7 @@
 #define _copysign copysign
 #endif
 
-using namespace RakNet;
+namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS(BitStream,BitStream)
 
@@ -1170,5 +1170,7 @@ void BitStream::WriteFloat16( float inOutFloat, float floatMin, float floatMax )
 		percentile=65535.0f;
 	Write((unsigned short)percentile);
 }
+
+} // namespace RakNet
 
 #endif // #if _MSC_VER < 1299 

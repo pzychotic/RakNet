@@ -17,7 +17,7 @@
 #include "RakNetSocket2.h"
 #include "GetTime.h"
 
-using namespace RakNet;
+namespace RakNet {
 
 struct DynDnsResult
 {
@@ -245,5 +245,6 @@ void DynDNS::Update(void)
 	}
 }
 
+} // namespace RakNet
 
 #endif // _RAKNET_SUPPORT_DynDNS

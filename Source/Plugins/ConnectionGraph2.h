@@ -25,8 +25,7 @@
 #include "DS_OrderedList.h"
 #include "Export.h"
 
-namespace RakNet
-{
+namespace RakNet {
 
 /// \brief A one hop connection graph.
 /// \details Sends ID_REMOTE_CONNECTION_LOST, ID_REMOTE_DISCONNECTION_NOTIFICATION, ID_REMOTE_NEW_INCOMING_CONNECTION<BR>

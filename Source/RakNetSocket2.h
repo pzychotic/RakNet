@@ -35,8 +35,7 @@
 typedef int PP_Resource;
 #endif
 
-namespace RakNet
-{
+namespace RakNet {
 
 class RakNetSocket2;
 struct RNS2_BerkleyBindParameters;
@@ -218,7 +217,7 @@ public:
 	//
 	// Example:
 	// 
-	// DataStructures::List< RakNet::RakNetSocket2* > sockets;
+	// DataStructures::List< RakNetSocket2* > sockets;
 	// rakPeerInterface->GetSockets(sockets);
 	// for (unsigned int i=0; i < sockets.Size(); i++)
 	// {
@@ -337,7 +336,7 @@ protected:
 	RNS2_BerkleyBindParameters binding;
 
 	unsigned RecvFromLoopInt(void);
-	RakNet::LocklessUint32_t isRecvFromLoopThreadActive;
+	LocklessUint32_t isRecvFromLoopThreadActive;
 	volatile bool endThreads;
 	// Constructor not called!
 
