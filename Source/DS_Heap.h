@@ -13,10 +13,7 @@
 /// \brief Heap (Also serves as a priority queue)
 ///
 
-
-
-#ifndef __RAKNET_HEAP_H
-#define __RAKNET_HEAP_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 #include "DS_List.h"
@@ -285,5 +282,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

@@ -13,9 +13,7 @@
 /// \brief A binary search tree, and an AVL balanced BST derivation.
 ///
 
-
-#ifndef __BINARY_SEARCH_TREE_H
-#define __BINARY_SEARCH_TREE_H
+#pragma once
 
 #include "DS_QueueLinkedList.h"
 #include "RakMemoryOverride.h"
@@ -1122,5 +1120,3 @@ namespace RakNet { namespace DataStructures {
 	}
 	
 } } // namespace RakNet::DataStructures
-
-#endif

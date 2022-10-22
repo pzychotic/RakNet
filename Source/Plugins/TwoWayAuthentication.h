@@ -14,12 +14,10 @@
 /// This can be used to determine what permissions are should be allowed to the other system
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TwoWayAuthentication==1
-
-#ifndef __TWO_WAY_AUTHENTICATION_H
-#define __TWO_WAY_AUTHENTICATION_H
 
 // How often to change the nonce.
 #define NONCE_TIMEOUT_MS 10000
@@ -146,7 +144,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

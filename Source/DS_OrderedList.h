@@ -13,12 +13,11 @@
 /// \brief Quicksort ordered list.
 ///
 
+#pragma once
+
 #include "DS_List.h"
 #include "RakMemoryOverride.h"
 #include "Export.h"
-
-#ifndef __ORDERED_LIST_H
-#define __ORDERED_LIST_H
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
@@ -272,5 +271,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

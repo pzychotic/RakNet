@@ -11,9 +11,7 @@
 /// \file FileListNodeContext.h
 ///
 
-
-#ifndef __FILE_LIST_NODE_CONTEXT_H
-#define __FILE_LIST_NODE_CONTEXT_H
+#pragma once
 
 #include "BitStream.h"
 
@@ -57,5 +55,3 @@ inline BitStream& operator>>(BitStream& in, FileListNodeContext& out)
 }
 
 } // namespace RakNet
-
-#endif

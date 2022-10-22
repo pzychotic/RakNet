@@ -13,9 +13,7 @@
 /// \brief A queue implemented as a linked list.
 ///
 
-
-#ifndef __QUEUE_LINKED_LIST_H
-#define __QUEUE_LINKED_LIST_H
+#pragma once
 
 #include "DS_LinkedList.h" 
 #include "Export.h"
@@ -107,5 +105,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

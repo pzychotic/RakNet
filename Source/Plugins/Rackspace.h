@@ -12,9 +12,9 @@
 /// \brief Helper to class to manage Rackspace servers
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
-
 #if _RAKNET_SUPPORT_Rackspace==1 && _RAKNET_SUPPORT_TCPInterface==1
 
 #include "Export.h"
@@ -22,9 +22,6 @@
 #include "RakNetTypes.h"
 //#include "DS_Queue.h"
 #include "RakString.h"
-
-#ifndef __RACKSPACE_H
-#define __RACKSPACE_H
 
 namespace RakNet {
 
@@ -404,7 +401,5 @@ namespace RakNet {
 	};
 
 } // namespace RakNet
-
-#endif // __RACKSPACE_API_H
 
 #endif // _RAKNET_SUPPORT_Rackspace

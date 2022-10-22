@@ -14,9 +14,7 @@
 /// \details I'm assuming the indices are complex map types, rather than sequential numbers (which could be implemented much more efficiently).
 ///
 
-
-#ifndef __WEIGHTED_GRAPH_H
-#define __WEIGHTED_GRAPH_H
+#pragma once
 
 #include "DS_OrderedList.h"
 #include "DS_Map.h"
@@ -523,5 +521,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

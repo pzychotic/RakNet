@@ -13,9 +13,7 @@
 /// \brief Straightforward linked list data structure.
 ///
 
-
-#ifndef __LINKED_LIST_H
-#define __LINKED_LIST_H 
+#pragma once
 
 #include "Export.h"
 #include "RakMemoryOverride.h"
@@ -1240,5 +1238,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

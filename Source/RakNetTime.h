@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __RAKNET_TIME_H
-#define __RAKNET_TIME_H
+#pragma once
 
 #include "RakNetDefines.h"
 
@@ -30,5 +29,3 @@ typedef uint64_t TimeUS;
 #endif
 
 } // namespace RakNet
-
-#endif

@@ -12,11 +12,10 @@
 /// \brief Contains RakNetCommandParser , used to send commands to an instance of RakPeer
 ///
 
+#pragma once
+
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_RakNetCommandParser==1
-
-#ifndef __RAKNET_COMMAND_PARSER
-#define __RAKNET_COMMAND_PARSER
 
 #include "CommandParserInterface.h"
 #include "Export.h"
@@ -64,7 +63,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

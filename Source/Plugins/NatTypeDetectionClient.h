@@ -12,12 +12,10 @@
 /// \brief Contains the NAT-type detection code for the client
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_NatTypeDetectionClient==1
-
-#ifndef __NAT_TYPE_DETECTION_CLIENT_H
-#define __NAT_TYPE_DETECTION_CLIENT_H
 
 #include "Plugins/NatTypeDetectionCommon.h"
 #include "RakNetTypes.h"
@@ -87,7 +85,5 @@ struct Packet;
 
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

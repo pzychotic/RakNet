@@ -12,12 +12,10 @@
 /// \brief Derivation of the packet logger to defer the call to WriteLog until the user thread.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_PacketLogger==1
-
-#ifndef __THREADSAFE_PACKET_LOGGER_H
-#define __THREADSAFE_PACKET_LOGGER_H
 
 #include "Plugins/PacketLogger.h"
 #include "SingleProducerConsumer.h"
@@ -41,7 +39,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

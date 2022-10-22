@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __AUTOPATCHER_PATCH_CONTEXT_H
-#define __AUTOPATCHER_PATCH_CONTEXT_H
+#pragma once
 
 namespace RakNet {
 
@@ -28,5 +27,3 @@ enum PatchContext
 };
 
 } // namespace RakNet
-
-#endif

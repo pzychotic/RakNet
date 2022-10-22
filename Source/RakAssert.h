@@ -8,5 +8,7 @@
  *
  */
 
+#pragma once
+
 #include <cassert>
 #include "RakNetDefines.h"

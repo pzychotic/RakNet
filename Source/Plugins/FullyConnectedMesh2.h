@@ -13,12 +13,10 @@
 /// \details This will connect RakPeer to all connecting peers, and all peers the connecting peer knows about.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_FullyConnectedMesh2==1
-
-#ifndef __FULLY_CONNECTED_MESH_2_H
-#define __FULLY_CONNECTED_MESH_2_H
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
@@ -416,7 +414,5 @@ SendOurGuid(allParticipants);
 OnReceiveTheirGuid()
 AssignTheirGuid()
 */
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

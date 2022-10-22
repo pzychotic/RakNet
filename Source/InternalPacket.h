@@ -12,8 +12,7 @@
 /// \brief \b [Internal] A class which stores a user message, and all information associated with sending and receiving that message.
 ///
 
-#ifndef __INTERNAL_PACKET_H
-#define __INTERNAL_PACKET_H
+#pragma once
 
 #include "PacketPriority.h"
 #include "RakNetTypes.h"
@@ -126,5 +125,3 @@ struct InternalPacket : public InternalPacketFixedSizeTransmissionHeader
 };
 
 } // namespace RakNet
-
-#endif

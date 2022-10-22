@@ -3,8 +3,7 @@
 /// Should emulate windows finddata structure
 ///
 
-#ifndef GCC_FINDFIRST_H
-#define GCC_FINDFIRST_H
+#pragma once
 
 #if (defined(__GNUC__) || defined(__ARMCC_VERSION) || defined(__GCCXML__) || defined(__S3E__) ) && !defined(__WIN32)
 
@@ -51,6 +50,5 @@ long _findfirst(const char *name, _finddata_t *f);
 int _findnext(long h, _finddata_t *f);
 int _findclose(long h);
 
-#endif
 #endif
 

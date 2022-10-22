@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef _GCC_WIN_STRINGS
-#define _GCC_WIN_STRINGS
+#pragma once
 
 #if  defined(__native_client__)
 	#ifndef _stricmp
@@ -32,9 +31,5 @@
 		char *_strlwr(char * str ); //this won't compile on OSX for some reason
 #endif
 
-
-
 	#endif
 #endif
-
-#endif // _GCC_WIN_STRINGS

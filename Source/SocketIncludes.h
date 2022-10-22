@@ -1,5 +1,5 @@
-#ifndef RAKNET_SOCKETINCLUDES_H
-#define RAKNET_SOCKETINCLUDES_H
+
+#pragma once
 
 // All this crap just to include type SOCKET
 
@@ -8,25 +8,6 @@
 #else
 #define _PP_Instance_ int
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #if   defined(WINDOWS_STORE_RT)
 	#include <windows.h>
@@ -94,5 +75,3 @@
 #endif
 
 #endif
-
-#endif  // RAKNET_SOCKETINCLUDES_H

@@ -11,9 +11,7 @@
 /// \file FileListTransferCBInterface.h
 ///
 
-
-#ifndef __FILE_LIST_TRANSFER_CALLBACK_INTERFACE_H
-#define __FILE_LIST_TRANSFER_CALLBACK_INTERFACE_H
+#pragma once
 
 #include "Plugins/FileListNodeContext.h"
 #include "RakMemoryOverride.h"
@@ -148,5 +146,3 @@ public:
 };
 
 } // namespace RakNet
-
-#endif

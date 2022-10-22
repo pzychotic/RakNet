@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __RAKNET_DEFINES_H
-#define __RAKNET_DEFINES_H
+#pragma once
 
 // If you want to change these defines, put them in RakNetDefinesOverrides so your changes are not lost when updating RakNet
 // The user should not edit this file
@@ -77,9 +76,6 @@
 #endif
 
 #ifndef RakAssert
-
-
-
 #if   defined(__native_client__)
 #define RakAssert(x)
 #else
@@ -132,16 +128,6 @@
 #define RAKNET_SUPPORT_IPV6 0
 #endif
 
-
-
-
-
-
-
-
-
-
-
 #ifndef RAKSTRING_TYPE
 #if defined(_UNICODE)
 #define RAKSTRING_TYPE RakWString
@@ -185,11 +171,4 @@
 #define USE_ALLOCA 1
 #endif
 
-
-
-
-
-
 //#define USE_THREADED_SEND
-
-#endif // __RAKNET_DEFINES_H

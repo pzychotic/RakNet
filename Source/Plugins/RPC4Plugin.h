@@ -12,12 +12,10 @@
 /// \brief Remote procedure call, supporting C functions only. No external dependencies required.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_RPC4Plugin==1
-
-#ifndef __RPC_4_PLUGIN_H
-#define __RPC_4_PLUGIN_H
 
 #include "PluginInterface2.h"
 #include "PacketPriority.h"
@@ -225,7 +223,5 @@ namespace RakNet {
 	};
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

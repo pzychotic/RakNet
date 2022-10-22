@@ -12,12 +12,10 @@
 /// \brief Connection graph plugin, version 2. Tells new systems about existing and new connections
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_ConnectionGraph2==1
-
-#ifndef __CONNECTION_GRAPH_2_H
-#define __CONNECTION_GRAPH_2_H
 
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
@@ -115,7 +113,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif // #ifndef __CONNECTION_GRAPH_2_H
 
 #endif // _RAKNET_SUPPORT_*

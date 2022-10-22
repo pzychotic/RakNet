@@ -8,17 +8,13 @@
  *
  */
 
-#ifndef __RAK_W_STRING_H
-#define __RAK_W_STRING_H 
+#pragma once
 
 #include "Export.h"
 #include "RakNetTypes.h" // int64_t
 #include "RakString.h"
 
 #ifdef _WIN32
-
-
-
 #include "WindowsIncludes.h"
 #endif
 
@@ -119,5 +115,3 @@ namespace RakNet {
 const RakWString RAK_DLL_EXPORT operator+(const RakWString &lhs, const RakWString &rhs);
 
 } // namespace RakNet
-
-#endif

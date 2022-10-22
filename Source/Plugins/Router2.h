@@ -12,12 +12,10 @@
 /// \brief Router2 plugin. Allows you to connect to a system by routing packets through another system that is connected to both you and the destination. Useful for getting around NATs.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_Router2==1 && _RAKNET_SUPPORT_UDPForwarder==1
-
-#ifndef __ROUTER_2_PLUGIN_H
-#define __ROUTER_2_PLUGIN_H
 
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
@@ -193,7 +191,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

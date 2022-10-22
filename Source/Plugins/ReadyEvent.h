@@ -12,11 +12,10 @@
 /// \brief Ready event plugin.  This enables a set of systems to create a signal event, set this signal as ready or unready, and to trigger the event when all systems are ready
 ///
 
+#pragma once
+
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_ReadyEvent==1
-
-#ifndef __READY_EVENT_H
-#define __READY_EVENT_H
 
 #include "PluginInterface2.h"
 #include "DS_OrderedList.h"
@@ -233,7 +232,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

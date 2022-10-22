@@ -12,10 +12,7 @@
 /// \brief \b Compresses/Decompresses ASCII strings and writes/reads them to BitStream class instances.  You can use this to easily serialize and deserialize your own strings.
 ///
 
-
-
-#ifndef __STRING_COMPRESSOR_H
-#define __STRING_COMPRESSOR_H
+#pragma once
 
 #include "Export.h"
 #include "DS_Map.h"
@@ -104,5 +101,3 @@ private:
 };
 
 } // namespace RakNet
-
-#endif

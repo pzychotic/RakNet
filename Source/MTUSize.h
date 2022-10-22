@@ -12,6 +12,7 @@
 /// \brief \b [Internal] Defines the default maximum transfer unit.
 ///
 
+#pragma once
 
 #ifndef MAXIMUM_MTU_SIZE
 
@@ -28,11 +29,7 @@
 /// \li \em 576. Typical value to connect to dial-up ISPs.
 /// The largest value for an UDP datagram
 
-
-
 #define MAXIMUM_MTU_SIZE 1492
-
-
 #define MINIMUM_MTU_SIZE 400
 
 #endif

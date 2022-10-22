@@ -13,9 +13,7 @@
 /// \brief Byte queue
 ///
 
-
-#ifndef __BYTE_QUEUE_H
-#define __BYTE_QUEUE_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 #include "Export.h"
@@ -44,5 +42,3 @@ namespace RakNet { namespace DataStructures {
 	};
 
 } } // namespace RakNet::DataStructures
-
-#endif

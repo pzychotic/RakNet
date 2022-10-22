@@ -12,9 +12,7 @@
 /// \brief \b RakNet's plugin functionality system, version 2.  You can derive from this to create your own plugins.
 ///
 
-
-#ifndef __PLUGIN_INTERFACE_2_H
-#define __PLUGIN_INTERFACE_2_H
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #include "RakNetTypes.h"
@@ -207,5 +205,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

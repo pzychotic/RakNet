@@ -12,8 +12,7 @@
 /// \brief \b [Internal] A single node in the Huffman Encoding Tree.
 ///
 
-#ifndef __HUFFMAN_ENCODING_TREE_NODE
-#define __HUFFMAN_ENCODING_TREE_NODE
+#pragma once
 
 namespace RakNet {
 
@@ -27,5 +26,3 @@ struct HuffmanEncodingTreeNode
 };
 
 } // namespace RakNet
-
-#endif

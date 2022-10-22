@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __WSA_STARTUP_SINGLETON_H
-#define __WSA_STARTUP_SINGLETON_H
+#pragma once
 
 namespace RakNet {
 
@@ -26,5 +25,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

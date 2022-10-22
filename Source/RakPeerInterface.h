@@ -12,10 +12,7 @@
 /// \brief An interface for RakPeer.  Simply contains all user functions as pure virtuals.
 ///
 
-
-
-#ifndef __RAK_PEER_INTERFACE_H
-#define __RAK_PEER_INTERFACE_H
+#pragma once
 
 #include "PacketPriority.h"
 #include "RakNetTypes.h"
@@ -607,5 +604,3 @@ public:
 ;
 
 } // namespace RakNet
-
-#endif

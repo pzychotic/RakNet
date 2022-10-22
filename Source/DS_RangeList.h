@@ -13,9 +13,7 @@
 /// \brief A queue implemented as a linked list.
 ///
 
-
-#ifndef __RANGE_LIST_H
-#define __RANGE_LIST_H
+#pragma once
 
 #include "DS_OrderedList.h"
 #include "BitStream.h"
@@ -239,5 +237,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

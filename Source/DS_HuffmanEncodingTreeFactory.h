@@ -13,9 +13,7 @@
 /// \brief Creates instances of the class HuffmanEncodingTree
 ///
 
- 
-#ifndef __HUFFMAN_ENCODING_TREE_FACTORY
-#define __HUFFMAN_ENCODING_TREE_FACTORY
+#pragma once
 
 #include "RakMemoryOverride.h"
 
@@ -61,5 +59,3 @@ private:
 };
 
 } // namespace RakNet
-
-#endif

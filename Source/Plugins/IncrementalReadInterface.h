@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __INCREMENTAL_READ_INTERFACE_H
-#define __INCREMENTAL_READ_INTERFACE_H
+#pragma once
 
 #include "Plugins/FileListNodeContext.h"
 #include "Export.h"
@@ -33,5 +32,3 @@ public:
 };
 
 } // namespace RakNet
-
-#endif

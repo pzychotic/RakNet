@@ -12,18 +12,12 @@
 /// \brief \b [Internal] Encapsulates a mutex
 ///
 
-
-
-#ifndef __SIMPLE_MUTEX_H
-#define __SIMPLE_MUTEX_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 
-
 #if   defined(_WIN32)
 #include "WindowsIncludes.h"
-
-
 #else
 #include <pthread.h>
 #include <sys/types.h>
@@ -64,5 +58,3 @@ private:
 };
 
 } // namespace RakNet
-
-#endif

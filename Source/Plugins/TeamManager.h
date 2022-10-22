@@ -18,13 +18,10 @@
 /// Advanced functionality includes the ability for a team member to be on multiple teams simultaneously, the ability to swap teams with other members, and the ability to resize the number of members supported per team
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TeamManager==1
-
-#ifndef __TEAM_MANAGER_H
-#define __TEAM_MANAGER_H
-
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
 #include "DS_List.h"
@@ -748,7 +745,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif // __TEAM_MANAGER_H
 
 #endif // _RAKNET_SUPPORT_*

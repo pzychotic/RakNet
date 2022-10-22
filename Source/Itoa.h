@@ -8,13 +8,10 @@
  *
  */
 
-#ifndef __RAK_ITOA_H
-#define __RAK_ITOA_H
+#pragma once
 
 namespace RakNet {
 
 char* Itoa( int value, char* result, int base );
 
 } // namespace RakNet
-
-#endif

@@ -12,9 +12,7 @@
 /// \brief All the message identifiers used by RakNet.  Message identifiers comprise the first byte of any message.
 ///
 
-
-#ifndef __MESSAGE_IDENTIFIERS_H
-#define __MESSAGE_IDENTIFIERS_H 
+#pragma once
 
 namespace RakNet {
 
@@ -430,5 +428,3 @@ enum DefaultMessageIDTypes
 };
 
 } // namespace RakNet
-
-#endif

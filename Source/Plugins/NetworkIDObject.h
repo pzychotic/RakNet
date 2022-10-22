@@ -12,9 +12,7 @@
 /// \brief A class you can derive from to make it easier to represent every networked object with an integer.  This way you can refer to objects over the network.
 ///
 
-
-#if !defined(__NETWORK_ID_GENERATOR)
-#define      __NETWORK_ID_GENERATOR
+#pragma once
 
 #include "RakNetTypes.h"
 #include "RakMemoryOverride.h"
@@ -85,5 +83,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

@@ -14,9 +14,7 @@
 /// \details Usually the Queue class is used instead, since it has all the same functionality and is only worse at random access.
 ///
 
-
-#ifndef __LIST_H
-#define __LIST_H 
+#pragma once
 
 #include "RakAssert.h"
 #include <string.h> // memmove
@@ -521,5 +519,3 @@ namespace RakNet { namespace DataStructures {
 	}
 	
 } } // namespace RakNet::DataStructures
-
-#endif

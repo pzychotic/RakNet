@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __SUPER_FAST_HASH_H
-#define __SUPER_FAST_HASH_H
+#pragma once
 
 #include <stdio.h>
 #include <stdint.h>
@@ -27,5 +26,3 @@ uint32_t SuperFastHashFile (const char * filename);
 uint32_t SuperFastHashFilePtr (FILE *fp);
 
 } // namespace RakNet
-
-#endif

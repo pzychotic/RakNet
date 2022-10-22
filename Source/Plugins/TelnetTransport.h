@@ -12,12 +12,10 @@
 /// \brief Contains TelnetTransport , used to supports the telnet transport protocol.  Insecure
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TelnetTransport==1 && _RAKNET_SUPPORT_TCPInterface==1
-
-#ifndef __TELNET_TRANSPORT
-#define __TELNET_TRANSPORT
 
 #include "TransportInterface.h"
 #include "DS_List.h"
@@ -74,7 +72,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

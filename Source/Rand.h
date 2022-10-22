@@ -12,10 +12,7 @@
 /// \brief \b [Internal] Random number generator
 ///
 
-
-
-#ifndef __RAND_H
-#define __RAND_H 
+#pragma once
 
 #include "Export.h"
 
@@ -63,5 +60,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

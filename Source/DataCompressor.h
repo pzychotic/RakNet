@@ -13,9 +13,7 @@
 /// \details Not very good compression, but it's small and fast so is something you can use per-message at runtime.
 ///
 
-
-#ifndef __DATA_COMPRESSOR_H
-#define __DATA_COMPRESSOR_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 #include "Export.h"
@@ -36,5 +34,3 @@ public:
 };
 
 } // namespace RakNet
-
-#endif

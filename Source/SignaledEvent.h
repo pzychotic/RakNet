@@ -8,10 +8,7 @@
  *
  */
 
-#ifndef __SIGNALED_EVENT_H
-#define __SIGNALED_EVENT_H
-
-
+#pragma once
 
 #if   defined(_WIN32)
 #include "WindowsIncludes.h"
@@ -52,5 +49,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

@@ -12,12 +12,10 @@
 /// \brief Contains the third iteration of the ReplicaManager class.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_ReplicaManager3==1
-
-#ifndef __REPLICA_MANAGER_3
-#define __REPLICA_MANAGER_3
 
 #include "Plugins/NetworkIDObject.h"
 #include "RakNetTypes.h"
@@ -1130,7 +1128,5 @@ public:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

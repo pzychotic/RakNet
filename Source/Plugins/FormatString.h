@@ -11,9 +11,7 @@
 /// \file FormatString.h
 ///
 
-
-#ifndef __FORMAT_STRING_H
-#define __FORMAT_STRING_H
+#pragma once
 
 #include "Export.h"
 
@@ -23,6 +21,3 @@ char * FormatString(const char *format, ...);
 char * FormatStringTS(char *output, const char *format, ...);
 
 } // namespace RakNet
-
-#endif
-

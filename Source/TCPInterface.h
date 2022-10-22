@@ -12,12 +12,10 @@
 /// \brief A simple TCP based server allowing sends and receives.  Can be connected by any TCP client, including telnet.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TCPInterface==1
-
-#ifndef __SIMPLE_TCP_SERVER
-#define __SIMPLE_TCP_SERVER
 
 #include "RakMemoryOverride.h"
 #include "DS_List.h"
@@ -256,7 +254,5 @@ struct RemoteClient
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

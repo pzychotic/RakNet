@@ -12,12 +12,10 @@
 /// \brief A plugin to provide a simple way to compress and incrementally send the files in the FileList structure.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_FileListTransfer==1 && _RAKNET_SUPPORT_FileOperations==1
-
-#ifndef __FILE_LIST_TRANFER_H
-#define __FILE_LIST_TRANFER_H
 
 #include "Plugins/FileList.h"
 #include "RakNetTypes.h"
@@ -179,7 +177,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

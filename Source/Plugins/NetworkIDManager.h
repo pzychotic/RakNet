@@ -11,9 +11,7 @@
 /// \file
 ///
 
-
-#ifndef __NETWORK_ID_MANAGER_H
-#define __NETWORK_ID_MANAGER_H
+#pragma once
 
 #include "Plugins/NetworkIDObject.h"
 #include "RakNetTypes.h"
@@ -75,5 +73,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

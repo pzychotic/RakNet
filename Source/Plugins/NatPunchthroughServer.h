@@ -12,12 +12,10 @@
 /// \brief Contains the NAT-punchthrough plugin for the server.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_NatPunchthroughServer==1
-
-#ifndef __NAT_PUNCHTHROUGH_SERVER_H
-#define __NAT_PUNCHTHROUGH_SERVER_H
 
 #include "RakNetTypes.h"
 #include "Export.h"
@@ -148,7 +146,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

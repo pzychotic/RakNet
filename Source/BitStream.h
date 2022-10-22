@@ -13,13 +13,11 @@
 /// \details BitStream is used extensively throughout RakNet and is designed to be used by users as well.
 ///
 
+#pragma once
 
 #if defined(_MSC_VER) && _MSC_VER < 1299 // VC6 doesn't support template specialization
 #include "BitStream_NoTemplate.h"
 #else
-
-#ifndef __BITSTREAM_H
-#define __BITSTREAM_H
 
 #include <cmath>
 #include <cfloat>
@@ -2017,7 +2015,5 @@ namespace RakNet {
 	}
 
 } // namespace RakNet
-
-#endif
 
 #endif // VC6

@@ -11,9 +11,7 @@
 /// \file DS_BPlusTree.h
 ///
 
-
-#ifndef __B_PLUS_TREE_CPP
-#define __B_PLUS_TREE_CPP
+#pragma once
 
 #include "DS_MemoryPool.h"
 #include "DS_Queue.h"
@@ -1057,8 +1055,6 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif
 
 // Code to test this hellish data structure.
 /*

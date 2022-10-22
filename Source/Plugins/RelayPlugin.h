@@ -12,12 +12,10 @@
 /// \brief Contains the class RelayPlugin
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_RelayPlugin==1
-
-#ifndef __RELAY_PLUGIN_H
-#define __RELAY_PLUGIN_H
 
 #include "PluginInterface2.h"
 #include "RakString.h"
@@ -148,7 +146,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

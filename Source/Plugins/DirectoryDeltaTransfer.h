@@ -13,12 +13,10 @@
 /// \details In essence, a simple autopatcher that can be used for transmitting levels, skins, etc.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_DirectoryDeltaTransfer==1 && _RAKNET_SUPPORT_FileOperations==1
-
-#ifndef __DIRECTORY_DELTA_TRANSFER_H
-#define __DIRECTORY_DELTA_TRANSFER_H
 
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
@@ -162,7 +160,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

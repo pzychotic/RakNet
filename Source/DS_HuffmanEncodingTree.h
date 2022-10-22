@@ -12,9 +12,7 @@
 /// \brief \b [Internal] Generates a huffman encoding tree, used for string and global compression.
 ///
 
-
-#ifndef __HUFFMAN_ENCODING_TREE
-#define __HUFFMAN_ENCODING_TREE
+#pragma once
 
 #include "RakMemoryOverride.h"
 #include "DS_HuffmanEncodingTreeNode.h"
@@ -69,5 +67,3 @@ private:
 };
 
 } // namespace RakNet
-
-#endif

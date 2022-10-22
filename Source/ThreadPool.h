@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __THREAD_POOL_H
-#define __THREAD_POOL_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 #include "DS_Queue.h"
@@ -610,5 +609,3 @@ void ThreadPool<InputType, OutputType>::Resume(void)
 }
 
 } // namespace RakNet
-
-#endif

@@ -12,10 +12,7 @@
 /// \brief This file contains enumerations for packet priority and reliability enumerations.
 ///
 
-
-
-#ifndef __PACKET_PRIORITY_H
-#define __PACKET_PRIORITY_H 
+#pragma once
 
 namespace RakNet {
 
@@ -87,5 +84,3 @@ enum PacketReliability
 };
 
 } // namespace RakNet
-
-#endif

@@ -12,10 +12,7 @@
 /// \brief \b [Internal] Passes queued data between threads using a circular buffer with read and write pointers
 ///
 
-
-
-#ifndef __SINGLE_PRODUCER_CONSUMER_H
-#define __SINGLE_PRODUCER_CONSUMER_H
+#pragma once
 
 #include "RakAssert.h"
 
@@ -264,5 +261,3 @@ namespace RakNet { namespace DataStructures {
 	}	
 
 } } // namespace RakNet::DataStructures
-
-#endif

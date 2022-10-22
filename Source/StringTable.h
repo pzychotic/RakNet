@@ -12,10 +12,7 @@
 /// \brief A simple class to encode and decode known strings based on a lookup table.  Similar to the StringCompressor class.
 ///
 
-
-
-#ifndef __STRING_TABLE_H
-#define __STRING_TABLE_H
+#pragma once
 
 #include "DS_OrderedList.h"
 #include "Export.h"
@@ -97,5 +94,3 @@ struct StrAndBool
 	};
 
 } // namespace RakNet
-
-#endif

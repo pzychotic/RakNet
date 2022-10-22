@@ -11,12 +11,10 @@
 /// \file
 /// \brief A RakNet plugin performing networking to communicate with UDPProxyCoordinator. Ultimately used to tell UDPProxyServer to forward UDP packets.
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_UDPProxyClient==1
-
-#ifndef __UDP_PROXY_CLIENT_H
-#define __UDP_PROXY_CLIENT_H
 
 #include "Export.h"
 #include "RakNetTypes.h"
@@ -175,7 +173,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

@@ -12,12 +12,10 @@
 /// \brief This will write all incoming and outgoing network messages to the local console screen.  See derived functions for other outputs
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_PacketLogger==1
-
-#ifndef __PACKET_LOGGER_H
-#define __PACKET_LOGGER_H
 
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
@@ -100,7 +98,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

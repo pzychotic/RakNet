@@ -12,12 +12,10 @@
 /// \brief Contains RakNetTransportCommandParser and RakNetTransport used to provide a secure console connection.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TelnetTransport==1
-
-#ifndef __RAKNET_TRANSPORT_2
-#define __RAKNET_TRANSPORT_2
 
 #include "TransportInterface.h"
 #include "DS_Queue.h"
@@ -99,7 +97,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

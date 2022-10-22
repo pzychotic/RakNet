@@ -12,12 +12,10 @@
 /// \brief Essentially maintains a list of servers running UDPProxyServer, and some state management for UDPProxyClient to find a free server to forward datagrams
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_UDPProxyCoordinator==1 && _RAKNET_SUPPORT_UDPForwarder==1
-
-#ifndef __UDP_PROXY_COORDINATOR_H
-#define __UDP_PROXY_COORDINATOR_H
 
 #include "Export.h"
 #include "RakNetTypes.h"
@@ -110,7 +108,5 @@ namespace RakNet {
 	};
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

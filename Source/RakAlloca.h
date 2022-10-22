@@ -8,12 +8,10 @@
  *
  */
 
+#pragma once
+
 #if defined(__FreeBSD__)
 #include <stdlib.h>
-
-
-
-
 #elif defined ( __APPLE__ ) || defined ( __APPLE_CC__ )
 #include <malloc/malloc.h>
 #include <alloca.h>

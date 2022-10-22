@@ -11,9 +11,7 @@
 /// \file DS_Table.h
 ///
 
-
-#ifndef __TABLE_H
-#define __TABLE_H
+#pragma once
 
 #include "DS_List.h"
 #include "DS_BPlusTree.h"
@@ -339,5 +337,3 @@ namespace RakNet { namespace DataStructures {
 	};
 
 } } // namespace RakNet::DataStructures
-
-#endif

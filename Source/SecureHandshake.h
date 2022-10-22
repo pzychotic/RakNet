@@ -11,12 +11,9 @@
 /// \file
 ///
 
-
-#ifndef SECURE_HANDSHAKE_H
-#define SECURE_HANDSHAKE_H
+#pragma once
 
 #include "NativeFeatureIncludes.h"
-
 #if LIBCAT_SECURITY==1
 
 // If building a RakNet DLL, be sure to tweak the CAT_EXPORT macro meaning
@@ -30,5 +27,3 @@
 #include "cat/AllTunnel.hpp"
 
 #endif // LIBCAT_SECURITY
-
-#endif // SECURE_HANDSHAKE_H

@@ -8,6 +8,8 @@
  *
  */
 
+#pragma once
+
 #if   defined (WINDOWS_STORE_RT)
 #include <windows.h>
 #include <winsock.h>

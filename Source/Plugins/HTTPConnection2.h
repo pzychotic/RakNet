@@ -12,11 +12,10 @@
 /// \brief Contains HTTPConnection2, used to communicate with web servers
 ///
 
+#pragma once
+
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_HTTPConnection2==1 && _RAKNET_SUPPORT_TCPInterface==1
-
-#ifndef __HTTP_CONNECTION_2
-#define __HTTP_CONNECTION_2
 
 #include "Export.h"
 #include "RakString.h"
@@ -118,7 +117,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

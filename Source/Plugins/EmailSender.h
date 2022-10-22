@@ -12,11 +12,10 @@
 /// \brief Rudimentary class to send email from code.  Don't expect anything fancy.
 ///
 
+#pragma once
+
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_EmailSender==1 && _RAKNET_SUPPORT_TCPInterface==1 && _RAKNET_SUPPORT_FileOperations==1
-
-#ifndef __EMAIL_SENDER_H
-#define __EMAIL_SENDER_H
 
 #include "RakNetTypes.h"
 #include "RakMemoryOverride.h"
@@ -58,7 +57,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

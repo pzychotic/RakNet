@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __LOCKLESS_TYPES_H
-#define __LOCKLESS_TYPES_H
+#pragma once
 
 #include "Export.h"
 #include "WindowsIncludes.h"
@@ -46,5 +45,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

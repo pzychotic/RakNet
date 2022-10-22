@@ -11,12 +11,10 @@
 /// \file FileList.h
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_FileOperations==1
-
-#ifndef __FILE_LIST
-#define __FILE_LIST
 
 #include "Plugins/FileListNodeContext.h"
 #include "Export.h"
@@ -246,7 +244,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_FileOperations

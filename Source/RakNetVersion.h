@@ -8,6 +8,8 @@
  *
  */
 
+#pragma once
+
 #define RAKNET_VERSION "4.081"
 #define RAKNET_VERSION_NUMBER 4.081
 #define RAKNET_VERSION_NUMBER_INT 4081

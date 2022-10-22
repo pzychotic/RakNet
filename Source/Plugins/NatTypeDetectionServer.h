@@ -12,11 +12,10 @@
 /// \brief Contains the NAT-type detection code for the server
 ///
 
+#pragma once
+
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_NatTypeDetectionServer==1
-
-#ifndef __NAT_TYPE_DETECTION_SERVER_H
-#define __NAT_TYPE_DETECTION_SERVER_H
 
 #include "Plugins/NatTypeDetectionCommon.h"
 #include "RakNetTypes.h"
@@ -128,7 +127,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

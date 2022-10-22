@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __RAK_SLEEP_H
-#define __RAK_SLEEP_H
+#pragma once
 
 #include "Export.h"
 
@@ -18,5 +17,3 @@ namespace RakNet {
 void RAK_DLL_EXPORT RakSleep(unsigned int ms);
 
 } // namespace RakNet
-
-#endif

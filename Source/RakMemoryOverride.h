@@ -12,10 +12,7 @@
 /// \brief If _USE_RAK_MEMORY_OVERRIDE is defined, memory allocations go through rakMalloc, rakRealloc, and rakFree
 ///
 
-
-
-#ifndef __RAK_MEMORY_H
-#define __RAK_MEMORY_H
+#pragma once
 
 #include "Export.h"
 #include "RakNetDefines.h"
@@ -233,5 +230,3 @@ void FreeRakNetFixedHeap(void);
 // 	#undef RMO_NEW_UNDEF
 // 	#endif
 // #endif
-
-#endif

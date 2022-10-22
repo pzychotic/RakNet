@@ -13,12 +13,10 @@
 /// \details TODO
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_CloudServer==1
-
-#ifndef __CLOUD_SERVER_H
-#define __CLOUD_SERVER_H
 
 #include "Plugins/CloudCommon.h"
 #include "PluginInterface2.h"
@@ -329,9 +327,6 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
-
 
 // Key subscription
 //

@@ -12,9 +12,7 @@
 /// \brief Hashing container
 ///
 
-
-#ifndef __HASH_H
-#define __HASH_H 
+#pragma once
 
 #include "RakAssert.h"
 #include <string.h> // memmove
@@ -355,5 +353,3 @@ namespace RakNet { namespace DataStructures {
 	}
 
 } } // namespace RakNet::DataStructures
-
-#endif

@@ -12,9 +12,7 @@
 /// \brief Types used by RakNet, most of which involve user code.
 ///
 
-
-#ifndef __NETWORK_TYPES_H
-#define __NETWORK_TYPES_H
+#pragma once
 
 #include "RakNetDefines.h"
 #include "RakNetTime.h"
@@ -494,5 +492,3 @@ struct RAK_DLL_EXPORT uint24_t
 };
 
 } // namespace RakNet
-
-#endif

@@ -12,12 +12,10 @@
 /// \brief A RakNet plugin performing networking to communicate with UDPProxyServer. It allows UDPProxyServer to control our instance of UDPForwarder.
 ///
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_UDPProxyServer==1 && _RAKNET_SUPPORT_UDPForwarder==1
-
-#ifndef __UDP_PROXY_SERVER_H
-#define __UDP_PROXY_SERVER_H
 
 #include "Export.h"
 #include "RakNetTypes.h"
@@ -121,7 +119,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

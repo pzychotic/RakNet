@@ -11,12 +11,10 @@
 /// \file StatisticsHistory.h
 /// \brief Input numerical values over time. Get sum, average, highest, lowest, standard deviation on recent or all-time values
 
+#pragma once
 
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_StatisticsHistory==1
-
-#ifndef __STATISTICS_HISTORY_H
-#define __STATISTICS_HISTORY_H
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
@@ -227,7 +225,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif // __STATISTICS_HISTORY_H
 
 #endif // _RAKNET_SUPPORT_*

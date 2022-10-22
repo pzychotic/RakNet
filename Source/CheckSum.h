@@ -13,8 +13,7 @@
 /// \brief [Internal] CheckSum implementation from http://www.flounder.com/checksum.htm
 ///
 
-#ifndef __CHECKSUM_H
-#define __CHECKSUM_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 
@@ -63,5 +62,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

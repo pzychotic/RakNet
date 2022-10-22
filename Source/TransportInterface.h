@@ -12,10 +12,7 @@
 /// \brief Contains TransportInterface from which you can derive custom transport providers for ConsoleServer.
 ///
 
-
-
-#ifndef __TRANSPORT_INTERFACE_H
-#define __TRANSPORT_INTERFACE_H
+#pragma once
 
 #include "RakNetTypes.h"
 #include "Export.h"
@@ -85,5 +82,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

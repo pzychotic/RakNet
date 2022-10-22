@@ -13,9 +13,7 @@
 /// \brief An interface used by AutopatcherServer to get the data necessary to run an autopatcher.
 ///
 
-
-#ifndef __AUTOPATCHER_REPOSITORY_INTERFACE_H
-#define __AUTOPATCHER_REPOSITORY_INTERFACE_H
+#pragma once
 
 #include "Plugins/IncrementalReadInterface.h"
 
@@ -70,5 +68,3 @@ public:
 };
 
 } // namespace RakNet
-
-#endif

@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __BASE_64_ENCODER_H
-#define __BASE_64_ENCODER_H
+#pragma once
 
 #include "Export.h"
 
@@ -21,5 +20,3 @@ int Base64Encoding(const unsigned char *inputData, int dataLength, char *outputD
 const char *Base64Map(void);
 
 } // namespace RakNet
-
-#endif

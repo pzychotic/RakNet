@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __TABLE_SERIALIZER_H
-#define __TABLE_SERIALIZER_H
+#pragma once
 
 #include "RakMemoryOverride.h"
 #include "DS_Table.h"
@@ -43,8 +42,6 @@ public:
 };
 
 } // namespace RakNet
-
-#endif
 
 // Test code for the table
 /*

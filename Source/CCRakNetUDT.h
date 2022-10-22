@@ -8,12 +8,10 @@
  *
  */
 
+#pragma once
+
 #include "RakNetDefines.h"
-
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL!=1
-
-#ifndef __CONGESTION_CONTROL_UDT_H
-#define __CONGESTION_CONTROL_UDT_H
 
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
@@ -398,7 +396,5 @@ class CCRakNetUDT
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif

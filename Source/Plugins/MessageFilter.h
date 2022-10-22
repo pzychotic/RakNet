@@ -12,11 +12,10 @@
 /// \brief Message filter plugin. Assigns systems to FilterSets.  Each FilterSet limits what messages are allowed.  This is a security related plugin.
 ///
 
+#pragma once
+
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_MessageFilter==1
-
-#ifndef __MESSAGE_FILTER_PLUGIN_H
-#define __MESSAGE_FILTER_PLUGIN_H
 
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
@@ -192,7 +191,5 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif
 
 #endif // _RAKNET_SUPPORT_*

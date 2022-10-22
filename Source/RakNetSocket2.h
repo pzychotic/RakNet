@@ -8,8 +8,7 @@
  *
  */
 
-#ifndef __RAKNET_SOCKET_2_H
-#define __RAKNET_SOCKET_2_H
+#pragma once
 
 #include "RakNetTypes.h"
 #include "MTUSize.h"
@@ -455,5 +454,3 @@ protected:
 #endif // #elif !defined(WINDOWS_STORE_RT)
 
 } // namespace RakNet
-
-#endif // __RAKNET_SOCKET_2_H
