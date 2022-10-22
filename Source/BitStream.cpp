@@ -11,12 +11,6 @@
 /// \file
 ///
 
-
-
-#if defined(_MSC_VER) && _MSC_VER < 1299 // VC6 doesn't support template specialization
-#include "BitStream_NoTemplate.cpp"
-#else
-
 #include "BitStream.h"
 #include <stdio.h>
 #include <string.h>
@@ -25,17 +19,11 @@
 #include "SocketIncludes.h"
 #include "RakNetDefines.h"
 
-
-
 #if   defined(_WIN32)
 #include "WindowsIncludes.h"
 #include <memory.h>
 #include <cmath>
 #include <float.h>
-
-
-
-
 #else
 #include <arpa/inet.h>
 #include <memory.h>
@@ -1172,5 +1160,3 @@ void BitStream::WriteFloat16( float inOutFloat, float floatMin, float floatMax )
 }
 
 } // namespace RakNet
-
-#endif // #if _MSC_VER < 1299 

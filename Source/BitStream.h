@@ -15,10 +15,6 @@
 
 #pragma once
 
-#if defined(_MSC_VER) && _MSC_VER < 1299 // VC6 doesn't support template specialization
-#include "BitStream_NoTemplate.h"
-#else
-
 #include <cmath>
 #include <cfloat>
 #include <string>
@@ -2015,5 +2011,3 @@ namespace RakNet {
 	}
 
 } // namespace RakNet
-
-#endif // VC6
