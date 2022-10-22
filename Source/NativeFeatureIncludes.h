@@ -38,7 +38,6 @@
 // #define _RAKNET_SUPPORT_UDPProxyCoordinator 0
 // #define _RAKNET_SUPPORT_UDPProxyServer 0
 // #define _RAKNET_SUPPORT_ConsoleServer 0
-// #define _RAKNET_SUPPORT_RakNetTransport 0
 // #define _RAKNET_SUPPORT_TelnetTransport 0
 // #define _RAKNET_SUPPORT_TCPInterface 0
 // #define _RAKNET_SUPPORT_LogCommandParser 0
@@ -61,9 +60,6 @@
 #endif
 #ifndef _RAKNET_SUPPORT_FileListTransfer
 #define _RAKNET_SUPPORT_FileListTransfer 1
-#endif
-#ifndef _RAKNET_SUPPORT_FullyConnectedMesh
-#define _RAKNET_SUPPORT_FullyConnectedMesh 1
 #endif
 #ifndef _RAKNET_SUPPORT_FullyConnectedMesh2
 #define _RAKNET_SUPPORT_FullyConnectedMesh2 1
@@ -116,9 +112,6 @@
 #ifndef _RAKNET_SUPPORT_ConsoleServer
 #define _RAKNET_SUPPORT_ConsoleServer 1
 #endif
-#ifndef _RAKNET_SUPPORT_RakNetTransport
-#define _RAKNET_SUPPORT_RakNetTransport 1
-#endif
 #ifndef _RAKNET_SUPPORT_TelnetTransport
 #define _RAKNET_SUPPORT_TelnetTransport 1
 #endif
@@ -167,9 +160,6 @@
 #ifndef _RAKNET_SUPPORT_StatisticsHistory
 #define _RAKNET_SUPPORT_StatisticsHistory 1
 #endif
-#ifndef _RAKNET_SUPPORT_LibVoice
-#define _RAKNET_SUPPORT_LibVoice 0
-#endif
 #ifndef _RAKNET_SUPPORT_RelayPlugin
 #define _RAKNET_SUPPORT_RelayPlugin 1
 #endif
@@ -191,16 +181,5 @@
 #undef _RAKNET_SUPPORT_TCPInterface
 #define _RAKNET_SUPPORT_TCPInterface 1
 #endif
-
-
-
-
-
-
-
-
-
-
-
 
 #endif // __NATIVE_FEATURE_INCLDUES_H
