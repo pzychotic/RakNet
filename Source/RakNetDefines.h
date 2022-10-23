@@ -40,7 +40,7 @@
 // Use WaitForSingleObject instead of sleep.
 // Defining it plays nicer with other systems, and uses less CPU, but gives worse RakNet performance
 // Undefining it uses more CPU time, but is more responsive and faster.
-#ifndef _WIN32_WCE
+#ifndef USE_WAIT_FOR_MULTIPLE_EVENTS
 #define USE_WAIT_FOR_MULTIPLE_EVENTS
 #endif
 

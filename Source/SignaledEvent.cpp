@@ -35,12 +35,9 @@ SignaledEvent::~SignaledEvent()
 
 void SignaledEvent::InitEvent(void)
 {
-#if defined(WINDOWS_PHONE_8) || defined(WINDOWS_STORE_RT)
-		eventList=CreateEventEx(0, 0, 0, 0);
-#elif defined(_WIN32)
+#if defined(_WIN32)
 		eventList=CreateEvent(0, false, false, 0);
 #else
-
 #if !defined(ANDROID)
 		pthread_condattr_init( &condAttr );
 		pthread_cond_init(&eventList, &condAttr);

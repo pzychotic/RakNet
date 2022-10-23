@@ -13,7 +13,7 @@
 #ifndef RAKNETSOCKET2_WINDOWS_LINUX_CPP
 #define RAKNETSOCKET2_WINDOWS_LINUX_CPP
 
-#if !defined(WINDOWS_STORE_RT) && !defined(__native_client__)
+#if !defined(__native_client__)
 
 namespace RakNet {
 

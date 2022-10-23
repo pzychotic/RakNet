@@ -137,11 +137,7 @@ protected:
 
 	Packet* ReceiveInt( void );
 
-#if defined(WINDOWS_STORE_RT)
-	bool CreateListenSocket_WinStore8(unsigned short port, unsigned short maxIncomingConnections, unsigned short socketFamily, const char *hostAddress);
-#else
 	bool CreateListenSocket(unsigned short port, unsigned short maxIncomingConnections, unsigned short socketFamily, const char *hostAddress);
-#endif
 
 	// Plugins
 	DataStructures::List<PluginInterface2*> messageHandlerList;
@@ -221,9 +217,7 @@ struct RemoteClient
 		ssl=0;
 #endif
 		isActive=false;
-#if !defined(WINDOWS_STORE_RT)
 		socket=0;
-#endif
 	}
 	__TCPSOCKET__ socket;
 	SystemAddress systemAddress;

@@ -13,8 +13,8 @@
 #ifndef RAKNETSOCKET2_BERKLEY_NATIVE_CLIENT_CPP
 #define RAKNETSOCKET2_BERKLEY_NATIVE_CLIENT_CPP
 
-// Every platform except windows store 8 and native client supports Berkley sockets
-#if !defined(WINDOWS_STORE_RT)
+// Every platform except native client supports Berkley sockets
+#if !defined(__native_client__)
 
 namespace RakNet {
 
@@ -104,7 +104,7 @@ void DomainNameToIP_Berkley( const char *domainName, char ip[65] )
 
 } // namespace RakNet
 
-#endif // !defined(WINDOWS_STORE_RT) && !defined(__native_client__)
+#endif // !defined(__native_client__)
 
 #endif // file header
 

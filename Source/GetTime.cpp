@@ -75,7 +75,7 @@ RakNet::TimeMS RakNet::GetTimeMS( void )
 	return (RakNet::TimeMS)(GetTimeUS()/1000);
 }
 
-#if   defined(_WIN32)
+#if defined(_WIN32)
 RakNet::TimeUS GetTimeUS_Windows( void )
 {
 	if ( initialized == false)
@@ -83,7 +83,6 @@ RakNet::TimeUS GetTimeUS_Windows( void )
 		initialized = true;
 
 		// Save the current process
-#if !defined(_WIN32_WCE)
 //		HANDLE mProc = GetCurrentProcess();
 
 		// Get the current Affinity
@@ -93,8 +92,6 @@ RakNet::TimeUS GetTimeUS_Windows( void )
 //		GetProcessAffinityMask(mProc, &mProcMask, &mSysMask);
 #endif
 //		mThread = GetCurrentThread();
-
-#endif // _WIN32_WCE
 	}	
 
 	// 9/26/2010 In China running LuDaShi, QueryPerformanceFrequency has to be called every time because CPU clock speeds can be different

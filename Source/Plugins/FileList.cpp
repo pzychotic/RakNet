@@ -748,11 +748,7 @@ void FileList::DeleteFiles(const char *applicationDirectory)
 		strcat(fullPath, fileList[i].filename.C_String());
 	
 		// Do not rename to _unlink as linux uses unlink
-#if defined(WINDOWS_PHONE_8) || defined(WINDOWS_STORE_RT)
-		int result = _unlink(fullPath);
-#else
         int result = unlink(fullPath);
-#endif
 		if (result!=0)
 		{
 			RAKNET_DEBUG_PRINTF("FileList::DeleteFiles: unlink (%s) failed.\n", fullPath);

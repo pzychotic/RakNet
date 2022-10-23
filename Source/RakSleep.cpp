@@ -8,15 +8,8 @@
  *
  */
 
-#if   defined(_WIN32)
+#if defined(_WIN32)
 #include "WindowsIncludes.h" // Sleep
-
-
-
-
-
-
-
 #else
 #include <pthread.h>
 #include <time.h>
@@ -26,12 +19,6 @@ pthread_cond_t fakeCond = PTHREAD_COND_INITIALIZER;
 #endif
 
 #include "RakSleep.h"
-
-
-#if defined(WINDOWS_PHONE_8) || defined(WINDOWS_STORE_RT)
-#include "ThreadEmulation.h"
-using namespace ThreadEmulation;
-#endif
 
 namespace RakNet {
 

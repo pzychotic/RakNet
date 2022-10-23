@@ -13,7 +13,7 @@
 #ifndef RAKNETSOCKET2_WINDOWS_LINUX_360_CPP
 #define RAKNETSOCKET2_WINDOWS_LINUX_360_CPP
 
-#if (defined(_WIN32) || defined(__GNUC__)  || defined(__GCCXML__) || defined(__S3E__) ) && !defined(WINDOWS_STORE_RT) && !defined(__native_client__)
+#if (defined(_WIN32) || defined(__GNUC__)  || defined(__GCCXML__) || defined(__S3E__) ) && !defined(__native_client__)
 
 namespace RakNet {
 

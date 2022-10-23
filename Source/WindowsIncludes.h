@@ -10,10 +10,7 @@
 
 #pragma once
 
-#if   defined (WINDOWS_STORE_RT)
-#include <windows.h>
-#include <winsock.h>
-#elif defined (_WIN32)
+#if defined (_WIN32)
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>

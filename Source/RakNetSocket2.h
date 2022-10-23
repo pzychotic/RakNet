@@ -137,53 +137,8 @@ protected:
 	unsigned int userConnectionSocketIndex;
 };
 
-#if defined(WINDOWS_STORE_RT)
 
-ref class ListenerContext;
-
-// #include <collection.h>
-//#include <map>
-#include "DS_List.h"
-class RNS2_WindowsStore8 : public RakNetSocket2
-{
-public:
-	RNS2_WindowsStore8();
-	~RNS2_WindowsStore8();
-
-	virtual RNS2SendResult Send( RNS2_SendParameters *sendParameters, const char *file, unsigned int line );
-	RNS2BindResult Bind( Platform::String ^localServiceName );
-	// ----------- STATICS ------------
-	static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-	static void DomainNameToIP( const char *domainName, char ip[65] );
-
-	static int WinRTInet_Addr(const char * cp);
-
-	static int WinRTSetSockOpt(Windows::Networking::Sockets::DatagramSocket ^s,
-	   int level,
-	   int optname,
-	   const char * optval,
-	   socklen_t optlen);
-   
-	static int WinRTIOCTLSocket(Windows::Networking::Sockets::DatagramSocket ^s,
-		long cmd,
-		unsigned long *argp);
-	
-	static int WinRTGetSockName(Windows::Networking::Sockets::DatagramSocket ^s,
-		struct sockaddr *name,
-		socklen_t* namelen);
-
-	static RNS2_WindowsStore8 *GetRNS2FromDatagramSocket(Windows::Networking::Sockets::DatagramSocket^ s);
-protected:
-	static DataStructures::List<RNS2_WindowsStore8*> rns2List;
-	static SimpleMutex rns2ListMutex;
-
-	Windows::Networking::Sockets::DatagramSocket^ listener;
-	// Platform::Collections::Map<Windows::Storage::Streams::IOutputStream> ^outputStreamMap;
-	// Platform::Collections::Map<String^, int>^ m;
-	//std::map<> m;
-    ListenerContext^ listenerContext;
-};
-#elif defined(__native_client__)
+#if defined(__native_client__)
 struct NativeClientBindParameters
 {
 	_PP_Instance_ nativeClientInstance;
@@ -249,7 +204,7 @@ protected:
 	DataStructures::Queue<RNS2_SendParameters_NativeClient*> bufferedSends;
 	SimpleMutex bufferedSendsMutex;
 };
-#else // defined(WINDOWS_STORE_RT)
+#else // defined(__native_client__)
 
 class RAK_DLL_EXPORT SocketLayerOverride
 {
@@ -285,7 +240,7 @@ struct RNS2_BerkleyBindParameters
 	unsigned short remotePortRakNetWasStartedOn_PS3_PS4_PSP2;
 };
 
-// Every platform except Windows Store 8 can use the Berkley sockets interface
+// Every platform can use the Berkley sockets interface
 class IRNS2_Berkley : public RakNetSocket2
 {
 public:
@@ -349,21 +304,6 @@ protected:
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #if defined(_WIN32) || defined(__GNUC__)  || defined(__GCCXML__) || defined(__S3E__)
 class RNS2_Windows_Linux_360
 {
@@ -373,53 +313,7 @@ protected:
 };
 #endif
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#if   defined(_WIN32)
+#if defined(_WIN32)
 
 class RNS2_Windows : public RNS2_Berkley, public RNS2_Windows_Linux_360
 {
@@ -451,6 +345,6 @@ protected:
 
 #endif // Linux
 
-#endif // #elif !defined(WINDOWS_STORE_RT)
+#endif // !defined(__native_client__)
 
 } // namespace RakNet
