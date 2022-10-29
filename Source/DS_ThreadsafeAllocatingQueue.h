@@ -15,8 +15,9 @@
 #pragma once
 
 #include "DS_Queue.h"
-#include "SimpleMutex.h"
 #include "DS_MemoryPool.h"
+
+#include <mutex>
 
 // #if defined(new)
 // #pragma push_macro("new")
@@ -47,17 +48,16 @@ public:
 protected:
 
 	mutable MemoryPool<structureType> memoryPool;
-	SimpleMutex memoryPoolMutex;
+	std::mutex memoryPoolMutex;
 	Queue<structureType*> queue;
-	SimpleMutex queueMutex;
+	std::mutex queueMutex;
 };
 	
 template <class structureType>
 void ThreadsafeAllocatingQueue<structureType>::Push(structureType *s)
 {
-	queueMutex.Lock();
+	std::lock_guard<std::mutex> guard(queueMutex);
 	queue.Push(s, _FILE_AND_LINE_ );
-	queueMutex.Unlock();
 }
 
 template <class structureType>
@@ -66,27 +66,23 @@ structureType *ThreadsafeAllocatingQueue<structureType>::PopInaccurate(void)
 	structureType *s;
 	if (queue.IsEmpty())
 		return 0;
-	queueMutex.Lock();
+	std::lock_guard<std::mutex> guard(queueMutex);
 	if (queue.IsEmpty()==false)
 		s=queue.Pop();
 	else
 		s=0;
-	queueMutex.Unlock();	
 	return s;
 }
 
 template <class structureType>
 structureType *ThreadsafeAllocatingQueue<structureType>::Pop(void)
 {
-	structureType *s;
-	queueMutex.Lock();
+	std::lock_guard<std::mutex> guard(queueMutex);
 	if (queue.IsEmpty())
 	{
-		queueMutex.Unlock();	
 		return 0;
 	}
-	s=queue.Pop();
-	queueMutex.Unlock();	
+	structureType* s = queue.Pop();
 	return s;
 }
 
@@ -94,9 +90,9 @@ template <class structureType>
 structureType *ThreadsafeAllocatingQueue<structureType>::Allocate(const char *file, unsigned int line)
 {
 	structureType *s;
-	memoryPoolMutex.Lock();
+	memoryPoolMutex.lock();
 	s=memoryPool.Allocate(file, line);
-	memoryPoolMutex.Unlock();
+	memoryPoolMutex.unlock();
 	// Call new operator, memoryPool doesn't do this
 	s = new ((void*)s) structureType;
 	return s;
@@ -106,25 +102,25 @@ void ThreadsafeAllocatingQueue<structureType>::Deallocate(structureType *s, cons
 {
 	// Call delete operator, memory pool doesn't do this
 	s->~structureType();
-	memoryPoolMutex.Lock();
+	memoryPoolMutex.lock();
 	memoryPool.Release(s, file, line);
-	memoryPoolMutex.Unlock();
+	memoryPoolMutex.unlock();
 }
 
 template <class structureType>
 void ThreadsafeAllocatingQueue<structureType>::Clear(const char *file, unsigned int line)
 {
-	memoryPoolMutex.Lock();
+	memoryPoolMutex.lock();
 	for (unsigned int i=0; i < queue.Size(); i++)
 	{
 		queue[i]->~structureType();
 		memoryPool.Release(queue[i], file, line);
 	}
 	queue.Clear(file, line);
-	memoryPoolMutex.Unlock();
-	memoryPoolMutex.Lock();
+	memoryPoolMutex.unlock();
+	memoryPoolMutex.lock();
 	memoryPool.Clear(file, line);
-	memoryPoolMutex.Unlock();
+	memoryPoolMutex.unlock();
 }
 
 template <class structureType>
@@ -136,38 +132,31 @@ void ThreadsafeAllocatingQueue<structureType>::SetPageSize(int size)
 template <class structureType>
 bool ThreadsafeAllocatingQueue<structureType>::IsEmpty(void)
 {
-	bool isEmpty;
-	queueMutex.Lock();
-	isEmpty=queue.IsEmpty();
-	queueMutex.Unlock();
+	std::lock_guard<std::mutex> queueGuard(queueMutex);
+	bool isEmpty=queue.IsEmpty();
 	return isEmpty;
 }
 
 template <class structureType>
 structureType * ThreadsafeAllocatingQueue<structureType>::operator[] ( unsigned int position )
 {
-	structureType *s;
-	queueMutex.Lock();
-	s=queue[position];
-	queueMutex.Unlock();
+	std::lock_guard<std::mutex> queueGuard(queueMutex);
+	structureType* s = queue[position];
 	return s;
 }
 
 template <class structureType>
 void ThreadsafeAllocatingQueue<structureType>::RemoveAtIndex( unsigned int position )
 {
-	queueMutex.Lock();
+	std::lock_guard<std::mutex> queueGuard(queueMutex);
 	queue.RemoveAtIndex(position);
-	queueMutex.Unlock();
 }
 
 template <class structureType>
 unsigned int ThreadsafeAllocatingQueue<structureType>::Size( void )
 {
-	unsigned int s;
-	queueMutex.Lock();
-	s=queue.Size();
-	queueMutex.Unlock();
+	std::lock_guard<std::mutex> queueGuard(queueMutex);
+	unsigned int s = queue.Size();
 	return s;
 }
 

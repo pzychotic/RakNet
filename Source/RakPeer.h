@@ -21,7 +21,6 @@
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 //#include "SingleProducerConsumer.h"
-#include "SimpleMutex.h"
 #include "DS_List.h"
 #include "Export.h"
 #include "RakString.h"
@@ -31,6 +30,8 @@
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
 #include "DS_Queue.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -801,7 +802,7 @@ protected:
 		offlinePingResponse_Mutex,
 		NUMBER_OF_RAKPEER_MUTEXES
 	};
-	SimpleMutex rakPeerMutexes[ NUMBER_OF_RAKPEER_MUTEXES ];
+	std::mutex rakPeerMutexes[ NUMBER_OF_RAKPEER_MUTEXES ];
 	///RunUpdateCycle is not thread safe but we don't need to mutex calls. Just skip calls if it is running already
 
 	bool updateCycleIsRunning;
@@ -814,7 +815,7 @@ protected:
 	// bool isSocketLayerBlocking;
 	// bool continualPing,isRecvfromThreadActive,isMainLoopThreadActive, endThreads, isSocketLayerBlocking;
 	unsigned int validationInteger;
-	SimpleMutex incomingQueueMutex, banListMutex; //,synchronizedMemoryQueueMutex, automaticVariableSynchronizationMutex;
+	std::mutex banListMutex;
 	//DataStructures::Queue<Packet *> incomingpacketSingleProducerConsumer; //, synchronizedMemorypacketSingleProducerConsumer;
 	// BitStream enumerationData;
 
@@ -861,8 +862,8 @@ protected:
 
 	DataStructures::Queue<RequestedConnectionStruct*> requestedConnectionQueue;
 	DataStructures::Queue<SystemAddress> requestedConnectionCancelQueue;
-	SimpleMutex requestedConnectionQueueMutex;
-	SimpleMutex requestedConnectionCancelQueueMutex;
+	std::mutex requestedConnectionQueueMutex;
+	std::mutex requestedConnectionCancelQueueMutex;
 
 	// void RunMutexedUpdateCycle(void);
 
@@ -897,9 +898,9 @@ protected:
 	// DataStructures::ThreadsafeAllocatingQueue<RNS2RecvStruct> bufferedPackets;
 
 	DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsFreePool;
-	SimpleMutex bufferedPacketsFreePoolMutex;
+	std::mutex bufferedPacketsFreePoolMutex;
 	DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsQueue;
-	SimpleMutex bufferedPacketsQueueMutex;
+	std::mutex bufferedPacketsQueueMutex;
 
 	virtual void DeallocRNS2RecvStruct(RNS2RecvStruct *s, const char *file, unsigned int line);
 	virtual RNS2RecvStruct *AllocRNS2RecvStruct(const char *file, unsigned int line);
@@ -933,7 +934,7 @@ protected:
 	void AddPacketToProducer(Packet *p);
 	unsigned int GenerateSeedFromGuid(void);
 	RakNet::Time GetClockDifferentialInt(RemoteSystemStruct *remoteSystem) const;
-	SimpleMutex securityExceptionMutex;
+	std::mutex securityExceptionMutex;
 
 	//DataStructures::AVLBalancedBinarySearchTree<RPCNode> rpcTree;
 	int defaultMTUSize;
@@ -988,10 +989,10 @@ protected:
 	SignaledEvent quitAndDataEvents;
 	bool limitConnectionFrequencyFromTheSameIP;
 
-	SimpleMutex packetAllocationPoolMutex;
+	std::mutex packetAllocationPoolMutex;
 	DataStructures::MemoryPool<Packet> packetAllocationPool;
 
-	SimpleMutex packetReturnMutex;
+	std::mutex packetReturnMutex;
 	DataStructures::Queue<Packet*> packetReturnQueue;
 	Packet *AllocPacket(unsigned dataSize, const char *file, unsigned int line);
 	Packet *AllocPacket(unsigned dataSize, unsigned char *data, const char *file, unsigned int line);
@@ -999,7 +1000,7 @@ protected:
 	/// This is used to return a number to the user when they call Send identifying the message
 	/// This number will be returned back with ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS and is only returned
 	/// with the reliability types that contain RECEIPT in the name
-	SimpleMutex sendReceiptSerialMutex;
+	std::mutex sendReceiptSerialMutex;
 	uint32_t sendReceiptSerial;
 	void ResetSendReceipt(void);
 	void OnConnectedPong(RakNet::Time sendPingTime, RakNet::Time sendPongTime, RemoteSystemStruct *remoteSystem);

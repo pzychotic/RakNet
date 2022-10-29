@@ -26,8 +26,9 @@
 #include "PacketPriority.h"
 #include "RakMemoryOverride.h"
 #include "DS_Queue.h"
-#include "SimpleMutex.h"
 #include "ThreadPool.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -149,7 +150,7 @@ protected:
 	struct FileToPushRecipient
 	{
 		unsigned int refCount;
-		SimpleMutex refCountMutex;
+		std::mutex refCountMutex;
 		void DeleteThis(void);
 		void AddRef(void);
 		void Deref(void);
@@ -157,11 +158,11 @@ protected:
 		SystemAddress systemAddress;
 		unsigned short setId;
 
-		//// SimpleMutex filesToPushMutex;
+		//std::mutex filesToPushMutex;
 		DataStructures::Queue<FileToPush*> filesToPush;
 	};
 	DataStructures::List< FileToPushRecipient* > fileToPushRecipientList;
-	SimpleMutex fileToPushRecipientListMutex;
+	std::mutex fileToPushRecipientListMutex;
 	void RemoveFromList(FileToPushRecipient *ftpr);
 
 	struct ThreadData

@@ -21,8 +21,9 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "PluginInterface2.h"
-#include "SimpleMutex.h"
 #include "SocketIncludes.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -71,7 +72,7 @@ struct Packet;
 		virtual RNS2RecvStruct *AllocRNS2RecvStruct(const char *file, unsigned int line);
 	protected:
 		DataStructures::Queue<RNS2RecvStruct*> bufferedPackets;
-		SimpleMutex bufferedPacketsMutex;
+		std::mutex bufferedPacketsMutex;
 		
 		RakNetSocket2* c2;
 		//unsigned short c2Port;

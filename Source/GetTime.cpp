@@ -29,7 +29,7 @@ RakNet::TimeUS initialTime;
 #endif
 
 #if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
-#include "SimpleMutex.h"
+#include <mutex>
 #endif
 
 namespace RakNet {
@@ -45,9 +45,9 @@ RakNet::TimeUS lastNormalizedInputValue=0;
 RakNet::TimeUS NormalizeTime(RakNet::TimeUS timeIn)
 {
 	RakNet::TimeUS diff, lastNormalizedReturnedValueCopy;
-	static SimpleMutex mutex;
+	static std::mutex mutex;
+	std::lock_guard<std::mutex> guard(mutex);
 	
-	mutex.Lock();
 	if (timeIn>=lastNormalizedInputValue)
 	{
 		diff = timeIn-lastNormalizedInputValue;
@@ -61,7 +61,6 @@ RakNet::TimeUS NormalizeTime(RakNet::TimeUS timeIn)
 
 	lastNormalizedInputValue=timeIn;
 	lastNormalizedReturnedValueCopy=lastNormalizedReturnedValue;
-	mutex.Unlock();
 
 	return lastNormalizedReturnedValueCopy;
 }

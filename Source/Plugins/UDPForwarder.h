@@ -20,7 +20,6 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
-#include "SimpleMutex.h"
 #include "RakString.h"
 #include "RakThread.h"
 #include "DS_Queue.h"
@@ -29,6 +28,7 @@
 #include "Plugins/UDPProxyCommon.h"
 
 #include <atomic>
+#include <mutex>
 
 namespace RakNet {
 
@@ -130,7 +130,7 @@ protected:
 		unsigned int inputId;
 	};
 	DataStructures::Queue<StartForwardingOutputStruct> startForwardingOutput;
-	SimpleMutex startForwardingOutputMutex;
+	std::mutex startForwardingOutputMutex;
 
 	struct StopForwardingStruct
 	{
@@ -142,7 +142,6 @@ protected:
 
 	// New entries are added to forwardListNotUpdated
 	DataStructures::List<ForwardEntry*> forwardListNotUpdated;
-//	SimpleMutex forwardListNotUpdatedMutex;
 
 	unsigned short maxForwardEntries;
 	std::atomic<uint32_t> isRunning, threadRunning;

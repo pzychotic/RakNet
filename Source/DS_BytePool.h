@@ -16,7 +16,8 @@
 #include "RakMemoryOverride.h"
 #include "DS_MemoryPool.h"
 #include "Export.h"
-#include "SimpleMutex.h"
+
+#include <mutex>
 
 // #define _DISABLE_BYTE_POOL
 // #define _THREADSAFE_BYTE_POOL
@@ -40,10 +41,10 @@ namespace RakNet { namespace DataStructures {
 		MemoryPool<unsigned char[2048]> pool2048;
 		MemoryPool<unsigned char[8192]> pool8192;
 #ifdef _THREADSAFE_BYTE_POOL
-		SimpleMutex mutex128;
-		SimpleMutex mutex512;
-		SimpleMutex mutex2048;
-		SimpleMutex mutex8192;
+		std::mutex mutex128;
+		std::mutex mutex512;
+		std::mutex mutex2048;
+		std::mutex mutex8192;
 #endif
 	};
 

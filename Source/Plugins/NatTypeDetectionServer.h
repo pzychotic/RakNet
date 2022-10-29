@@ -21,9 +21,10 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "PluginInterface2.h"
-#include "SimpleMutex.h"
 #include "SocketIncludes.h"
 #include "DS_List.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -113,7 +114,7 @@ public:
 	virtual RNS2RecvStruct *AllocRNS2RecvStruct(const char *file, unsigned int line);
 protected:
 	DataStructures::Queue<RNS2RecvStruct*> bufferedPackets;
-	SimpleMutex bufferedPacketsMutex;
+	std::mutex bufferedPacketsMutex;
 
 	void OnDetectionRequest(Packet *packet);
 	DataStructures::List<NATDetectionAttempt> natDetectionAttempts;

@@ -235,12 +235,12 @@ void TCPInterface::Stop(void)
 	}
 
 	// Abort waiting connect calls
-	blockingSocketListMutex.Lock();
+	blockingSocketListMutex.lock();
 	for (i=0; i < blockingSocketList.Size(); i++)
 	{
 		closesocket__(blockingSocketList[i]);
 	}
-	blockingSocketListMutex.Unlock();
+	blockingSocketListMutex.unlock();
 
 	// Wait for the thread to stop
 	while ( threadRunning > 0 )
@@ -297,14 +297,12 @@ SystemAddress TCPInterface::Connect(const char* host, unsigned short remotePort,
 	int newRemoteClientIndex=-1;
 	for (newRemoteClientIndex=0; newRemoteClientIndex < remoteClientsLength; newRemoteClientIndex++)
 	{
-		remoteClients[newRemoteClientIndex].isActiveMutex.Lock();
+		std::lock_guard<std::mutex> guard(remoteClients[newRemoteClientIndex].isActiveMutex);
 		if (remoteClients[newRemoteClientIndex].isActive==false)
 		{
 			remoteClients[newRemoteClientIndex].SetActive(true);
-			remoteClients[newRemoteClientIndex].isActiveMutex.Unlock();
 			break;
 		}
-		remoteClients[newRemoteClientIndex].isActiveMutex.Unlock();
 	}
 	if (newRemoteClientIndex==-1)
 		return UNASSIGNED_SYSTEM_ADDRESS;
@@ -321,13 +319,13 @@ SystemAddress TCPInterface::Connect(const char* host, unsigned short remotePort,
 		__TCPSOCKET__ sockfd = SocketConnect(buffout, remotePort, socketFamily, bindAddress);
 		if (sockfd==0)
 		{
-			remoteClients[newRemoteClientIndex].isActiveMutex.Lock();
+			remoteClients[newRemoteClientIndex].isActiveMutex.lock();
 			remoteClients[newRemoteClientIndex].SetActive(false);
-			remoteClients[newRemoteClientIndex].isActiveMutex.Unlock();
+			remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
 
-			failedConnectionAttemptMutex.Lock();
+			failedConnectionAttemptMutex.lock();
 			failedConnectionAttempts.Push(systemAddress, _FILE_AND_LINE_ );
-			failedConnectionAttemptMutex.Unlock();
+			failedConnectionAttemptMutex.unlock();
 
 			return UNASSIGNED_SYSTEM_ADDRESS;
 		}
@@ -335,9 +333,9 @@ SystemAddress TCPInterface::Connect(const char* host, unsigned short remotePort,
 		remoteClients[newRemoteClientIndex].socket=sockfd;
 		remoteClients[newRemoteClientIndex].systemAddress=systemAddress;
 
-		completedConnectionAttemptMutex.Lock();
+		completedConnectionAttemptMutex.lock();
 		completedConnectionAttempts.Push(remoteClients[newRemoteClientIndex].systemAddress, _FILE_AND_LINE_ );
-		completedConnectionAttemptMutex.Unlock();
+		completedConnectionAttemptMutex.unlock();
 
 		return remoteClients[newRemoteClientIndex].systemAddress;
 	}
@@ -374,13 +372,12 @@ void TCPInterface::StartSSLClient(SystemAddress systemAddress)
 {
 	if (ctx==0)
 	{
-		sharedSslMutex.Lock();
+		std::lock_guard<std::mutex> guard(sharedSslMutex);
 		SSLeay_add_ssl_algorithms();
 		meth = (SSL_METHOD*) SSLv23_client_method();
 		SSL_load_error_strings();
 		ctx = SSL_CTX_new (meth);
 		RakAssert(ctx!=0);
-		sharedSslMutex.Unlock();
 	}
 
 	SystemAddress *id = startSSL.Allocate( _FILE_AND_LINE_ );
@@ -539,22 +536,19 @@ void TCPInterface::CloseConnection( SystemAddress systemAddress )
 
 	if (systemAddress.systemIndex<remoteClientsLength && remoteClients[systemAddress.systemIndex].systemAddress==systemAddress)
 	{
-		remoteClients[systemAddress.systemIndex].isActiveMutex.Lock();
+		std::lock_guard<std::mutex> guard(remoteClients[systemAddress.systemIndex].isActiveMutex);
 		remoteClients[systemAddress.systemIndex].SetActive(false);
-		remoteClients[systemAddress.systemIndex].isActiveMutex.Unlock();
 	}
 	else
 	{
 		for (int i=0; i < remoteClientsLength; i++)
 		{
-			remoteClients[i].isActiveMutex.Lock();
+			std::lock_guard<std::mutex> guard(remoteClients[i].isActiveMutex);
 			if (remoteClients[i].isActive && remoteClients[i].systemAddress==systemAddress)
 			{
 				remoteClients[systemAddress.systemIndex].SetActive(false);
-				remoteClients[i].isActiveMutex.Unlock();
 				break;
 			}
-			remoteClients[i].isActiveMutex.Unlock();
 		}
 	}
 
@@ -607,10 +601,10 @@ bool TCPInterface::WasStarted(void) const
 SystemAddress TCPInterface::HasCompletedConnectionAttempt(void)
 {
 	SystemAddress sysAddr=UNASSIGNED_SYSTEM_ADDRESS;
-	completedConnectionAttemptMutex.Lock();
+	completedConnectionAttemptMutex.lock();
 	if (completedConnectionAttempts.IsEmpty()==false)
 		sysAddr=completedConnectionAttempts.Pop();
-	completedConnectionAttemptMutex.Unlock();
+	completedConnectionAttemptMutex.unlock();
 
 	if (sysAddr!=UNASSIGNED_SYSTEM_ADDRESS)
 	{
@@ -624,10 +618,10 @@ SystemAddress TCPInterface::HasCompletedConnectionAttempt(void)
 SystemAddress TCPInterface::HasFailedConnectionAttempt(void)
 {
 	SystemAddress sysAddr=UNASSIGNED_SYSTEM_ADDRESS;
-	failedConnectionAttemptMutex.Lock();
+	failedConnectionAttemptMutex.lock();
 	if (failedConnectionAttempts.IsEmpty()==false)
 		sysAddr=failedConnectionAttempts.Pop();
-	failedConnectionAttemptMutex.Unlock();
+	failedConnectionAttemptMutex.unlock();
 
 	if (sysAddr!=UNASSIGNED_SYSTEM_ADDRESS)
 	{
@@ -718,9 +712,8 @@ unsigned int TCPInterface::GetOutgoingDataBufferSize(SystemAddress systemAddress
 		remoteClients[systemAddress.systemIndex].isActive &&
 		remoteClients[systemAddress.systemIndex].systemAddress==systemAddress)
 	{
-		remoteClients[systemAddress.systemIndex].outgoingDataMutex.Lock();
+		std::lock_guard<std::mutex> guard(remoteClients[systemAddress.systemIndex].outgoingDataMutex);
 		bytesWritten=remoteClients[systemAddress.systemIndex].outgoingData.GetBytesWritten();
-		remoteClients[systemAddress.systemIndex].outgoingDataMutex.Unlock();
 		return bytesWritten;
 	}
 
@@ -728,9 +721,8 @@ unsigned int TCPInterface::GetOutgoingDataBufferSize(SystemAddress systemAddress
 	{
 		if (remoteClients[i].isActive && remoteClients[i].systemAddress==systemAddress)
 		{
-			remoteClients[i].outgoingDataMutex.Lock();
+			std::lock_guard<std::mutex> guard(remoteClients[i].outgoingDataMutex);
 			bytesWritten+=remoteClients[i].outgoingData.GetBytesWritten();
-			remoteClients[i].outgoingDataMutex.Unlock();
 		}
 	}
 	return bytesWritten;
@@ -773,9 +765,9 @@ __TCPSOCKET__ TCPInterface::SocketConnect(const char* host, unsigned short remot
 
 	memcpy((char *)&serverAddress.sin_addr.s_addr, (char *)server->h_addr, server->h_length);
 
-	blockingSocketListMutex.Lock();
+	blockingSocketListMutex.lock();
 	blockingSocketList.Insert(sockfd, _FILE_AND_LINE_);
-	blockingSocketListMutex.Unlock();
+	blockingSocketListMutex.unlock();
 
 	// This is blocking
 	connectResult = connect__( sockfd, ( struct sockaddr * ) &serverAddress, sizeof( struct sockaddr ) );
@@ -792,9 +784,9 @@ __TCPSOCKET__ TCPInterface::SocketConnect(const char* host, unsigned short remot
 	Itoa(remotePort,portStr,10);
 	getaddrinfo(host, portStr, &hints, &res);
 	sockfd = socket__(res->ai_family, res->ai_socktype, res->ai_protocol);
-	blockingSocketListMutex.Lock();
+	blockingSocketListMutex.lock();
 	blockingSocketList.Insert(sockfd, _FILE_AND_LINE_);
-	blockingSocketListMutex.Unlock();
+	blockingSocketListMutex.unlock();
 	connectResult=connect__(sockfd, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res); // free the linked-list
 
@@ -803,11 +795,11 @@ __TCPSOCKET__ TCPInterface::SocketConnect(const char* host, unsigned short remot
 	if (connectResult==-1)
 	{
 		unsigned sockfdIndex;
-		blockingSocketListMutex.Lock();
+		blockingSocketListMutex.lock();
 		sockfdIndex=blockingSocketList.GetIndexOf(sockfd);
 		if (sockfdIndex!=(unsigned)-1)
 			blockingSocketList.RemoveAtIndexFast(sockfdIndex);
-		blockingSocketListMutex.Unlock();
+		blockingSocketListMutex.unlock();
 
 		closesocket__(sockfd);
 		return 0;
@@ -837,13 +829,13 @@ RAK_THREAD_DECLARATION(ConnectionAttemptLoop)
 	__TCPSOCKET__ sockfd = tcpInterface->SocketConnect(str1, systemAddress.GetPort(), socketFamily, s->bindAddress);
 	if (sockfd==0)
 	{
-		tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.Lock();
+		tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.lock();
 		tcpInterface->remoteClients[newRemoteClientIndex].SetActive(false);
-		tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.Unlock();
+		tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
 
-		tcpInterface->failedConnectionAttemptMutex.Lock();
+		tcpInterface->failedConnectionAttemptMutex.lock();
 		tcpInterface->failedConnectionAttempts.Push(systemAddress, _FILE_AND_LINE_ );
-		tcpInterface->failedConnectionAttemptMutex.Unlock();
+		tcpInterface->failedConnectionAttemptMutex.unlock();
 		return 0;
 	}
 
@@ -853,13 +845,9 @@ RAK_THREAD_DECLARATION(ConnectionAttemptLoop)
 	// Notify user that the connection attempt has completed.
 	if (tcpInterface->threadRunning > 0)
 	{
-		tcpInterface->completedConnectionAttemptMutex.Lock();
+		std::lock_guard<std::mutex> guard(tcpInterface->completedConnectionAttemptMutex);
 		tcpInterface->completedConnectionAttempts.Push(systemAddress, _FILE_AND_LINE_ );
-		tcpInterface->completedConnectionAttemptMutex.Unlock();
 	}	
-
-
-
 
 	return 0;
 
@@ -867,11 +855,7 @@ RAK_THREAD_DECLARATION(ConnectionAttemptLoop)
 
 RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 {
-
-
-
 	TCPInterface * sts = ( TCPInterface * ) arguments;
-
 
 //	const int BUFF_SIZE=8096;
 	const unsigned int BUFF_SIZE=1048576;
@@ -916,13 +900,12 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 			{
 				for (int i=0; i < sts->remoteClientsLength; i++)
 				{
-					sts->remoteClients[i].isActiveMutex.Lock();
+					std::lock_guard<std::mutex> guard(sts->remoteClients[i].isActiveMutex);
 					if (sts->remoteClients[i].isActive && sts->remoteClients[i].systemAddress==*sslSystemAddress)
 					{
 						if (sts->remoteClients[i].ssl==0)
 							sts->remoteClients[i].InitSSL(sts->ctx,sts->meth);
 					}
-					sts->remoteClients[i].isActiveMutex.Unlock();
 				}
 			}
 			sts->startSSL.Deallocate(sslSystemAddress,_FILE_AND_LINE_);
@@ -955,7 +938,7 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 			unsigned i;
 			for (i=0; i < (unsigned int) sts->remoteClientsLength; i++)
 			{
-				sts->remoteClients[i].isActiveMutex.Lock();
+				std::lock_guard<std::mutex> guard(sts->remoteClients[i].isActiveMutex);
 				if (sts->remoteClients[i].isActive)
 				{
 					// calling FD_ISSET with -1 as socket (that's what 0 is set to) produces a bus error under Linux 64-Bit
@@ -970,13 +953,9 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 							largestDescriptor = socketCopy;
 					}
 				}
-				sts->remoteClients[i].isActiveMutex.Unlock();
 			}
 
 			selectResult=(int) select__(largestDescriptor+1, &readFD, &writeFD, &exceptionFD, &tv);		
-
-
-
 
 			if (selectResult<=0)
 				break;
@@ -990,7 +969,7 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 					int newRemoteClientIndex=-1;
 					for (newRemoteClientIndex=0; newRemoteClientIndex < sts->remoteClientsLength; newRemoteClientIndex++)
 					{
-						sts->remoteClients[newRemoteClientIndex].isActiveMutex.Lock();
+						sts->remoteClients[newRemoteClientIndex].isActiveMutex.lock();
 						if (sts->remoteClients[newRemoteClientIndex].isActive==false)
 						{
 							sts->remoteClients[newRemoteClientIndex].socket=newSock;
@@ -1013,7 +992,7 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 							sts->remoteClients[newRemoteClientIndex].SetActive(true);
-							sts->remoteClients[newRemoteClientIndex].isActiveMutex.Unlock();
+							sts->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
 
 
 							SystemAddress *newConnectionSystemAddress=sts->newIncomingConnections.Allocate( _FILE_AND_LINE_ );
@@ -1022,7 +1001,7 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 
 							break;
 						}
-						sts->remoteClients[newRemoteClientIndex].isActiveMutex.Unlock();
+						sts->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
 					}
 					if (newRemoteClientIndex==-1)
 					{
@@ -1081,9 +1060,8 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 						SystemAddress *lostConnectionSystemAddress=sts->lostConnections.Allocate( _FILE_AND_LINE_ );
 						*lostConnectionSystemAddress=sts->remoteClients[i].systemAddress;
 						sts->lostConnections.Push(lostConnectionSystemAddress);
-						sts->remoteClients[i].isActiveMutex.Lock();
+						std::lock_guard<std::mutex> guard(sts->remoteClients[i].isActiveMutex);
 						sts->remoteClients[i].SetActive(false);
-						sts->remoteClients[i].isActiveMutex.Unlock();
 					}
 					else
 					{
@@ -1126,9 +1104,8 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 								SystemAddress *lostConnectionSystemAddress=sts->lostConnections.Allocate( _FILE_AND_LINE_ );
 								*lostConnectionSystemAddress=sts->remoteClients[i].systemAddress;
 								sts->lostConnections.Push(lostConnectionSystemAddress);
-								sts->remoteClients[i].isActiveMutex.Lock();
+								std::lock_guard<std::mutex> guard(sts->remoteClients[i].isActiveMutex);
 								sts->remoteClients[i].SetActive(false);
-								sts->remoteClients[i].isActiveMutex.Unlock();
 								continue;
 							}
 						}
@@ -1138,7 +1115,7 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 							unsigned int bytesInBuffer;
 							int bytesAvailable;
 							int bytesSent;
-							rc->outgoingDataMutex.Lock();
+							std::lock_guard<std::mutex> guard(rc->outgoingDataMutex);
 							bytesInBuffer=rc->outgoingData.GetBytesWritten();
 							if (bytesInBuffer>0)
 							{
@@ -1162,7 +1139,6 @@ RAK_THREAD_DECLARATION(UpdateTCPInterfaceLoop)
 									rc->outgoingData.IncrementReadOffset(bytesSent);
 								bytesInBuffer=rc->outgoingData.GetBytesWritten();
 							}
-							rc->outgoingDataMutex.Unlock();
 						}
 							
 						i++; // Nothing deleted so increment the index
@@ -1206,23 +1182,23 @@ void RemoteClient::SendOrBuffer(const char **data, const unsigned int *lengths, 
 	parameterIndex=0;
 	for (; parameterIndex < numParameters; parameterIndex++)
 	{
-		outgoingDataMutex.Lock();
+		outgoingDataMutex.lock();
 		if (ALLOW_SEND_FROM_USER_THREAD && outgoingData.GetBytesWritten()==0)
 		{
-			outgoingDataMutex.Unlock();
+			outgoingDataMutex.unlock();
 			int bytesSent = Send(data[parameterIndex],lengths[parameterIndex]);
 			if (bytesSent<(int) lengths[parameterIndex])
 			{
 				// Push remainder
-				outgoingDataMutex.Lock();
+				outgoingDataMutex.lock();
 				outgoingData.WriteBytes(data[parameterIndex]+bytesSent,lengths[parameterIndex]-bytesSent,_FILE_AND_LINE_);
-				outgoingDataMutex.Unlock();
+				outgoingDataMutex.unlock();
 			}
 		}
 		else
 		{
 			outgoingData.WriteBytes(data[parameterIndex],lengths[parameterIndex],_FILE_AND_LINE_);
-			outgoingDataMutex.Unlock();
+			outgoingDataMutex.unlock();
 		}
 	}
 }

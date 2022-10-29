@@ -12,7 +12,6 @@
 
 #include "RakMemoryOverride.h"
 #include "DS_Queue.h"
-#include "SimpleMutex.h"
 #include "Export.h"
 #include "RakThread.h"
 #include "SignaledEvent.h"
@@ -22,6 +21,8 @@
 #else
 #include <unistd.h>
 #endif
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -153,7 +154,7 @@ struct RAK_DLL_EXPORT ThreadPool
 protected:
 	// It is valid to cancel input before it is processed.  To do so, lock the inputQueue with inputQueueMutex,
 	// Scan the list, and remove the item you don't want.
-	SimpleMutex inputQueueMutex, outputQueueMutex, workingThreadCountMutex, runThreadsMutex;
+	std::mutex inputQueueMutex, outputQueueMutex, workingThreadCountMutex, runThreadsMutex;
 
 	void* (*perThreadDataFactory)();
 	void (*perThreadDataDestructor)(void*);
@@ -186,7 +187,7 @@ protected:
 	/// \internal
 	int numThreadsWorking;
 	/// \internal
-	SimpleMutex numThreadsRunningMutex;
+	std::mutex numThreadsRunningMutex;
 
 	SignaledEvent quitAndIncomingDataEvents;
 
@@ -224,9 +225,9 @@ void* WorkerThread( void* arguments )
 		perThreadData=0;
 
 	// Increase numThreadsRunning
-	threadPool->numThreadsRunningMutex.Lock();
+	threadPool->numThreadsRunningMutex.lock();
 	++threadPool->numThreadsRunning;
-	threadPool->numThreadsRunningMutex.Unlock();
+	threadPool->numThreadsRunningMutex.unlock();
 
 	while (1)
 	{
@@ -240,48 +241,46 @@ void* WorkerThread( void* arguments )
 // 			RakSleep(30);
 // #endif
 
-		threadPool->runThreadsMutex.Lock();
+		threadPool->runThreadsMutex.lock();
 		if (threadPool->runThreads==false)
 		{
-			threadPool->runThreadsMutex.Unlock();
+			threadPool->runThreadsMutex.unlock();
 			break;
 		}
-		threadPool->runThreadsMutex.Unlock();
+		threadPool->runThreadsMutex.unlock();
 
-		threadPool->workingThreadCountMutex.Lock();
+		threadPool->workingThreadCountMutex.lock();
 		++threadPool->numThreadsWorking;
-		threadPool->workingThreadCountMutex.Unlock();
+		threadPool->workingThreadCountMutex.unlock();
 
 		// Read input data
 		userCallback=0;
-		threadPool->inputQueueMutex.Lock();
+		threadPool->inputQueueMutex.lock();
 		if (threadPool->inputFunctionQueue.Size())
 		{
 			userCallback=threadPool->inputFunctionQueue.Pop();
 			inputData=threadPool->inputQueue.Pop();
 		}
-		threadPool->inputQueueMutex.Unlock();
+		threadPool->inputQueueMutex.unlock();
 
 		if (userCallback)
 		{
 			callbackOutput=userCallback(inputData, &returnOutput,perThreadData);
 			if (returnOutput)
 			{
-				threadPool->outputQueueMutex.Lock();
+				std::lock_guard<std::mutex> guard(threadPool->outputQueueMutex);
 				threadPool->outputQueue.Push(callbackOutput, _FILE_AND_LINE_ );
-				threadPool->outputQueueMutex.Unlock();
 			}			
 		}
 
-		threadPool->workingThreadCountMutex.Lock();
+		std::lock_guard<std::mutex> guard(threadPool->workingThreadCountMutex);
 		--threadPool->numThreadsWorking;
-		threadPool->workingThreadCountMutex.Unlock();
 	}
 
 	// Decrease numThreadsRunning
-	threadPool->numThreadsRunningMutex.Lock();
+	threadPool->numThreadsRunningMutex.lock();
 	--threadPool->numThreadsRunning;
-	threadPool->numThreadsRunningMutex.Unlock();
+	threadPool->numThreadsRunningMutex.unlock();
 	
 	if (threadPool->perThreadDataDestructor)
 		threadPool->perThreadDataDestructor(perThreadData);
@@ -315,23 +314,23 @@ bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSi
 // 	runtime = RakThread::AllocRuntime(numThreads);
 // #endif
 
-	runThreadsMutex.Lock();
+	runThreadsMutex.lock();
 	if (runThreads==true)
 	{
 		// Already running
-		runThreadsMutex.Unlock();
+		runThreadsMutex.unlock();
 		return false;
 	}
-	runThreadsMutex.Unlock();
+	runThreadsMutex.unlock();
 
 	quitAndIncomingDataEvents.InitEvent();
 
 	perThreadDataFactory=_perThreadDataFactory;
 	perThreadDataDestructor=_perThreadDataDestructor;
 
-	runThreadsMutex.Lock();
+	runThreadsMutex.lock();
 	runThreads=true;
-	runThreadsMutex.Unlock();
+	runThreadsMutex.unlock();
 
 	numThreadsWorking=0;
 	unsigned threadId = 0;
@@ -357,10 +356,9 @@ bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSi
 	while (done==false)
 	{
 		RakSleep(50);
-		numThreadsRunningMutex.Lock();
+		std::lock_guard<std::mutex> guard(numThreadsRunningMutex);
 		if (numThreadsRunning==numThreads)
 			done=true;
-		numThreadsRunningMutex.Unlock();
 	}
 
 	return true;
@@ -374,15 +372,15 @@ void ThreadPool<InputType, OutputType>::SetThreadDataInterface(ThreadDataInterfa
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::StopThreads(void)
 {
-	runThreadsMutex.Lock();
+	runThreadsMutex.lock();
 	if (runThreads==false)
 	{
-		runThreadsMutex.Unlock();
+		runThreadsMutex.unlock();
 		return;
 	}
 
 	runThreads=false;
-	runThreadsMutex.Unlock();
+	runThreadsMutex.unlock();
 
 	// Wait for number of threads running to decrease to 0
 	bool done=false;
@@ -391,10 +389,9 @@ void ThreadPool<InputType, OutputType>::StopThreads(void)
 		quitAndIncomingDataEvents.SetEvent();
 
 		RakSleep(50);
-		numThreadsRunningMutex.Lock();
+		std::lock_guard<std::mutex> guard(numThreadsRunningMutex);
 		if (numThreadsRunning==0)
 			done=true;
-		numThreadsRunningMutex.Unlock();
 	}
 
 	quitAndIncomingDataEvents.CloseEvent();
@@ -408,19 +405,18 @@ void ThreadPool<InputType, OutputType>::StopThreads(void)
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::AddInput(OutputType (*workerThreadCallback)(InputType, bool *returnOutput, void* perThreadData), InputType inputData)
 {
-	inputQueueMutex.Lock();
+	inputQueueMutex.lock();
 	inputQueue.Push(inputData, _FILE_AND_LINE_ );
 	inputFunctionQueue.Push(workerThreadCallback, _FILE_AND_LINE_ );
-	inputQueueMutex.Unlock();
+	inputQueueMutex.unlock();
 
 	quitAndIncomingDataEvents.SetEvent();
 }
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::AddOutput(OutputType outputData)
 {
-	outputQueueMutex.Lock();
+	std::lock_guard<std::mutex> guard(outputQueueMutex);
 	outputQueue.Push(outputData, _FILE_AND_LINE_ );
-	outputQueueMutex.Unlock();
 }
 template <class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::HasOutputFast(void)
@@ -430,10 +426,8 @@ bool ThreadPool<InputType, OutputType>::HasOutputFast(void)
 template <class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::HasOutput(void)
 {
-	bool res;
-	outputQueueMutex.Lock();
-	res=outputQueue.IsEmpty()==false;
-	outputQueueMutex.Unlock();
+	std::lock_guard<std::mutex> guard(outputQueueMutex);
+	bool res = outputQueue.IsEmpty()==false;
 	return res;
 }
 template <class InputType, class OutputType>
@@ -444,37 +438,33 @@ bool ThreadPool<InputType, OutputType>::HasInputFast(void)
 template <class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::HasInput(void)
 {
-	bool res;
-	inputQueueMutex.Lock();
-	res=inputQueue.IsEmpty()==false;
-	inputQueueMutex.Unlock();
+	std::lock_guard<std::mutex> guard(inputQueueMutex);
+	bool res = inputQueue.IsEmpty()==false;
 	return res;
 }
 template <class InputType, class OutputType>
 OutputType ThreadPool<InputType, OutputType>::GetOutput(void)
 {
 	// Real output check
-	OutputType output;
-	outputQueueMutex.Lock();
-	output=outputQueue.Pop();
-	outputQueueMutex.Unlock();
+	std::lock_guard<std::mutex> guard(outputQueueMutex);
+	OutputType output = outputQueue.Pop();
 	return output;
 }
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::Clear(void)
 {
-	runThreadsMutex.Lock();
+	runThreadsMutex.lock();
 	if (runThreads)
 	{
-		runThreadsMutex.Unlock();
-		inputQueueMutex.Lock();
+		runThreadsMutex.unlock();
+		inputQueueMutex.lock();
 		inputFunctionQueue.Clear(_FILE_AND_LINE_);
 		inputQueue.Clear(_FILE_AND_LINE_);
-		inputQueueMutex.Unlock();
+		inputQueueMutex.unlock();
 
-		outputQueueMutex.Lock();
+		outputQueueMutex.lock();
 		outputQueue.Clear(_FILE_AND_LINE_);
-		outputQueueMutex.Unlock();
+		outputQueueMutex.unlock();
 	}
 	else
 	{
@@ -486,12 +476,12 @@ void ThreadPool<InputType, OutputType>::Clear(void)
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::LockInput(void)
 {
-	inputQueueMutex.Lock();
+	inputQueueMutex.lock();
 }
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::UnlockInput(void)
 {
-	inputQueueMutex.Unlock();
+	inputQueueMutex.unlock();
 }
 template <class InputType, class OutputType>
 unsigned ThreadPool<InputType, OutputType>::InputSize(void)
@@ -512,12 +502,12 @@ void ThreadPool<InputType, OutputType>::RemoveInputAtIndex(unsigned index)
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::LockOutput(void)
 {
-	outputQueueMutex.Lock();
+	outputQueueMutex.lock();
 }
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::UnlockOutput(void)
 {
-	outputQueueMutex.Unlock();
+	outputQueueMutex.unlock();
 }
 template <class InputType, class OutputType>
 unsigned ThreadPool<InputType, OutputType>::OutputSize(void)
@@ -550,9 +540,9 @@ template <class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::IsWorking(void)
 {
 	bool isWorking;
-//	workingThreadCountMutex.Lock();
+//	workingThreadCountMutex.lock();
 //	isWorking=numThreadsWorking!=0;
-//	workingThreadCountMutex.Unlock();
+//	workingThreadCountMutex.unlock();
 
 //	if (isWorking)
 //		return true;
@@ -567,9 +557,9 @@ bool ThreadPool<InputType, OutputType>::IsWorking(void)
 		return true;
 
 	// Need to check is working again, in case the thread was between the first and second checks
-	workingThreadCountMutex.Lock();
+	workingThreadCountMutex.lock();
 	isWorking=numThreadsWorking!=0;
-	workingThreadCountMutex.Unlock();
+	workingThreadCountMutex.unlock();
 
 	return isWorking;
 }
@@ -583,10 +573,8 @@ int ThreadPool<InputType, OutputType>::NumThreadsWorking(void)
 template <class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::WasStarted(void)
 {
-	bool b;
-	runThreadsMutex.Lock();
-	b = runThreads;
-	runThreadsMutex.Unlock();
+	std::lock_guard<std::mutex> guard(runThreadsMutex);
+	bool b = runThreads;
 	return b;
 }
 template <class InputType, class OutputType>
@@ -595,7 +583,7 @@ bool ThreadPool<InputType, OutputType>::Pause(void)
 	if (WasStarted()==false)
 		return false;
 
-	workingThreadCountMutex.Lock();
+	workingThreadCountMutex.lock();
 	while (numThreadsWorking>0)
 	{
 		RakSleep(30);
@@ -605,7 +593,7 @@ bool ThreadPool<InputType, OutputType>::Pause(void)
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::Resume(void)
 {
-	workingThreadCountMutex.Unlock();
+	workingThreadCountMutex.unlock();
 }
 
 } // namespace RakNet

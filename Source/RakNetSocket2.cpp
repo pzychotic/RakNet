@@ -106,10 +106,9 @@ void RakNetSocket2::DomainNameToIP( const char *domainName, char ip[65] ) {
 RNS2_NativeClient::RNS2_NativeClient() {bindState = BS_UNBOUND; sendInProgress=false;}
 RNS2_NativeClient::~RNS2_NativeClient()
 {
-	bufferedSendsMutex.Lock();
+	std::lock_guard<std::mutex> guard(bufferedSendsMutex);
 	while (bufferedSends.Size())
 		RakNet::OP_DELETE(bufferedSends.Pop(), _FILE_AND_LINE_);
-	bufferedSendsMutex.Unlock();
 }
 void RNS2_NativeClient::onSocketBound(void* pData, int32_t dataSize)
 {
@@ -138,23 +137,22 @@ void RNS2_NativeClient::ProcessBufferedSend(void)
 	if (bufferedSends.IsEmpty()==true)
 		return;
 
-	sendInProgressMutex.Lock();
-	if (sendInProgress==true) {sendInProgressMutex.Unlock(); return;}
+	sendInProgressMutex.lock();
+	if (sendInProgress==true) {sendInProgressMutex.unlock(); return;}
 	else {sendInProgress=true;}
-	sendInProgressMutex.Unlock();
+	sendInProgressMutex.unlock();
 
 	RNS2_SendParameters_NativeClient *sp;
-	bufferedSendsMutex.Lock();
+	bufferedSendsMutex.lock();
 	if (bufferedSends.IsEmpty()==false)
 		sp=bufferedSends.Pop();
 	else
 		sp=0;
-	bufferedSendsMutex.Unlock();
+	bufferedSendsMutex.unlock();
 	if (sp==0)
 	{
-		sendInProgressMutex.Lock();
+		std::lock_guard<std::mutex> guard(sendInProgressMutex);
 		sendInProgress=false;
-		sendInProgressMutex.Unlock();
 		return; // Nothing to send after all
 	}
 
@@ -186,9 +184,9 @@ void RNS2_NativeClient::onSendTo(void* pData, int32_t dataSize)
 	RNS2_SendParameters_NativeClient *sp = (RNS2_SendParameters_NativeClient*) pData;
 
 	// Caller will check sendInProgress to send again if needed
-	sp->socket2->sendInProgressMutex.Lock();
+	sp->socket2->sendInProgressMutex.lock();
 	sp->socket2->sendInProgress=false;
-	sp->socket2->sendInProgressMutex.Unlock();
+	sp->socket2->sendInProgressMutex.unlock();
 
 	DeallocSP(sp);
 
@@ -210,9 +208,9 @@ void RNS2_NativeClient::BufferSend( RNS2_SendParameters *sendParameters, const c
 		return;
 
 	RNS2_SendParameters_NativeClient* sp = CloneSP(sendParameters, this, file, line);
-	bufferedSendsMutex.Lock();
+	bufferedSendsMutex.lock();
 	bufferedSends.Push(sp, file, line);
-	bufferedSendsMutex.Unlock();
+	bufferedSendsMutex.unlock();
 
 	// Do not check to send immediately, because this was probably invoked from a thread and native client is not threadsafe
 }

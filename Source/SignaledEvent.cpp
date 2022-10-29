@@ -74,9 +74,9 @@ void SignaledEvent::SetEvent(void)
 #else
 	// Different from SetEvent which stays signaled.
 	// We have to record manually that the event was signaled
-	isSignaledMutex.Lock();
+	isSignaledMutex.lock();
 	isSignaled=true;
-	isSignaledMutex.Unlock();
+	isSignaledMutex.unlock();
 
 	// Unblock waiting threads
 	pthread_cond_broadcast(&eventList);
@@ -95,14 +95,14 @@ void SignaledEvent::WaitOnEvent(int timeoutMs)
 #else
 
 	// If was previously set signaled, just unset and return
-	isSignaledMutex.Lock();
+	isSignaledMutex.lock();
 	if (isSignaled==true)
 	{
 		isSignaled=false;
-		isSignaledMutex.Unlock();
+		isSignaledMutex.unlock();
 		return;
 	}
-	isSignaledMutex.Unlock();
+	isSignaledMutex.unlock();
 	//struct timespec   ts;
 
 	// Else wait for SetEvent to be called
@@ -137,14 +137,14 @@ void SignaledEvent::WaitOnEvent(int timeoutMs)
 
 			timeoutMs-=30;
 
-			isSignaledMutex.Lock();
+			isSignaledMutex.lock();
 			if (isSignaled==true)
 			{
 				isSignaled=false;
-				isSignaledMutex.Unlock();
+				isSignaledMutex.unlock();
 				return;
 			}
-			isSignaledMutex.Unlock();
+			isSignaledMutex.unlock();
 		}
 
 		// Wait the remaining time, and turn off the signal in case it was set
@@ -159,9 +159,9 @@ void SignaledEvent::WaitOnEvent(int timeoutMs)
 		pthread_cond_timedwait(&eventList, &hMutex, &ts);
         pthread_mutex_unlock(&hMutex);
 
-		isSignaledMutex.Lock();
+		isSignaledMutex.lock();
 		isSignaled=false;
-		isSignaledMutex.Unlock();
+		isSignaledMutex.unlock();
 
 #endif
 }

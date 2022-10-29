@@ -20,10 +20,14 @@
 #include "WindowsIncludes.h"
 #endif
 
+namespace std
+{
+	class mutex;
+}
+
 namespace RakNet {
 
 /// Forward declarations
-class SimpleMutex;
 class BitStream;
 
 /// \brief String class
@@ -298,7 +302,7 @@ public:
 	/// \internal
 	struct SharedString
 	{
-		SimpleMutex *refCountMutex;
+		std::mutex* refCountMutex;
 		unsigned int refCount;
 		size_t bytesUsed;
 		char *bigString;
@@ -312,7 +316,7 @@ public:
 	/// \internal
 	SharedString *sharedString;
 
-//	static SimpleMutex poolMutex;
+//	static std::mutex poolMutex;
 //	static DataStructures::MemoryPool<SharedString> pool;
 	/// \internal
 	static SharedString emptyString;

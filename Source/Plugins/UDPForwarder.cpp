@@ -136,7 +136,7 @@ UDPForwarderResult UDPForwarder::StartForwarding(SystemAddress source, SystemAdd
 	while (1)
 	{
 		RakSleep(0);
-		startForwardingOutputMutex.Lock();
+		std::lock_guard<std::mutex> guard(startForwardingOutputMutex);
 		for (unsigned int i=0; i < startForwardingOutput.Size(); i++)
 		{
 			if (startForwardingOutput[i].inputId==inputId)
@@ -150,11 +150,9 @@ UDPForwarderResult UDPForwarder::StartForwarding(SystemAddress source, SystemAdd
 				}
 				UDPForwarderResult res = startForwardingOutput[i].result;
 				startForwardingOutput.RemoveAtIndex(i);
-				startForwardingOutputMutex.Unlock();
 				return res;
 			}
 		}
-		startForwardingOutputMutex.Unlock();
 	}
 
 	return UDPFORWARDER_RESULT_COUNT;
@@ -530,9 +528,9 @@ void UDPForwarder::UpdateUDPForwarder(void)
 
 		// Push result
 		sfos.inputId=sfis->inputId;
-		startForwardingOutputMutex.Lock();
+		startForwardingOutputMutex.lock();
 		startForwardingOutput.Push(sfos,_FILE_AND_LINE_);
-		startForwardingOutputMutex.Unlock();
+		startForwardingOutputMutex.unlock();
 
 		startForwardingInput.Deallocate(sfis, _FILE_AND_LINE_);
 	}

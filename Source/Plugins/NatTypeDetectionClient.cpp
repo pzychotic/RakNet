@@ -102,13 +102,9 @@ void NatTypeDetectionClient::Update(void)
 {
 	if (IsInProgress())
 	{
-		RNS2RecvStruct *recvStruct;
-		bufferedPacketsMutex.Lock();
-		if (bufferedPackets.Size()>0)
-			recvStruct=bufferedPackets.Pop();
-		else
-			recvStruct=0;
-		bufferedPacketsMutex.Unlock();
+		bufferedPacketsMutex.lock();
+		RNS2RecvStruct* recvStruct = bufferedPackets.Size() > 0 ? bufferedPackets.Pop() : 0;
+		bufferedPacketsMutex.unlock();
 		while (recvStruct)
 		{
 			if (recvStruct->bytesRead==1 && recvStruct->data[0]==NAT_TYPE_NONE)
@@ -118,12 +114,8 @@ void NatTypeDetectionClient::Update(void)
 			}
 			DeallocRNS2RecvStruct(recvStruct, _FILE_AND_LINE_);
 
-			bufferedPacketsMutex.Lock();
-			if (bufferedPackets.Size()>0)
-				recvStruct=bufferedPackets.Pop();
-			else
-				recvStruct=0;
-			bufferedPacketsMutex.Unlock();
+			std::lock_guard<std::mutex> guard(bufferedPacketsMutex);
+			recvStruct = bufferedPackets.Size() > 0 ? bufferedPackets.Pop() : 0;
 		}
 	}
 }
@@ -216,10 +208,9 @@ void NatTypeDetectionClient::Shutdown(void)
 		c2=0;
 	}
 
-	bufferedPacketsMutex.Lock();
+	std::lock_guard<std::mutex> guard(bufferedPacketsMutex);
 	while (bufferedPackets.Size())
 		RakNet::OP_DELETE(bufferedPackets.Pop(), _FILE_AND_LINE_);
-	bufferedPacketsMutex.Unlock();
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -234,9 +225,8 @@ RNS2RecvStruct *NatTypeDetectionClient::AllocRNS2RecvStruct(const char *file, un
 }
 void NatTypeDetectionClient::OnRNS2Recv(RNS2RecvStruct *recvStruct)
 {
-	bufferedPacketsMutex.Lock();
+	std::lock_guard<std::mutex> guard(bufferedPacketsMutex);
 	bufferedPackets.Push(recvStruct,_FILE_AND_LINE_);
-	bufferedPacketsMutex.Unlock();
 }
 
 } // namespace RakNet

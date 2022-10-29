@@ -16,9 +16,10 @@
 #include <string.h>
 #include "LinuxStrings.h"
 #include "StringCompressor.h"
-#include "SimpleMutex.h"
 #include <stdlib.h>
 #include "Itoa.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -39,9 +40,9 @@ public:
 
 static RakStringCleanup cleanup;
 
-SimpleMutex& GetPoolMutex(void)
+std::mutex& GetPoolMutex(void)
 {
-	static SimpleMutex poolMutex;
+	static std::mutex poolMutex;
 	return poolMutex;
 }
 
@@ -92,7 +93,7 @@ RakString::RakString( const RakString & rhs)
 		return;
 	}
 
-	rhs.sharedString->refCountMutex->Lock();
+	rhs.sharedString->refCountMutex->lock();
 	if (rhs.sharedString->refCount==0)
 	{
 		sharedString=&emptyString;
@@ -102,7 +103,7 @@ RakString::RakString( const RakString & rhs)
 		rhs.sharedString->refCount++;
 		sharedString=rhs.sharedString;
 	}
-	rhs.sharedString->refCountMutex->Unlock();
+	rhs.sharedString->refCountMutex->unlock();
 }
 RakString::~RakString()
 {
@@ -114,7 +115,7 @@ RakString& RakString::operator = ( const RakString& rhs )
 	if (rhs.sharedString==&emptyString)
 		return *this;
 
-	rhs.sharedString->refCountMutex->Lock();
+	rhs.sharedString->refCountMutex->lock();
 	if (rhs.sharedString->refCount==0)
 	{
 		sharedString=&emptyString;
@@ -124,7 +125,7 @@ RakString& RakString::operator = ( const RakString& rhs )
 		sharedString=rhs.sharedString;
 		sharedString->refCount++;
 	}
-	rhs.sharedString->refCountMutex->Unlock();
+	rhs.sharedString->refCountMutex->unlock();
 	return *this;
 }
 RakString& RakString::operator = ( const char *str )
@@ -283,28 +284,28 @@ const RakString operator+(const RakString &lhs, const RakString &rhs)
 	}
 	if (lhs.IsEmpty())
 	{
-		rhs.sharedString->refCountMutex->Lock();
+		rhs.sharedString->refCountMutex->lock();
 		if (rhs.sharedString->refCount==0)
 		{
-			rhs.sharedString->refCountMutex->Unlock();
-			lhs.sharedString->refCountMutex->Lock();
+			rhs.sharedString->refCountMutex->unlock();
+			lhs.sharedString->refCountMutex->lock();
 			lhs.sharedString->refCount++;
-			lhs.sharedString->refCountMutex->Unlock();
+			lhs.sharedString->refCountMutex->unlock();
 			return RakString(lhs.sharedString);
 		}
 		else
 		{
 			rhs.sharedString->refCount++;
-			rhs.sharedString->refCountMutex->Unlock();
+			rhs.sharedString->refCountMutex->unlock();
 			return RakString(rhs.sharedString);
 		}
-		// rhs.sharedString->refCountMutex->Unlock();
+		// rhs.sharedString->refCountMutex->unlock();
 	}
 	if (rhs.IsEmpty())
 	{
-		lhs.sharedString->refCountMutex->Lock();
+		lhs.sharedString->refCountMutex->lock();
 		lhs.sharedString->refCount++;
-		lhs.sharedString->refCountMutex->Unlock();
+		lhs.sharedString->refCountMutex->unlock();
 		return RakString(lhs.sharedString);
 	}
 
@@ -325,7 +326,7 @@ const RakString operator+(const RakString &lhs, const RakString &rhs)
 		//	RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
 			RakString::SharedString *ss;
 			ss = (RakString::SharedString*) rakMalloc_Ex(sizeof(RakString::SharedString), _FILE_AND_LINE_);
-			ss->refCountMutex=RakNet::OP_NEW<SimpleMutex>(_FILE_AND_LINE_);
+			ss->refCountMutex=RakNet::OP_NEW<std::mutex>(_FILE_AND_LINE_);
 			RakString::freeList.Insert(ss, _FILE_AND_LINE_);
 
 		}
@@ -1330,7 +1331,7 @@ void RakString::Allocate(size_t len)
 
 			RakString::SharedString *ss;
 			ss = (RakString::SharedString*) rakMalloc_Ex(sizeof(RakString::SharedString), _FILE_AND_LINE_);
-			ss->refCountMutex=RakNet::OP_NEW<SimpleMutex>(_FILE_AND_LINE_);
+			ss->refCountMutex=RakNet::OP_NEW<std::mutex>(_FILE_AND_LINE_);
 			RakString::freeList.Insert(ss, _FILE_AND_LINE_);
 		}
 		//RakString::sharedStringFreeListAllocationCount+=1024;
@@ -1497,33 +1498,33 @@ void RakString::Clone(void)
 	}
 
 	// Empty or solo then no point to cloning
-	sharedString->refCountMutex->Lock();
+	sharedString->refCountMutex->lock();
 	if (sharedString->refCount==1)
 	{
-		sharedString->refCountMutex->Unlock();
+		sharedString->refCountMutex->unlock();
 		return;
 	}
 
 	sharedString->refCount--;
-	sharedString->refCountMutex->Unlock();
+	sharedString->refCountMutex->unlock();
 	Assign(sharedString->c_str);
 }
 void RakString::Free(void)
 {
 	if (sharedString==&emptyString)
 		return;
-	sharedString->refCountMutex->Lock();
+	sharedString->refCountMutex->lock();
 	sharedString->refCount--;
 	if (sharedString->refCount==0)
 	{
-		sharedString->refCountMutex->Unlock();
+		sharedString->refCountMutex->unlock();
 		const size_t smallStringSize = 128-sizeof(unsigned int)-sizeof(size_t)-sizeof(char*)*2;
 		if (sharedString->bytesUsed>smallStringSize)
 			rakFree_Ex(sharedString->bigString, _FILE_AND_LINE_ );
 		/*
-		poolMutex->Lock();
+		poolMutex->lock();
 		pool.Release(sharedString);
-		poolMutex->Unlock();
+		poolMutex->unlock();
 		*/
 
 		RakString::LockMutex();
@@ -1534,7 +1535,7 @@ void RakString::Free(void)
 	}
 	else
 	{
-		sharedString->refCountMutex->Unlock();
+		sharedString->refCountMutex->unlock();
 	}
 	sharedString=&emptyString;
 }
@@ -1552,11 +1553,11 @@ unsigned char RakString::ToUpper(unsigned char c)
 }
 void RakString::LockMutex(void)
 {
-	GetPoolMutex().Lock();
+	GetPoolMutex().lock();
 }
 void RakString::UnlockMutex(void)
 {
-	GetPoolMutex().Unlock();
+	GetPoolMutex().unlock();
 }
 
 } // namespace RakNet

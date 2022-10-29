@@ -24,7 +24,8 @@
 #include "DS_List.h"
 #include "DS_Queue.h"
 #include "PluginInterface2.h"
-#include "SimpleMutex.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -112,7 +113,7 @@ protected:
 	DataStructures::List<Request*> sentRequests;
 	DataStructures::List<Request*> completedRequests;
 
-	SimpleMutex pendingRequestsMutex, sentRequestsMutex, completedRequestsMutex;
+	std::mutex pendingRequestsMutex, sentRequestsMutex, completedRequestsMutex;
 
 };
 

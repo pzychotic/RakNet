@@ -23,7 +23,8 @@
 #include "UDPForwarder.h"
 #include "MessageIdentifiers.h"
 #include "DS_List.h"
-#include "SimpleMutex.h"
+
+#include <mutex>
 
 namespace RakNet {
 
@@ -117,7 +118,7 @@ public:
 		~ConnnectRequest();
 
 		DataStructures::List<ConnectionRequestSystem> connectionRequestSystems;
-		SimpleMutex connectionRequestSystemsMutex;
+		std::mutex connectionRequestSystemsMutex;
 		Router2RequestStates requestState;
 		RakNet::TimeMS pingTimeout;
 		RakNetGUID endpointGuid;
@@ -169,7 +170,7 @@ protected:
 
 	UDPForwarder *udpForwarder;
 	int maximumForwardingRequests;
-	SimpleMutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
+	std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
 	DataStructures::List<ConnnectRequest*> connectionRequests;
 	DataStructures::List<MiniPunchRequest> miniPunchesInProgress;
 	// Forwarding we have initiated

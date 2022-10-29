@@ -27,6 +27,7 @@
 #endif
 
 #include <atomic>
+#include <mutex>
 
 // #define TEST_NATIVE_CLIENT_ON_WINDOWS
 
@@ -193,7 +194,7 @@ protected:
 	PP_Resource rns2Socket;
 	NativeClientBindParameters binding;
 	bool sendInProgress;
-	SimpleMutex sendInProgressMutex;
+	std::mutex sendInProgressMutex;
 
 	enum BindState
 	{
@@ -203,7 +204,7 @@ protected:
 		BS_FAILED
 	} bindState;
 	DataStructures::Queue<RNS2_SendParameters_NativeClient*> bufferedSends;
-	SimpleMutex bufferedSendsMutex;
+	std::mutex bufferedSendsMutex;
 };
 #else // defined(__native_client__)
 

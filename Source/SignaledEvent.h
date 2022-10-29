@@ -13,9 +13,9 @@
 #if   defined(_WIN32)
 #include "WindowsIncludes.h"
 #else
+	#include <mutex>
 	#include <pthread.h>
 	#include <sys/types.h>
-	#include "SimpleMutex.h"
 #endif
 
 #include "Export.h"
@@ -37,7 +37,7 @@ protected:
 #ifdef _WIN32
 	HANDLE eventList;
 #else
-	SimpleMutex isSignaledMutex;
+	std::mutex isSignaledMutex;
 	bool isSignaled;
 #if !defined(ANDROID)
 	pthread_condattr_t condAttr;

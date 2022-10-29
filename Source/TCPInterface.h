@@ -23,7 +23,6 @@
 #include "Export.h"
 #include "RakThread.h"
 #include "DS_Queue.h"
-#include "SimpleMutex.h"
 #include "RakNetDefines.h"
 #include "SocketIncludes.h"
 #include "DS_ByteQueue.h"
@@ -39,6 +38,7 @@
 #endif
 
 #include <atomic>
+#include <mutex>
 
 namespace RakNet {
 
@@ -154,7 +154,7 @@ protected:
 	// DataStructures::List<RemoteClient*> remoteClients;
 	// Use this thread-safe queue to add to remoteClients
 	// DataStructures::Queue<RemoteClient*> remoteClientsInsertionQueue;
-	// SimpleMutex remoteClientsInsertionQueueMutex;
+	// std::mutex remoteClientsInsertionQueueMutex;
 
 	/*
 	struct OutgoingMessage
@@ -173,13 +173,13 @@ protected:
 	DataStructures::ThreadsafeAllocatingQueue<Packet> incomingMessages;
 	DataStructures::ThreadsafeAllocatingQueue<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
 	DataStructures::ThreadsafeAllocatingQueue<RemoteClient*> newRemoteClients;
-	SimpleMutex completedConnectionAttemptMutex, failedConnectionAttemptMutex;
+	std::mutex completedConnectionAttemptMutex, failedConnectionAttemptMutex;
 	DataStructures::Queue<SystemAddress> completedConnectionAttempts, failedConnectionAttempts;
 
 	int threadPriority;
 
 	DataStructures::List<__TCPSOCKET__> blockingSocketList;
-	SimpleMutex blockingSocketListMutex;
+	std::mutex blockingSocketListMutex;
 
 
 
@@ -206,7 +206,7 @@ protected:
 	SSL_METHOD *meth;
 	DataStructures::ThreadsafeAllocatingQueue<SystemAddress> startSSL;
 	DataStructures::List<SystemAddress> activeSSLConnections;
-	SimpleMutex sharedSslMutex;
+	std::mutex sharedSslMutex;
 #endif
 };
 
@@ -224,8 +224,8 @@ struct RemoteClient
 	SystemAddress systemAddress;
 	DataStructures::ByteQueue outgoingData;
 	bool isActive;
-	SimpleMutex outgoingDataMutex;
-	SimpleMutex isActiveMutex;
+	std::mutex outgoingDataMutex;
+	std::mutex isActiveMutex;
 
 #if OPEN_SSL_CLIENT_SUPPORT==1
 	SSL*     ssl;
@@ -240,9 +240,8 @@ struct RemoteClient
 #endif
 	void Reset(void)
 	{
-		outgoingDataMutex.Lock();
+		std::lock_guard<std::mutex> guard(outgoingDataMutex);
 		outgoingData.Clear(_FILE_AND_LINE_);
-		outgoingDataMutex.Unlock();
 	}
 	void SetActive(bool a);
 	void SendOrBuffer(const char **data, const unsigned int *lengths, const int numParameters);
