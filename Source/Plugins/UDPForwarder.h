@@ -25,9 +25,10 @@
 #include "RakThread.h"
 #include "DS_Queue.h"
 #include "DS_List.h"
-#include "LocklessTypes.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "Plugins/UDPProxyCommon.h"
+
+#include <atomic>
 
 namespace RakNet {
 
@@ -144,7 +145,7 @@ protected:
 //	SimpleMutex forwardListNotUpdatedMutex;
 
 	unsigned short maxForwardEntries;
-	LocklessUint32_t isRunning, threadRunning;
+	std::atomic<uint32_t> isRunning, threadRunning;
 };
 
 } // namespace RakNet

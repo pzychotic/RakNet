@@ -654,7 +654,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 						Shutdown( 0, 0 );
 						return FAILED_TO_CREATE_NETWORK_THREAD;
 					}
-//					RakAssert(isRecvFromLoopThreadActive.GetValue()==0);
+//					RakAssert(isRecvFromLoopThreadActive == 0);
 #endif // RAKPEER_USER_THREADED!=1
 
 					/*
@@ -687,7 +687,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 		/*
 #if RAKPEER_USER_THREADED!=1
 
-			while (  isRecvFromLoopThreadActive.GetValue() < (uint32_t) socketDescriptorCount )
+			while ( isRecvFromLoopThreadActive < socketDescriptorCount )
 				RakSleep(10);
 				#endif // RAKPEER_USER_THREADED!=1
 				*/
@@ -1104,7 +1104,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
 	/*
 	timeout = RakNet::GetTimeMS()+1000;
-	while ( isRecvFromLoopThreadActive.GetValue()>0 && RakNet::GetTimeMS()<timeout )
+	while ( isRecvFromLoopThreadActive > 0 && RakNet::GetTimeMS() < timeout )
 	{
 		// Get recvfrom to unblock
 		for (i=0; i < socketList.Size(); i++)
@@ -1160,10 +1160,10 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 	packetAllocationPoolMutex.Unlock();
 
 	/*
-	if (isRecvFromLoopThreadActive.GetValue()>0)
+	if (isRecvFromLoopThreadActive > 0)
 	{
 		timeout = RakNet::GetTimeMS()+1000;
-		while ( isRecvFromLoopThreadActive.GetValue()>0 && RakNet::GetTimeMS()<timeout )
+		while ( isRecvFromLoopThreadActive > 0 && RakNet::GetTimeMS() < timeout )
 		{
 			RakSleep(30);
 		}
@@ -6303,7 +6303,7 @@ RAK_THREAD_DECLARATION(RecvFromLoop)
 	RakNetSocket *s = rpai->s;
 	RakNet::OP_DELETE(rpai,_FILE_AND_LINE_);
 
-	rakPeer->isRecvFromLoopThreadActive.Increment();
+	rakPeer->isRecvFromLoopThreadActive++;
 
 	while ( rakPeer->endThreads == false )
 	{
@@ -6311,7 +6311,7 @@ RAK_THREAD_DECLARATION(RecvFromLoop)
 			s->GetBlockingSocket()==false)
 			RakSleep(0);
 	}
-	rakPeer->isRecvFromLoopThreadActive.Decrement();
+	rakPeer->isRecvFromLoopThreadActive--;
 
 #if defined(SN_TARGET_PSP2)
 	return sceKernelExitDeleteThread(0);

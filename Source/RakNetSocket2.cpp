@@ -297,7 +297,7 @@ RAK_THREAD_DECLARATION(RNS2_Berkley::RecvFromLoop)
 }
 unsigned RNS2_Berkley::RecvFromLoopInt(void)
 {
-	isRecvFromLoopThreadActive.Increment();
+	isRecvFromLoopThreadActive++;
 	
 	while ( endThreads == false )
 	{
@@ -320,10 +320,7 @@ unsigned RNS2_Berkley::RecvFromLoopInt(void)
 			}
 		}
 	}
-	isRecvFromLoopThreadActive.Decrement();
-
-
-
+	isRecvFromLoopThreadActive--;
 
 	return 0;
 
@@ -378,7 +375,7 @@ void RNS2_Berkley::BlockOnStopRecvPollingThread(void)
 	Send(&bsp, _FILE_AND_LINE_);
 
 	RakNet::TimeMS timeout = RakNet::GetTimeMS()+1000;
-	while ( isRecvFromLoopThreadActive.GetValue()>0 && RakNet::GetTimeMS()<timeout )
+	while ( isRecvFromLoopThreadActive > 0 && RakNet::GetTimeMS() < timeout )
 	{
 		// Get recvfrom to unblock
 		Send(&bsp, _FILE_AND_LINE_);
@@ -392,48 +389,6 @@ void RNS2_Berkley::SetSocketLayerOverride(SocketLayerOverride *_slo) {slo = _slo
 SocketLayerOverride* RNS2_Berkley::GetSocketLayerOverride(void) {return slo;}
 
 // See RakNetSocket2_Berkley.cpp for WriteSharedIPV4, BindSharedIPV4And6 and other implementations
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #if   defined(_WIN32)
 RNS2_Windows::RNS2_Windows() {}

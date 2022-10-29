@@ -28,7 +28,6 @@
 #include "SocketIncludes.h"
 #include "DS_ByteQueue.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
-#include "LocklessTypes.h"
 #include "PluginInterface2.h"
 
 #if OPEN_SSL_CLIENT_SUPPORT==1
@@ -38,6 +37,8 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
+
+#include <atomic>
 
 namespace RakNet {
 
@@ -142,7 +143,7 @@ protected:
 	// Plugins
 	DataStructures::List<PluginInterface2*> messageHandlerList;
 
-	LocklessUint32_t isStarted, threadRunning;
+	std::atomic<uint32_t> isStarted, threadRunning;
 	__TCPSOCKET__ listenSocket;
 
 	DataStructures::Queue<Packet*> headPush, tailPush;

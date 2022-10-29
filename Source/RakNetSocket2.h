@@ -12,7 +12,6 @@
 
 #include "RakNetTypes.h"
 #include "MTUSize.h"
-#include "LocklessTypes.h"
 #include "RakThread.h"
 #include "DS_Queue.h"
 //#include "DS_ThreadsafeAllocatingQueue.h"
@@ -26,6 +25,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #endif
+
+#include <atomic>
 
 // #define TEST_NATIVE_CLIENT_ON_WINDOWS
 
@@ -290,7 +291,7 @@ protected:
 	RNS2_BerkleyBindParameters binding;
 
 	unsigned RecvFromLoopInt(void);
-	LocklessUint32_t isRecvFromLoopThreadActive;
+	std::atomic<uint32_t> isRecvFromLoopThreadActive;
 	volatile bool endThreads;
 	// Constructor not called!
 

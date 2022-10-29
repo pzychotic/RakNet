@@ -30,7 +30,6 @@
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
-//#include "LocklessTypes.h"
 #include "DS_Queue.h"
 
 namespace RakNet {
@@ -750,7 +749,7 @@ protected:
 	///true if the peer thread is active. 
 	volatile bool isMainLoopThreadActive;
 	
-	//LocklessUint32_t isRecvFromLoopThreadActive;
+	//std::atomic<uint32_t> isRecvFromLoopThreadActive;
 
 
 	bool occasionalPing;  /// Do we occasionally ping the other systems?*/
