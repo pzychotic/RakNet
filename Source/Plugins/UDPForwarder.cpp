@@ -17,7 +17,6 @@
 #include "SocketLayer.h"
 #include "WSAStartupSingleton.h"
 #include "RakSleep.h"
-#include "LinuxStrings.h"
 #include "SocketDefines.h"
 #include "errno.h"
 

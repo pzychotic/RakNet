@@ -34,7 +34,6 @@
 #include <arpa/inet.h>
 #endif
 
-#include <string.h> // strncasecmp
 #include "Itoa.h"
 #include "SocketLayer.h"
 #include "SuperFastHash.h"
@@ -438,18 +437,8 @@ bool SystemAddress::SetBinaryAddress(const char *str, char portDelineator)
 {
 	if ( NonNumericHostString( str ) )
 	{
-
-#if defined(_WIN32)
 		if (_strnicmp(str,"localhost", 9)==0)
-#else
-		if (strncasecmp(str,"localhost", 9)==0)
-#endif
 		{
-
-
-
-
-
 			address.addr4.sin_addr.s_addr=inet_addr__("127.0.0.1");
 
 			if (str[9])
@@ -465,13 +454,7 @@ bool SystemAddress::SetBinaryAddress(const char *str, char portDelineator)
 		RakNetSocket2::DomainNameToIP(str, ip);
 		if (ip[0])
 		{
-
-
-
-
-
 			address.addr4.sin_addr.s_addr=inet_addr__(ip);
-
 		}
 		else
 		{
