@@ -12,7 +12,6 @@
 #if _RAKNET_SUPPORT_Router2==1 && _RAKNET_SUPPORT_UDPForwarder==1
 
 #include "Plugins/Router2.h"
-#include "Plugins/FormatString.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 #include "RakNetTime.h"
@@ -55,8 +54,12 @@ Algorithm:
 
 #define MIN_MINIPUNCH_TIMEOUT	5000
 
-
-
+template<typename ... Args>
+char* FormatStringTS(char* output, const char* format, Args... args)
+{
+	snprintf(output, 511, format, args...);
+	return output;
+}
 
 void Router2DebugInterface::ShowFailure(const char *message)
 {
