@@ -190,10 +190,6 @@ protected:
 	std::mutex numThreadsRunningMutex;
 
 	SignaledEvent quitAndIncomingDataEvents;
-
-// #if defined(SN_TARGET_PSP2)
-// 	RakThread::UltUlThreadRuntime *runtime;
-// #endif
 };
 
 template <class ThreadInputType, class ThreadOutputType>
@@ -310,10 +306,6 @@ bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSi
 {
 	(void) stackSize;
 
-// #if defined(SN_TARGET_PSP2)
-// 	runtime = RakThread::AllocRuntime(numThreads);
-// #endif
-
 	runThreadsMutex.lock();
 	if (runThreads==true)
 	{
@@ -338,12 +330,7 @@ bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSi
 	int i;
 	for (i=0; i < numThreads; i++)
 	{
-		int errorCode;
-
-
-
-
-		errorCode = RakThread::Create(WorkerThread<InputType, OutputType>, this);
+		int errorCode = RakThread::Create(WorkerThread<InputType, OutputType>, this);
 
 		if (errorCode!=0)
 		{
@@ -395,12 +382,6 @@ void ThreadPool<InputType, OutputType>::StopThreads(void)
 	}
 
 	quitAndIncomingDataEvents.CloseEvent();
-
-// #if defined(SN_TARGET_PSP2)
-// 	RakThread::DeallocRuntime(runtime);
-// 	runtime=0;
-// #endif
-
 }
 template <class InputType, class OutputType>
 void ThreadPool<InputType, OutputType>::AddInput(OutputType (*workerThreadCallback)(InputType, bool *returnOutput, void* perThreadData), InputType inputData)

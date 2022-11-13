@@ -310,9 +310,6 @@ void UDPForwarder::RecvFrom(RakNet::TimeMS curTime, ForwardEntry *forwardEntry)
 // 	saOut.sin_family = AF_INET;
 	do
 	{
-
-
-
 #if RAKNET_SUPPORT_IPV6==1
 		if (forwardTarget.address.addr4.sin_family==AF_INET)
 		{
@@ -337,36 +334,6 @@ void UDPForwarder::RecvFrom(RakNet::TimeMS curTime, ForwardEntry *forwardEntry)
 		}
 		while ( len == 0 );
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	}
 	while ( len == 0 );
 
@@ -375,14 +342,6 @@ void UDPForwarder::RecvFrom(RakNet::TimeMS curTime, ForwardEntry *forwardEntry)
 }
 void UDPForwarder::UpdateUDPForwarder(void)
 {
-	/*
-#if !defined(SN_TARGET_PSP2)
-	timeval tv;
-	tv.tv_sec=0;
-	tv.tv_usec=0;
-#endif
-	*/
-
 	RakNet::TimeMS curTime = RakNet::GetTimeMS();
 
 	StartForwardingInputStruct *sfis;

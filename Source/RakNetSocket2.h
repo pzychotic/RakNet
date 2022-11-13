@@ -239,7 +239,6 @@ struct RNS2_BerkleyBindParameters
 	int doNotFragment;
 	int pollingThreadPriority;
 	RNS2EventHandler *eventHandler;
-	unsigned short remotePortRakNetWasStartedOn_PS3_PS4_PSP2;
 };
 
 // Every platform can use the Berkley sockets interface

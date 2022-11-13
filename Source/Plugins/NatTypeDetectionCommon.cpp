@@ -124,7 +124,6 @@ RakNetSocket2* CreateNonblockingBoundSocket(const char *bindAddr
 		bbp.doNotFragment=false;
 		bbp.pollingThreadPriority=0;
 		bbp.eventHandler=eventHandler;
-		bbp.remotePortRakNetWasStartedOn_PS3_PS4_PSP2=0;
 		RNS2BindResult br = ((RNS2_Berkley*) r2)->Bind(&bbp, _FILE_AND_LINE_);
 
 		if (br==BR_FAILED_TO_BIND_SOCKET)

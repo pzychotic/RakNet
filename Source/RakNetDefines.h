@@ -146,10 +146,6 @@
 #define RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH 48
 #endif
 
-#ifndef XBOX_BYPASS_SECURITY
-#define XBOX_BYPASS_SECURITY 1
-#endif
-
 // Controls how many allocations occur at once for the memory pool of incoming datagrams waiting to be transferred between the recvfrom thread and the main update thread
 // Has large effect on memory usage, per instance of RakPeer. Approximately MAXIMUM_MTU_SIZE*BUFFERED_PACKETS_PAGE_SIZE bytes, once after calling RakPeer::Startup()
 #ifndef BUFFERED_PACKETS_PAGE_SIZE

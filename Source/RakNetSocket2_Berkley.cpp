@@ -29,7 +29,6 @@ void RNS2_Berkley::SetSocketOptions(void)
 	RakAssert(r==0);
 
 	// Immediate hard close. Don't linger the socket, or recreating the socket quickly on Vista fails.
-	// Fail with voice and xbox
 
 	sock_opt=0;
 	r = setsockopt__( rns2Socket, SOL_SOCKET, SO_LINGER, ( char * ) & sock_opt, sizeof ( sock_opt ) );
@@ -38,7 +37,6 @@ void RNS2_Berkley::SetSocketOptions(void)
 
 
 	// This doesn't make much difference: 10% maybe
-	// Not supported on console 2
 	sock_opt=1024*16;
 	r = setsockopt__( rns2Socket, SOL_SOCKET, SO_SNDBUF, ( char * ) & sock_opt, sizeof ( sock_opt ) );
 	RakAssert(r==0);
@@ -392,7 +390,7 @@ void RNS2_Berkley::RecvFromBlockingIPV4(RNS2RecvStruct *recvFromStruct)
 		}
 		else if ( dwIOError != WSAEWOULDBLOCK && dwIOError != WSAEADDRNOTAVAIL)
 		{
-#if defined(_WIN32) && !defined(_XBOX) && !defined(_XBOX_720_COMPILE_AS_WINDOWS) && !defined(X360) && defined(_DEBUG) && !defined(_XBOX_720_COMPILE_AS_WINDOWS)
+#if defined(_WIN32) && defined(_DEBUG)
 			LPVOID messageBuffer;
 			FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 				NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),  // Default language

@@ -1173,7 +1173,6 @@ void RemoteClient::SetActive(bool a)
 void RemoteClient::SendOrBuffer(const char **data, const unsigned int *lengths, const int numParameters)
 {
 	// True can save memory and buffer copies, but gives worse performance overall
-	// Do not use true for the XBOX, as it just locks up
 	const bool ALLOW_SEND_FROM_USER_THREAD=false;
 
 	int parameterIndex;

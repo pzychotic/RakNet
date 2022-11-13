@@ -25,9 +25,6 @@
 
 namespace RakNet {
 
-// Can't figure out which library has this function on the PS3
-double Ceil(double d) {if (((double)((int)d))==d) return d; return (int) (d+1.0);}
-
 // #if defined(new)
 // #pragma push_macro("new")
 // #undef new
@@ -1061,7 +1058,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
 							// Sequenced
 							internalPacket = BuildPacketFromSplitPacketList( internalPacket->splitPacketId, timeRead,
-								s, systemAddress, rnr, remotePortRakNetWasStartedOn_PS3, extraSocketOptions);
+								s, systemAddress, rnr, extraSocketOptions);
 
 							if ( internalPacket )
 							{
@@ -1109,7 +1106,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 					InsertIntoSplitPacketList( internalPacket, timeRead );
 
 					internalPacket = BuildPacketFromSplitPacketList( internalPacket->splitPacketId, timeRead,
-						s, systemAddress, rnr, remotePortRakNetWasStartedOn_PS3, extraSocketOptions);
+						s, systemAddress, rnr, extraSocketOptions);
 
 					if ( internalPacket == 0 )
 					{
@@ -2244,7 +2241,6 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2 *s, SystemAddress &systemAdd
 		dat->s=s;
 		dat->length=length;
 		dat->sendTime = 0;
-		dat->remotePortRakNetWasStartedOn_PS3=remotePortRakNetWasStartedOn_PS3;
 		dat->extraSocketOptions=extraSocketOptions;
 		delayList.PushAtHead(dat, 0, _FILE_AND_LINE_);
 #else
@@ -2298,7 +2294,6 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2 *s, SystemAddress &systemAdd
 	memcpy(block->data, bitStream->GetData(), length);
 	block->dataWriteOffset=length;
 	block->extraSocketOptions=extraSocketOptions;
-	block->remotePortRakNetWasStartedOn_PS3=remotePortRakNetWasStartedOn_PS3;
 	block->s=s;
 	block->systemAddress=systemAddress;
 	SendToThread::ProcessBlock(block);

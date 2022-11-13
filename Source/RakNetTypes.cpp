@@ -83,13 +83,18 @@ bool NonNumericHostString( const char *host )
 	return false;
 }
 
-SocketDescriptor::SocketDescriptor() {
+SocketDescriptor::SocketDescriptor()
+{
 #ifdef __native_client__
 	blockingSocket=false;
 #else
 	blockingSocket=true;
 #endif
-	port=0; hostAddress[0]=0; remotePortRakNetWasStartedOn_PS3_PSP2=0; extraSocketOptions=0; socketFamily=AF_INET;}
+	port=0; hostAddress[0]=0;
+	extraSocketOptions=0;
+	socketFamily=AF_INET;
+}
+
 SocketDescriptor::SocketDescriptor(unsigned short _port, const char *_hostAddress)
 {
 	#ifdef __native_client__
@@ -97,7 +102,6 @@ SocketDescriptor::SocketDescriptor(unsigned short _port, const char *_hostAddres
 	#else
 		blockingSocket=true;
 	#endif
-	remotePortRakNetWasStartedOn_PS3_PSP2=0;
 	port=_port;
 	if (_hostAddress)
 		strcpy(hostAddress, _hostAddress);
@@ -462,9 +466,6 @@ bool SystemAddress::SetBinaryAddress(const char *str, char portDelineator)
 	}
 	else
 	{
-		//#ifdef _XBOX
-		//	binaryAddress=UNASSIGNED_SYSTEM_ADDRESS.binaryAddress;
-		//#else
 		// Split the string into the first part, and the : part
 		int index, portIndex;
 		char IPPart[22];
@@ -493,36 +494,16 @@ bool SystemAddress::SetBinaryAddress(const char *str, char portDelineator)
 			portPart[portIndex]=0;
 		}
 
-
-
-
-
-
-
-
-
-
-
-
-
 		if (IPPart[0])
 		{
-
-
-
-
-
 			address.addr4.sin_addr.s_addr=inet_addr__(IPPart);
-
 		}
-
 
 		if (portPart[0])
 		{
 			address.addr4.sin_port=htons((unsigned short) atoi(portPart));
 			debugPort=ntohs(address.addr4.sin_port);
 		}
-		//#endif
 	}
 	return true;
 }

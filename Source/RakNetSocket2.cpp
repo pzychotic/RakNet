@@ -231,7 +231,6 @@ void RNS2_NativeClient::Update(void)
 #else // defined(__native_client__)
 bool IRNS2_Berkley::IsPortInUse(unsigned short port, const char *hostAddress, unsigned short addressFamily, int type ) {
 	RNS2_BerkleyBindParameters bbp;
-	bbp.remotePortRakNetWasStartedOn_PS3_PS4_PSP2=0;
 	bbp.port=port; bbp.hostAddress=(char*) hostAddress;	bbp.addressFamily=addressFamily;
 	bbp.type=type; bbp.protocol=0; bbp.nonBlockingSocket=false;
 	bbp.setBroadcast=false;	bbp.doNotFragment=false; bbp.protocol=0;
