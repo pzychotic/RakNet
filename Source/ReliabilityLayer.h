@@ -18,7 +18,6 @@
 #include "MTUSize.h"
 #include "DS_LinkedList.h"
 #include "DS_List.h"
-#include "SocketLayer.h"
 #include "PacketPriority.h"
 #include "DS_Queue.h"
 #include "BitStream.h"

@@ -11,8 +11,6 @@
 // \file
 //
 
-
-
 #define CAT_NEUTER_EXPORT /* Neuter dllimport for libcat */
 
 #include "RakNetDefines.h"
@@ -87,18 +85,9 @@ namespace RakNet {
 
 RAK_THREAD_DECLARATION(UpdateNetworkLoop);
 RAK_THREAD_DECLARATION(RecvFromLoop);
-RAK_THREAD_DECLARATION(UDTConnect);
 
 static const int NUM_MTU_SIZES=3;
-
-
-
 static const int mtuSizes[NUM_MTU_SIZES]={MAXIMUM_MTU_SIZE, 1200, 576};
-
-
-// Note to self - if I change this it might affect RECIPIENT_OFFLINE_MESSAGE_INTERVAL in Natpunchthrough.cpp
-//static const int MAX_OPEN_CONNECTION_REQUESTS=8;
-//static const int TIME_BETWEEN_OPEN_CONNECTION_REQUESTS=500;
 
 static RakNetRandom rnr;
 
@@ -190,22 +179,15 @@ RakPeer::RakPeer()
 	WSAStartupSingleton::AddRef();
 
 	defaultMTUSize = mtuSizes[NUM_MTU_SIZES-1];
-	trackFrequencyTable = false;
 	maximumIncomingConnections = 0;
 	maximumNumberOfPeers = 0;
-	//remoteSystemListSize=0;
 	remoteSystemList = 0;
 	activeSystemList = 0;
 	activeSystemListSize=0;
 	remoteSystemLookup=0;
-	bytesSentPerSecond = bytesReceivedPerSecond = 0;
 	endThreads = true;
 	isMainLoopThreadActive = false;
 	incomingDatagramEventHandler=0;
-
-
-
-
 
 	// isRecvfromThreadActive=false;
 #if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
@@ -213,7 +195,6 @@ RakPeer::RakPeer()
 #else
 	occasionalPing = false;
 #endif
-	allowInternalRouting=false;
 	for (unsigned int i=0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++)
 		ipList[i]=UNASSIGNED_SYSTEM_ADDRESS;
 	allowConnectionResponseIPMigration = false;
@@ -280,21 +261,6 @@ RakPeer::~RakPeer()
 	if (_cookie_jar) RakNet::OP_DELETE(_cookie_jar,_FILE_AND_LINE_);
 #endif
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // 	for (unsigned int i=0; i < pluginListTS.Size(); i++)
 // 		pluginListTS[i]->SetRakPeerInterface(0);
 // 	for (unsigned int i=0; i < pluginListNTS.Size(); i++)
@@ -328,14 +294,8 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 
 	if (threadPriority==-99999)
 	{
-
-
 #if   defined(_WIN32)
 		threadPriority=0;
-
-
-
-
 #else
 		threadPriority=1000;
 #endif
@@ -357,9 +317,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 	if (socketDescriptors==0 || socketDescriptorCount<1)
 		return INVALID_SOCKET_DESCRIPTORS;
 
-	//unsigned short localPort;
-	//localPort=socketDescriptors[0].port;
-
 	RakAssert( maxConnections > 0 );
 
 	if ( maxConnections <= 0 )
@@ -372,49 +329,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 	// Go through all socket descriptors and precreate sockets on the specified addresses
 	for (i=0; i<socketDescriptorCount; i++)
 	{
-		/*
-		const char *addrToBind;
-		if (socketDescriptors[i].hostAddress[0]==0)
-			addrToBind=0;
-		else
-			addrToBind=socketDescriptors[i].hostAddress;
-			*/
-
-
-
-
-
-
-
-
-
-		/*
-#if RAKNET_SUPPORT_IPV6==1
-		if (SocketLayer::IsSocketFamilySupported(addrToBind, socketDescriptors[i].socketFamily)==false)
-			return SOCKET_FAMILY_NOT_SUPPORTED;
-#endif
-
-		if (socketDescriptors[i].port!=0 && SocketLayer::IsPortInUse(socketDescriptors[i].port, addrToBind, socketDescriptors[i].socketFamily)==true)
-		{
-			DerefAllSockets();
-			return SOCKET_PORT_ALREADY_IN_USE;
-		}
-
-		RakNetSocket* rns = 0;
-		if (socketDescriptors[i].remotePortRakNetWasStartedOn_PS3_PSP2==0)
-		{
-			rns = SocketLayer::CreateBoundSocket( this, socketDescriptors[i].port, socketDescriptors[i].blockingSocket, addrToBind, 100, socketDescriptors[i].extraSocketOptions, socketDescriptors[i].socketFamily, socketDescriptors[i].chromeInstance );
-		}
-		else
-		{
-#if defined(_PS3) || defined(__PS3__) || defined(SN_TARGET_PS3) || defined(_PS4)
-			rns = SocketLayer::CreateBoundSocket_PS3Lobby( socketDescriptors[i].port, socketDescriptors[i].blockingSocket, addrToBind, socketDescriptors[i].socketFamily );
-#elif  defined(SN_TARGET_PSP2)
-			rns = SocketLayer::CreateBoundSocket_PSP2( socketDescriptors[i].port, socketDescriptors[i].blockingSocket, addrToBind, socketDescriptors[i].socketFamily );
-#endif
-		}
-		*/
-
 		RakNetSocket2 *r2 = RakNetSocket2Allocator::AllocRNS2();
 		r2->SetUserConnectionSocketIndex(i);
 		#if defined(__native_client__)
@@ -476,35 +390,8 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 			RakAssert("TODO" && 0);
 		}
 		#endif
-/*
-
-		SystemAddress saOut;
-		SocketLayer::GetSystemAddress( rns, &saOut );
-		rns->SetBoundAddress(saOut);
-		rns->SetRemotePortRakNetWasStartedOn(socketDescriptors[i].remotePortRakNetWasStartedOn_PS3_PSP2);
-		rns->SetChromeInstance(socketDescriptors[i].chromeInstance);
-		rns->SetExtraSocketOptions(socketDescriptors[i].extraSocketOptions);
-		rns->SetUserConnectionSocketIndex(i);
-		rns->SetBlockingSocket(socketDescriptors[i].blockingSocket);
-
-#if RAKNET_SUPPORT_IPV6==0
-		if (addrToBind==0)
-			rns->SetBoundAddressToLoopback(4);
-#endif
-
-		// GetBoundAddress is asynch, which isn't supported by this architecture
-#if !defined(__native_client__)
-		int zero=0;
-		if (SocketLayer::SendTo(rns, (const char*) &zero,4, rns->GetBoundAddress(), _FILE_AND_LINE_)!=0)
-		{
-			DerefAllSockets();
-			return SOCKET_FAILED_TEST_SEND;
-		}
-#endif
-		*/
 
 		socketList.Push(r2, _FILE_AND_LINE_ );
-
 	}
 
 #if !defined(__native_client__)
@@ -540,13 +427,8 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 			maximumIncomingConnections = maxConnections;
 
 		maximumNumberOfPeers = maxConnections;
-		// 04/19/2006 - Don't overallocate because I'm no longer allowing connected pings.
-		// The disconnects are not consistently processed and the process was sloppy and complicated.
-		// Allocate 10% extra to handle new connections from players trying to connect when the server is full
-		//remoteSystemListSize = maxConnections;// * 11 / 10 + 1;
 
 		// remoteSystemList in Single thread
-		//remoteSystemList = RakNet::OP_NEW<RemoteSystemStruct[ remoteSystemListSize ]>( _FILE_AND_LINE_ );
 		remoteSystemList = RakNet::OP_NEW_ARRAY<RemoteSystemStruct>(maximumNumberOfPeers, _FILE_AND_LINE_ );
 
 		remoteSystemLookup = RakNet::OP_NEW_ARRAY<RemoteSystemIndex*>((unsigned int) maximumNumberOfPeers * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE, _FILE_AND_LINE_ );
@@ -554,7 +436,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 		activeSystemList = RakNet::OP_NEW_ARRAY<RemoteSystemStruct*>(maximumNumberOfPeers, _FILE_AND_LINE_ );
 
 		for ( i = 0; i < maximumNumberOfPeers; i++ )
-		//for ( i = 0; i < remoteSystemListSize; i++ )
 		{
 			// remoteSystemList in Single thread
 			remoteSystemList[ i ].isActive = false;
@@ -578,13 +459,8 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 		}
 	}
 
-	// For histogram statistics
-	// nextReadBytesTime=0;
-	// lastSentBytes=lastReceivedBytes=0;
-
 	if ( endThreads )
 	{
-		updateCycleIsRunning = false;
 		endThreads = false;
 		firstExternalID=UNASSIGNED_SYSTEM_ADDRESS;
 
@@ -596,26 +472,17 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 		{
 #if RAKPEER_USER_THREADED!=1
 
-			int errorCode;
+			int errorCode = RakThread::Create(UpdateNetworkLoop, this, threadPriority);
 
-
-
-
-
-
-
-					errorCode = RakThread::Create(UpdateNetworkLoop, this, threadPriority);
-
-
-					if ( errorCode != 0 )
-					{
-						Shutdown( 0, 0 );
-						return FAILED_TO_CREATE_NETWORK_THREAD;
-					}
-//					RakAssert(isRecvFromLoopThreadActive == 0);
+			if ( errorCode != 0 )
+			{
+				Shutdown( 0, 0 );
+				return FAILED_TO_CREATE_NETWORK_THREAD;
+			}
+			//RakAssert(isRecvFromLoopThreadActive == 0);
 #endif // RAKPEER_USER_THREADED!=1
 
-					/*
+			/*
 			for (i=0; i<socketDescriptorCount; i++)
 			{
 				RakPeerAndIndex *rpai = RakNet::OP_NEW<RakPeerAndIndex>(_FILE_AND_LINE_);
@@ -639,18 +506,17 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor *s
 				}
 #endif // RAKPEER_USER_THREADED!=1
 				}
-				*/
+			*/
 
-
-		/*
+			/*
 #if RAKPEER_USER_THREADED!=1
 
 			while ( isRecvFromLoopThreadActive < socketDescriptorCount )
 				RakSleep(10);
 				#endif // RAKPEER_USER_THREADED!=1
-				*/
+			*/
 
-				}
+		}
 
 #if RAKPEER_USER_THREADED!=1
 		// Wait for the threads to activate.  When they are active they will set these variables to true
@@ -938,11 +804,6 @@ ConnectionAttemptResult RakPeer::Connect( const char* host, unsigned short remot
 //		memcpy(outgoingPassword, passwordData, passwordDataLength);
 //	outgoingPasswordLength=(unsigned char) passwordDataLength;
 
-	// 04/02/09 - Can't remember why I disabled connecting to self, but it seems to work
-	// Connecting to ourselves in the same instance of the program?
-//	if ( ( strcmp( host, "127.0.0.1" ) == 0 || strcmp( host, "0.0.0.0" ) == 0 ) && remotePort == mySystemAddress[0].port )
-//		return false;
-
 	return SendConnectionRequest( host, remotePort, passwordData, passwordDataLength, publicKey, connectionSocketIndex, 0, sendConnectionAttemptCount, timeBetweenSendConnectionAttemptsMS, timeoutTime);
 }
 
@@ -972,9 +833,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 	unsigned i,j;
 	bool anyActive;
 	RakNet::TimeMS startWaitingTime;
-//	SystemAddress systemAddress;
 	RakNet::TimeMS time;
-	//unsigned short systemListSize = remoteSystemListSize; // This is done for threading reasons
 	unsigned int systemListSize = maximumNumberOfPeers;
 
 	if ( blockDuration > 0 )
@@ -1040,34 +899,11 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 	}
 #endif
 
-	/*
-	// Get recvfrom to unblock
-	for (i=0; i < socketList.Size(); i++)
-	{
-		if (SocketLayer::SendTo(socketList[i], (const char*) &i,1,socketList[i]->GetBoundAddress(), _FILE_AND_LINE_)!=0)
-			break;
-	}
-	*/
-
 	while ( isMainLoopThreadActive )
 	{
 		endThreads = true;
 		RakSleep(15);
 	}
-
-	/*
-	timeout = RakNet::GetTimeMS()+1000;
-	while ( isRecvFromLoopThreadActive > 0 && RakNet::GetTimeMS() < timeout )
-	{
-		// Get recvfrom to unblock
-		for (i=0; i < socketList.Size(); i++)
-		{
-			SocketLayer::SendTo(socketList[i], (const char*) &i,1,socketList[i]->GetBoundAddress(), _FILE_AND_LINE_);
-		}
-
-		RakSleep(30);
-	}
-	*/
 
 #if !defined(__native_client__)
 	for (i=0; i < socketList.Size(); i++)
@@ -1082,8 +918,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
 #endif // RAKPEER_USER_THREADED!=1
 
-//	char c=0;
-//	unsigned int socketIndex;
 	// remoteSystemList in Single thread
 	for ( i = 0; i < systemListSize; i++ )
 	{
@@ -1098,9 +932,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
 
 	// Setting maximumNumberOfPeers to 0 allows remoteSystemList to be reallocated in Initialize.
-	// Setting remoteSystemListSize prevents threads from accessing the reliability layer
 	maximumNumberOfPeers = 0;
-	//remoteSystemListSize = 0;
 
 	// Free any packets the user didn't deallocate
 	packetReturnMutex.lock();
@@ -1128,7 +960,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 	ClearBufferedCommands();
 	ClearBufferedPackets();
 	ClearSocketQueryOutput();
-	bytesSentPerSecond = bytesReceivedPerSecond = 0;
 
 	ClearRequestedConnectionList();
 
@@ -1406,48 +1237,10 @@ Packet* RakPeer::Receive( void )
 		return 0;
 
 	Packet *packet;
-//	Packet **threadPacket;
 	PluginReceiveResult pluginResult;
 
 	int offset;
 	unsigned int i;
-
-	// User should call RunUpdateCycle and RunRecvFromOnce to do this commented code
-	/*
-#if RAKPEER_SINGLE_THREADED==1
-	RakPeer::RecvFromStruct *recvFromStruct;
-	for (i=0; i < socketList.Size(); i++)
-	{
-		while (1)
-		{
-			recvFromStruct=bufferedPackets.Allocate( _FILE_AND_LINE_ );
-			recvFromStruct->s=socketList[i]->s;
-			recvFromStruct->remotePortRakNetWasStartedOn_PS3=socketList[i]->remotePortRakNetWasStartedOn_PS3_PSP2;
-			recvFromStruct->extraSocketOptions=socketList[i]->extraSocketOptions;
-			SocketLayer::RecvFromBlocking(
-				recvFromStruct->s, this, recvFromStruct->remotePortRakNetWasStartedOn_PS3,
-				recvFromStruct->extraSocketOptions, recvFromStruct->data, &recvFromStruct->bytesRead, &recvFromStruct->systemAddress, &recvFromStruct->timeRead);
-			if (recvFromStruct->bytesRead<=0)
-			{
-				bufferedPackets.Deallocate(recvFromStruct, _FILE_AND_LINE_);
-				break;
-			}
-			else
-			{
-				RakAssert(recvFromStruct->systemAddress.GetPort());
-				bufferedPackets.Push(recvFromStruct);
-			}
-		}
-	}
-
-	BitStream updateBitStream( MAXIMUM_MTU_SIZE
-#if LIBCAT_SECURITY==1
-		+ cat::AuthenticatedEncryption::OVERHEAD_BYTES
-#endif
-		);
-	RunUpdateCycle(0, 0, updateBitStream);
-#endif
-	*/
 
 	for (i=0; i < pluginListTS.Size(); i++)
 	{
@@ -1727,7 +1520,6 @@ int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress ) cons
 SystemAddress RakPeer::GetSystemAddressFromIndex( unsigned int index )
 {
 	// remoteSystemList in user thread
-	//if ( index >= 0 && index < remoteSystemListSize )
 	if ( index < maximumNumberOfPeers )
 		if (remoteSystemList[index].isActive && remoteSystemList[ index ].connectMode==RakPeer::RemoteSystemStruct::CONNECTED) // Don't give the user players that aren't fully connected, since sends will fail
 			return remoteSystemList[ index ].systemAddress;
@@ -1743,7 +1535,6 @@ SystemAddress RakPeer::GetSystemAddressFromIndex( unsigned int index )
 RakNetGUID RakPeer::GetGUIDFromIndex( unsigned int index )
 {
 	// remoteSystemList in user thread
-	//if ( index >= 0 && index < remoteSystemListSize )
 	if ( index < maximumNumberOfPeers )
 		if (remoteSystemList[index].isActive && remoteSystemList[ index ].connectMode==RakPeer::RemoteSystemStruct::CONNECTED) // Don't give the user players that aren't fully connected, since sends will fail
 			return remoteSystemList[ index ].guid;
@@ -2027,17 +1818,6 @@ bool RakPeer::Ping( const char* host, unsigned short remotePort, bool onlyReplyO
 
 	// No timestamp for 255.255.255.255
 	unsigned int realIndex = GetRakNetSocketFromUserConnectionSocketIndex(connectionSocketIndex);
-	/*
-
-	SystemAddress systemAddress;
-	systemAddress.FromStringExplicitPort(host,remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion());
-	systemAddress.FixForIPVersion(socketList[realIndex]->GetBoundAddress());
-
-	unsigned i;
-	for (i=0; i < pluginListNTS.Size(); i++)
-		pluginListNTS[i]->OnDirectSocketSend((const char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), systemAddress);
-	SocketLayer::SendTo( socketList[realIndex], (const char*)bitStream.GetData(), (int) bitStream.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
-	*/
 
 	RNS2_SendParameters bsp;
 	bsp.data = (char*) bitStream.GetData() ;
@@ -2218,25 +1998,11 @@ SystemAddress RakPeer::GetInternalID( const SystemAddress systemAddress, const i
 	}
 	else
 	{
-
-//		SystemAddress returnValue;
 		RemoteSystemStruct * remoteSystem = GetRemoteSystemFromSystemAddress( systemAddress, false, true );
 		if (remoteSystem==0)
 			return UNASSIGNED_SYSTEM_ADDRESS;
 
 		return remoteSystem->theirInternalSystemAddress[index];
-		/*
-		sockaddr_in sa;
-		socklen_t len = sizeof(sa);
-		if (getsockname__(connectionSockets[remoteSystem->connectionSocketIndex], (sockaddr*)&sa, &len)!=0)
-			return UNASSIGNED_SYSTEM_ADDRESS;
-		returnValue.port=ntohs(sa.sin_port);
-		returnValue.binaryAddress=sa.sin_addr.s_addr;
-		return returnValue;
-*/
-
-
-
 	}
 }
 
@@ -2497,7 +2263,6 @@ int RakPeer::GetMTUSize( const SystemAddress target ) const
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::GetNumberOfAddresses( void )
 {
-
 	if (IsActive()==false)
 	{
 		FillIPList();
@@ -2509,10 +2274,6 @@ unsigned int RakPeer::GetNumberOfAddresses( void )
 		i++;
 
 	return i;
-
-
-
-
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2534,10 +2295,6 @@ const char* RakPeer::GetLocalIP( unsigned int index )
 	static char str[128];
 	ipList[index].ToString(false,str);
 	return str;
-
-
-
-
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2561,9 +2318,6 @@ bool RakPeer::IsLocalIP( const char *ip )
 		if (strcmp(ip, GetLocalIP(i))==0)
 			return true;
 	}
-
-
-
 
 	return false;
 }
@@ -2821,7 +2575,6 @@ void RakPeer::GetSockets( DataStructures::List<RakNetSocket2* > &sockets )
 
 	// Block up to one second to get the socket, although it should actually take virtually no time
 	SocketQueryOutput *sqo;
-//	RakNetSocket2* output;
 	while (1)
 	{
 		if (isMainLoopThreadActive==false)
@@ -2857,7 +2610,6 @@ void RakPeer::ApplyNetworkSimulator( float packetloss, unsigned short minExtraPi
 	{
 		unsigned short i;
 		for (i=0; i < maximumNumberOfPeers; i++)
-			//for (i=0; i < remoteSystemListSize; i++)
 			remoteSystemList[i].reliabilityLayer.ApplyNetworkSimulator(packetloss, minExtraPing, extraPingVariance);
 	}
 
@@ -2932,18 +2684,6 @@ bool RakPeer::SendOutOfBand(const char *host, unsigned short remotePort, const c
 	}
 	
 	unsigned int realIndex = GetRakNetSocketFromUserConnectionSocketIndex(connectionSocketIndex);
-
-	/*
-	SystemAddress systemAddress;
-	systemAddress.FromStringExplicitPort(host,remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion());
-	systemAddress.FixForIPVersion(socketList[realIndex]->GetBoundAddress());
-
-	unsigned i;
-	for (i=0; i < pluginListNTS.Size(); i++)
-		pluginListNTS[i]->OnDirectSocketSend((const char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), systemAddress);
-	
-	SocketLayer::SendTo( socketList[realIndex], (const char*)bitStream.GetData(), (int) bitStream.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
-	*/
 
 	RNS2_SendParameters bsp;
 	bsp.data = (char*) bitStream.GetData();
@@ -3184,7 +2924,6 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
 	if (GetRemoteSystemFromSystemAddress(systemAddress, false, true))
 		return ALREADY_CONNECTED_TO_ENDPOINT;
 
-	//RequestedConnectionStruct *rcs = (RequestedConnectionStruct *) rakMalloc_Ex(sizeof(RequestedConnectionStruct), _FILE_AND_LINE_);
 	RequestedConnectionStruct *rcs = RakNet::OP_NEW<RequestedConnectionStruct>(_FILE_AND_LINE_);
 
 	rcs->systemAddress=systemAddress;
@@ -3235,7 +2974,6 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
 	if (GetRemoteSystemFromSystemAddress(systemAddress, false, true))
 		return ALREADY_CONNECTED_TO_ENDPOINT;
 
-	//RequestedConnectionStruct *rcs = (RequestedConnectionStruct *) rakMalloc_Ex(sizeof(RequestedConnectionStruct), _FILE_AND_LINE_);
 	RequestedConnectionStruct *rcs = RakNet::OP_NEW<RequestedConnectionStruct>(_FILE_AND_LINE_);
 
 	rcs->systemAddress=systemAddress;
@@ -3597,45 +3335,6 @@ RakPeer::RemoteSystemStruct * RakPeer::AssignSystemAddressToRemoteSystemList( co
 							break;
 						}
 					}
-
-					if (socketListIndex==socketList.Size())
-					{
-						char ipListFoundIndexStr[128];
-						ipList[foundIndex].ToString(false,str);
-
-						// Force binding with new socket
-						RakNetSocket* rns(RakNet::OP_NEW<RakNetSocket>(_FILE_AND_LINE_));
-						if (incomingRakNetSocket->GetRemotePortRakNetWasStartedOn()==0)
-							rns = SocketLayer::CreateBoundSocket( this, bindingAddress.GetPort(), incomingRakNetSocket->GetBlockingSocket(), ipListFoundIndexStr, 0, incomingRakNetSocket->GetExtraSocketOptions(), incomingRakNetSocket->GetSocketFamily(), incomingRakNetSocket->GetChromeInstance() );
-						else
-							rns = SocketLayer::CreateBoundSocket_PS3Lobby( bindingAddress.GetPort(), incomingRakNetSocket->GetBlockingSocket(), ipListFoundIndexStr, incomingRakNetSocket->GetSocketFamily() );
-
-
-						if (rns==0)
-						{
-							// Can't bind. Just use whatever socket it came in on
-							remoteSystem->rakNetSocket=incomingRakNetSocket;
-						}
-						else
-						{
-							rns->GetBoundAddress()=bindingAddress;
-							rns->SetUserConnectionSocketIndex((unsigned int)-1);
-							socketList.Push(rns, _FILE_AND_LINE_ );
-							remoteSystem->rakNetSocket=rns;
-
-
-#ifdef _WIN32
-							int highPriority=THREAD_PRIORITY_ABOVE_NORMAL;
-#else
-							int highPriority=-10;
-#endif
-
-							highPriority=0;
-
-
-						}
-					}
-
 					*/
 				}
 			}
@@ -3861,51 +3560,7 @@ void RakPeer::RemoveFromActiveSystemList(const SystemAddress &sa)
 	}
 	RakAssert("activeSystemList invalid, entry not found in RemoveFromActiveSystemList. Ensure that AddToActiveSystemList and RemoveFromActiveSystemList are called by the same thread." && 0);
 }
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/*
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-unsigned int RakPeer::LookupIndexUsingHashIndex(const SystemAddress &sa) const
-{
-	unsigned int scanCount=0;
-	unsigned int index = RemoteSystemLookupHashIndex(sa);
-	if (remoteSystemLookup[index].index==(unsigned int)-1)
-		return (unsigned int) -1;
-	while (remoteSystemList[remoteSystemLookup[index].index].systemAddress!=sa)
-	{
-		if (++index==(unsigned int) maximumNumberOfPeers*REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE)
-			index=0;
-		if (++scanCount>(unsigned int) maximumNumberOfPeers*REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE)
-			return (unsigned int) -1;
-		if (remoteSystemLookup[index].index==-1)
-			return (unsigned int) -1;
-	}
-	return index;
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-unsigned int RakPeer::RemoteSystemListIndexUsingHashIndex(const SystemAddress &sa) const
-{
-	unsigned int index = LookupIndexUsingHashIndex(sa);
-	if (index!=(unsigned int) -1)
-	{
-		return remoteSystemLookup[index].index;
-	}
-	return (unsigned int) -1;
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-unsigned int RakPeer::FirstFreeRemoteSystemLookupIndex(const SystemAddress &sa) const
-{
-//	unsigned int collisionCount=0;
-	unsigned int index = RemoteSystemLookupHashIndex(sa);
-	while (remoteSystemLookup[index].index!=(unsigned int)-1)
-	{
-		if (++index==(unsigned int) maximumNumberOfPeers*REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE)
-			index=0;
-//		collisionCount++;
-	}
-//	printf("%i collisions. Using index %i\n", collisionCount, index);
-	return index;
-}
-*/
+
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::IsLoopbackAddress(const AddressOrGUID &systemIdentifier, bool matchPort) const
 {
@@ -3932,11 +3587,7 @@ bool RakPeer::IsLoopbackAddress(const AddressOrGUID &systemIdentifier, bool matc
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetLoopbackAddress(void) const
 {
-
 	return ipList[0];
-
-
-
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::AllowIncomingConnections(void) const
@@ -4187,7 +3838,6 @@ bool RakPeer::SendImmediate( char *data, BitSize_t numberOfBitsToSend, PacketPri
 	unsigned sendListSize;
 	bool callerDataAllocationUsed;
 	unsigned int remoteSystemIndex, sendListIndex; // Iterates into the list of remote systems
-//	unsigned numberOfBytesUsed = (unsigned) BITS_TO_BYTES(numberOfBitsToSend);
 	callerDataAllocationUsed=false;
 
 	sendListSize=0;
@@ -4290,14 +3940,13 @@ void RakPeer::ResetSendReceipt(void)
 void RakPeer::OnConnectedPong(RakNet::Time sendPingTime, RakNet::Time sendPongTime, RemoteSystemStruct *remoteSystem)
 {
 	RakNet::Time ping;
-//	RakNet::TimeMS lastPing;
 	RakNet::Time time = RakNet::GetTime(); // Update the time value to be accurate
 	if (time > sendPingTime)
 		ping = time - sendPingTime;
 	else
 		ping=0;
 
-//	lastPing = remoteSystem->pingAndClockDifferential[ remoteSystem->pingAndClockDifferentialWriteIndex ].pingTime;
+//	RakNet::TimeMS lastPing = remoteSystem->pingAndClockDifferential[ remoteSystem->pingAndClockDifferentialWriteIndex ].pingTime;
 
 	remoteSystem->pingAndClockDifferential[ remoteSystem->pingAndClockDifferentialWriteIndex ].pingTime = ( unsigned short ) ping;
 	// Thanks to Chris Taylor (cat02e@fsu.edu) for the improved timestamping algorithm
@@ -4400,14 +4049,7 @@ void RakPeer::GenerateGUID(void)
 	myGuid.g=Get64BitUniqueRandomNumber();
 
 }
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// void ProcessPortUnreachable( SystemAddress systemAddress, RakPeer *rakPeer )
-// {
-// 	(void) binaryAddress;
-// 	(void) port;
-// 	(void) rakPeer;
-//
-// }
+
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNetSocket2* rakNetSocket, bool *isOfflineMessage, RakNet::TimeUS timeRead )
 {
@@ -4437,13 +4079,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 		for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 			rakPeer->pluginListNTS[i]->OnDirectSocketSend((char*) bs.GetData(), bs.GetNumberOfBitsUsed(), systemAddress);
 		rakNetSocket->Send(&bsp, _FILE_AND_LINE_);
-
-/*
-		unsigned i;
-		for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
-			rakPeer->pluginListNTS[i]->OnDirectSocketSend((char*) bs.GetData(), bs.GetNumberOfBitsUsed(), systemAddress);
-		SocketLayer::SendTo( rakNetSocket, (char*) bs.GetData(), bs.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
-		*/
 
 		return true;
 	}
@@ -4538,8 +4173,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 				bsp.length = outBitStream.GetNumberOfBytesUsed();
 				bsp.systemAddress = systemAddress;
 				rakNetSocket->Send(&bsp, _FILE_AND_LINE_);
-
-				// SocketLayer::SendTo( rakNetSocket, (const char*)outBitStream.GetData(), (unsigned int) outBitStream.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
 
 				packet=rakPeer->AllocPacket(sizeof(MessageID), _FILE_AND_LINE_);
 				packet->data[0]=data[0];
@@ -4726,8 +4359,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 
 					for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 						rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsOut.GetData(), bsOut.GetNumberOfBitsUsed(), rcs->systemAddress);
-
-					// SocketLayer::SendTo( rakPeer->socketList[rcs->socketIndex], (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), rcs->systemAddress, _FILE_AND_LINE_ );
 
 					RNS2_SendParameters bsp;
 					bsp.data = (char*) bsOut.GetData();
@@ -4997,13 +4628,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 			}
 		}
 		else if ((unsigned char)(data)[0] == ID_OPEN_CONNECTION_REQUEST_1 && length > (int) (1+sizeof(OFFLINE_MESSAGE_DATA_ID)))
-		{/*
-			static int x = 0;
-			++x;
-
-			SystemAddress *addr = (SystemAddress*)&systemAddress;
-			addr->binaryAddress += x;*/
-
+		{
 			unsigned int i;
 			//RAKNET_DEBUG_PRINTF("%i:IOCR, ", __LINE__);
 			char remoteProtocol=data[1+sizeof(OFFLINE_MESSAGE_DATA_ID)];
@@ -5017,8 +4642,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 
 				for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 					rakPeer->pluginListNTS[i]->OnDirectSocketSend((char*)bs.GetData(), bs.GetNumberOfBitsUsed(), systemAddress);
-
-				// SocketLayer::SendTo( rakNetSocket, (char*)bs.GetData(), bs.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
 
 				RNS2_SendParameters bsp;
 				bsp.data = (char*) bs.GetData();
@@ -5059,7 +4682,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 
 			for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 				rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsOut.GetData(), bsOut.GetNumberOfBitsUsed(), systemAddress);
-			// SocketLayer::SendTo( rakNetSocket, (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
 
 			RNS2_SendParameters bsp;
 			bsp.data = (char*) bsOut.GetData();
@@ -5199,7 +4821,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 				unsigned int i;
 				for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 					rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsAnswer.GetData(), bsAnswer.GetNumberOfBitsUsed(), systemAddress);
-				// SocketLayer::SendTo( rakNetSocket, (const char*) bsAnswer.GetData(), bsAnswer.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
 
 				RNS2_SendParameters bsp;
 				bsp.data = (char*) bsAnswer.GetData();
@@ -5216,7 +4837,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 				bsOut.Write(rakPeer->myGuid);
 				for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 					rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsOut.GetData(), bsOut.GetNumberOfBitsUsed(), systemAddress);
-				// SocketLayer::SendTo( rakNetSocket, (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
+
 				RNS2_SendParameters bsp;
 				bsp.data = (char*) bsOut.GetData();
 				bsp.length = bsOut.GetNumberOfBytesUsed();
@@ -5233,7 +4854,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 				bsOut.Write(rakPeer->myGuid);
 				for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 					rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsOut.GetData(), bsOut.GetNumberOfBitsUsed(), systemAddress);
-				//SocketLayer::SendTo( rakNetSocket, (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
+
 				RNS2_SendParameters bsp;
 				bsp.data = (char*) bsOut.GetData();
 				bsp.length = bsOut.GetNumberOfBytesUsed();
@@ -5253,7 +4874,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 				bsOut.Write(rakPeer->myGuid);
 				for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 					rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsOut.GetData(), bsOut.GetNumberOfBitsUsed(), systemAddress);
-				//SocketLayer::SendTo( rakNetSocket, (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
 
 				RNS2_SendParameters bsp;
 				bsp.data = (char*) bsOut.GetData();
@@ -5289,7 +4909,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data,
 			unsigned int i;
 			for (i=0; i < rakPeer->pluginListNTS.Size(); i++)
 				rakPeer->pluginListNTS[i]->OnDirectSocketSend((const char*) bsAnswer.GetData(), bsAnswer.GetNumberOfBitsUsed(), systemAddress);
-			// SocketLayer::SendTo( rakNetSocket, (const char*) bsAnswer.GetData(), bsAnswer.GetNumberOfBytesUsed(), systemAddress, _FILE_AND_LINE_ );
+
 			RNS2_SendParameters bsp;
 			bsp.data = (char*) bsAnswer.GetData();
 			bsp.length = bsAnswer.GetNumberOfBytesUsed();
@@ -5326,7 +4946,6 @@ void ProcessNetworkPacket( SystemAddress systemAddress, const char *data, const 
 		return;
 	}
 
-//	Packet *packet;
 	RakPeer::RemoteSystemStruct *remoteSystem;
 
 	// See if this datagram came from a connected system
@@ -5344,7 +4963,6 @@ void ProcessNetworkPacket( SystemAddress systemAddress, const char *data, const 
 	}
 	else
 	{
-		// int a=5;
 		// printf("--- Packet from unknown system %s\n", systemAddress.ToString());
 	}
 }
@@ -5393,65 +5011,12 @@ unsigned int RakPeer::GetRakNetSocketFromUserConnectionSocketIndex(unsigned int 
 	return (unsigned int) -1;
 }
 
-/*
-// DS_APR
-void RakPeer::ProcessChromePacket(RakNetSocket2 *s, const char *buffer, int dataSize, const SystemAddress& recvFromAddress, RakNet::TimeUS timeRead)
-{
-	RakAssert(buffer);
-	RakAssert(dataSize > 0);
-	RakAssert(recvFromAddress.GetPort());
-
-	RNS2RecvStruct *recvFromStruct;
-	recvFromStruct=bufferedPackets.Allocate( _FILE_AND_LINE_ );
-	RakAssert(dataSize <= (int)sizeof(recvFromStruct->data));
-	memcpy(recvFromStruct->data, buffer, dataSize);
-	recvFromStruct->bytesRead=dataSize;
-	recvFromStruct->systemAddress=recvFromAddress;
-	recvFromStruct->timeRead=timeRead;
-	bufferedPackets.Push(recvFromStruct);
-}
-*/
-
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/*
-bool RakPeer::RunRecvFromOnce( RakNetSocket *s )
-{
-	RakPeer::RecvFromStruct *recvFromStruct;
-
-	recvFromStruct=bufferedPackets.Allocate( _FILE_AND_LINE_ );
-	if (recvFromStruct != NULL)
-	{
-		recvFromStruct->s=s;
-		SocketLayer::RecvFromBlocking(s, this, recvFromStruct->data, &recvFromStruct->bytesRead, &recvFromStruct->systemAddress, &recvFromStruct->timeRead);
-
-		if (recvFromStruct->bytesRead>0)
-		{
-			RakAssert(recvFromStruct->systemAddress.GetPort());
-			bufferedPackets.Push(recvFromStruct);
-			quitAndDataEvents.SetEvent();
-
-			// Got data
-			return true;
-		}
-		else
-		{
-			bufferedPackets.Deallocate(recvFromStruct, _FILE_AND_LINE_);
-		}
-	}
-	// No data
-	return false;
-}
-*/
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 {
 	RakPeer::RemoteSystemStruct * remoteSystem;
 	unsigned int activeSystemListIndex;
 	Packet *packet;
-	// int currentSentBytes,currentReceivedBytes;
-//	unsigned numberOfBytesUsed;
-//	BitSize_t numberOfBitsUsed;
-	//SystemAddress authoritativeClientSystemAddress;
 	BitSize_t bitSize;
 	unsigned int byteSize;
 	unsigned char *data;
@@ -5478,20 +5043,11 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 	}
 #endif
 
-//	unsigned int socketListIndex;
 	RNS2RecvStruct *recvFromStruct;
 	while ((recvFromStruct=PopBufferedPacket())!=0)
 	{
-		/*
-		for (socketListIndex=0; socketListIndex < socketList.Size(); socketListIndex++)
-		{
-			if ((RakNetSocket*) socketList[socketListIndex]==recvFromStruct->s)
-				break;
-		}
-		if (socketListIndex!=socketList.Size())
-		*/
-			ProcessNetworkPacket(recvFromStruct->systemAddress, recvFromStruct->data, recvFromStruct->bytesRead, this, recvFromStruct->socket, recvFromStruct->timeRead, updateBitStream);
-			DeallocRNS2RecvStruct(recvFromStruct, _FILE_AND_LINE_);
+		ProcessNetworkPacket(recvFromStruct->systemAddress, recvFromStruct->data, recvFromStruct->bytesRead, this, recvFromStruct->socket, recvFromStruct->timeRead, updateBitStream);
+		DeallocRNS2RecvStruct(recvFromStruct, _FILE_AND_LINE_);
 	}
 
 	while ((bcs=bufferedCommands.PopInaccurate())!=0)
@@ -5661,7 +5217,6 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 						((RNS2_Berkley*)socketToUse)->SetDoNotFragment(1);
 #endif
 
-//					SocketLayer::SetDoNotFragment(socketToUse, 1);
 					RakNet::Time sendToStart=RakNet::GetTime();
 
 					RNS2_SendParameters bsp;
@@ -5669,7 +5224,6 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 					bsp.length = bitStream.GetNumberOfBytesUsed();
 					bsp.systemAddress = rcs->systemAddress;
 					if (socketToUse->Send(&bsp, _FILE_AND_LINE_) == 10040)
-					// if (SocketLayer::SendTo( socketToUse, (const char*) bitStream.GetData(), bitStream.GetNumberOfBytesUsed(), rcs->systemAddress, _FILE_AND_LINE_ )==-10040)
 					{
 						// Don't use this MTU size again
 						rcs->requestsMade = (unsigned char) ((MTUSizeIndex + 1) * (rcs->sendConnectionAttemptCount/NUM_MTU_SIZES));
@@ -5691,7 +5245,6 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 								rcs->requestsMade=(unsigned char)(rcs->sendConnectionAttemptCount+1);
 						}
 					}
-					// SocketLayer::SetDoNotFragment(socketToUse, 0);
 #if !defined(__native_client__)
 					if (socketToUse->IsBerkleySocket())
 						((RNS2_Berkley*)socketToUse)->SetDoNotFragment(0);
@@ -5710,7 +5263,6 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 
 	// remoteSystemList in network thread
 	for ( activeSystemListIndex = 0; activeSystemListIndex < activeSystemListSize; ++activeSystemListIndex )
-	//for ( remoteSystemIndex = 0; remoteSystemIndex < remoteSystemListSize; ++remoteSystemIndex )
 	{
 		// I'm using systemAddress from remoteSystemList but am not locking it because this loop is called very frequently and it doesn't
 		// matter if we miss or do an extra update.  The reliability layers themselves never care which player they are associated with
@@ -5809,10 +5361,6 @@ bool RakPeer::RunUpdateCycle(BitStream &updateBitStream )
 				// Update again immediately after this tick so the ping goes out right away
 				quitAndDataEvents.SetEvent();
 			}
-
-			// Find whoever has the lowest player ID
-			//if (systemAddress < authoritativeClientSystemAddress)
-			// authoritativeClientSystemAddress=systemAddress;
 
 			// Does the reliability layer have any packets waiting for us?
 			// To be thread safe, this has to be called in the same thread as HandleSocketReceiveFromConnectedPlayer
@@ -6175,78 +5723,16 @@ void RakPeer::OnRNS2Recv(RNS2RecvStruct *recvStruct)
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-/*
-RAK_THREAD_DECLARATION(RecvFromLoop)
-{
-#if defined(SN_TARGET_PSP2)
-	RakPeerAndIndex *rpai = ( RakPeerAndIndex * ) RakThread::GetRealThreadArgument(callGetRealThreadArgument);
-#else
-	RakPeerAndIndex *rpai = ( RakPeerAndIndex * ) arguments;
-#endif
-	RakPeer * rakPeer = rpai->rakPeer;
-	RakNetSocket *s = rpai->s;
-	RakNet::OP_DELETE(rpai,_FILE_AND_LINE_);
-
-	rakPeer->isRecvFromLoopThreadActive++;
-
-	while ( rakPeer->endThreads == false )
-	{
-		if (rakPeer->RunRecvFromOnce(s)==false &&
-			s->GetBlockingSocket()==false)
-			RakSleep(0);
-	}
-	rakPeer->isRecvFromLoopThreadActive--;
-
-#if defined(SN_TARGET_PSP2)
-	return sceKernelExitDeleteThread(0);
-#else
-	return 0;
-#endif
-}
-*/
-
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RAK_THREAD_DECLARATION(UpdateNetworkLoop)
 {
-
-
-
 	RakPeer * rakPeer = ( RakPeer * ) arguments;
-
-
-/*
-	// 11/15/05 - this is slower than Sleep()
-#ifdef _WIN32
-#if (_WIN32_WINNT >= 0x0400) || (_WIN32_WINDOWS > 0x0400)
-	// Lets see if these timers give better performance than Sleep
-	HANDLE timerHandle;
-	LARGE_INTEGER dueTime;
-
-	if ( rakPeer->threadSleepTimer <= 0 )
-		rakPeer->threadSleepTimer = 1;
-
-	// 2nd parameter of false means synchronization timer instead of manual-reset timer
-	timerHandle = CreateWaitableTimer( NULL, FALSE, 0 );
-
-	RakAssert( timerHandle );
-
-	dueTime.QuadPart = -10000 * rakPeer->threadSleepTimer; // 10000 is 1 ms?
-
-	BOOL success = SetWaitableTimer( timerHandle, &dueTime, rakPeer->threadSleepTimer, NULL, NULL, FALSE );
-    (void) success;
-	RakAssert( success );
-
-#endif
-#endif
-*/
 
 	BitStream updateBitStream( MAXIMUM_MTU_SIZE
 #if LIBCAT_SECURITY==1
 		+ cat::AuthenticatedEncryption::OVERHEAD_BYTES
 #endif
 		);
-// 
+
 	rakPeer->isMainLoopThreadActive = true;
 
 	while ( rakPeer->endThreads == false )
@@ -6264,56 +5750,11 @@ RAK_THREAD_DECLARATION(UpdateNetworkLoop)
 
 		// Pending sends go out this often, unless quitAndDataEvents is set
 		rakPeer->quitAndDataEvents.WaitOnEvent(10);
-
-		/*
-
-// #if ((_WIN32_WINNT >= 0x0400) || (_WIN32_WINDOWS > 0x0400)) &&
-#if defined(USE_WAIT_FOR_MULTIPLE_EVENTS) && defined(_WIN32)
-
-		if (rakPeer->threadSleepTimer>0)
-		{
-			WSAEVENT eventArray[256];
-			unsigned int i, eventArrayIndex;
-			for (i=0,eventArrayIndex=0; i < rakPeer->socketList.Size(); i++)
-			{
-				if (rakPeer->socketList[i]->recvEvent!=INVALID_HANDLE_VALUE)
-				{
-					eventArray[eventArrayIndex]=rakPeer->socketList[i]->recvEvent;
-					eventArrayIndex++;
-					if (eventArrayIndex==256)
-						break;
-				}
-			}
-			WSAWaitForMultipleEvents(eventArrayIndex,(const HANDLE*) &eventArray,FALSE,rakPeer->threadSleepTimer,FALSE);
-		}
-		else
-		{
-			RakSleep(0);
-		}
-
-#else // ((_WIN32_WINNT >= 0x0400) || (_WIN32_WINDOWS > 0x0400)) && defined(USE_WAIT_FOR_MULTIPLE_EVENTS)
-		#pragma message("-- RakNet: Using Sleep(). Uncomment USE_WAIT_FOR_MULTIPLE_EVENTS in RakNetDefines.h if you want to use WaitForSingleObject instead. --")
-
-		RakSleep( rakPeer->threadSleepTimer );
-#endif
-		*/
 	}
 
 	rakPeer->isMainLoopThreadActive = false;
 
-	/*
-#ifdef _WIN32
-#if (_WIN32_WINNT >= 0x0400) || (_WIN32_WINDOWS > 0x0400)
-	CloseHandle(timerHandle);
-#endif
-#endif
-	*/
-
-
-
-
 	return 0;
-
 }
 
 void RakPeer::CallPluginCallbacks(DataStructures::List<PluginInterface2*> &pluginList, Packet *packet)

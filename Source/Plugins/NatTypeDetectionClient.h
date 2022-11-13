@@ -75,7 +75,6 @@ struct Packet;
 		std::mutex bufferedPacketsMutex;
 		
 		RakNetSocket2* c2;
-		//unsigned short c2Port;
 		void Shutdown(void);
 		void OnCompletion(NATTypeDetectionResult result);
 		bool IsInProgress(void) const;

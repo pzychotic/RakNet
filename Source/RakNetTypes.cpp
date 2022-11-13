@@ -35,7 +35,6 @@
 #endif
 
 #include "Itoa.h"
-#include "SocketLayer.h"
 #include "SuperFastHash.h"
 #include <stdlib.h>
 
@@ -448,7 +447,6 @@ bool SystemAddress::SetBinaryAddress(const char *str, char portDelineator)
 			return true;
 		}
 
-		//const char *ip = ( char* ) SocketLayer::DomainNameToIP( str );
 		char ip[65];
 		ip[0]=0;
 		RakNetSocket2::DomainNameToIP(str, ip);

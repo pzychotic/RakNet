@@ -20,7 +20,6 @@
 #include "ReliabilityLayer.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
-//#include "SingleProducerConsumer.h"
 #include "DS_List.h"
 #include "Export.h"
 #include "RakString.h"
@@ -41,7 +40,6 @@ class PluginInterface2;
 // Sucks but this struct has to be outside the class.  Inside and DevCPP won't let you refer to the struct as RakPeer::RemoteSystemIndex while GCC
 // forces you to do RakPeer::RemoteSystemIndex
 struct RemoteSystemIndex{unsigned index; RemoteSystemIndex *next;};
-//int RAK_DLL_EXPORT SystemAddressAndIndexComp( const SystemAddress &key, const RemoteSystemIndex &data ); // GCC requires RakPeer::RemoteSystemIndex or it won't compile
 
 ///\brief Main interface for network communications.
 /// \details It implements most of RakNet's functionality and is the primary interface for RakNet.
@@ -553,15 +551,14 @@ public:
 	Packet* AllocatePacket(unsigned dataSize);
 
 	/// \brief Get the socket used with a particular active connection.
-	/// The smart pointer reference counts the RakNetSocket object, so the socket will remain active as long as the smart pointer does, even if RakNet were to shutdown or close the connection.
 	/// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
 	/// \param[in] target Which system.
-	/// \return A smart pointer object containing the socket information about the target. Be sure to check IsNull() which is returned if the update thread is unresponsive, shutting down, or if this system is not connected.
+	/// \return A pointer object containing the socket information about the target. Be sure to check IsNull() which is returned if the update thread is unresponsive, shutting down, or if this system is not connected.
 	virtual RakNetSocket2* GetSocket( const SystemAddress target );
 
 	/// \brief Gets all sockets in use.
 	/// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
-	/// \param[out] sockets List of RakNetSocket structures in use.
+	/// \param[out] sockets List of RakNetSocket2 structures in use.
 	virtual void GetSockets( DataStructures::List<RakNetSocket2* > &sockets );
 	virtual void ReleaseSockets( DataStructures::List<RakNetSocket2* > &sockets );
 
@@ -636,15 +633,7 @@ public:
 	bool RunUpdateCycle( BitStream &updateBitStream );
 
 	/// \internal
-	// Call manually if RAKPEER_USER_THREADED==1 at least every 30 milliseconds.
-	// Call in a loop until returns false if the socket is non-blocking
-	// remotePortRakNetWasStartedOn_PS3 and extraSocketOptions are from SocketDescriptor when the socket was created
-	// bool RunRecvFromOnce( RakNetSocket *s );
-
-	/// \internal
 	bool SendOutOfBand(const char *host, unsigned short remotePort, const char *data, BitSize_t dataLength, unsigned connectionSocketIndex=0 );
-
-	// static Packet *AllocPacket(unsigned dataSize, const char *file, unsigned int line);
 
 	/// \internal
 	/// \brief Holds the clock differences between systems, along with the ping
@@ -689,14 +678,10 @@ public:
 		enum ConnectMode {NO_ACTION, DISCONNECT_ASAP, DISCONNECT_ASAP_SILENTLY, DISCONNECT_ON_NO_ACK, REQUESTED_CONNECTION, HANDLING_CONNECTION_REQUEST, UNVERIFIED_SENDER, CONNECTED} connectMode;
 	};
 
-	// DS_APR
-	//void ProcessChromePacket(RakNetSocket2 *s, const char *buffer, int dataSize, const SystemAddress& recvFromAddress, RakNet::TimeUS timeRead);
-	// /DS_APR
 protected:
 
 	friend RAK_THREAD_DECLARATION(UpdateNetworkLoop);
 	//friend RAK_THREAD_DECLARATION(RecvFromLoop);
-	friend RAK_THREAD_DECLARATION(UDTConnect);
 
 	friend bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNetSocket2* rakNetSocket, bool *isOfflineMessage, RakNet::TimeUS timeRead );
 	friend void ProcessNetworkPacket( const SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNet::TimeUS timeRead, BitStream &updateBitStream );
@@ -705,7 +690,6 @@ protected:
 	int GetIndexFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread ) const;
 	int GetIndexFromGuid( const RakNetGUID guid );
 
-	//void RemoveFromRequestedConnectionsList( const SystemAddress systemAddress );
 	// Two versions needed because some buggy compilers strip the last parameter if unused, and crashes
 	ConnectionAttemptResult SendConnectionRequest( const char* host, unsigned short remotePort, const char *passwordData, int passwordDataLength, PublicKey *publicKey, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime, RakNetSocket2* socket );
 	ConnectionAttemptResult SendConnectionRequest( const char* host, unsigned short remotePort, const char *passwordData, int passwordDataLength, PublicKey *publicKey, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime );
@@ -758,12 +742,10 @@ protected:
 	unsigned int maximumNumberOfPeers;
 	//05/02/06 Just using maximumNumberOfPeers instead
 	///Store the maximum number of peers able to connect, including reserved connection slots for pings, etc.
-	//unsigned short remoteSystemListSize;
 	///Store the maximum incoming connection allowed 
 	unsigned int maximumIncomingConnections;
 	BitStream offlinePingResponse;
 	///Local Player ID
-	// SystemAddress mySystemAddress[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
 	char incomingPassword[256];
 	unsigned char incomingPasswordLength;
 
@@ -791,10 +773,6 @@ protected:
 	void AddToActiveSystemList(unsigned int remoteSystemListIndex);
 	void RemoveFromActiveSystemList(const SystemAddress &sa);
 
-//	unsigned int LookupIndexUsingHashIndex(const SystemAddress &sa) const;
-//	unsigned int RemoteSystemListIndexUsingHashIndex(const SystemAddress &sa) const;
-//	unsigned int FirstFreeRemoteSystemLookupIndex(const SystemAddress &sa) const;
-	
 	enum
 	{
 		// Only put these mutexes in user thread functions!
@@ -805,19 +783,7 @@ protected:
 	std::mutex rakPeerMutexes[ NUMBER_OF_RAKPEER_MUTEXES ];
 	///RunUpdateCycle is not thread safe but we don't need to mutex calls. Just skip calls if it is running already
 
-	bool updateCycleIsRunning;
-	///The list of people we have tried to connect to recently
-
-	//DataStructures::Queue<RequestedConnectionStruct*> requestedConnectionsList;
-	///Data that both the client and the server needs
-
-	unsigned int bytesSentPerSecond, bytesReceivedPerSecond;
-	// bool isSocketLayerBlocking;
-	// bool continualPing,isRecvfromThreadActive,isMainLoopThreadActive, endThreads, isSocketLayerBlocking;
-	unsigned int validationInteger;
 	std::mutex banListMutex;
-	//DataStructures::Queue<Packet *> incomingpacketSingleProducerConsumer; //, synchronizedMemorypacketSingleProducerConsumer;
-	// BitStream enumerationData;
 
 	struct BanStruct
 	{
@@ -847,15 +813,12 @@ protected:
 		char handshakeChallenge[cat::EasyHandshake::CHALLENGE_BYTES];
 		cat::ClientEasyHandshake *client_handshake;
 		char remote_public_key[cat::EasyHandshake::PUBLIC_KEY_BYTES];
-//		char remote_challenge[cat::EasyHandshake::CHALLENGE_BYTES];
-	//	char random[16];
 #endif
 	};
 #if LIBCAT_SECURITY==1
 	bool GenerateConnectionRequestChallenge(RequestedConnectionStruct *rcs,PublicKey *publicKey);
 #endif
 
-	//DataStructures::List<DataStructures::List<MemoryBlock>* > automaticVariableSynchronizationList;
 	DataStructures::List<BanStruct*> banList;
 	// Threadsafe, and not thread safe
 	DataStructures::List<PluginInterface2*> pluginListTS, pluginListNTS;
@@ -864,8 +827,6 @@ protected:
 	DataStructures::Queue<SystemAddress> requestedConnectionCancelQueue;
 	std::mutex requestedConnectionQueueMutex;
 	std::mutex requestedConnectionCancelQueueMutex;
-
-	// void RunMutexedUpdateCycle(void);
 
 	struct BufferedCommandStruct
 	{
@@ -889,13 +850,7 @@ protected:
 		enum {BCS_SEND, BCS_CLOSE_CONNECTION, BCS_GET_SOCKET, BCS_CHANGE_SYSTEM_ADDRESS,/* BCS_USE_USER_SOCKET, BCS_REBIND_SOCKET_ADDRESS, BCS_RPC, BCS_RPC_SHIFT,*/ BCS_DO_NOTHING} command;
 	};
 
-	// Single producer single consumer queue using a linked list
-	//BufferedCommandStruct* bufferedCommandReadIndex, bufferedCommandWriteIndex;
-
 	DataStructures::ThreadsafeAllocatingQueue<BufferedCommandStruct> bufferedCommands;
-
-
-	// DataStructures::ThreadsafeAllocatingQueue<RNS2RecvStruct> bufferedPackets;
 
 	DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsFreePool;
 	std::mutex bufferedPacketsFreePoolMutex;
@@ -926,7 +881,6 @@ protected:
 	void SendBuffered( const char *data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt );
 	void SendBufferedList( const char **data, const int *lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt );
 	bool SendImmediate( char *data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool useCallerDataAllocation, RakNet::TimeUS currentTime, uint32_t receipt );
-	//bool HandleBufferedRPC(BufferedCommandStruct *bcs, RakNet::TimeMS time);
 	void ClearBufferedCommands(void);
 	void ClearBufferedPackets(void);
 	void ClearSocketQueryOutput(void);
@@ -936,18 +890,12 @@ protected:
 	RakNet::Time GetClockDifferentialInt(RemoteSystemStruct *remoteSystem) const;
 	std::mutex securityExceptionMutex;
 
-	//DataStructures::AVLBalancedBinarySearchTree<RPCNode> rpcTree;
 	int defaultMTUSize;
-	bool trackFrequencyTable;
 
 	// Smart pointer so I can return the object to the user
 	DataStructures::List<RakNetSocket2* > socketList;
 	void DerefAllSockets(void);
 	unsigned int GetRakNetSocketFromUserConnectionSocketIndex(unsigned int userIndex) const;
-	// Used for RPC replies
-	BitStream *replyFromTargetBS;
-	SystemAddress replyFromTargetPlayer;
-	bool replyFromTargetBroadcast;
 
 	RakNet::TimeMS defaultTimeoutTime;
 
@@ -979,8 +927,6 @@ protected:
 	DataStructures::List<RakString> securityExceptionList;
 
 	SystemAddress ipList[ MAXIMUM_NUMBER_OF_INTERNAL_IDS ];
-
-	bool allowInternalRouting;
 
 	void (*userUpdateThreadPtr)(RakPeerInterface *, void *);
 	void *userUpdateThreadData;

@@ -17,7 +17,6 @@
 #include "RakString.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
-#include "SocketLayer.h"
 
 namespace RakNet {
 
@@ -43,10 +42,7 @@ void NatTypeDetectionClient::DetectNATType(SystemAddress _serverAddress)
 	{
 		DataStructures::List<RakNetSocket2* > sockets;
 		rakPeerInterface->GetSockets(sockets);
-		//SystemAddress sockAddr;
-		//SocketLayer::GetSystemAddress(sockets[0], &sockAddr);
 		char str[64];
-		//sockAddr.ToString(false,str);
 		sockets[0]->GetBoundAddress().ToString(false,str);
 		c2=CreateNonblockingBoundSocket(str
 #ifdef __native_client__
@@ -54,7 +50,6 @@ void NatTypeDetectionClient::DetectNATType(SystemAddress _serverAddress)
 #endif
 			,this
 			);
-		//c2Port=SocketLayer::GetLocalPort(c2);
 	}
 
 #if !defined(__native_client__)
@@ -185,7 +180,6 @@ void NatTypeDetectionClient::OnTestPortRestricted(Packet *packet)
 	BitStream bsOut;
 	bsOut.Write((MessageID) NAT_TYPE_PORT_RESTRICTED);
 	bsOut.Write(rakPeerInterface->GetGuidFromSystemAddress(UNASSIGNED_SYSTEM_ADDRESS));
-//	SocketLayer::SendTo_PC( sockets[0], (const char*) bsOut.GetData(), bsOut.GetNumberOfBytesUsed(), s3p4Addr, __FILE__, __LINE__ );
 
 	RNS2_SendParameters bsp;
 	bsp.data = (char*) bsOut.GetData();

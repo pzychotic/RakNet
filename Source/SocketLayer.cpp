@@ -34,8 +34,6 @@ using namespace pp;
 #include "CCRakNetSlidingWindow.h"
 #endif
 
-//SocketLayerOverride *SocketLayer::slo=0;
-
 #ifdef _WIN32
 #else
 #include <string.h> // memcpy
@@ -65,10 +63,6 @@ using namespace pp;
 #include <stdio.h>
 
 namespace RakNet {
-
-	extern void ProcessNetworkPacket( const SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNet::TimeUS timeRead );
-	//extern void ProcessNetworkPacket( const SystemAddress systemAddress, const char *data, const int length, RakPeer *rakPeer, RakNetSocket* rakNetSocket, RakNet::TimeUS timeRead );
-
 
 // http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#ip4to6
 // http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#getaddrinfo
@@ -311,23 +305,10 @@ void GetMyIP_Win32( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 
 void SocketLayer::GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 {
-#if defined(_WIN32)
 	GetMyIP_Win32(addresses);
-#else
-//	GetMyIP_Linux(addresses);
-	GetMyIP_Win32(addresses);
-#endif
 }
 
 
-/*
-unsigned short SocketLayer::GetLocalPort(RakNetSocket *s)
-{
-	SystemAddress sa;
-	GetSystemAddress(s,&sa);
-	return sa.GetPort();
-}
-*/
 unsigned short SocketLayer::GetLocalPort(__UDPSOCKET__ s)
 {
 	SystemAddress sa;
@@ -364,12 +345,7 @@ void SocketLayer::GetSystemAddress_Old ( __UDPSOCKET__ s, SystemAddress *systemA
 	systemAddressOut->address.addr4.sin_addr.s_addr=sa.sin_addr.s_addr;
 #endif
 }
-/*
-void SocketLayer::GetSystemAddress_Old ( RakNetSocket *s, SystemAddress *systemAddressOut )
-{
-	return GetSystemAddress_Old(s->s, systemAddressOut);
-}
-*/
+
 void SocketLayer::GetSystemAddress ( __UDPSOCKET__ s, SystemAddress *systemAddressOut )
 {
 #if RAKNET_SUPPORT_IPV6!=1
@@ -421,17 +397,6 @@ void SocketLayer::GetSystemAddress ( __UDPSOCKET__ s, SystemAddress *systemAddre
 	}
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 }
-/*
-void SocketLayer::GetSystemAddress ( RakNetSocket *s, SystemAddress *systemAddressOut )
-{
-	return GetSystemAddress(s->s, systemAddressOut);
-}
-*/
-
-// void SocketLayer::SetSocketLayerOverride(SocketLayerOverride *_slo)
-// {
-// 	slo=_slo;
-// }
 
 bool SocketLayer::GetFirstBindableIP(char firstBindable[128], int ipProto)
 {

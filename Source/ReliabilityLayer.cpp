@@ -15,7 +15,6 @@
 
 #include "ReliabilityLayer.h"
 #include "GetTime.h"
-#include "SocketLayer.h"
 #include "RakAssert.h"
 #include "Rand.h"
 #include "MessageIdentifiers.h"
@@ -1685,7 +1684,6 @@ void ReliabilityLayer::Update( RakNetSocket2 *s, SystemAddress &systemAddress, i
 		if (delayList.Peek()->sendTime <= timeMs)
 		{
 			DataAndTime *dat = delayList.Pop();
-//			SocketLayer::SendTo( dat->s, dat->data, dat->length, systemAddress, __FILE__, __LINE__  );
 
 			RNS2_SendParameters bsp;
 			bsp.data = (char*) dat->data;
@@ -2305,7 +2303,6 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2 *s, SystemAddress &systemAdd
 	block->systemAddress=systemAddress;
 	SendToThread::ProcessBlock(block);
 #else
-	// SocketLayer::SendTo( s, ( char* ) bitStream->GetData(), length, systemAddress, __FILE__, __LINE__  );
 
 	RNS2_SendParameters bsp;
 	bsp.data = (char*) bitStream->GetData();

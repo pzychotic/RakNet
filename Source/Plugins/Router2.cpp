@@ -17,7 +17,6 @@
 #include "RakNetTime.h"
 #include "GetTime.h"
 #include "DS_OrderedList.h"
-#include "SocketLayer.h"
 #include "SocketDefines.h"
 
 namespace RakNet {
@@ -924,8 +923,6 @@ void Router2::SendOOBFromSpecifiedSocket(OutOfBandIdentifiers oob, SystemAddress
 	BitStream bs;
 	rakPeerInterface->WriteOutOfBandHeader(&bs);
 	bs.Write((unsigned char) oob);
-	// SocketLayer::SendTo_PC( socket, (const char*) bs.GetData(), bs.GetNumberOfBytesUsed(), sa, __FILE__, __LINE__  );
-
 
 	if (sa.address.addr4.sin_family==AF_INET)
 	{
@@ -937,19 +934,8 @@ void Router2::SendOOBFromSpecifiedSocket(OutOfBandIdentifiers oob, SystemAddress
 		sendto__( socket, (const char*) bs.GetData(), bs.GetNumberOfBytesUsed(), 0, ( const sockaddr* ) & sa.address.addr6, sizeof( sockaddr_in6 ) );
 		#endif
 	}
-
-
-
-
-
-
-
-
-
-
-
-
 }
+
 void Router2::SendOOBMessages(Router2::MiniPunchRequest *mpr)
 {
 	// Mini NAT punch
