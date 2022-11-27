@@ -636,7 +636,7 @@ bool Rackspace::ConnectToServerManagementDomain(RackspaceOperation &ro)
 	if (ro.connectionAddress==UNASSIGNED_SYSTEM_ADDRESS)
 	{
 		for (i=0; i < eventCallbacks.Size(); i++)
-			eventCallbacks[i]->OnConnectionAttemptFailure(ro.type, serverManagementURL);
+			eventCallbacks[i]->OnConnectionAttemptFailure(ro.type, serverManagementURL.C_String());
 		return false;
 	}
 

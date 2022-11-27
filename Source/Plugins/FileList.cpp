@@ -172,7 +172,7 @@ void FileList::AddFile(const char *filename, const char *fullPathToFile, const c
 	unsigned i;
 	for (i=0; i<fileList.Size();i++)
 	{
-		if (strcmp(fileList[i].filename, filename)==0)
+		if (strcmp(fileList[i].filename.C_String(), filename) == 0)
 		{
 			if (fileList[i].fileLengthBytes==fileLength && fileList[i].dataLengthBytes==dataLength &&
 				(dataLength==0 || fileList[i].data==0 ||
@@ -525,7 +525,7 @@ void FileList::GetDeltaToCurrent(FileList *input, FileList *output, const char *
 				else
 				{
 					// File exists on both machines and is not the same.
-					output->AddFile(fileList[thisIndex].filename, fileList[thisIndex].fullPathToFile, 0,0, fileList[thisIndex].fileLengthBytes, FileListNodeContext(0,0,0,0), false);
+					output->AddFile(fileList[thisIndex].filename.C_String(), fileList[thisIndex].fullPathToFile.C_String(), 0,0, fileList[thisIndex].fileLengthBytes, FileListNodeContext(0,0,0,0), false);
 					break;
 				}
 			}
@@ -533,7 +533,7 @@ void FileList::GetDeltaToCurrent(FileList *input, FileList *output, const char *
 		if (match==false)
 		{
             // Other system does not have the file at all
-			output->AddFile(fileList[thisIndex].filename, fileList[thisIndex].fullPathToFile, 0,0, fileList[thisIndex].fileLengthBytes, FileListNodeContext(0,0,0,0), false);
+			output->AddFile(fileList[thisIndex].filename.C_String(), fileList[thisIndex].fullPathToFile.C_String(), 0,0, fileList[thisIndex].fileLengthBytes, FileListNodeContext(0,0,0,0), false);
 		}
 	}
 }
@@ -550,11 +550,11 @@ void FileList::ListMissingOrChangedFiles(const char *applicationDirectory, FileL
 	{
 		strcpy(fullPath, applicationDirectory);
 		FixEndingSlash(fullPath);
-		strcat(fullPath,fileList[i].filename);
+		strcat(fullPath,fileList[i].filename.C_String());
 		fp=fopen(fullPath, "rb");
 		if (fp==0)
 		{
-			missingOrChangedFiles->AddFile(fileList[i].filename, fileList[i].fullPathToFile, 0, 0, 0, FileListNodeContext(0,0,0,0), false);
+			missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), fileList[i].fullPathToFile.C_String(), 0, 0, 0, FileListNodeContext(0,0,0,0), false);
 		}
 		else
 		{
@@ -564,7 +564,7 @@ void FileList::ListMissingOrChangedFiles(const char *applicationDirectory, FileL
 
 			if (fileLength != fileList[i].fileLengthBytes && alwaysWriteHash==false)
 			{
-				missingOrChangedFiles->AddFile(fileList[i].filename, fileList[i].fullPathToFile, 0, 0, fileLength, FileListNodeContext(0,0,0,0), false);
+				missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), fileList[i].fullPathToFile.C_String(), 0, 0, fileLength, FileListNodeContext(0,0,0,0), false);
 			}
 			else
 			{
@@ -586,10 +586,10 @@ void FileList::ListMissingOrChangedFiles(const char *applicationDirectory, FileL
 				if (fileLength != fileList[i].fileLengthBytes || memcmp( &hash, fileList[i].data, HASH_LENGTH)!=0)
 				{
 					if (neverWriteHash==false)
-					//	missingOrChangedFiles->AddFile((const char*)fileList[i].filename, (const char*)sha1.GetHash(), HASH_LENGTH, fileLength, 0);
-						missingOrChangedFiles->AddFile((const char*)fileList[i].filename, (const char*)fileList[i].fullPathToFile, (const char *) &hash, HASH_LENGTH, fileLength, FileListNodeContext(0,0,0,0), false);
+					//	missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), (const char*)sha1.GetHash(), HASH_LENGTH, fileLength, 0);
+						missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), fileList[i].fullPathToFile.C_String(), (const char *) &hash, HASH_LENGTH, fileLength, FileListNodeContext(0,0,0,0), false);
 					else
-						missingOrChangedFiles->AddFile((const char*)fileList[i].filename, (const char*)fileList[i].fullPathToFile, 0, 0, fileLength, FileListNodeContext(0,0,0,0), false);
+						missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), fileList[i].fullPathToFile.C_String(), 0, 0, fileLength, FileListNodeContext(0,0,0,0), false);
 				}
 			}
 			fclose(fp);

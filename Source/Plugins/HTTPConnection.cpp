@@ -110,7 +110,7 @@ void HTTPConnection::Update(void)
 				return;
 
 			//printf("Connecting\n");
-			server = tcp->Connect(host, port, false);
+			server = tcp->Connect(host.C_String(), port, false);
 			connectionState = CS_CONNECTING;
 		}
 		break;
@@ -241,7 +241,7 @@ void HTTPConnection::ProcessTCPPacket(Packet *packet)
 
 		RakAssert(strlen((char *)packet->data) == packet->length); // otherwise it contains Null bytes
 
-		const char *start_of_body = strstr(incomingData, "\r\n\r\n");
+		const char *start_of_body = strstr(incomingData.C_String(), "\r\n\r\n");
 
 		// besides having the server close the connection, they may
 		// provide a length header and supply that many bytes
@@ -263,7 +263,7 @@ void HTTPConnection::ProcessTCPPacket(Packet *packet)
 				if (start_of_body)
 				{
 					length_of_headers = (long)(start_of_body + 4 - incomingData.C_String());
-					const char *length_header = strstr(incomingData, "\r\nLength: ");
+					const char *length_header = strstr(incomingData.C_String(), "\r\nLength: ");
 
 					if(length_header)
 					{

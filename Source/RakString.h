@@ -47,9 +47,6 @@ public:
 	~RakString();
 	RakString( const RakString & rhs);
 
-	/// Implicit return of const char*
-	operator const char* () const {return sharedString->c_str;}
-
 	/// Same as std::string::c_str
 	const char *C_String(void) const {return sharedString->c_str;}
 

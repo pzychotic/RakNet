@@ -193,7 +193,7 @@ void FileListTransfer::Send(FileList *fileList, RakPeerInterface *rakPeer, Syste
 				outBitstream << fileList->fileList[i].context;
 				// outBitstream.Write(fileList->fileList[i].context);
 				outBitstream.Write(setID);
-				StringCompressor::Instance()->EncodeString(fileList->fileList[i].filename, 512, &outBitstream);
+				StringCompressor::Instance()->EncodeString(fileList->fileList[i].filename.C_String(), 512, &outBitstream);
 
 				outBitstream.WriteCompressed(i);
 				outBitstream.WriteCompressed(fileList->fileList[i].dataLengthBytes); // Original length in bytes
@@ -962,7 +962,7 @@ int SendIRIToAddressCB(FileListTransfer::ThreadData threadData, bool *returnOutp
 			}
 
 			// Read the next file chunk
-			bytesRead=ftp->incrementalReadInterface->GetFilePart(ftp->fileListNode.fullPathToFile, ftp->currentOffset, ftp->chunkSize, buff, ftp->fileListNode.context);
+			bytesRead=ftp->incrementalReadInterface->GetFilePart(ftp->fileListNode.fullPathToFile.C_String(), ftp->currentOffset, ftp->chunkSize, buff, ftp->fileListNode.context);
 
 			bool done = ftp->fileListNode.dataLengthBytes == ftp->currentOffset+bytesRead;
 			while (done && ftp->currentOffset==0 && smallFileTotalSize<ftp->chunkSize)
@@ -982,7 +982,7 @@ int SendIRIToAddressCB(FileListTransfer::ThreadData threadData, bool *returnOutp
 				// outBitstream.Write(ftp->fileListNode.context);
 				outBitstream << ftp->fileListNode.context;
 				outBitstream.Write(setId);
-				StringCompressor::Instance()->EncodeString(ftp->fileListNode.filename, 512, &outBitstream);
+				StringCompressor::Instance()->EncodeString(ftp->fileListNode.filename.C_String(), 512, &outBitstream);
 				outBitstream.WriteCompressed(ftp->setIndex);
 				outBitstream.WriteCompressed(ftp->fileListNode.dataLengthBytes); // Original length in bytes
 				outBitstream.AlignWriteToByteBoundary();
@@ -1002,7 +1002,7 @@ int SendIRIToAddressCB(FileListTransfer::ThreadData threadData, bool *returnOutp
 				ftp = ftpr->filesToPush.Pop();
 				//ftpr->filesToPushMutex.unlock();
 
-				bytesRead=ftp->incrementalReadInterface->GetFilePart(ftp->fileListNode.fullPathToFile, ftp->currentOffset, ftp->chunkSize, buff, ftp->fileListNode.context);
+				bytesRead=ftp->incrementalReadInterface->GetFilePart(ftp->fileListNode.fullPathToFile.C_String(), ftp->currentOffset, ftp->chunkSize, buff, ftp->fileListNode.context);
 				done = ftp->fileListNode.dataLengthBytes == ftp->currentOffset+bytesRead;
 			}
 
@@ -1012,7 +1012,7 @@ int SendIRIToAddressCB(FileListTransfer::ThreadData threadData, bool *returnOutp
 			// outBitstream.Write(ftp->fileListNode.context);
 			outBitstream << ftp->fileListNode.context;
 			outBitstream.Write(setId);
-			StringCompressor::Instance()->EncodeString(ftp->fileListNode.filename, 512, &outBitstream);
+			StringCompressor::Instance()->EncodeString(ftp->fileListNode.filename.C_String(), 512, &outBitstream);
 			outBitstream.WriteCompressed(ftp->setIndex);
 			outBitstream.WriteCompressed(ftp->fileListNode.dataLengthBytes); // Original length in bytes
 			outBitstream.WriteCompressed(ftp->currentOffset);
@@ -1021,7 +1021,7 @@ int SendIRIToAddressCB(FileListTransfer::ThreadData threadData, bool *returnOutp
 			outBitstream.Write(done);
 
 			for (unsigned int flpcIndex=0; flpcIndex < fileListTransfer->fileListProgressCallbacks.Size(); flpcIndex++)
-				fileListTransfer->fileListProgressCallbacks[flpcIndex]->OnFilePush(ftp->fileListNode.filename, ftp->fileListNode.fileLengthBytes, ftp->currentOffset-bytesRead, bytesRead, done, systemAddress, setId);
+				fileListTransfer->fileListProgressCallbacks[flpcIndex]->OnFilePush(ftp->fileListNode.filename.C_String(), ftp->fileListNode.fileLengthBytes, ftp->currentOffset-bytesRead, bytesRead, done, systemAddress, setId);
 
 			dataBlocks[0]=(char*) outBitstream.GetData();
 			lengths[0]=outBitstream.GetNumberOfBytesUsed();

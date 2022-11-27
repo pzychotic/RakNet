@@ -349,8 +349,8 @@ const RakString operator+(const RakString &lhs, const RakString &rhs)
 		sharedString->c_str=sharedString->bigString;
 	}
 
-	strcpy(sharedString->c_str, lhs);
-	strcat(sharedString->c_str, rhs);
+	strcpy(sharedString->c_str, lhs.C_String());
+	strcat(sharedString->c_str, rhs.C_String());
 
 	return RakString(sharedString);
 }
