@@ -764,14 +764,7 @@ protected:
 	void AddToActiveSystemList(unsigned int remoteSystemListIndex);
 	void RemoveFromActiveSystemList(const SystemAddress &sa);
 
-	enum
-	{
-		// Only put these mutexes in user thread functions!
-		requestedConnectionList_Mutex,
-		offlinePingResponse_Mutex,
-		NUMBER_OF_RAKPEER_MUTEXES
-	};
-	std::mutex rakPeerMutexes[ NUMBER_OF_RAKPEER_MUTEXES ];
+	std::mutex offlinePingResponseMutex;
 	///RunUpdateCycle is not thread safe but we don't need to mutex calls. Just skip calls if it is running already
 
 	std::mutex banListMutex;
