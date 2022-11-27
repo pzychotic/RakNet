@@ -23,7 +23,6 @@
 #include "WindowsIncludes.h"
 #include <memory.h>
 #include <cmath>
-#include <float.h>
 #else
 #include <arpa/inet.h>
 #include <memory.h>
@@ -32,13 +31,8 @@
 #else
 #include <cmath>
 #endif
+#endif
 #include <float.h>
-#endif
-
-// MSWin uses _copysign, others use copysign...
-#ifndef _WIN32
-#define _copysign copysign
-#endif
 
 namespace RakNet {
 
