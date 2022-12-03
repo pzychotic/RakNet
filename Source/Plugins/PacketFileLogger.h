@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -15,7 +15,7 @@
 #pragma once
 
 #include "NativeFeatureIncludes.h"
-#if _RAKNET_SUPPORT_PacketLogger==1
+#if _RAKNET_SUPPORT_PacketLogger == 1
 
 #include "Plugins/PacketLogger.h"
 #include <stdio.h>
@@ -27,12 +27,13 @@ namespace RakNet {
 class RAK_DLL_EXPORT PacketFileLogger : public PacketLogger
 {
 public:
-	PacketFileLogger();
-	virtual ~PacketFileLogger();
-	void StartLog(const char *filenamePrefix);
-	virtual void WriteLog(const char *str);
+    PacketFileLogger();
+    virtual ~PacketFileLogger();
+    void StartLog( const char* filenamePrefix );
+    virtual void WriteLog( const char* str );
+
 protected:
-	FILE *packetLogFile;
+    FILE* packetLogFile;
 };
 
 } // namespace RakNet

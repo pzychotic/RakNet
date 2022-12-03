@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -29,171 +29,171 @@ namespace RakNet {
 class ThreadDataInterface
 {
 public:
-	ThreadDataInterface() {}
-	virtual ~ThreadDataInterface() {}
+    ThreadDataInterface() {}
+    virtual ~ThreadDataInterface() {}
 
-	virtual void* PerThreadFactory(void *context)=0;
-	virtual void PerThreadDestructor(void* factoryResult, void *context)=0;
+    virtual void* PerThreadFactory( void* context ) = 0;
+    virtual void PerThreadDestructor( void* factoryResult, void* context ) = 0;
 };
 /// A simple class to create worker threads that processes a queue of functions with data.
 /// This class does not allocate or deallocate memory.  It is up to the user to handle memory management.
 /// InputType and OutputType are stored directly in a queue.  For large structures, if you plan to delete from the middle of the queue,
 /// you might wish to store pointers rather than the structures themselves so the array can shift efficiently.
-template <class InputType, class OutputType>
+template<class InputType, class OutputType>
 struct RAK_DLL_EXPORT ThreadPool
 {
-	ThreadPool();
-	~ThreadPool();
+    ThreadPool();
+    ~ThreadPool();
 
-	/// Start the specified number of threads.
-	/// \param[in] numThreads The number of threads to start
-	/// \param[in] stackSize 0 for default (except on consoles).
-	/// \param[in] _perThreadInit User callback to return data stored per thread.  Pass 0 if not needed.
-	/// \param[in] _perThreadDeinit User callback to destroy data stored per thread, created by _perThreadInit.  Pass 0 if not needed.
-	/// \return True on success, false on failure.
-	bool StartThreads(int numThreads, int stackSize, void* (*_perThreadInit)()=0, void (*_perThreadDeinit)(void*)=0);
+    /// Start the specified number of threads.
+    /// \param[in] numThreads The number of threads to start
+    /// \param[in] stackSize 0 for default (except on consoles).
+    /// \param[in] _perThreadInit User callback to return data stored per thread.  Pass 0 if not needed.
+    /// \param[in] _perThreadDeinit User callback to destroy data stored per thread, created by _perThreadInit.  Pass 0 if not needed.
+    /// \return True on success, false on failure.
+    bool StartThreads( int numThreads, int stackSize, void* ( *_perThreadInit )() = 0, void ( *_perThreadDeinit )( void* ) = 0 );
 
-	// Alternate form of _perThreadDataFactory, _perThreadDataDestructor
-	void SetThreadDataInterface(ThreadDataInterface *tdi, void *context);
+    // Alternate form of _perThreadDataFactory, _perThreadDataDestructor
+    void SetThreadDataInterface( ThreadDataInterface* tdi, void* context );
 
-	/// Stops all threads
-	void StopThreads(void);
+    /// Stops all threads
+    void StopThreads( void );
 
-	/// Adds a function to a queue with data to pass to that function.  This function will be called from the thread
-	/// Memory management is your responsibility!  This class does not allocate or deallocate memory.
-	/// The best way to deallocate \a inputData is in userCallback.  If you call EndThreads such that callbacks were not called, you
-	/// can iterate through the inputQueue and deallocate all pending input data there
-	/// The best way to deallocate output is as it is returned to you from GetOutput.  Similarly, if you end the threads such that
-	/// not all output was returned, you can iterate through outputQueue and deallocate it there.
-	/// \param[in] workerThreadCallback The function to call from the thread
-	/// \param[in] inputData The parameter to pass to \a userCallback
-	void AddInput(OutputType (*workerThreadCallback)(InputType, bool *returnOutput, void* perThreadData), InputType inputData);
+    /// Adds a function to a queue with data to pass to that function.  This function will be called from the thread
+    /// Memory management is your responsibility!  This class does not allocate or deallocate memory.
+    /// The best way to deallocate \a inputData is in userCallback.  If you call EndThreads such that callbacks were not called, you
+    /// can iterate through the inputQueue and deallocate all pending input data there
+    /// The best way to deallocate output is as it is returned to you from GetOutput.  Similarly, if you end the threads such that
+    /// not all output was returned, you can iterate through outputQueue and deallocate it there.
+    /// \param[in] workerThreadCallback The function to call from the thread
+    /// \param[in] inputData The parameter to pass to \a userCallback
+    void AddInput( OutputType ( *workerThreadCallback )( InputType, bool* returnOutput, void* perThreadData ), InputType inputData );
 
-	/// Adds to the output queue
-	/// Use it if you want to inject output into the same queue that the system uses. Normally you would not use this. Consider it a convenience function.
-	/// \param[in] outputData The output to inject
-	void AddOutput(OutputType outputData);
+    /// Adds to the output queue
+    /// Use it if you want to inject output into the same queue that the system uses. Normally you would not use this. Consider it a convenience function.
+    /// \param[in] outputData The output to inject
+    void AddOutput( OutputType outputData );
 
-	/// Returns true if output from GetOutput is waiting.
-	/// \return true if output is waiting, false otherwise
-	bool HasOutput(void);
+    /// Returns true if output from GetOutput is waiting.
+    /// \return true if output is waiting, false otherwise
+    bool HasOutput( void );
 
-	/// Inaccurate but fast version of HasOutput.  If this returns true, you should still check HasOutput for the real value.
-	/// \return true if output is probably waiting, false otherwise
-	bool HasOutputFast(void);
+    /// Inaccurate but fast version of HasOutput.  If this returns true, you should still check HasOutput for the real value.
+    /// \return true if output is probably waiting, false otherwise
+    bool HasOutputFast( void );
 
-	/// Returns true if input from GetInput is waiting.
-	/// \return true if input is waiting, false otherwise
-	bool HasInput(void);
+    /// Returns true if input from GetInput is waiting.
+    /// \return true if input is waiting, false otherwise
+    bool HasInput( void );
 
-	/// Inaccurate but fast version of HasInput.  If this returns true, you should still check HasInput for the real value.
-	/// \return true if input is probably waiting, false otherwise
-	bool HasInputFast(void);
+    /// Inaccurate but fast version of HasInput.  If this returns true, you should still check HasInput for the real value.
+    /// \return true if input is probably waiting, false otherwise
+    bool HasInputFast( void );
 
-	/// Gets the output of a call to \a userCallback
-	/// HasOutput must return true before you call this function.  Otherwise it will assert.
-	/// \return The output of \a userCallback.  If you have different output signatures, it is up to you to encode the data to indicate this
-	OutputType GetOutput(void);
+    /// Gets the output of a call to \a userCallback
+    /// HasOutput must return true before you call this function.  Otherwise it will assert.
+    /// \return The output of \a userCallback.  If you have different output signatures, it is up to you to encode the data to indicate this
+    OutputType GetOutput( void );
 
-	/// Clears internal buffers
-	void Clear(void);
+    /// Clears internal buffers
+    void Clear( void );
 
-	/// Lock the input buffer before calling the functions InputSize, InputAtIndex, and RemoveInputAtIndex
-	/// It is only necessary to lock the input or output while the threads are running
-	void LockInput(void);
+    /// Lock the input buffer before calling the functions InputSize, InputAtIndex, and RemoveInputAtIndex
+    /// It is only necessary to lock the input or output while the threads are running
+    void LockInput( void );
 
-	/// Unlock the input buffer after you are done with the functions InputSize, GetInputAtIndex, and RemoveInputAtIndex
-	void UnlockInput(void);
+    /// Unlock the input buffer after you are done with the functions InputSize, GetInputAtIndex, and RemoveInputAtIndex
+    void UnlockInput( void );
 
-	/// Length of the input queue
-	unsigned InputSize(void);
+    /// Length of the input queue
+    unsigned InputSize( void );
 
-	/// Get the input at a specified index
-	InputType GetInputAtIndex(unsigned index);
+    /// Get the input at a specified index
+    InputType GetInputAtIndex( unsigned index );
 
-	/// Remove input from a specific index.  This does NOT do memory deallocation - it only removes the item from the queue
-	void RemoveInputAtIndex(unsigned index);
+    /// Remove input from a specific index.  This does NOT do memory deallocation - it only removes the item from the queue
+    void RemoveInputAtIndex( unsigned index );
 
-	/// Lock the output buffer before calling the functions OutputSize, OutputAtIndex, and RemoveOutputAtIndex
-	/// It is only necessary to lock the input or output while the threads are running
-	void LockOutput(void);
-	
-	/// Unlock the output buffer after you are done with the functions OutputSize, GetOutputAtIndex, and RemoveOutputAtIndex
-	void UnlockOutput(void);
+    /// Lock the output buffer before calling the functions OutputSize, OutputAtIndex, and RemoveOutputAtIndex
+    /// It is only necessary to lock the input or output while the threads are running
+    void LockOutput( void );
 
-	/// Length of the output queue
-	unsigned OutputSize(void);
+    /// Unlock the output buffer after you are done with the functions OutputSize, GetOutputAtIndex, and RemoveOutputAtIndex
+    void UnlockOutput( void );
 
-	/// Get the output at a specified index
-	OutputType GetOutputAtIndex(unsigned index);
+    /// Length of the output queue
+    unsigned OutputSize( void );
 
-	/// Remove output from a specific index.  This does NOT do memory deallocation - it only removes the item from the queue
-	void RemoveOutputAtIndex(unsigned index);
+    /// Get the output at a specified index
+    OutputType GetOutputAtIndex( unsigned index );
 
-	/// Removes all items from the input queue
-	void ClearInput(void);
+    /// Remove output from a specific index.  This does NOT do memory deallocation - it only removes the item from the queue
+    void RemoveOutputAtIndex( unsigned index );
 
-	/// Removes all items from the output queue
-	void ClearOutput(void);
+    /// Removes all items from the input queue
+    void ClearInput( void );
 
-	/// Are any of the threads working, or is input or output available?
-	bool IsWorking(void);
+    /// Removes all items from the output queue
+    void ClearOutput( void );
 
-	/// The number of currently active threads.
-	int NumThreadsWorking(void);
+    /// Are any of the threads working, or is input or output available?
+    bool IsWorking( void );
 
-	/// Did we call Start?
-	bool WasStarted(void);
+    /// The number of currently active threads.
+    int NumThreadsWorking( void );
 
-	// Block until all threads are stopped.
-	bool Pause(void);
+    /// Did we call Start?
+    bool WasStarted( void );
 
-	// Continue running
-	void Resume(void);
+    // Block until all threads are stopped.
+    bool Pause( void );
+
+    // Continue running
+    void Resume( void );
 
 protected:
-	// It is valid to cancel input before it is processed.  To do so, lock the inputQueue with inputQueueMutex,
-	// Scan the list, and remove the item you don't want.
-	std::mutex inputQueueMutex, outputQueueMutex, workingThreadCountMutex, runThreadsMutex;
+    // It is valid to cancel input before it is processed.  To do so, lock the inputQueue with inputQueueMutex,
+    // Scan the list, and remove the item you don't want.
+    std::mutex inputQueueMutex, outputQueueMutex, workingThreadCountMutex, runThreadsMutex;
 
-	void* (*perThreadDataFactory)();
-	void (*perThreadDataDestructor)(void*);
+    void* ( *perThreadDataFactory )();
+    void ( *perThreadDataDestructor )( void* );
 
-	// inputFunctionQueue & inputQueue are paired arrays so if you delete from one at a particular index you must delete from the other
-	// at the same index
-	DataStructures::Queue<OutputType (*)(InputType, bool *, void*)> inputFunctionQueue;
-	DataStructures::Queue<InputType> inputQueue;
-	DataStructures::Queue<OutputType> outputQueue;
+    // inputFunctionQueue & inputQueue are paired arrays so if you delete from one at a particular index you must delete from the other
+    // at the same index
+    DataStructures::Queue<OutputType ( * )( InputType, bool*, void* )> inputFunctionQueue;
+    DataStructures::Queue<InputType> inputQueue;
+    DataStructures::Queue<OutputType> outputQueue;
 
-	ThreadDataInterface *threadDataInterface;
-	void *tdiContext;
+    ThreadDataInterface* threadDataInterface;
+    void* tdiContext;
 
-	
-	template <class ThreadInputType, class ThreadOutputType>
-	friend RAK_THREAD_DECLARATION(WorkerThread);
 
-	/*
+    template<class ThreadInputType, class ThreadOutputType>
+    friend RAK_THREAD_DECLARATION( WorkerThread );
+
+    /*
 #ifdef _WIN32
-	friend unsigned __stdcall WorkerThread( LPVOID arguments );
+    friend unsigned __stdcall WorkerThread( LPVOID arguments );
 #else
-	friend void* WorkerThread( void* arguments );
+    friend void* WorkerThread( void* arguments );
 #endif
-	*/
+    */
 
-	/// \internal
-	bool runThreads;
-	/// \internal
-	int numThreadsRunning;
-	/// \internal
-	int numThreadsWorking;
-	/// \internal
-	std::mutex numThreadsRunningMutex;
+    /// \internal
+    bool runThreads;
+    /// \internal
+    int numThreadsRunning;
+    /// \internal
+    int numThreadsWorking;
+    /// \internal
+    std::mutex numThreadsRunningMutex;
 
-	SignaledEvent quitAndIncomingDataEvents;
+    SignaledEvent quitAndIncomingDataEvents;
 };
 
-template <class ThreadInputType, class ThreadOutputType>
-RAK_THREAD_DECLARATION(WorkerThread)
+template<class ThreadInputType, class ThreadOutputType>
+RAK_THREAD_DECLARATION( WorkerThread )
 /*
 #ifdef _WIN32
 unsigned __stdcall WorkerThread( LPVOID arguments )
@@ -202,379 +202,378 @@ void* WorkerThread( void* arguments )
 #endif
 */
 {
-	ThreadPool<ThreadInputType, ThreadOutputType> *threadPool = (ThreadPool<ThreadInputType, ThreadOutputType>*) arguments;
+    ThreadPool<ThreadInputType, ThreadOutputType>* threadPool = (ThreadPool<ThreadInputType, ThreadOutputType>*)arguments;
 
 
-	bool returnOutput;
-	ThreadOutputType (*userCallback)(ThreadInputType, bool *, void*);
-	ThreadInputType inputData;
-	ThreadOutputType callbackOutput;
+    bool returnOutput;
+    ThreadOutputType ( *userCallback )( ThreadInputType, bool*, void* );
+    ThreadInputType inputData;
+    ThreadOutputType callbackOutput;
 
-	userCallback=0;
+    userCallback = 0;
 
-	void *perThreadData;
-	if (threadPool->perThreadDataFactory)
-		perThreadData=threadPool->perThreadDataFactory();
-	else if (threadPool->threadDataInterface)
-		perThreadData=threadPool->threadDataInterface->PerThreadFactory(threadPool->tdiContext);
-	else
-		perThreadData=0;
+    void* perThreadData;
+    if( threadPool->perThreadDataFactory )
+        perThreadData = threadPool->perThreadDataFactory();
+    else if( threadPool->threadDataInterface )
+        perThreadData = threadPool->threadDataInterface->PerThreadFactory( threadPool->tdiContext );
+    else
+        perThreadData = 0;
 
-	// Increase numThreadsRunning
-	threadPool->numThreadsRunningMutex.lock();
-	++threadPool->numThreadsRunning;
-	threadPool->numThreadsRunningMutex.unlock();
+    // Increase numThreadsRunning
+    threadPool->numThreadsRunningMutex.lock();
+    ++threadPool->numThreadsRunning;
+    threadPool->numThreadsRunningMutex.unlock();
 
-	while (1)
-	{
-//#ifdef _WIN32
-		if (userCallback==0)
-		{
-			threadPool->quitAndIncomingDataEvents.WaitOnEvent(1000);
-		}
-// #else
-// 		if (userCallback==0)
-// 			RakSleep(30);
-// #endif
+    while( 1 )
+    {
+        //#ifdef _WIN32
+        if( userCallback == 0 )
+        {
+            threadPool->quitAndIncomingDataEvents.WaitOnEvent( 1000 );
+        }
+        // #else
+        // 		if (userCallback==0)
+        // 			RakSleep(30);
+        // #endif
 
-		threadPool->runThreadsMutex.lock();
-		if (threadPool->runThreads==false)
-		{
-			threadPool->runThreadsMutex.unlock();
-			break;
-		}
-		threadPool->runThreadsMutex.unlock();
+        threadPool->runThreadsMutex.lock();
+        if( threadPool->runThreads == false )
+        {
+            threadPool->runThreadsMutex.unlock();
+            break;
+        }
+        threadPool->runThreadsMutex.unlock();
 
-		threadPool->workingThreadCountMutex.lock();
-		++threadPool->numThreadsWorking;
-		threadPool->workingThreadCountMutex.unlock();
+        threadPool->workingThreadCountMutex.lock();
+        ++threadPool->numThreadsWorking;
+        threadPool->workingThreadCountMutex.unlock();
 
-		// Read input data
-		userCallback=0;
-		threadPool->inputQueueMutex.lock();
-		if (threadPool->inputFunctionQueue.Size())
-		{
-			userCallback=threadPool->inputFunctionQueue.Pop();
-			inputData=threadPool->inputQueue.Pop();
-		}
-		threadPool->inputQueueMutex.unlock();
+        // Read input data
+        userCallback = 0;
+        threadPool->inputQueueMutex.lock();
+        if( threadPool->inputFunctionQueue.Size() )
+        {
+            userCallback = threadPool->inputFunctionQueue.Pop();
+            inputData = threadPool->inputQueue.Pop();
+        }
+        threadPool->inputQueueMutex.unlock();
 
-		if (userCallback)
-		{
-			callbackOutput=userCallback(inputData, &returnOutput,perThreadData);
-			if (returnOutput)
-			{
-				std::lock_guard<std::mutex> guard(threadPool->outputQueueMutex);
-				threadPool->outputQueue.Push(callbackOutput, _FILE_AND_LINE_ );
-			}			
-		}
+        if( userCallback )
+        {
+            callbackOutput = userCallback( inputData, &returnOutput, perThreadData );
+            if( returnOutput )
+            {
+                std::lock_guard<std::mutex> guard( threadPool->outputQueueMutex );
+                threadPool->outputQueue.Push( callbackOutput, _FILE_AND_LINE_ );
+            }
+        }
 
-		std::lock_guard<std::mutex> guard(threadPool->workingThreadCountMutex);
-		--threadPool->numThreadsWorking;
-	}
+        std::lock_guard<std::mutex> guard( threadPool->workingThreadCountMutex );
+        --threadPool->numThreadsWorking;
+    }
 
-	// Decrease numThreadsRunning
-	threadPool->numThreadsRunningMutex.lock();
-	--threadPool->numThreadsRunning;
-	threadPool->numThreadsRunningMutex.unlock();
-	
-	if (threadPool->perThreadDataDestructor)
-		threadPool->perThreadDataDestructor(perThreadData);
-	else if (threadPool->threadDataInterface)
-		threadPool->threadDataInterface->PerThreadDestructor(perThreadData, threadPool->tdiContext);
+    // Decrease numThreadsRunning
+    threadPool->numThreadsRunningMutex.lock();
+    --threadPool->numThreadsRunning;
+    threadPool->numThreadsRunningMutex.unlock();
 
-	return 0;
+    if( threadPool->perThreadDataDestructor )
+        threadPool->perThreadDataDestructor( perThreadData );
+    else if( threadPool->threadDataInterface )
+        threadPool->threadDataInterface->PerThreadDestructor( perThreadData, threadPool->tdiContext );
+
+    return 0;
 }
-template <class InputType, class OutputType>
+template<class InputType, class OutputType>
 ThreadPool<InputType, OutputType>::ThreadPool()
 {
-	runThreads=false;
-	numThreadsRunning=0;
-	threadDataInterface=0;
-	tdiContext=0;
-	numThreadsWorking=0;
-
+    runThreads = false;
+    numThreadsRunning = 0;
+    threadDataInterface = 0;
+    tdiContext = 0;
+    numThreadsWorking = 0;
 }
-template <class InputType, class OutputType>
+template<class InputType, class OutputType>
 ThreadPool<InputType, OutputType>::~ThreadPool()
 {
-	StopThreads();
-	Clear();
+    StopThreads();
+    Clear();
 }
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::StartThreads(int numThreads, int stackSize, void* (*_perThreadDataFactory)(), void (*_perThreadDataDestructor)(void *))
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::StartThreads( int numThreads, int stackSize, void* ( *_perThreadDataFactory )(), void ( *_perThreadDataDestructor )( void* ) )
 {
-	(void) stackSize;
+    (void)stackSize;
 
-	runThreadsMutex.lock();
-	if (runThreads==true)
-	{
-		// Already running
-		runThreadsMutex.unlock();
-		return false;
-	}
-	runThreadsMutex.unlock();
+    runThreadsMutex.lock();
+    if( runThreads == true )
+    {
+        // Already running
+        runThreadsMutex.unlock();
+        return false;
+    }
+    runThreadsMutex.unlock();
 
-	quitAndIncomingDataEvents.InitEvent();
+    quitAndIncomingDataEvents.InitEvent();
 
-	perThreadDataFactory=_perThreadDataFactory;
-	perThreadDataDestructor=_perThreadDataDestructor;
+    perThreadDataFactory = _perThreadDataFactory;
+    perThreadDataDestructor = _perThreadDataDestructor;
 
-	runThreadsMutex.lock();
-	runThreads=true;
-	runThreadsMutex.unlock();
+    runThreadsMutex.lock();
+    runThreads = true;
+    runThreadsMutex.unlock();
 
-	numThreadsWorking=0;
-	unsigned threadId = 0;
-	(void) threadId;
-	int i;
-	for (i=0; i < numThreads; i++)
-	{
-		int errorCode = RakThread::Create(WorkerThread<InputType, OutputType>, this);
+    numThreadsWorking = 0;
+    unsigned threadId = 0;
+    (void)threadId;
+    int i;
+    for( i = 0; i < numThreads; i++ )
+    {
+        int errorCode = RakThread::Create( WorkerThread<InputType, OutputType>, this );
 
-		if (errorCode!=0)
-		{
-			StopThreads();
-			return false;
-		}
-	}
-	// Wait for number of threads running to increase to numThreads
-	bool done=false;
-	while (done==false)
-	{
-		RakSleep(50);
-		std::lock_guard<std::mutex> guard(numThreadsRunningMutex);
-		if (numThreadsRunning==numThreads)
-			done=true;
-	}
+        if( errorCode != 0 )
+        {
+            StopThreads();
+            return false;
+        }
+    }
+    // Wait for number of threads running to increase to numThreads
+    bool done = false;
+    while( done == false )
+    {
+        RakSleep( 50 );
+        std::lock_guard<std::mutex> guard( numThreadsRunningMutex );
+        if( numThreadsRunning == numThreads )
+            done = true;
+    }
 
-	return true;
+    return true;
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::SetThreadDataInterface(ThreadDataInterface *tdi, void *context)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::SetThreadDataInterface( ThreadDataInterface* tdi, void* context )
 {
-	threadDataInterface=tdi;
-	tdiContext=context;
+    threadDataInterface = tdi;
+    tdiContext = context;
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::StopThreads(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::StopThreads( void )
 {
-	runThreadsMutex.lock();
-	if (runThreads==false)
-	{
-		runThreadsMutex.unlock();
-		return;
-	}
+    runThreadsMutex.lock();
+    if( runThreads == false )
+    {
+        runThreadsMutex.unlock();
+        return;
+    }
 
-	runThreads=false;
-	runThreadsMutex.unlock();
+    runThreads = false;
+    runThreadsMutex.unlock();
 
-	// Wait for number of threads running to decrease to 0
-	bool done=false;
-	while (done==false)
-	{
-		quitAndIncomingDataEvents.SetEvent();
+    // Wait for number of threads running to decrease to 0
+    bool done = false;
+    while( done == false )
+    {
+        quitAndIncomingDataEvents.SetEvent();
 
-		RakSleep(50);
-		std::lock_guard<std::mutex> guard(numThreadsRunningMutex);
-		if (numThreadsRunning==0)
-			done=true;
-	}
+        RakSleep( 50 );
+        std::lock_guard<std::mutex> guard( numThreadsRunningMutex );
+        if( numThreadsRunning == 0 )
+            done = true;
+    }
 
-	quitAndIncomingDataEvents.CloseEvent();
+    quitAndIncomingDataEvents.CloseEvent();
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::AddInput(OutputType (*workerThreadCallback)(InputType, bool *returnOutput, void* perThreadData), InputType inputData)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::AddInput( OutputType ( *workerThreadCallback )( InputType, bool* returnOutput, void* perThreadData ), InputType inputData )
 {
-	inputQueueMutex.lock();
-	inputQueue.Push(inputData, _FILE_AND_LINE_ );
-	inputFunctionQueue.Push(workerThreadCallback, _FILE_AND_LINE_ );
-	inputQueueMutex.unlock();
+    inputQueueMutex.lock();
+    inputQueue.Push( inputData, _FILE_AND_LINE_ );
+    inputFunctionQueue.Push( workerThreadCallback, _FILE_AND_LINE_ );
+    inputQueueMutex.unlock();
 
-	quitAndIncomingDataEvents.SetEvent();
+    quitAndIncomingDataEvents.SetEvent();
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::AddOutput(OutputType outputData)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::AddOutput( OutputType outputData )
 {
-	std::lock_guard<std::mutex> guard(outputQueueMutex);
-	outputQueue.Push(outputData, _FILE_AND_LINE_ );
+    std::lock_guard<std::mutex> guard( outputQueueMutex );
+    outputQueue.Push( outputData, _FILE_AND_LINE_ );
 }
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::HasOutputFast(void)
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::HasOutputFast( void )
 {
-	return outputQueue.IsEmpty()==false;
+    return outputQueue.IsEmpty() == false;
 }
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::HasOutput(void)
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::HasOutput( void )
 {
-	std::lock_guard<std::mutex> guard(outputQueueMutex);
-	bool res = outputQueue.IsEmpty()==false;
-	return res;
+    std::lock_guard<std::mutex> guard( outputQueueMutex );
+    bool res = outputQueue.IsEmpty() == false;
+    return res;
 }
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::HasInputFast(void)
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::HasInputFast( void )
 {
-	return inputQueue.IsEmpty()==false;
+    return inputQueue.IsEmpty() == false;
 }
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::HasInput(void)
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::HasInput( void )
 {
-	std::lock_guard<std::mutex> guard(inputQueueMutex);
-	bool res = inputQueue.IsEmpty()==false;
-	return res;
+    std::lock_guard<std::mutex> guard( inputQueueMutex );
+    bool res = inputQueue.IsEmpty() == false;
+    return res;
 }
-template <class InputType, class OutputType>
-OutputType ThreadPool<InputType, OutputType>::GetOutput(void)
+template<class InputType, class OutputType>
+OutputType ThreadPool<InputType, OutputType>::GetOutput( void )
 {
-	// Real output check
-	std::lock_guard<std::mutex> guard(outputQueueMutex);
-	OutputType output = outputQueue.Pop();
-	return output;
+    // Real output check
+    std::lock_guard<std::mutex> guard( outputQueueMutex );
+    OutputType output = outputQueue.Pop();
+    return output;
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::Clear(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::Clear( void )
 {
-	runThreadsMutex.lock();
-	if (runThreads)
-	{
-		runThreadsMutex.unlock();
-		inputQueueMutex.lock();
-		inputFunctionQueue.Clear(_FILE_AND_LINE_);
-		inputQueue.Clear(_FILE_AND_LINE_);
-		inputQueueMutex.unlock();
+    runThreadsMutex.lock();
+    if( runThreads )
+    {
+        runThreadsMutex.unlock();
+        inputQueueMutex.lock();
+        inputFunctionQueue.Clear( _FILE_AND_LINE_ );
+        inputQueue.Clear( _FILE_AND_LINE_ );
+        inputQueueMutex.unlock();
 
-		outputQueueMutex.lock();
-		outputQueue.Clear(_FILE_AND_LINE_);
-		outputQueueMutex.unlock();
-	}
-	else
-	{
-		inputFunctionQueue.Clear(_FILE_AND_LINE_);
-		inputQueue.Clear(_FILE_AND_LINE_);
-		outputQueue.Clear(_FILE_AND_LINE_);
-	}
+        outputQueueMutex.lock();
+        outputQueue.Clear( _FILE_AND_LINE_ );
+        outputQueueMutex.unlock();
+    }
+    else
+    {
+        inputFunctionQueue.Clear( _FILE_AND_LINE_ );
+        inputQueue.Clear( _FILE_AND_LINE_ );
+        outputQueue.Clear( _FILE_AND_LINE_ );
+    }
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::LockInput(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::LockInput( void )
 {
-	inputQueueMutex.lock();
+    inputQueueMutex.lock();
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::UnlockInput(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::UnlockInput( void )
 {
-	inputQueueMutex.unlock();
+    inputQueueMutex.unlock();
 }
-template <class InputType, class OutputType>
-unsigned ThreadPool<InputType, OutputType>::InputSize(void)
+template<class InputType, class OutputType>
+unsigned ThreadPool<InputType, OutputType>::InputSize( void )
 {
-	return inputQueue.Size();
+    return inputQueue.Size();
 }
-template <class InputType, class OutputType>
-InputType ThreadPool<InputType, OutputType>::GetInputAtIndex(unsigned index)
+template<class InputType, class OutputType>
+InputType ThreadPool<InputType, OutputType>::GetInputAtIndex( unsigned index )
 {
-	return inputQueue[index];
+    return inputQueue[index];
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::RemoveInputAtIndex(unsigned index)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::RemoveInputAtIndex( unsigned index )
 {
-	inputQueue.RemoveAtIndex(index);
-	inputFunctionQueue.RemoveAtIndex(index);
+    inputQueue.RemoveAtIndex( index );
+    inputFunctionQueue.RemoveAtIndex( index );
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::LockOutput(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::LockOutput( void )
 {
-	outputQueueMutex.lock();
+    outputQueueMutex.lock();
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::UnlockOutput(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::UnlockOutput( void )
 {
-	outputQueueMutex.unlock();
+    outputQueueMutex.unlock();
 }
-template <class InputType, class OutputType>
-unsigned ThreadPool<InputType, OutputType>::OutputSize(void)
+template<class InputType, class OutputType>
+unsigned ThreadPool<InputType, OutputType>::OutputSize( void )
 {
-	return outputQueue.Size();
+    return outputQueue.Size();
 }
-template <class InputType, class OutputType>
-OutputType ThreadPool<InputType, OutputType>::GetOutputAtIndex(unsigned index)
+template<class InputType, class OutputType>
+OutputType ThreadPool<InputType, OutputType>::GetOutputAtIndex( unsigned index )
 {
-	return outputQueue[index];
+    return outputQueue[index];
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::RemoveOutputAtIndex(unsigned index)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::RemoveOutputAtIndex( unsigned index )
 {
-	outputQueue.RemoveAtIndex(index);
+    outputQueue.RemoveAtIndex( index );
 }
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::ClearInput(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::ClearInput( void )
 {
-	inputQueue.Clear(_FILE_AND_LINE_);
-	inputFunctionQueue.Clear(_FILE_AND_LINE_);
-}
-
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::ClearOutput(void)
-{
-	outputQueue.Clear(_FILE_AND_LINE_);
-}
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::IsWorking(void)
-{
-	bool isWorking;
-//	workingThreadCountMutex.lock();
-//	isWorking=numThreadsWorking!=0;
-//	workingThreadCountMutex.unlock();
-
-//	if (isWorking)
-//		return true;
-
-	// Bug fix: Originally the order of these two was reversed.
-	// It's possible with the thread timing that working could have been false, then it picks up the data in the other thread, then it checks
-	// here and sees there is no data.  So it thinks the thread is not working when it was.
-	if (HasOutputFast() && HasOutput())
-		return true;
-
-	if (HasInputFast() && HasInput())
-		return true;
-
-	// Need to check is working again, in case the thread was between the first and second checks
-	workingThreadCountMutex.lock();
-	isWorking=numThreadsWorking!=0;
-	workingThreadCountMutex.unlock();
-
-	return isWorking;
+    inputQueue.Clear( _FILE_AND_LINE_ );
+    inputFunctionQueue.Clear( _FILE_AND_LINE_ );
 }
 
-template <class InputType, class OutputType>
-int ThreadPool<InputType, OutputType>::NumThreadsWorking(void)
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::ClearOutput( void )
 {
-	return numThreadsWorking;
+    outputQueue.Clear( _FILE_AND_LINE_ );
+}
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::IsWorking( void )
+{
+    bool isWorking;
+    //	workingThreadCountMutex.lock();
+    //	isWorking=numThreadsWorking!=0;
+    //	workingThreadCountMutex.unlock();
+
+    //	if (isWorking)
+    //		return true;
+
+    // Bug fix: Originally the order of these two was reversed.
+    // It's possible with the thread timing that working could have been false, then it picks up the data in the other thread, then it checks
+    // here and sees there is no data.  So it thinks the thread is not working when it was.
+    if( HasOutputFast() && HasOutput() )
+        return true;
+
+    if( HasInputFast() && HasInput() )
+        return true;
+
+    // Need to check is working again, in case the thread was between the first and second checks
+    workingThreadCountMutex.lock();
+    isWorking = numThreadsWorking != 0;
+    workingThreadCountMutex.unlock();
+
+    return isWorking;
 }
 
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::WasStarted(void)
+template<class InputType, class OutputType>
+int ThreadPool<InputType, OutputType>::NumThreadsWorking( void )
 {
-	std::lock_guard<std::mutex> guard(runThreadsMutex);
-	bool b = runThreads;
-	return b;
+    return numThreadsWorking;
 }
-template <class InputType, class OutputType>
-bool ThreadPool<InputType, OutputType>::Pause(void)
-{
-	if (WasStarted()==false)
-		return false;
 
-	workingThreadCountMutex.lock();
-	while (numThreadsWorking>0)
-	{
-		RakSleep(30);
-	}
-	return true;
-}
-template <class InputType, class OutputType>
-void ThreadPool<InputType, OutputType>::Resume(void)
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::WasStarted( void )
 {
-	workingThreadCountMutex.unlock();
+    std::lock_guard<std::mutex> guard( runThreadsMutex );
+    bool b = runThreads;
+    return b;
+}
+template<class InputType, class OutputType>
+bool ThreadPool<InputType, OutputType>::Pause( void )
+{
+    if( WasStarted() == false )
+        return false;
+
+    workingThreadCountMutex.lock();
+    while( numThreadsWorking > 0 )
+    {
+        RakSleep( 30 );
+    }
+    return true;
+}
+template<class InputType, class OutputType>
+void ThreadPool<InputType, OutputType>::Resume( void )
+{
+    workingThreadCountMutex.unlock();
 }
 
 } // namespace RakNet

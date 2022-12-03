@@ -3,13 +3,13 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
 
 /// \file DataCompressor.h
-/// \brief DataCompressor does compression on a block of data.  
+/// \brief DataCompressor does compression on a block of data.
 /// \details Not very good compression, but it's small and fast so is something you can use per-message at runtime.
 ///
 
@@ -26,11 +26,11 @@ class BitStream;
 class RAK_DLL_EXPORT DataCompressor
 {
 public:
-	// GetInstance() and DestroyInstance(instance*)
-	STATIC_FACTORY_DECLARATIONS(DataCompressor)
+    // GetInstance() and DestroyInstance(instance*)
+    STATIC_FACTORY_DECLARATIONS( DataCompressor )
 
-	static void Compress( unsigned char *userData, unsigned sizeInBytes, BitStream* output );
-	static unsigned DecompressAndAllocate( BitStream* input, unsigned char **output );
+    static void Compress( unsigned char* userData, unsigned sizeInBytes, BitStream* output );
+    static unsigned DecompressAndAllocate( BitStream* input, unsigned char** output );
 };
 
 } // namespace RakNet

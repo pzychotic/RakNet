@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -32,44 +32,44 @@ namespace RakNet {
 class RAK_DLL_EXPORT NetworkIDManager
 {
 public:
-	// GetInstance() and DestroyInstance(instance*)
-	STATIC_FACTORY_DECLARATIONS(NetworkIDManager)
+    // GetInstance() and DestroyInstance(instance*)
+    STATIC_FACTORY_DECLARATIONS( NetworkIDManager )
 
-	NetworkIDManager();
-	virtual ~NetworkIDManager(void);
+    NetworkIDManager();
+    virtual ~NetworkIDManager( void );
 
-	/// Returns the parent object, or this instance if you don't use a parent.
-	/// Supports NetworkIDObject anywhere in the inheritance hierarchy
-	/// \pre You must first call SetNetworkIDManager before using this function
-	template <class returnType>
-	returnType GET_OBJECT_FROM_ID(NetworkID x) {
-		NetworkIDObject *nio = GET_BASE_OBJECT_FROM_ID(x);
-		if (nio==0)
-			return 0;
-		if (nio->GetParent())
-			return (returnType) nio->GetParent();
-		return (returnType) nio;
-	}
+    /// Returns the parent object, or this instance if you don't use a parent.
+    /// Supports NetworkIDObject anywhere in the inheritance hierarchy
+    /// \pre You must first call SetNetworkIDManager before using this function
+    template<class returnType>
+    returnType GET_OBJECT_FROM_ID( NetworkID x )
+    {
+        NetworkIDObject* nio = GET_BASE_OBJECT_FROM_ID( x );
+        if( nio == 0 )
+            return 0;
+        if( nio->GetParent() )
+            return (returnType)nio->GetParent();
+        return (returnType)nio;
+    }
 
-	// Stop tracking all NetworkID objects
-	void Clear(void);
+    // Stop tracking all NetworkID objects
+    void Clear( void );
 
-	/// \internal
-	NetworkIDObject *GET_BASE_OBJECT_FROM_ID(NetworkID x);
+    /// \internal
+    NetworkIDObject* GET_BASE_OBJECT_FROM_ID( NetworkID x );
 
 protected:
-	/// \internal
-	void TrackNetworkIDObject(NetworkIDObject *networkIdObject);
-	void StopTrackingNetworkIDObject(NetworkIDObject *networkIdObject);
+    /// \internal
+    void TrackNetworkIDObject( NetworkIDObject* networkIdObject );
+    void StopTrackingNetworkIDObject( NetworkIDObject* networkIdObject );
 
-	friend class NetworkIDObject;
+    friend class NetworkIDObject;
 
-	NetworkIDObject *networkIdHash[NETWORK_ID_MANAGER_HASH_LENGTH];
-	unsigned int NetworkIDToHashIndex(NetworkID networkId);
-	uint64_t startingOffset;
-	/// \internal
-	NetworkID GetNewNetworkID(void);
-
+    NetworkIDObject* networkIdHash[NETWORK_ID_MANAGER_HASH_LENGTH];
+    unsigned int NetworkIDToHashIndex( NetworkID networkId );
+    uint64_t startingOffset;
+    /// \internal
+    NetworkID GetNewNetworkID( void );
 };
 
 } // namespace RakNet

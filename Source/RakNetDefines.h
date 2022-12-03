@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -24,7 +24,7 @@
 
 // Define _FILE_AND_LINE_ to "",0 if you want to strip out file and line info for memory tracking from the EXE
 #ifndef _FILE_AND_LINE_
-#define _FILE_AND_LINE_ __FILE__,__LINE__
+#define _FILE_AND_LINE_ __FILE__, __LINE__
 #endif
 
 /// Define __BITSTREAM_NATIVE_END to NOT support endian swapping in the BitStream class.  This is faster and is what you should use
@@ -45,7 +45,7 @@
 #endif
 
 /// Uncomment to use RakMemoryOverride for custom memory tracking
-/// See RakMemoryOverride.h. 
+/// See RakMemoryOverride.h.
 #ifndef _USE_RAK_MEMORY_OVERRIDE
 #define _USE_RAK_MEMORY_OVERRIDE 0
 #endif
@@ -76,13 +76,13 @@
 #endif
 
 #ifndef RakAssert
-#if   defined(__native_client__)
-#define RakAssert(x)
+#if defined( __native_client__ )
+#define RakAssert( x )
 #else
-#if defined(_DEBUG)
-#define RakAssert(x) assert(x);
+#if defined( _DEBUG )
+#define RakAssert( x ) assert( x );
 #else
-#define RakAssert(x) 
+#define RakAssert( x )
 #endif
 #endif
 #endif
@@ -129,7 +129,7 @@
 #endif
 
 #ifndef RAKSTRING_TYPE
-#if defined(_UNICODE)
+#if defined( _UNICODE )
 #define RAKSTRING_TYPE RakWString
 #define RAKSTRING_TYPE_IS_UNICODE 1
 #else

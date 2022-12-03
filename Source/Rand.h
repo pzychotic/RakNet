@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -39,24 +39,24 @@ extern float RAK_DLL_EXPORT frandomMT( void );
 
 /// Randomizes a buffer
 /// \note not threadSafe, use an instance of RakNetRandom if necessary per thread
-extern void RAK_DLL_EXPORT fillBufferMT( void *buffer, unsigned int bytes );
+extern void RAK_DLL_EXPORT fillBufferMT( void* buffer, unsigned int bytes );
 
 // Same thing as above functions, but not global
 class RAK_DLL_EXPORT RakNetRandom
 {
 public:
-	RakNetRandom();
-	~RakNetRandom();
-	void SeedMT( unsigned int seed );
-	unsigned int ReloadMT( void );
-	unsigned int RandomMT( void );
-	float FrandomMT( void );
-	void FillBufferMT( void *buffer, unsigned int bytes );
+    RakNetRandom();
+    ~RakNetRandom();
+    void SeedMT( unsigned int seed );
+    unsigned int ReloadMT( void );
+    unsigned int RandomMT( void );
+    float FrandomMT( void );
+    void FillBufferMT( void* buffer, unsigned int bytes );
 
 protected:
-	unsigned int state[ 624 + 1 ];
-	unsigned int *next;
-	int left;
+    unsigned int state[624 + 1];
+    unsigned int* next;
+    int left;
 };
 
 } // namespace RakNet

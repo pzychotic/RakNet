@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -15,7 +15,7 @@
 #pragma once
 
 #include "NativeFeatureIncludes.h"
-#if _RAKNET_SUPPORT_Router2==1 && _RAKNET_SUPPORT_UDPForwarder==1
+#if _RAKNET_SUPPORT_Router2 == 1 && _RAKNET_SUPPORT_UDPForwarder == 1
 
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
@@ -30,10 +30,10 @@ namespace RakNet {
 
 struct Router2DebugInterface
 {
-	Router2DebugInterface() {}
-	virtual ~Router2DebugInterface() {}
-	virtual void ShowFailure(const char *message);
-	virtual void ShowDiagnostic(const char *message);
+    Router2DebugInterface() {}
+    virtual ~Router2DebugInterface() {}
+    virtual void ShowFailure( const char* message );
+    virtual void ShowDiagnostic( const char* message );
 };
 
 /// \defgroup ROUTER_2_GROUP Router2
@@ -49,146 +49,145 @@ struct Router2DebugInterface
 class RAK_DLL_EXPORT Router2 : public PluginInterface2
 {
 public:
-	// GetInstance() and DestroyInstance(instance*)
-	STATIC_FACTORY_DECLARATIONS(Router2)
+    // GetInstance() and DestroyInstance(instance*)
+    STATIC_FACTORY_DECLARATIONS( Router2 )
 
-	Router2();
-	virtual ~Router2();
+    Router2();
+    virtual ~Router2();
 
-	/// Sets the socket family to use, either IPV4 or IPV6
-	/// \param[in] socketFamily For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
-	void SetSocketFamily(unsigned short _socketFamily);
+    /// Sets the socket family to use, either IPV4 or IPV6
+    /// \param[in] socketFamily For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
+    void SetSocketFamily( unsigned short _socketFamily );
 
-	/// \brief Query all connected systems to connect through them to a third system.
-	/// System will return ID_ROUTER_2_FORWARDING_NO_PATH if unable to connect.
-	/// Else you will get ID_ROUTER_2_FORWARDING_ESTABLISHED
-	///
-	/// On ID_ROUTER_2_FORWARDING_ESTABLISHED, EstablishRouting as follows:
-	///
-	/// BitStream bs(packet->data, packet->length, false);
-	/// bs.IgnoreBytes(sizeof(MessageID));
-	/// RakNetGUID endpointGuid;
-	/// bs.Read(endpointGuid);
-	/// unsigned short sourceToDestPort;
-	/// bs.Read(sourceToDestPort);
-	/// char ipAddressString[32];
-	/// packet->systemAddress.ToString(false, ipAddressString);
-	/// rakPeerInterface->EstablishRouting(ipAddressString, sourceToDestPort, 0,0);
-	///
-	/// \note The SystemAddress for a connection should not be used - always use RakNetGuid as the address can change at any time.
-	/// When the address changes, you will get ID_ROUTER_2_REROUTED
-	void EstablishRouting(RakNetGUID endpointGuid);
+    /// \brief Query all connected systems to connect through them to a third system.
+    /// System will return ID_ROUTER_2_FORWARDING_NO_PATH if unable to connect.
+    /// Else you will get ID_ROUTER_2_FORWARDING_ESTABLISHED
+    ///
+    /// On ID_ROUTER_2_FORWARDING_ESTABLISHED, EstablishRouting as follows:
+    ///
+    /// BitStream bs(packet->data, packet->length, false);
+    /// bs.IgnoreBytes(sizeof(MessageID));
+    /// RakNetGUID endpointGuid;
+    /// bs.Read(endpointGuid);
+    /// unsigned short sourceToDestPort;
+    /// bs.Read(sourceToDestPort);
+    /// char ipAddressString[32];
+    /// packet->systemAddress.ToString(false, ipAddressString);
+    /// rakPeerInterface->EstablishRouting(ipAddressString, sourceToDestPort, 0,0);
+    ///
+    /// \note The SystemAddress for a connection should not be used - always use RakNetGuid as the address can change at any time.
+    /// When the address changes, you will get ID_ROUTER_2_REROUTED
+    void EstablishRouting( RakNetGUID endpointGuid );
 
-	/// Set the maximum number of bidirectional connections this system will support
-	/// Defaults to 0
-	void SetMaximumForwardingRequests(int max);
+    /// Set the maximum number of bidirectional connections this system will support
+    /// Defaults to 0
+    void SetMaximumForwardingRequests( int max );
 
-	/// For testing and debugging
-	void SetDebugInterface(Router2DebugInterface *_debugInterface);
+    /// For testing and debugging
+    void SetDebugInterface( Router2DebugInterface* _debugInterface );
 
-	/// Get the pointer passed to SetDebugInterface()
-	Router2DebugInterface *GetDebugInterface(void) const;
+    /// Get the pointer passed to SetDebugInterface()
+    Router2DebugInterface* GetDebugInterface( void ) const;
 
-	// --------------------------------------------------------------------------------------------
-	// Packet handling functions
-	// --------------------------------------------------------------------------------------------
-	virtual PluginReceiveResult OnReceive(Packet *packet);
-	virtual void Update(void);
-	virtual void OnClosedConnection(const SystemAddress &systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
-	virtual void OnFailedConnectionAttempt(Packet *packet, PI2_FailedConnectionAttemptReason failedConnectionAttemptReason);
-	virtual void OnRakPeerShutdown(void);
+    // --------------------------------------------------------------------------------------------
+    // Packet handling functions
+    // --------------------------------------------------------------------------------------------
+    virtual PluginReceiveResult OnReceive( Packet* packet );
+    virtual void Update( void );
+    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    virtual void OnFailedConnectionAttempt( Packet* packet, PI2_FailedConnectionAttemptReason failedConnectionAttemptReason );
+    virtual void OnRakPeerShutdown( void );
 
 
-	enum Router2RequestStates
-	{
-		R2RS_REQUEST_STATE_QUERY_FORWARDING,
-		REQUEST_STATE_REQUEST_FORWARDING,
-	};
+    enum Router2RequestStates
+    {
+        R2RS_REQUEST_STATE_QUERY_FORWARDING,
+        REQUEST_STATE_REQUEST_FORWARDING,
+    };
 
-	struct ConnectionRequestSystem
-	{
-		RakNetGUID guid;
-		int pingToEndpoint;
-		unsigned short usedForwardingEntries;
-	};
+    struct ConnectionRequestSystem
+    {
+        RakNetGUID guid;
+        int pingToEndpoint;
+        unsigned short usedForwardingEntries;
+    };
 
-	struct ConnnectRequest
-	{
-		ConnnectRequest();
-		~ConnnectRequest();
+    struct ConnnectRequest
+    {
+        ConnnectRequest();
+        ~ConnnectRequest();
 
-		DataStructures::List<ConnectionRequestSystem> connectionRequestSystems;
-		std::mutex connectionRequestSystemsMutex;
-		Router2RequestStates requestState;
-		RakNet::TimeMS pingTimeout;
-		RakNetGUID endpointGuid;
-		RakNetGUID lastRequestedForwardingSystem;
-		bool returnConnectionLostOnFailure;
-		unsigned int GetGuidIndex(RakNetGUID guid);
-	};
+        DataStructures::List<ConnectionRequestSystem> connectionRequestSystems;
+        std::mutex connectionRequestSystemsMutex;
+        Router2RequestStates requestState;
+        RakNet::TimeMS pingTimeout;
+        RakNetGUID endpointGuid;
+        RakNetGUID lastRequestedForwardingSystem;
+        bool returnConnectionLostOnFailure;
+        unsigned int GetGuidIndex( RakNetGUID guid );
+    };
 
-	unsigned int GetConnectionRequestIndex(RakNetGUID endpointGuid);
+    unsigned int GetConnectionRequestIndex( RakNetGUID endpointGuid );
 
-	struct MiniPunchRequest
-	{
-		RakNetGUID endpointGuid;
-		SystemAddress endpointAddress;
-		bool gotReplyFromEndpoint;
-		RakNetGUID sourceGuid;
-		SystemAddress sourceAddress;
-		bool gotReplyFromSource;
-		RakNet::TimeMS timeout;
-		RakNet::TimeMS nextAction;
-		unsigned short forwardingPort;
-		__UDPSOCKET__ forwardingSocket;
-	};
+    struct MiniPunchRequest
+    {
+        RakNetGUID endpointGuid;
+        SystemAddress endpointAddress;
+        bool gotReplyFromEndpoint;
+        RakNetGUID sourceGuid;
+        SystemAddress sourceAddress;
+        bool gotReplyFromSource;
+        RakNet::TimeMS timeout;
+        RakNet::TimeMS nextAction;
+        unsigned short forwardingPort;
+        __UDPSOCKET__ forwardingSocket;
+    };
 
-	struct ForwardedConnection
-	{
-		RakNetGUID endpointGuid;
-		RakNetGUID intermediaryGuid;
-		SystemAddress intermediaryAddress;
-		bool returnConnectionLostOnFailure;
-		bool weInitiatedForwarding;
-	};
+    struct ForwardedConnection
+    {
+        RakNetGUID endpointGuid;
+        RakNetGUID intermediaryGuid;
+        SystemAddress intermediaryAddress;
+        bool returnConnectionLostOnFailure;
+        bool weInitiatedForwarding;
+    };
 
 protected:
+    bool UpdateForwarding( ConnnectRequest* connectionRequest );
+    void RemoveConnectionRequest( unsigned int connectionRequestIndex );
+    void RequestForwarding( ConnnectRequest* connectionRequest );
+    void OnQueryForwarding( Packet* packet );
+    void OnQueryForwardingReply( Packet* packet );
+    void OnRequestForwarding( Packet* packet );
+    void OnRerouted( Packet* packet );
+    void OnMiniPunchReply( Packet* packet );
+    void OnMiniPunchReplyBounce( Packet* packet );
+    bool OnForwardingSuccess( Packet* packet );
+    int GetLargestPingAmongConnectedSystems( void ) const;
+    void ReturnToUser( MessageID messageId, RakNetGUID endpointGuid, const SystemAddress& systemAddress, bool wasGeneratedLocally );
+    bool ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure );
 
-	bool UpdateForwarding(ConnnectRequest* connectionRequest);
-	void RemoveConnectionRequest(unsigned int connectionRequestIndex);
-	void RequestForwarding(ConnnectRequest* connectionRequest);
-	void OnQueryForwarding(Packet *packet);
-	void OnQueryForwardingReply(Packet *packet);
-	void OnRequestForwarding(Packet *packet);
-	void OnRerouted(Packet *packet);
-	void OnMiniPunchReply(Packet *packet);
-	void OnMiniPunchReplyBounce(Packet *packet);
-	bool OnForwardingSuccess(Packet *packet);
-	int GetLargestPingAmongConnectedSystems(void) const;
-	void ReturnToUser(MessageID messageId, RakNetGUID endpointGuid, const SystemAddress &systemAddress, bool wasGeneratedLocally);
-	bool ConnectInternal(RakNetGUID endpointGuid, bool returnConnectionLostOnFailure);
+    UDPForwarder* udpForwarder;
+    int maximumForwardingRequests;
+    std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
+    DataStructures::List<ConnnectRequest*> connectionRequests;
+    DataStructures::List<MiniPunchRequest> miniPunchesInProgress;
+    // Forwarding we have initiated
+    DataStructures::List<ForwardedConnection> forwardedConnectionList;
 
-	UDPForwarder *udpForwarder;
-	int maximumForwardingRequests;
-	std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
-	DataStructures::List<ConnnectRequest*> connectionRequests;
-	DataStructures::List<MiniPunchRequest> miniPunchesInProgress;
-	// Forwarding we have initiated
-	DataStructures::List<ForwardedConnection> forwardedConnectionList;
+    void ClearConnectionRequests( void );
+    void ClearMinipunches( void );
+    void ClearForwardedConnections( void );
+    void ClearAll( void );
+    int ReturnFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid );
+    void SendFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid );
+    void SendForwardingSuccess( MessageID messageId, RakNetGUID sourceGuid, RakNetGUID endpointGuid, unsigned short sourceToDstPort );
+    void SendOOBFromRakNetPort( OutOfBandIdentifiers oob, BitStream* extraData, SystemAddress sa );
+    void SendOOBFromSpecifiedSocket( OutOfBandIdentifiers oob, SystemAddress sa, __UDPSOCKET__ socket );
+    void SendOOBMessages( MiniPunchRequest* mpr );
 
-	void ClearConnectionRequests(void);
-	void ClearMinipunches(void);
-	void ClearForwardedConnections(void);
-	void ClearAll(void);
-	int ReturnFailureOnCannotForward(RakNetGUID sourceGuid, RakNetGUID endpointGuid);
-	void SendFailureOnCannotForward(RakNetGUID sourceGuid, RakNetGUID endpointGuid);
-	void SendForwardingSuccess(MessageID messageId, RakNetGUID sourceGuid, RakNetGUID endpointGuid, unsigned short sourceToDstPort);
-	void SendOOBFromRakNetPort(OutOfBandIdentifiers oob, BitStream *extraData, SystemAddress sa);
-	void SendOOBFromSpecifiedSocket(OutOfBandIdentifiers oob, SystemAddress sa, __UDPSOCKET__ socket);
-	void SendOOBMessages(MiniPunchRequest *mpr);
-
-	Router2DebugInterface *debugInterface;
-	unsigned short socketFamily;
+    Router2DebugInterface* debugInterface;
+    unsigned short socketFamily;
 };
 
 } // namespace RakNet

@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -24,28 +24,29 @@
 
 namespace RakNet { namespace DataStructures {
 
-	// Allocate some number of bytes from pools.  Uses the heap if necessary.
-	class RAK_DLL_EXPORT BytePool
-	{
-	public:
-		BytePool();
-		~BytePool();
-		// Should be at least 8 times bigger than 8192
-		void SetPageSize(int size);
-		unsigned char* Allocate(int bytesWanted, const char *file, unsigned int line);
-		void Release(unsigned char *data, const char *file, unsigned int line);
-		void Clear(const char *file, unsigned int line);
-	protected:	
-		MemoryPool<unsigned char[128]> pool128;
-		MemoryPool<unsigned char[512]> pool512;
-		MemoryPool<unsigned char[2048]> pool2048;
-		MemoryPool<unsigned char[8192]> pool8192;
-#ifdef _THREADSAFE_BYTE_POOL
-		std::mutex mutex128;
-		std::mutex mutex512;
-		std::mutex mutex2048;
-		std::mutex mutex8192;
-#endif
-	};
+// Allocate some number of bytes from pools.  Uses the heap if necessary.
+class RAK_DLL_EXPORT BytePool
+{
+public:
+    BytePool();
+    ~BytePool();
+    // Should be at least 8 times bigger than 8192
+    void SetPageSize( int size );
+    unsigned char* Allocate( int bytesWanted, const char* file, unsigned int line );
+    void Release( unsigned char* data, const char* file, unsigned int line );
+    void Clear( const char* file, unsigned int line );
 
-} } // namespace RakNet::DataStructures
+protected:
+    MemoryPool<unsigned char[128]> pool128;
+    MemoryPool<unsigned char[512]> pool512;
+    MemoryPool<unsigned char[2048]> pool2048;
+    MemoryPool<unsigned char[8192]> pool8192;
+#ifdef _THREADSAFE_BYTE_POOL
+    std::mutex mutex128;
+    std::mutex mutex512;
+    std::mutex mutex2048;
+    std::mutex mutex8192;
+#endif
+};
+
+}} // namespace RakNet::DataStructures

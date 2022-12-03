@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -18,16 +18,17 @@ using namespace RakNet;
 class RakTimer
 {
 public:
-	RakTimer(void);
-	RakTimer(int lengthInMilliseconds);
-	~RakTimer(void);
-    void SetTimerLength(int lengthInMilliseconds);
+    RakTimer( void );
+    RakTimer( int lengthInMilliseconds );
+    ~RakTimer( void );
+    void SetTimerLength( int lengthInMilliseconds );
     void Start();
     void Pause();
     void Resume();
-	bool IsExpired();
+    bool IsExpired();
+
 private:
-	int timerLength;//Modified by SetTimerLength
-	int pauseOffset;
-	TimeMS startTime;
+    int timerLength; //Modified by SetTimerLength
+    int pauseOffset;
+    TimeMS startTime;
 };

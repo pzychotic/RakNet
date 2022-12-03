@@ -112,18 +112,17 @@
 
 #include <string.h> // Needed for strcat and strcpy
 #include "Export.h"
-//#define MAX_FILE_READ_BUFFER 8000 
+//#define MAX_FILE_READ_BUFFER 8000
 #define SHA1_LENGTH 20
 
 
-
-#if !defined(SHA1_UTILITY_FUNCTIONS) && !defined(SHA1_NO_UTILITY_FUNCTIONS)
+#if !defined( SHA1_UTILITY_FUNCTIONS ) && !defined( SHA1_NO_UTILITY_FUNCTIONS )
 #define SHA1_UTILITY_FUNCTIONS
 #endif
 
-#if !defined(SHA1_STL_FUNCTIONS) && !defined(SHA1_NO_STL_FUNCTIONS)
+#if !defined( SHA1_STL_FUNCTIONS ) && !defined( SHA1_NO_STL_FUNCTIONS )
 #define SHA1_STL_FUNCTIONS
-#if !defined(SHA1_UTILITY_FUNCTIONS)
+#if !defined( SHA1_UTILITY_FUNCTIONS )
 #error STL functions require SHA1_UTILITY_FUNCTIONS.
 #endif
 #endif
@@ -150,32 +149,32 @@
 // source files. Just #define SHA1_LITTLE_ENDIAN or #define SHA1_BIG_ENDIAN
 // in your files, before including the DR_SHA1.h header file. If you don't
 // define anything, the class defaults to little endian.
-#if !defined(SHA1_LITTLE_ENDIAN) && !defined(SHA1_BIG_ENDIAN)
+#if !defined( SHA1_LITTLE_ENDIAN ) && !defined( SHA1_BIG_ENDIAN )
 #define SHA1_LITTLE_ENDIAN
 #endif
 
 // If you want variable wiping, #define SHA1_WIPE_VARIABLES, if not,
 // #define SHA1_NO_WIPE_VARIABLES. If you don't define anything, it
 // defaults to wiping.
-#if !defined(SHA1_WIPE_VARIABLES) && !defined(SHA1_NO_WIPE_VARIABLES)
+#if !defined( SHA1_WIPE_VARIABLES ) && !defined( SHA1_NO_WIPE_VARIABLES )
 #define SHA1_WIPE_VARIABLES
 #endif
 
-#if defined(SHA1_HAS_TCHAR)
+#if defined( SHA1_HAS_TCHAR )
 #include <tchar.h>
 #else
 #ifdef _MSC_VER
 #include <tchar.h>
 #else
 #ifndef TCHAR
-#if defined(__WIN32__)
+#if defined( __WIN32__ )
 #include <tchar.h>
 #else
 #define TCHAR char
 #endif
 #endif
 #ifndef _T
-#define _T(__x) (__x)
+#define _T( __x ) ( __x )
 #define _tmain main
 #define _tprintf printf
 #define _getts gets
@@ -205,7 +204,7 @@ namespace RakNet {
 #ifdef _MSC_VER // Compiling with Microsoft compiler
 #define UINT_32 unsigned __int32
 #else // !_MSC_VER
-#if (ULONG_MAX == 0xFFFFFFFFUL)
+#if( ULONG_MAX == 0xFFFFFFFFUL )
 #define UINT_32 unsigned long
 #else
 #define UINT_32 unsigned int
@@ -234,73 +233,73 @@ namespace RakNet {
 
 typedef union
 {
-	UINT_8 c[64];
-	UINT_32 l[16];
+    UINT_8 c[64];
+    UINT_32 l[16];
 } SHA1_WORKSPACE_BLOCK;
 
 class RAK_DLL_EXPORT CSHA1
 {
 public:
 #ifdef SHA1_UTILITY_FUNCTIONS
-	// Different formats for ReportHash(Stl)
-	enum REPORT_TYPE
-	{
-		REPORT_HEX = 0,
-		REPORT_DIGIT = 1,
-		REPORT_HEX_SHORT = 2
-	};
+    // Different formats for ReportHash(Stl)
+    enum REPORT_TYPE
+    {
+        REPORT_HEX = 0,
+        REPORT_DIGIT = 1,
+        REPORT_HEX_SHORT = 2
+    };
 #endif
 
-	// Constructor and destructor
-	CSHA1();
+    // Constructor and destructor
+    CSHA1();
 
 #ifdef SHA1_WIPE_VARIABLES
-	~CSHA1();
+    ~CSHA1();
 #endif
 
-	void Reset();
+    void Reset();
 
-	// Hash in binary data and strings
-	void Update(const UINT_8* pbData, UINT_32 uLen);
+    // Hash in binary data and strings
+    void Update( const UINT_8* pbData, UINT_32 uLen );
 
 #ifdef SHA1_UTILITY_FUNCTIONS
-	// Hash in file contents
-	bool HashFile(const TCHAR* tszFileName);
+    // Hash in file contents
+    bool HashFile( const TCHAR* tszFileName );
 #endif
 
-	// Finalize hash; call it before using ReportHash(Stl)
-	void Final();
+    // Finalize hash; call it before using ReportHash(Stl)
+    void Final();
 
 #ifdef SHA1_UTILITY_FUNCTIONS
-	bool ReportHash(TCHAR* tszReport, REPORT_TYPE rtReportType = REPORT_HEX) const;
+    bool ReportHash( TCHAR* tszReport, REPORT_TYPE rtReportType = REPORT_HEX ) const;
 #endif
 
 #ifdef SHA1_STL_FUNCTIONS
-	bool ReportHashStl(std::basic_string<TCHAR>& strOut, REPORT_TYPE rtReportType =
-		REPORT_HEX) const;
+    bool ReportHashStl( std::basic_string<TCHAR>& strOut, REPORT_TYPE rtReportType =
+                                                              REPORT_HEX ) const;
 #endif
 
-	// Get the raw message digest (20 bytes)
-	bool GetHash(UINT_8* pbDest20) const;
+    // Get the raw message digest (20 bytes)
+    bool GetHash( UINT_8* pbDest20 ) const;
 
-unsigned char * GetHash( void ) const;
-// KevinJ: http://cseweb.ucsd.edu/~mihir/papers/hmac-cb.pdf
-	static void HMAC(unsigned char *sharedKey, int sharedKeyLength, unsigned char *data, int dataLength, unsigned char output[SHA1_LENGTH]);
+    unsigned char* GetHash( void ) const;
+    // KevinJ: http://cseweb.ucsd.edu/~mihir/papers/hmac-cb.pdf
+    static void HMAC( unsigned char* sharedKey, int sharedKeyLength, unsigned char* data, int dataLength, unsigned char output[SHA1_LENGTH] );
 
 private:
-	// Private SHA-1 transformation
-	void Transform(UINT_32* pState, const UINT_8* pBuffer);
+    // Private SHA-1 transformation
+    void Transform( UINT_32* pState, const UINT_8* pBuffer );
 
-	// Member variables
-	UINT_32 m_state[5];
-	UINT_32 m_count[2];
-	UINT_32 m_reserved0[1]; // Memory alignment padding
-	UINT_8 m_buffer[64];
-	UINT_8 m_digest[20];
-	UINT_32 m_reserved1[3]; // Memory alignment padding
+    // Member variables
+    UINT_32 m_state[5];
+    UINT_32 m_count[2];
+    UINT_32 m_reserved0[1]; // Memory alignment padding
+    UINT_8 m_buffer[64];
+    UINT_8 m_digest[20];
+    UINT_32 m_reserved1[3]; // Memory alignment padding
 
-	UINT_8 m_workspace[64];
-	SHA1_WORKSPACE_BLOCK* m_block; // SHA1 pointer to the byte array above
+    UINT_8 m_workspace[64];
+    SHA1_WORKSPACE_BLOCK* m_block; // SHA1 pointer to the byte array above
 };
 
 } // namespace RakNet

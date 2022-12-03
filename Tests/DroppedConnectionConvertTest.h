@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -28,16 +28,16 @@
 #include "CommonFunctions.h"
 
 using namespace RakNet;
-class DroppedConnectionConvertTest :
-	public TestInterface
+class DroppedConnectionConvertTest : public TestInterface
 {
 public:
-	DroppedConnectionConvertTest(void);
-	~DroppedConnectionConvertTest(void);
-	int RunTest(DataStructures::List<RakString> params,bool isVerbose,bool noPauses);//should return 0 if no error, or the error number
-	RakString GetTestName();
-	RakString ErrorCodeToString(int errorCode);
-	void DestroyPeers();
+    DroppedConnectionConvertTest( void );
+    ~DroppedConnectionConvertTest( void );
+    int RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses ); //should return 0 if no error, or the error number
+    RakString GetTestName();
+    RakString ErrorCodeToString( int errorCode );
+    void DestroyPeers();
+
 private:
-	DataStructures::List <RakPeerInterface *> destroyList;
+    DataStructures::List<RakPeerInterface*> destroyList;
 };

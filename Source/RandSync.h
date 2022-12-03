@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -27,28 +27,28 @@ class BitStream;
 class RAK_DLL_EXPORT RakNetRandomSync
 {
 public:
-	RakNetRandomSync();
-	virtual ~RakNetRandomSync();
-	void SeedMT( uint32_t _seed );
-	void SeedMT( uint32_t _seed, uint32_t skipValues );
-	float FrandomMT( void );
-	unsigned int RandomMT( void );
-	uint32_t GetSeed( void ) const;
-	uint32_t GetCallCount( void ) const;
-	void SetCallCount( uint32_t i );
+    RakNetRandomSync();
+    virtual ~RakNetRandomSync();
+    void SeedMT( uint32_t _seed );
+    void SeedMT( uint32_t _seed, uint32_t skipValues );
+    float FrandomMT( void );
+    unsigned int RandomMT( void );
+    uint32_t GetSeed( void ) const;
+    uint32_t GetCallCount( void ) const;
+    void SetCallCount( uint32_t i );
 
-	virtual void SerializeConstruction(BitStream *constructionBitstream);
-	virtual bool DeserializeConstruction(BitStream *constructionBitstream);
-	virtual void Serialize(BitStream *outputBitstream);
-	virtual void Deserialize(BitStream *outputBitstream);
+    virtual void SerializeConstruction( BitStream* constructionBitstream );
+    virtual bool DeserializeConstruction( BitStream* constructionBitstream );
+    virtual void Serialize( BitStream* outputBitstream );
+    virtual void Deserialize( BitStream* outputBitstream );
 
 protected:
-	void Skip( uint32_t count );
-	DataStructures::Queue<unsigned int> usedValues;
-	uint32_t seed;
-	uint32_t callCount;
-	uint32_t usedValueBufferCount;
-	RakNetRandom rnr;
+    void Skip( uint32_t count );
+    DataStructures::Queue<unsigned int> usedValues;
+    uint32_t seed;
+    uint32_t callCount;
+    uint32_t usedValueBufferCount;
+    RakNetRandom rnr;
 };
 
 } // namespace RakNet

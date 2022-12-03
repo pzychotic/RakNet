@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -13,14 +13,14 @@
 /*
 Description:
 Tests:
-virtual unsigned short RakPeerInterface::NumberOfConnections  	(  	void   	  	 )   	 const 
-virtual void RakPeerInterface::GetSystemList  	(  	DataStructures::List< SystemAddress > &   	 addresses, 		DataStructures::List< RakNetGUID > &  	guids	  	) 
-virtual bool RakPeerInterface::IsActive  	(  	void   	  	 )   	 const 
-virtual SystemAddress RakPeerInterface::GetSystemAddressFromIndex  	(  	int   	 index  	 )   	 
-virtual SystemAddress RakPeerInterface::GetSystemAddressFromGuid  	(  	const RakNetGUID   	 input  	 )   	 const 
-virtual const RakNetGUID& RakPeerInterface::GetGuidFromSystemAddress  	(  	const SystemAddress   	 input  	 )   	 const 
-pure virtual  virtual RakNetGUID RakPeerInterface::GetGUIDFromIndex  	(  	int   	 index  	 )   	 
-virtual SystemAddress RakPeerInterface::GetExternalID  	(  	const SystemAddress   	 target  	 )   	 const 
+virtual unsigned short RakPeerInterface::NumberOfConnections  	(  	void   	  	 )   	 const
+virtual void RakPeerInterface::GetSystemList  	(  	DataStructures::List< SystemAddress > &   	 addresses, 		DataStructures::List< RakNetGUID > &  	guids	  	)
+virtual bool RakPeerInterface::IsActive  	(  	void   	  	 )   	 const
+virtual SystemAddress RakPeerInterface::GetSystemAddressFromIndex  	(  	int   	 index  	 )
+virtual SystemAddress RakPeerInterface::GetSystemAddressFromGuid  	(  	const RakNetGUID   	 input  	 )   	 const
+virtual const RakNetGUID& RakPeerInterface::GetGuidFromSystemAddress  	(  	const SystemAddress   	 input  	 )   	 const
+pure virtual  virtual RakNetGUID RakPeerInterface::GetGUIDFromIndex  	(  	int   	 index  	 )
+virtual SystemAddress RakPeerInterface::GetExternalID  	(  	const SystemAddress   	 target  	 )   	 const
 
 Success conditions:
 All functions pass test.
@@ -31,7 +31,7 @@ Any function fails.
 Client was active but shouldn't be yet
 Client was not active but should be
 Could not connect the client
-Mismatch between guidList size and systemList size 
+Mismatch between guidList size and systemList size
 NumberOfConnections problem
 SystemList problem with GetSystemList
 Both SystemList and Number of connections have problems and report different results
@@ -56,289 +56,271 @@ IsConnected
 RakPeerInterface Functions Explicitly Tested:
 
 NumberOfConnections
-GetSystemList  
-IsActive  
-GetSystemAddressFromIndex  
-GetSystemAddressFromGuid  
-GetGuidFromSystemAddress  
-GetGUIDFromIndex  
-GetExternalID  
+GetSystemList
+IsActive
+GetSystemAddressFromIndex
+GetSystemAddressFromGuid
+GetGuidFromSystemAddress
+GetGUIDFromIndex
+GetExternalID
 
 */
-int SystemAddressAndGuidTest::RunTest(DataStructures::List<RakString> params,bool isVerbose,bool noPauses)
+int SystemAddressAndGuidTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
 {
 
-	RakPeerInterface *server,*client;
-	destroyList.Clear(false,_FILE_AND_LINE_);
+    RakPeerInterface *server, *client;
+    destroyList.Clear( false, _FILE_AND_LINE_ );
 
-	printf("Testing IsActive\n");
-	client=RakPeerInterface::GetInstance();
-	destroyList.Push(	client,_FILE_AND_LINE_);
-	if (client->IsActive())
-	{
+    printf( "Testing IsActive\n" );
+    client = RakPeerInterface::GetInstance();
+    destroyList.Push( client, _FILE_AND_LINE_ );
+    if( client->IsActive() )
+    {
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[1-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[1 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 1;
-	}
+        return 1;
+    }
 
-	client->Startup(1,&SocketDescriptor(60001,0),1);
+    client->Startup( 1, &SocketDescriptor( 60001, 0 ), 1 );
 
-	if (!client->IsActive())
-	{
+    if( !client->IsActive() )
+    {
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[2-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[2 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 2;
-	}
+        return 2;
+    }
 
-	//Passed by reference for initializations
-	TestHelpers::StandardServerPrep(server,destroyList);
+    //Passed by reference for initializations
+    TestHelpers::StandardServerPrep( server, destroyList );
 
-	if (!TestHelpers::WaitAndConnectTwoPeersLocally(client,server,5000))
-	{
+    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) )
+    {
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[3-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[3 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 3;
-	}
+        return 3;
+    }
 
-	DataStructures::List< SystemAddress  > systemList;
-	DataStructures::List< RakNetGUID > guidList;
+    DataStructures::List<SystemAddress> systemList;
+    DataStructures::List<RakNetGUID> guidList;
 
-	printf("Test GetSystemList and NumberOfConnections\n");
+    printf( "Test GetSystemList and NumberOfConnections\n" );
 
-	client->GetSystemList(systemList,guidList);//Get connectionlist
-	int len=systemList.Size();
-	int len2=guidList.Size();
+    client->GetSystemList( systemList, guidList ); //Get connectionlist
+    int len = systemList.Size();
+    int len2 = guidList.Size();
 
-	int conNum=client->NumberOfConnections();
+    int conNum = client->NumberOfConnections();
 
-	printf("Test if systemList size matches guidList size \n");
+    printf( "Test if systemList size matches guidList size \n" );
 
-	if (len2!=len)
-	{
+    if( len2 != len )
+    {
 
-		printf("system list size is %i and guid size is %i ",len,len2);
+        printf( "system list size is %i and guid size is %i ", len, len2 );
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[4-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[4 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 4;
-	}
+        return 4;
+    }
 
-	printf("Test returned list size against NumberofConnections return value\n");
-	if (conNum!=len)
-	{
+    printf( "Test returned list size against NumberofConnections return value\n" );
+    if( conNum != len )
+    {
 
-		if (conNum==1||len==1)
-		{
+        if( conNum == 1 || len == 1 )
+        {
 
-			if (conNum!=1)
-			{
-				printf("system list size is %i and NumberOfConnections return is %i ",len,conNum);
+            if( conNum != 1 )
+            {
+                printf( "system list size is %i and NumberOfConnections return is %i ", len, conNum );
 
-				if (isVerbose)
-					DebugTools::ShowError(errorList[5-1],!noPauses && isVerbose,__LINE__,__FILE__);
+                if( isVerbose )
+                    DebugTools::ShowError( errorList[5 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-				return 5;
+                return 5;
+            }
 
-			}
+            if( len != 1 )
+            {
 
-			if (len!=1)
-			{
+                printf( "system list size is %i and NumberOfConnections return is %i ", len, conNum );
 
-				printf("system list size is %i and NumberOfConnections return is %i ",len,conNum);
+                if( isVerbose )
+                    DebugTools::ShowError( errorList[6 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-				if (isVerbose)
-					DebugTools::ShowError(errorList[6-1],!noPauses && isVerbose,__LINE__,__FILE__);
+                return 6;
+            }
+        }
+        else
+        {
+            printf( "system list size is %i and NumberOfConnections return is %i ", len, conNum );
 
-				return 6;
+            if( isVerbose )
+                DebugTools::ShowError( errorList[7 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-			}
-		}
-		else
-		{
-			printf("system list size is %i and NumberOfConnections return is %i ",len,conNum);
+            return 7;
+        }
+    }
+    else
+    {
 
-			if (isVerbose)
-				DebugTools::ShowError(errorList[7-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( conNum != 1 )
+        {
+            printf( "system list size is %i and NumberOfConnections return is %i ", len, conNum );
 
-			return 7;
+            if( isVerbose )
+                DebugTools::ShowError( errorList[8 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		}
+            return 8;
+        }
+    }
 
-	}
-	else
-	{
+    printf( "Test GetSystemListValues of the system and guid list\n" );
+    SystemAddress serverAddress( "127.0.0.1", 60000 );
 
-		if (conNum!=1)
-		{
-			printf("system list size is %i and NumberOfConnections return is %i ",len,conNum);
+    if( !compareSystemAddresses( systemList[0], serverAddress ) )
+    {
 
-			if (isVerbose)
-				DebugTools::ShowError(errorList[8-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[10 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-			return 8;
+        return 10;
+    }
 
-		}
+    RakNetGUID serverGuid = server->GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS );
 
-	}
+    if( guidList[0] != serverGuid )
+    {
 
-	printf("Test GetSystemListValues of the system and guid list\n");
-	SystemAddress serverAddress("127.0.0.1", 60000);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[11 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	if (!compareSystemAddresses(systemList[0],serverAddress))
-	{
+        return 11;
+    }
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[10-1],!noPauses && isVerbose,__LINE__,__FILE__);
+    printf( "Test GetSystemAddressFromIndex\n" );
+    if( !compareSystemAddresses( client->GetSystemAddressFromIndex( 0 ), serverAddress ) )
+    {
 
-		return 10;
+        if( isVerbose )
+            DebugTools::ShowError( errorList[12 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	}
+        return 12;
+    }
 
-	RakNetGUID serverGuid=server->GetGuidFromSystemAddress(UNASSIGNED_SYSTEM_ADDRESS);
+    printf( "Test GetSystemAddressFromGuid\n" );
+    if( !compareSystemAddresses( client->GetSystemAddressFromGuid( serverGuid ), serverAddress ) )
+    {
 
-	if (guidList[0]!=serverGuid)
-	{
+        if( isVerbose )
+            DebugTools::ShowError( errorList[13 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[11-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        return 13;
+    }
 
-		return 11;
+    printf( "Test GetGuidFromSystemAddress\n" );
+    if( client->GetGuidFromSystemAddress( serverAddress ) != serverGuid )
+    {
 
-	}
+        if( isVerbose )
+            DebugTools::ShowError( errorList[14 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	printf("Test GetSystemAddressFromIndex\n");
-	if (!compareSystemAddresses(client->GetSystemAddressFromIndex(0),serverAddress))
-	{
+        return 14;
+    }
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[12-1],!noPauses && isVerbose,__LINE__,__FILE__);
+    printf( "Test GetGUIDFromIndex\n" );
+    if( client->GetGUIDFromIndex( 0 ) != serverGuid )
+    {
 
-		return 12;
-	}
+        if( isVerbose )
+            DebugTools::ShowError( errorList[15 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	printf("Test GetSystemAddressFromGuid\n");
-	if (!compareSystemAddresses(client->GetSystemAddressFromGuid(serverGuid),serverAddress))
-	{
+        return 15;
+    }
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[13-1],!noPauses && isVerbose,__LINE__,__FILE__);
+    SystemAddress clientAddress( "127.0.0.1", 60001 );
 
-		return 13;
-	}
+    printf( "Test GetExternalID, automatic testing is not only required for this\nbecause of it's nature\nShould be supplemented by internet tests\n" );
 
-	printf("Test GetGuidFromSystemAddress\n");
-	if (client->GetGuidFromSystemAddress(serverAddress)!=serverGuid)
-	{
+    if( !compareSystemAddresses( client->GetExternalID( serverAddress ), clientAddress ) )
+    {
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[14-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[16 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 14;
+        return 16;
+    }
 
-	}
 
-	printf("Test GetGUIDFromIndex\n");
-	if (client->GetGUIDFromIndex(0)!=serverGuid)
-	{
-
-		if (isVerbose)
-			DebugTools::ShowError(errorList[15-1],!noPauses && isVerbose,__LINE__,__FILE__);
-
-		return 15;
-
-	}
-
-	SystemAddress clientAddress("127.0.0.1", 60001);
-
-	printf("Test GetExternalID, automatic testing is not only required for this\nbecause of it's nature\nShould be supplemented by internet tests\n");
-
-	if (!compareSystemAddresses(client->GetExternalID(serverAddress),clientAddress))
-	{
-
-		if (isVerbose)
-			DebugTools::ShowError(errorList[16-1],!noPauses && isVerbose,__LINE__,__FILE__);
-
-		return 16;
-	}
-
-	
-	
-
-	return 0;
-
+    return 0;
 }
 
 RakString SystemAddressAndGuidTest::GetTestName()
 {
 
-	return "SystemAddressAndGuidTest";
-
+    return "SystemAddressAndGuidTest";
 }
 
-RakString SystemAddressAndGuidTest::ErrorCodeToString(int errorCode)
+RakString SystemAddressAndGuidTest::ErrorCodeToString( int errorCode )
 {
 
-	if (errorCode>0&&(unsigned int)errorCode<=errorList.Size())
-	{
-		return errorList[errorCode-1];
-	}
-	else
-	{
-		return "Undefined Error";
-	}	
-
+    if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
+    {
+        return errorList[errorCode - 1];
+    }
+    else
+    {
+        return "Undefined Error";
+    }
 }
 
-bool SystemAddressAndGuidTest::compareSystemAddresses(SystemAddress ad1,SystemAddress ad2)
+bool SystemAddressAndGuidTest::compareSystemAddresses( SystemAddress ad1, SystemAddress ad2 )
 {
-	if (ad1 != ad2)
-	{
-		return 0;
-	}
+    if( ad1 != ad2 )
+    {
+        return 0;
+    }
 
-	return 1;
-
+    return 1;
 }
 
-SystemAddressAndGuidTest::SystemAddressAndGuidTest(void)
+SystemAddressAndGuidTest::SystemAddressAndGuidTest( void )
 {
 
-	errorList.Push("Client was active but shouldn't be yet",_FILE_AND_LINE_);
-	errorList.Push("Client was not active but should be",_FILE_AND_LINE_);
-	errorList.Push("Could not connect the client",_FILE_AND_LINE_);
-	errorList.Push("Mismatch between guidList size and systemList size ",_FILE_AND_LINE_);
-	errorList.Push("NumberOfConnections problem",_FILE_AND_LINE_);
-	errorList.Push("SystemList problem with GetSystemList",_FILE_AND_LINE_);
-	errorList.Push("Both SystemList and Number of connections have problems and report different results",_FILE_AND_LINE_);
-	errorList.Push("Both SystemList and Number of connections have problems and report same results",_FILE_AND_LINE_);
-	errorList.Push("Undefined Error",_FILE_AND_LINE_);
-	errorList.Push("System address from list is wrong.",_FILE_AND_LINE_);
-	errorList.Push("Guid from list is wrong",_FILE_AND_LINE_);
-	errorList.Push("GetSystemAddressFromIndex failed to return correct values",_FILE_AND_LINE_);
-	errorList.Push("GetSystemAddressFromGuid failed to return correct values",_FILE_AND_LINE_);
-	errorList.Push("GetGuidFromSystemAddress failed to return correct values",_FILE_AND_LINE_);
-	errorList.Push("GetGUIDFromIndex failed to return correct values",_FILE_AND_LINE_);
-	errorList.Push("GetExternalID failed to return correct values",_FILE_AND_LINE_);
-
+    errorList.Push( "Client was active but shouldn't be yet", _FILE_AND_LINE_ );
+    errorList.Push( "Client was not active but should be", _FILE_AND_LINE_ );
+    errorList.Push( "Could not connect the client", _FILE_AND_LINE_ );
+    errorList.Push( "Mismatch between guidList size and systemList size ", _FILE_AND_LINE_ );
+    errorList.Push( "NumberOfConnections problem", _FILE_AND_LINE_ );
+    errorList.Push( "SystemList problem with GetSystemList", _FILE_AND_LINE_ );
+    errorList.Push( "Both SystemList and Number of connections have problems and report different results", _FILE_AND_LINE_ );
+    errorList.Push( "Both SystemList and Number of connections have problems and report same results", _FILE_AND_LINE_ );
+    errorList.Push( "Undefined Error", _FILE_AND_LINE_ );
+    errorList.Push( "System address from list is wrong.", _FILE_AND_LINE_ );
+    errorList.Push( "Guid from list is wrong", _FILE_AND_LINE_ );
+    errorList.Push( "GetSystemAddressFromIndex failed to return correct values", _FILE_AND_LINE_ );
+    errorList.Push( "GetSystemAddressFromGuid failed to return correct values", _FILE_AND_LINE_ );
+    errorList.Push( "GetGuidFromSystemAddress failed to return correct values", _FILE_AND_LINE_ );
+    errorList.Push( "GetGUIDFromIndex failed to return correct values", _FILE_AND_LINE_ );
+    errorList.Push( "GetExternalID failed to return correct values", _FILE_AND_LINE_ );
 }
 
-SystemAddressAndGuidTest::~SystemAddressAndGuidTest(void)
+SystemAddressAndGuidTest::~SystemAddressAndGuidTest( void )
 {
 }
 
 void SystemAddressAndGuidTest::DestroyPeers()
 {
 
-	int theSize=destroyList.Size();
+    int theSize = destroyList.Size();
 
-	for (int i=0; i < theSize; i++)
-		RakPeerInterface::DestroyInstance(destroyList[i]);
-
+    for( int i = 0; i < theSize; i++ )
+        RakPeerInterface::DestroyInstance( destroyList[i] );
 }

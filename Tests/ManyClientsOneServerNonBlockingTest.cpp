@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -38,665 +38,648 @@ During the very first connect loop any connect returns false.
 Connect function returns false and peer is not connected to anything.
 
 */
-int ManyClientsOneServerNonBlockingTest::RunTest(DataStructures::List<RakString> params,bool isVerbose,bool noPauses)
+int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
 {
 
-	const int clientNum= 256;
+    const int clientNum = 256;
 
-	RakPeerInterface *clientList[clientNum];//A list of clients
-	RakPeerInterface *server;//The server
+    RakPeerInterface* clientList[clientNum]; //A list of clients
+    RakPeerInterface* server;                //The server
 
-	//SystemAddress currentSystem;
+    //SystemAddress currentSystem;
 
-	Packet *packet;
-	destroyList.Clear(false,_FILE_AND_LINE_);
+    Packet* packet;
+    destroyList.Clear( false, _FILE_AND_LINE_ );
 
-	//Initializations of the arrays
-	for (int i=0;i<clientNum;i++)
-	{
-		clientList[i]=RakPeerInterface::GetInstance();
-		destroyList.Push(clientList[i],_FILE_AND_LINE_);
+    //Initializations of the arrays
+    for( int i = 0; i < clientNum; i++ )
+    {
+        clientList[i] = RakPeerInterface::GetInstance();
+        destroyList.Push( clientList[i], _FILE_AND_LINE_ );
 
-		clientList[i]->Startup(1,&SocketDescriptor(), 1);
+        clientList[i]->Startup( 1, &SocketDescriptor(), 1 );
+    }
 
-	}
+    server = RakPeerInterface::GetInstance();
+    destroyList.Push( server, _FILE_AND_LINE_ );
+    server->Startup( clientNum, &SocketDescriptor( 60000, 0 ), 1 );
+    server->SetMaximumIncomingConnections( clientNum );
 
-	server=RakPeerInterface::GetInstance();
-	destroyList.Push(server,_FILE_AND_LINE_);
-	server->Startup(clientNum, &SocketDescriptor(60000,0), 1);
-	server->SetMaximumIncomingConnections(clientNum);
+    //Connect all the clients to the server
 
-	//Connect all the clients to the server
+    for( int i = 0; i < clientNum; i++ )
+    {
 
-	for (int i=0;i<clientNum;i++)
-	{
+        if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
+        {
 
-		if (clientList[i]->Connect("127.0.0.1", 60000, 0,0)!=CONNECTION_ATTEMPT_STARTED)
-		{
+            if( isVerbose )
+                DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
 
-			if (isVerbose)
-				DebugTools::ShowError("Problem while calling connect.\n",!noPauses && isVerbose,__LINE__,__FILE__);
+            return 1; //This fails the test, don't bother going on.
+        }
+    }
 
-			return 1;//This fails the test, don't bother going on.
+    TimeMS entryTime = GetTimeMS(); //Loop entry time
 
-		}
+    DataStructures::List<SystemAddress> systemList;
+    DataStructures::List<RakNetGUID> guidList;
 
-	}
+    if( isVerbose )
+        printf( "Entering disconnect loop \n" );
 
-	TimeMS entryTime=GetTimeMS();//Loop entry time
+    while( GetTimeMS() - entryTime < 10000 ) //Run for 10 Secoonds
+    {
 
-	DataStructures::List< SystemAddress  > systemList;
-	DataStructures::List< RakNetGUID > guidList;
+        //Disconnect all clients IF connected to any from client side
+        for( int i = 0; i < clientNum; i++ )
+        {
 
-	if (isVerbose)
-		printf("Entering disconnect loop \n");
+            clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
+            int len = systemList.Size();
 
-	while(GetTimeMS()-entryTime<10000)//Run for 10 Secoonds
-	{
+            for( int j = 0; j < len; j++ ) //Disconnect them all
+            {
 
-		//Disconnect all clients IF connected to any from client side
-		for (int i=0;i<clientNum;i++)
-		{
+                clientList[i]->CloseConnection( systemList[j], true, 0, LOW_PRIORITY );
+            }
+        }
 
-			clientList[i]->GetSystemList(systemList,guidList);//Get connectionlist
-			int len=systemList.Size();
+        //RakSleep(100);
 
-			for (int j=0;j<len;j++)//Disconnect them all
-			{
+        //Connect
 
-				clientList[i]->CloseConnection (systemList[j],true,0,LOW_PRIORITY); 	
-			}
+        for( int i = 0; i < clientNum; i++ )
+        {
+            SystemAddress currentSystem( "127.0.0.1", 60000 );
 
-		}
+            if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
+            {
 
-		//RakSleep(100);
+                if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
+                {
 
-		//Connect
+                    if( isVerbose )
+                        DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		for (int i=0;i<clientNum;i++)
-		{
-			SystemAddress currentSystem("127.0.0.1", 60000);
+                    return 1; //This fails the test, don't bother going on.
+                }
+            }
+        }
 
-			if(!CommonFunctions::ConnectionStateMatchesOptions (clientList[i],currentSystem,true,true,true,true) )//Are we connected or is there a pending operation ?
-			{
+        //Server receive
 
-				if (clientList[i]->Connect("127.0.0.1", 60000, 0,0)!=CONNECTION_ATTEMPT_STARTED)
-				{
+        packet = server->Receive();
 
-					if (isVerbose)
-						DebugTools::ShowError("Problem while calling connect. \n",!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose && packet )
+            printf( "For server\n" );
 
-					return 1;//This fails the test, don't bother going on.
+        while( packet )
+        {
 
-				}
-			}
+            switch( packet->data[0] )
+            {
+            case ID_REMOTE_DISCONNECTION_NOTIFICATION:
+                if( isVerbose )
+                    printf( "Another client has disconnected.\n" );
+
+                break;
+            case ID_REMOTE_CONNECTION_LOST:
+                if( isVerbose )
+                    printf( "Another client has lost the connection.\n" );
+
+                break;
+            case ID_REMOTE_NEW_INCOMING_CONNECTION:
+                if( isVerbose )
+                    printf( "Another client has connected.\n" );
+                break;
+            case ID_CONNECTION_REQUEST_ACCEPTED:
+                if( isVerbose )
+                    printf( "Our connection request has been accepted.\n" );
 
-		}
+                break;
+            case ID_CONNECTION_ATTEMPT_FAILED:
+                if( isVerbose )
+                    printf( "A connection has failed.\n" );
+
+                break;
+
+            case ID_NEW_INCOMING_CONNECTION:
+                if( isVerbose )
+                    printf( "A connection is incoming.\n" );
+
+                break;
+            case ID_NO_FREE_INCOMING_CONNECTIONS:
+                if( isVerbose )
+                    printf( "The server is full.\n" );
 
-		//Server receive
+                break;
+
+            case ID_ALREADY_CONNECTED:
+                if( isVerbose )
+                    printf( "Already connected\n" );
+
+                break;
+
+            case ID_DISCONNECTION_NOTIFICATION:
+                if( isVerbose )
+                    printf( "We have been disconnected.\n" );
+                break;
+            case ID_CONNECTION_LOST:
+                if( isVerbose )
+                    printf( "Connection lost.\n" );
 
-		packet=server->Receive();
+                break;
+            default:
 
-		if (isVerbose&&packet)
-			printf("For server\n");
+                break;
+            }
 
-		while(packet)
-		{
-
-			switch (packet->data[0])
-			{
-			case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-				if (isVerbose)
-					printf("Another client has disconnected.\n");
-
-				break;
-			case ID_REMOTE_CONNECTION_LOST:
-				if (isVerbose)
-					printf("Another client has lost the connection.\n");
-
-				break;
-			case ID_REMOTE_NEW_INCOMING_CONNECTION:
-				if (isVerbose)              
-					printf("Another client has connected.\n");
-				break;
-			case ID_CONNECTION_REQUEST_ACCEPTED:
-				if (isVerbose)              
-					printf("Our connection request has been accepted.\n");
-
-				break;
-			case ID_CONNECTION_ATTEMPT_FAILED:
-				if (isVerbose)
-					printf("A connection has failed.\n");
-
-				break;
-
-			case ID_NEW_INCOMING_CONNECTION:
-				if (isVerbose)              
-					printf("A connection is incoming.\n");
-
-				break;
-			case ID_NO_FREE_INCOMING_CONNECTIONS:
-				if (isVerbose)              
-					printf("The server is full.\n");
-
-				break;
-
-			case ID_ALREADY_CONNECTED:
-				if (isVerbose)              
-					printf("Already connected\n");
-
-				break;
-
-			case ID_DISCONNECTION_NOTIFICATION:
-				if (isVerbose)
-					printf("We have been disconnected.\n");
-				break;
-			case ID_CONNECTION_LOST:
-				if (isVerbose)
-					printf("Connection lost.\n");
+            server->DeallocatePacket( packet );
 
-				break;
-			default:
+            // Stay in the loop as long as there are more packets.
+            packet = server->Receive();
+        }
 
-				break;
-			}
+        for( int i = 0; i < clientNum; i++ ) //Receive for all peers
+        {
 
-			server->DeallocatePacket(packet);
+            packet = clientList[i]->Receive();
 
-			// Stay in the loop as long as there are more packets.
-			packet = server->Receive();
-		}
+            if( isVerbose && packet )
+                printf( "For peer %i\n", i );
 
-		for (int i=0;i<clientNum;i++)//Receive for all peers
-		{
+            while( packet )
+            {
+
+                switch( packet->data[0] )
+                {
+                case ID_REMOTE_DISCONNECTION_NOTIFICATION:
+                    if( isVerbose )
+                        printf( "Another client has disconnected.\n" );
+
+                    break;
+                case ID_REMOTE_CONNECTION_LOST:
+                    if( isVerbose )
+                        printf( "Another client has lost the connection.\n" );
+
+                    break;
+                case ID_REMOTE_NEW_INCOMING_CONNECTION:
+                    if( isVerbose )
+                        printf( "Another client has connected.\n" );
+                    break;
+                case ID_CONNECTION_REQUEST_ACCEPTED:
+                    if( isVerbose )
+                        printf( "Our connection request has been accepted.\n" );
+
+                    break;
+                case ID_CONNECTION_ATTEMPT_FAILED:
+                    if( isVerbose )
+                        printf( "A connection has failed.\n" );
 
-			packet=clientList[i]->Receive();
+                    break;
 
-			if (isVerbose&&packet)
-				printf("For peer %i\n",i);
-
-			while(packet)
-			{
-
-				switch (packet->data[0])
-				{
-				case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-					if (isVerbose)
-						printf("Another client has disconnected.\n");
-
-					break;
-				case ID_REMOTE_CONNECTION_LOST:
-					if (isVerbose)
-						printf("Another client has lost the connection.\n");
-
-					break;
-				case ID_REMOTE_NEW_INCOMING_CONNECTION:
-					if (isVerbose)              
-						printf("Another client has connected.\n");
-					break;
-				case ID_CONNECTION_REQUEST_ACCEPTED:
-					if (isVerbose)              
-						printf("Our connection request has been accepted.\n");
-
-					break;
-				case ID_CONNECTION_ATTEMPT_FAILED:
-					if (isVerbose)
-						printf("A connection has failed.\n");
-
-					break;
+                case ID_NEW_INCOMING_CONNECTION:
+                    if( isVerbose )
+                        printf( "A connection is incoming.\n" );
+
+                    break;
+                case ID_NO_FREE_INCOMING_CONNECTIONS:
+                    if( isVerbose )
+                        printf( "The server is full.\n" );
+
+                    break;
 
-				case ID_NEW_INCOMING_CONNECTION:
-					if (isVerbose)              
-						printf("A connection is incoming.\n");
-
-					break;
-				case ID_NO_FREE_INCOMING_CONNECTIONS:
-					if (isVerbose)              
-						printf("The server is full.\n");
-
-					break;
-
-				case ID_ALREADY_CONNECTED:
-					if (isVerbose)              
-						printf("Already connected\n");
-
-					break;
+                case ID_ALREADY_CONNECTED:
+                    if( isVerbose )
+                        printf( "Already connected\n" );
 
-				case ID_DISCONNECTION_NOTIFICATION:
-					if (isVerbose)
-						printf("We have been disconnected.\n");
-					break;
-				case ID_CONNECTION_LOST:
-					if (isVerbose)
-						printf("Connection lost.\n");
+                    break;
 
-					break;
-				default:
+                case ID_DISCONNECTION_NOTIFICATION:
+                    if( isVerbose )
+                        printf( "We have been disconnected.\n" );
+                    break;
+                case ID_CONNECTION_LOST:
+                    if( isVerbose )
+                        printf( "Connection lost.\n" );
 
-					break;
-				}
+                    break;
+                default:
 
-				clientList[i]->DeallocatePacket(packet);
+                    break;
+                }
 
-				// Stay in the loop as long as there are more packets.
-				packet = clientList[i]->Receive();
-			}
-		}
-		RakSleep(0);//If needed for testing
-	}
-
-	entryTime=GetTimeMS();
-
-	while(GetTimeMS()-entryTime<2000)//Run for 2 Secoonds to process incoming disconnects
-	{
-
-		//Server receive
-
-		packet=server->Receive();
-
-		if (isVerbose&&packet)
-			printf("For server\n");
-
-		while(packet)
-		{
-
-			switch (packet->data[0])
-			{
-			case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-				if (isVerbose)
-					printf("Another client has disconnected.\n");
-
-				break;
-			case ID_REMOTE_CONNECTION_LOST:
-				if (isVerbose)
-					printf("Another client has lost the connection.\n");
-
-				break;
-			case ID_REMOTE_NEW_INCOMING_CONNECTION:
-				if (isVerbose)              
-					printf("Another client has connected.\n");
-				break;
-			case ID_CONNECTION_REQUEST_ACCEPTED:
-				if (isVerbose)              
-					printf("Our connection request has been accepted.\n");
-
-				break;
-			case ID_CONNECTION_ATTEMPT_FAILED:
-				if (isVerbose)
-					printf("A connection has failed.\n");
-
-				break;
-
-			case ID_NEW_INCOMING_CONNECTION:
-				if (isVerbose)              
-					printf("A connection is incoming.\n");
-
-				break;
-			case ID_NO_FREE_INCOMING_CONNECTIONS:
-				if (isVerbose)              
-					printf("The server is full.\n");
-
-				break;
-
-			case ID_ALREADY_CONNECTED:
-				if (isVerbose)              
-					printf("Already connected\n");
-
-				break;
-
-			case ID_DISCONNECTION_NOTIFICATION:
-				if (isVerbose)
-					printf("We have been disconnected.\n");
-				break;
-			case ID_CONNECTION_LOST:
-				if (isVerbose)
-					printf("Connection lost.\n");
-
-				break;
-			default:
-
-				break;
-			}
+                clientList[i]->DeallocatePacket( packet );
 
-			server->DeallocatePacket(packet);
+                // Stay in the loop as long as there are more packets.
+                packet = clientList[i]->Receive();
+            }
+        }
+        RakSleep( 0 ); //If needed for testing
+    }
+
+    entryTime = GetTimeMS();
 
-			// Stay in the loop as long as there are more packets.
-			packet = server->Receive();
-		}
+    while( GetTimeMS() - entryTime < 2000 ) //Run for 2 Secoonds to process incoming disconnects
+    {
+
+        //Server receive
+
+        packet = server->Receive();
+
+        if( isVerbose && packet )
+            printf( "For server\n" );
+
+        while( packet )
+        {
+
+            switch( packet->data[0] )
+            {
+            case ID_REMOTE_DISCONNECTION_NOTIFICATION:
+                if( isVerbose )
+                    printf( "Another client has disconnected.\n" );
+
+                break;
+            case ID_REMOTE_CONNECTION_LOST:
+                if( isVerbose )
+                    printf( "Another client has lost the connection.\n" );
+
+                break;
+            case ID_REMOTE_NEW_INCOMING_CONNECTION:
+                if( isVerbose )
+                    printf( "Another client has connected.\n" );
+                break;
+            case ID_CONNECTION_REQUEST_ACCEPTED:
+                if( isVerbose )
+                    printf( "Our connection request has been accepted.\n" );
 
-		for (int i=0;i<clientNum;i++)//Receive for all peers
-		{
+                break;
+            case ID_CONNECTION_ATTEMPT_FAILED:
+                if( isVerbose )
+                    printf( "A connection has failed.\n" );
+
+                break;
+
+            case ID_NEW_INCOMING_CONNECTION:
+                if( isVerbose )
+                    printf( "A connection is incoming.\n" );
+
+                break;
+            case ID_NO_FREE_INCOMING_CONNECTIONS:
+                if( isVerbose )
+                    printf( "The server is full.\n" );
 
-			packet=clientList[i]->Receive();
-			if (isVerbose&&packet)
-				printf("For peer %i\n",i);
+                break;
+
+            case ID_ALREADY_CONNECTED:
+                if( isVerbose )
+                    printf( "Already connected\n" );
+
+                break;
 
-			while(packet)
-			{
+            case ID_DISCONNECTION_NOTIFICATION:
+                if( isVerbose )
+                    printf( "We have been disconnected.\n" );
+                break;
+            case ID_CONNECTION_LOST:
+                if( isVerbose )
+                    printf( "Connection lost.\n" );
 
-				switch (packet->data[0])
-				{
-				case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-					if (isVerbose)
-						printf("Another client has disconnected.\n");
+                break;
+            default:
 
-					break;
-				case ID_REMOTE_CONNECTION_LOST:
-					if (isVerbose)
-						printf("Another client has lost the connection.\n");
+                break;
+            }
 
-					break;
-				case ID_REMOTE_NEW_INCOMING_CONNECTION:
-					if (isVerbose)              
-						printf("Another client has connected.\n");
-					break;
-				case ID_CONNECTION_REQUEST_ACCEPTED:
-					if (isVerbose)              
-						printf("Our connection request has been accepted.\n");
+            server->DeallocatePacket( packet );
 
-					break;
-				case ID_CONNECTION_ATTEMPT_FAILED:
-					if (isVerbose)
-						printf("A connection has failed.\n");
+            // Stay in the loop as long as there are more packets.
+            packet = server->Receive();
+        }
 
-					break;
+        for( int i = 0; i < clientNum; i++ ) //Receive for all peers
+        {
 
-				case ID_NEW_INCOMING_CONNECTION:
-					if (isVerbose)              
-						printf("A connection is incoming.\n");
+            packet = clientList[i]->Receive();
+            if( isVerbose && packet )
+                printf( "For peer %i\n", i );
 
-					break;
-				case ID_NO_FREE_INCOMING_CONNECTIONS:
-					if (isVerbose)              
-						printf("The server is full.\n");
+            while( packet )
+            {
 
-					break;
+                switch( packet->data[0] )
+                {
+                case ID_REMOTE_DISCONNECTION_NOTIFICATION:
+                    if( isVerbose )
+                        printf( "Another client has disconnected.\n" );
 
-				case ID_ALREADY_CONNECTED:
-					if (isVerbose)              
-						printf("Already connected\n");
+                    break;
+                case ID_REMOTE_CONNECTION_LOST:
+                    if( isVerbose )
+                        printf( "Another client has lost the connection.\n" );
 
-					break;
+                    break;
+                case ID_REMOTE_NEW_INCOMING_CONNECTION:
+                    if( isVerbose )
+                        printf( "Another client has connected.\n" );
+                    break;
+                case ID_CONNECTION_REQUEST_ACCEPTED:
+                    if( isVerbose )
+                        printf( "Our connection request has been accepted.\n" );
 
-				case ID_DISCONNECTION_NOTIFICATION:
-					if (isVerbose)
-						printf("We have been disconnected.\n");
-					break;
-				case ID_CONNECTION_LOST:
-					if (isVerbose)
-						printf("Connection lost.\n");
+                    break;
+                case ID_CONNECTION_ATTEMPT_FAILED:
+                    if( isVerbose )
+                        printf( "A connection has failed.\n" );
 
-					break;
-				default:
+                    break;
+
+                case ID_NEW_INCOMING_CONNECTION:
+                    if( isVerbose )
+                        printf( "A connection is incoming.\n" );
+
+                    break;
+                case ID_NO_FREE_INCOMING_CONNECTIONS:
+                    if( isVerbose )
+                        printf( "The server is full.\n" );
 
-					break;
-				}
+                    break;
 
-				clientList[i]->DeallocatePacket(packet);
+                case ID_ALREADY_CONNECTED:
+                    if( isVerbose )
+                        printf( "Already connected\n" );
 
-				// Stay in the loop as long as there are more packets.
-				packet = clientList[i]->Receive();
-			}
-		}
-		RakSleep(0);//If needed for testing
-	}
+                    break;
 
-	//Connect
+                case ID_DISCONNECTION_NOTIFICATION:
+                    if( isVerbose )
+                        printf( "We have been disconnected.\n" );
+                    break;
+                case ID_CONNECTION_LOST:
+                    if( isVerbose )
+                        printf( "Connection lost.\n" );
 
-	for (int i=0;i<clientNum;i++)
-	{
-		SystemAddress currentSystem("127.0.0.1", 60000);
+                    break;
+                default:
+
+                    break;
+                }
 
-		if(!CommonFunctions::ConnectionStateMatchesOptions (clientList[i],currentSystem,true,true,true,true) )//Are we connected or is there a pending operation ?
-		{
+                clientList[i]->DeallocatePacket( packet );
 
-			if (clientList[i]->Connect("127.0.0.1", 60000, 0,0)!=CONNECTION_ATTEMPT_STARTED)
-			{
+                // Stay in the loop as long as there are more packets.
+                packet = clientList[i]->Receive();
+            }
+        }
+        RakSleep( 0 ); //If needed for testing
+    }
 
-				clientList[i]->GetSystemList(systemList,guidList);//Get connectionlist
-				int len=systemList.Size();
+    //Connect
 
-				if (isVerbose)
-					DebugTools::ShowError("Problem while calling connect. \n",!noPauses && isVerbose,__LINE__,__FILE__);
+    for( int i = 0; i < clientNum; i++ )
+    {
+        SystemAddress currentSystem( "127.0.0.1", 60000 );
 
-				return 1;//This fails the test, don't bother going on.
+        if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
+        {
 
-			}
-		}
+            if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
+            {
 
-	}
+                clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
+                int len = systemList.Size();
 
-	entryTime=GetTimeMS();
+                if( isVerbose )
+                    DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	while(GetTimeMS()-entryTime<5000)//Run for 5 Secoonds
-	{
+                return 1; //This fails the test, don't bother going on.
+            }
+        }
+    }
 
-		//Server receive
+    entryTime = GetTimeMS();
 
-		packet=server->Receive();
-		if (isVerbose&&packet)
-			printf("For server\n");
+    while( GetTimeMS() - entryTime < 5000 ) //Run for 5 Secoonds
+    {
+
+        //Server receive
+
+        packet = server->Receive();
+        if( isVerbose && packet )
+            printf( "For server\n" );
+
+        while( packet )
+        {
+
+            switch( packet->data[0] )
+            {
+            case ID_REMOTE_DISCONNECTION_NOTIFICATION:
+                if( isVerbose )
+                    printf( "Another client has disconnected.\n" );
 
-		while(packet)
-		{
+                break;
+            case ID_REMOTE_CONNECTION_LOST:
+                if( isVerbose )
+                    printf( "Another client has lost the connection.\n" );
+
+                break;
+            case ID_REMOTE_NEW_INCOMING_CONNECTION:
+                if( isVerbose )
+                    printf( "Another client has connected.\n" );
+                break;
+            case ID_CONNECTION_REQUEST_ACCEPTED:
+                if( isVerbose )
+                    printf( "Our connection request has been accepted.\n" );
 
-			switch (packet->data[0])
-			{
-			case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-				if (isVerbose)
-					printf("Another client has disconnected.\n");
+                break;
+            case ID_CONNECTION_ATTEMPT_FAILED:
+                if( isVerbose )
+                    printf( "A connection has failed.\n" );
+
+                break;
+
+            case ID_NEW_INCOMING_CONNECTION:
+                if( isVerbose )
+                    printf( "A connection is incoming.\n" );
+
+                break;
+            case ID_NO_FREE_INCOMING_CONNECTIONS:
+                if( isVerbose )
+                    printf( "The server is full.\n" );
 
-				break;
-			case ID_REMOTE_CONNECTION_LOST:
-				if (isVerbose)
-					printf("Another client has lost the connection.\n");
+                break;
 
-				break;
-			case ID_REMOTE_NEW_INCOMING_CONNECTION:
-				if (isVerbose)              
-					printf("Another client has connected.\n");
-				break;
-			case ID_CONNECTION_REQUEST_ACCEPTED:
-				if (isVerbose)              
-					printf("Our connection request has been accepted.\n");
+            case ID_ALREADY_CONNECTED:
+                if( isVerbose )
+                    printf( "Already connected\n" );
 
-				break;
-			case ID_CONNECTION_ATTEMPT_FAILED:
-				if (isVerbose)
-					printf("A connection has failed.\n");
+                break;
+
+            case ID_DISCONNECTION_NOTIFICATION:
+                if( isVerbose )
+                    printf( "We have been disconnected.\n" );
+                break;
+            case ID_CONNECTION_LOST:
+                if( isVerbose )
+                    printf( "Connection lost.\n" );
+
+                break;
+            default:
+
+                break;
+            }
 
-				break;
+            server->DeallocatePacket( packet );
 
-			case ID_NEW_INCOMING_CONNECTION:
-				if (isVerbose)              
-					printf("A connection is incoming.\n");
+            // Stay in the loop as long as there are more packets.
+            packet = server->Receive();
+        }
 
-				break;
-			case ID_NO_FREE_INCOMING_CONNECTIONS:
-				if (isVerbose)              
-					printf("The server is full.\n");
+        for( int i = 0; i < clientNum; i++ ) //Receive for all clients
+        {
 
-				break;
+            packet = clientList[i]->Receive();
+            if( isVerbose && packet )
+                printf( "For peer %i\n", i );
 
-			case ID_ALREADY_CONNECTED:
-				if (isVerbose)              
-					printf("Already connected\n");
+            while( packet )
+            {
 
-				break;
+                switch( packet->data[0] )
+                {
+                case ID_REMOTE_DISCONNECTION_NOTIFICATION:
+                    if( isVerbose )
+                        printf( "Another client has disconnected.\n" );
 
-			case ID_DISCONNECTION_NOTIFICATION:
-				if (isVerbose)
-					printf("We have been disconnected.\n");
-				break;
-			case ID_CONNECTION_LOST:
-				if (isVerbose)
-					printf("Connection lost.\n");
+                    break;
+                case ID_REMOTE_CONNECTION_LOST:
+                    if( isVerbose )
+                        printf( "Another client has lost the connection.\n" );
 
-				break;
-			default:
+                    break;
+                case ID_REMOTE_NEW_INCOMING_CONNECTION:
+                    if( isVerbose )
+                        printf( "Another client has connected.\n" );
+                    break;
+                case ID_CONNECTION_REQUEST_ACCEPTED:
+                    if( isVerbose )
+                        printf( "Our connection request has been accepted.\n" );
 
-				break;
-			}
+                    break;
+                case ID_CONNECTION_ATTEMPT_FAILED:
+                    if( isVerbose )
+                        printf( "A connection has failed.\n" );
 
-			server->DeallocatePacket(packet);
+                    break;
 
-			// Stay in the loop as long as there are more packets.
-			packet = server->Receive();
-		}
+                case ID_NEW_INCOMING_CONNECTION:
+                    if( isVerbose )
+                        printf( "A connection is incoming.\n" );
 
-		for (int i=0;i<clientNum;i++)//Receive for all clients
-		{
+                    break;
+                case ID_NO_FREE_INCOMING_CONNECTIONS:
+                    if( isVerbose )
+                        printf( "The server is full.\n" );
 
-			packet=clientList[i]->Receive();
-			if (isVerbose&&packet)
-				printf("For peer %i\n",i);
+                    break;
 
-			while(packet)
-			{
+                case ID_ALREADY_CONNECTED:
+                    if( isVerbose )
+                        printf( "Already connected\n" );
 
-				switch (packet->data[0])
-				{
-				case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-					if (isVerbose)
-						printf("Another client has disconnected.\n");
+                    break;
 
-					break;
-				case ID_REMOTE_CONNECTION_LOST:
-					if (isVerbose)
-						printf("Another client has lost the connection.\n");
+                case ID_DISCONNECTION_NOTIFICATION:
+                    if( isVerbose )
+                        printf( "We have been disconnected.\n" );
+                    break;
+                case ID_CONNECTION_LOST:
+                    if( isVerbose )
+                        printf( "Connection lost.\n" );
 
-					break;
-				case ID_REMOTE_NEW_INCOMING_CONNECTION:
-					if (isVerbose)              
-						printf("Another client has connected.\n");
-					break;
-				case ID_CONNECTION_REQUEST_ACCEPTED:
-					if (isVerbose)              
-						printf("Our connection request has been accepted.\n");
+                    break;
+                default:
 
-					break;
-				case ID_CONNECTION_ATTEMPT_FAILED:
-					if (isVerbose)
-						printf("A connection has failed.\n");
+                    break;
+                }
 
-					break;
+                clientList[i]->DeallocatePacket( packet );
 
-				case ID_NEW_INCOMING_CONNECTION:
-					if (isVerbose)              
-						printf("A connection is incoming.\n");
+                // Stay in the loop as long as there are more packets.
+                packet = clientList[i]->Receive();
+            }
+        }
+        RakSleep( 0 ); //If needed for testing
+    }
 
-					break;
-				case ID_NO_FREE_INCOMING_CONNECTIONS:
-					if (isVerbose)              
-						printf("The server is full.\n");
+    for( int i = 0; i < clientNum; i++ )
+    {
 
-					break;
+        clientList[i]->GetSystemList( systemList, guidList );
+        int connNum = guidList.Size(); //Get the number of connections for the current peer
+        if( connNum != 1 )             //Did we connect to all?
+        {
 
-				case ID_ALREADY_CONNECTED:
-					if (isVerbose)              
-						printf("Already connected\n");
+            if( isVerbose )
+                printf( "Not all clients reconnected normally.\nFailed on clients number %i\n", i );
 
-					break;
+            if( isVerbose )
+                DebugTools::ShowError( "", !noPauses && isVerbose, __LINE__, __FILE__ );
 
-				case ID_DISCONNECTION_NOTIFICATION:
-					if (isVerbose)
-						printf("We have been disconnected.\n");
-					break;
-				case ID_CONNECTION_LOST:
-					if (isVerbose)
-						printf("Connection lost.\n");
 
-					break;
-				default:
+            return 2;
+        }
+    }
 
-					break;
-				}
 
-				clientList[i]->DeallocatePacket(packet);
-
-				// Stay in the loop as long as there are more packets.
-				packet = clientList[i]->Receive();
-			}
-		}
-		RakSleep(0);//If needed for testing
-	}
-
-	for (int i=0;i<clientNum;i++)
-	{
-
-		clientList[i]->GetSystemList(systemList,guidList);
-		int connNum=guidList.Size();//Get the number of connections for the current peer
-		if (connNum!=1)//Did we connect to all?
-		{
-
-			if (isVerbose)
-				printf("Not all clients reconnected normally.\nFailed on clients number %i\n",i);
-
-			if (isVerbose)
-				DebugTools::ShowError("",!noPauses && isVerbose,__LINE__,__FILE__);
-
-		
-			
-
-			return 2;
-
-		}
-
-	}
-
-	
-
-	if (isVerbose)
-		printf("Pass\n");
-	return 0;
-
+    if( isVerbose )
+        printf( "Pass\n" );
+    return 0;
 }
 
 RakString ManyClientsOneServerNonBlockingTest::GetTestName()
 {
 
-	return "ManyClientsOneServerNonBlockingTest";
-
+    return "ManyClientsOneServerNonBlockingTest";
 }
 
-RakString ManyClientsOneServerNonBlockingTest::ErrorCodeToString(int errorCode)
+RakString ManyClientsOneServerNonBlockingTest::ErrorCodeToString( int errorCode )
 {
 
-	switch (errorCode)
-	{
+    switch( errorCode )
+    {
 
-	case 0:
-		return "No error";
-		break;
+    case 0:
+        return "No error";
+        break;
 
-	case 1:
-		return "The connect function failed.";
-		break;
+    case 1:
+        return "The connect function failed.";
+        break;
 
-	case 2:
-		return "Peers did not connect normally.";
-		break;
+    case 2:
+        return "Peers did not connect normally.";
+        break;
 
-	default:
-		return "Undefined Error";
-	}
-
+    default:
+        return "Undefined Error";
+    }
 }
 
-ManyClientsOneServerNonBlockingTest::ManyClientsOneServerNonBlockingTest(void)
+ManyClientsOneServerNonBlockingTest::ManyClientsOneServerNonBlockingTest( void )
 {
 }
 
-ManyClientsOneServerNonBlockingTest::~ManyClientsOneServerNonBlockingTest(void)
+ManyClientsOneServerNonBlockingTest::~ManyClientsOneServerNonBlockingTest( void )
 {
 }
 
 void ManyClientsOneServerNonBlockingTest::DestroyPeers()
 {
 
-	int theSize=destroyList.Size();
+    int theSize = destroyList.Size();
 
-	for (int i=0; i < theSize; i++)
-		RakPeerInterface::DestroyInstance(destroyList[i]);
-
+    for( int i = 0; i < theSize; i++ )
+        RakPeerInterface::DestroyInstance( destroyList[i] );
 }

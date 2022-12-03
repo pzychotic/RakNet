@@ -3,7 +3,7 @@
  *  All rights reserved.
  *
  *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant 
+ *  LICENSE file in the root directory of this source tree. An additional grant
  *  of patent rights can be found in the PATENTS file in the same directory.
  *
  */
@@ -34,169 +34,160 @@ GetSockets
 GetSocket
 
 */
-int ConnectWithSocketTest::RunTest(DataStructures::List<RakString> params,bool isVerbose,bool noPauses)
+int ConnectWithSocketTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
 {
-	destroyList.Clear(false,_FILE_AND_LINE_);
+    destroyList.Clear( false, _FILE_AND_LINE_ );
 
-	RakPeerInterface *server,*client;
+    RakPeerInterface *server, *client;
 
-	DataStructures::List< RakNetSocket2* > sockets;
-	TestHelpers::StandardClientPrep(client,destroyList);
-	TestHelpers::StandardServerPrep(server,destroyList);
+    DataStructures::List<RakNetSocket2*> sockets;
+    TestHelpers::StandardClientPrep( client, destroyList );
+    TestHelpers::StandardServerPrep( server, destroyList );
 
-	SystemAddress serverAddress("127.0.0.1", 60000);
+    SystemAddress serverAddress( "127.0.0.1", 60000 );
 
-	printf("Testing normal connect before test\n");
-	if (!TestHelpers::WaitAndConnectTwoPeersLocally(client,server,5000))
-	{
+    printf( "Testing normal connect before test\n" );
+    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) )
+    {
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[1-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[1 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 1;
-	}
+        return 1;
+    }
 
-	TestHelpers::BroadCastTestPacket(client);
+    TestHelpers::BroadCastTestPacket( client );
 
-	if (!TestHelpers::WaitForTestPacket(server,5000))
-	{
+    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
+    {
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[2-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[2 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		return 2;
-	}
+        return 2;
+    }
 
-	printf("Disconnecting client\n");
-	CommonFunctions::DisconnectAndWait(client,"127.0.0.1",60000);
+    printf( "Disconnecting client\n" );
+    CommonFunctions::DisconnectAndWait( client, "127.0.0.1", 60000 );
 
-	client->GetSockets(sockets);
+    client->GetSockets( sockets );
 
-	RakNetSocket2* theSocket =sockets[0];
+    RakNetSocket2* theSocket = sockets[0];
 
-	RakTimer timer2(5000);
+    RakTimer timer2( 5000 );
 
-	printf("Testing ConnectWithSocket using socket from GetSockets\n");
-	while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&!timer2.IsExpired())
-	{
+    printf( "Testing ConnectWithSocket using socket from GetSockets\n" );
+    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && !timer2.IsExpired() )
+    {
 
-		if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
-		{
-			client->ConnectWithSocket("127.0.0.1",serverAddress.GetPort(),0,0,theSocket);
-		}
+        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
+        {
+            client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, theSocket );
+        }
 
-		RakSleep(100);
+        RakSleep( 100 );
+    }
 
-	}
+    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
+    {
 
-	if (!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true))
-	{
+        if( isVerbose )
+            DebugTools::ShowError( errorList[3 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[3-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        return 3;
+    }
 
-		return 3;
-	}
+    TestHelpers::BroadCastTestPacket( client );
 
-	TestHelpers::BroadCastTestPacket(client);
+    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
+    {
 
-	if (!TestHelpers::WaitForTestPacket(server,5000))
-	{
+        if( isVerbose )
+            DebugTools::ShowError( errorList[4 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[4-1],!noPauses && isVerbose,__LINE__,__FILE__);
+        return 4;
+    }
 
-		return 4;
+    printf( "Disconnecting client\n" );
+    CommonFunctions::DisconnectAndWait( client, "127.0.0.1", 60000 );
 
-	}
+    printf( "Testing ConnectWithSocket using socket from GetSocket\n" );
+    theSocket = client->GetSocket( UNASSIGNED_SYSTEM_ADDRESS ); //Get open Socket
 
-	printf("Disconnecting client\n");
-	CommonFunctions::DisconnectAndWait(client,"127.0.0.1",60000);
+    timer2.Start();
 
-	printf("Testing ConnectWithSocket using socket from GetSocket\n");
-	theSocket=client->GetSocket(UNASSIGNED_SYSTEM_ADDRESS);//Get open Socket
+    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && !timer2.IsExpired() )
+    {
 
-	timer2.Start();
+        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
+        {
+            client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, theSocket );
+        }
 
-	while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&!timer2.IsExpired())
-	{
+        RakSleep( 100 );
+    }
 
-		if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
-		{
-			client->ConnectWithSocket("127.0.0.1",serverAddress.GetPort(),0,0,theSocket);
-		}
+    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
+    {
 
-		RakSleep(100);
+        if( isVerbose )
+            DebugTools::ShowError( errorList[5 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	}
+        return 5;
+    }
 
-	if (!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true))
-	{
+    TestHelpers::BroadCastTestPacket( client );
 
-		if (isVerbose)
-			DebugTools::ShowError(errorList[5-1],!noPauses && isVerbose,__LINE__,__FILE__);
+    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
+    {
 
-		return 5;
-	}
+        if( isVerbose )
+            DebugTools::ShowError( errorList[6 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
 
-	TestHelpers::BroadCastTestPacket(client);
+        return 6;
+    }
 
-	if (!TestHelpers::WaitForTestPacket(server,5000))
-	{
-
-		if (isVerbose)
-			DebugTools::ShowError(errorList[6-1],!noPauses && isVerbose,__LINE__,__FILE__);
-
-		return 6;
-
-	}
-
-	return 0;
-
+    return 0;
 }
 
 RakString ConnectWithSocketTest::GetTestName()
 {
 
-	return "ConnectWithSocketTest";
-
+    return "ConnectWithSocketTest";
 }
 
-RakString ConnectWithSocketTest::ErrorCodeToString(int errorCode)
+RakString ConnectWithSocketTest::ErrorCodeToString( int errorCode )
 {
 
-	if (errorCode>0&&(unsigned int)errorCode<=errorList.Size())
-	{
-		return errorList[errorCode-1];
-	}
-	else
-	{
-		return "Undefined Error";
-	}	
-
+    if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
+    {
+        return errorList[errorCode - 1];
+    }
+    else
+    {
+        return "Undefined Error";
+    }
 }
 
-ConnectWithSocketTest::ConnectWithSocketTest(void)
+ConnectWithSocketTest::ConnectWithSocketTest( void )
 {
-	errorList.Push("Client did not connect after 5 seconds",_FILE_AND_LINE_);
-	errorList.Push("Control test send didn't work",_FILE_AND_LINE_);
-	errorList.Push("Client did not connect after 5 secods Using ConnectWithSocket, could be GetSockets or ConnectWithSocket problem",_FILE_AND_LINE_);
-	errorList.Push("Server did not recieve test packet from client",_FILE_AND_LINE_);
-	errorList.Push("Client did not connect after 5 secods Using ConnectWithSocket, could be GetSocket or ConnectWithSocket problem",_FILE_AND_LINE_);
-	errorList.Push("Server did not recieve test packet from client",_FILE_AND_LINE_);
-
+    errorList.Push( "Client did not connect after 5 seconds", _FILE_AND_LINE_ );
+    errorList.Push( "Control test send didn't work", _FILE_AND_LINE_ );
+    errorList.Push( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSockets or ConnectWithSocket problem", _FILE_AND_LINE_ );
+    errorList.Push( "Server did not recieve test packet from client", _FILE_AND_LINE_ );
+    errorList.Push( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSocket or ConnectWithSocket problem", _FILE_AND_LINE_ );
+    errorList.Push( "Server did not recieve test packet from client", _FILE_AND_LINE_ );
 }
 
-ConnectWithSocketTest::~ConnectWithSocketTest(void)
+ConnectWithSocketTest::~ConnectWithSocketTest( void )
 {
 }
 
 void ConnectWithSocketTest::DestroyPeers()
 {
 
-	int theSize=destroyList.Size();
+    int theSize = destroyList.Size();
 
-	for (int i=0; i < theSize; i++)
-		RakPeerInterface::DestroyInstance(destroyList[i]);
-
+    for( int i = 0; i < theSize; i++ )
+        RakPeerInterface::DestroyInstance( destroyList[i] );
 }
