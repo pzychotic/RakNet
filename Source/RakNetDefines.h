@@ -37,13 +37,6 @@
 #define MAX_ALLOCA_STACK_ALLOCATION 1048576
 #endif
 
-// Use WaitForSingleObject instead of sleep.
-// Defining it plays nicer with other systems, and uses less CPU, but gives worse RakNet performance
-// Undefining it uses more CPU time, but is more responsive and faster.
-#ifndef USE_WAIT_FOR_MULTIPLE_EVENTS
-#define USE_WAIT_FOR_MULTIPLE_EVENTS
-#endif
-
 /// Uncomment to use RakMemoryOverride for custom memory tracking
 /// See RakMemoryOverride.h.
 #ifndef _USE_RAK_MEMORY_OVERRIDE
@@ -144,12 +137,6 @@
 
 #ifndef RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH
 #define RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH 48
-#endif
-
-// Controls how many allocations occur at once for the memory pool of incoming datagrams waiting to be transferred between the recvfrom thread and the main update thread
-// Has large effect on memory usage, per instance of RakPeer. Approximately MAXIMUM_MTU_SIZE*BUFFERED_PACKETS_PAGE_SIZE bytes, once after calling RakPeer::Startup()
-#ifndef BUFFERED_PACKETS_PAGE_SIZE
-#define BUFFERED_PACKETS_PAGE_SIZE 8
 #endif
 
 // Controls how many allocations occur at once for the memory pool of incoming or outgoing datagrams.
