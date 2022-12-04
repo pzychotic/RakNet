@@ -110,12 +110,12 @@ void MessageFilter::SetFilterMaxTime( int allowedTimeMS, bool banOnExceed, RakNe
 }
 int MessageFilter::GetSystemFilterSet( AddressOrGUID systemAddress )
 {
-    // 	bool objectExists;
-    // 	unsigned index = systemList.GetIndexFromKey(systemAddress, &objectExists);
-    // 	if (objectExists==false)
-    // 		return -1;
-    // 	else
-    // 		return systemList[index].filter->filterSetID;
+    //  bool objectExists;
+    //  unsigned index = systemList.GetIndexFromKey(systemAddress, &objectExists);
+    //  if (objectExists==false)
+    //      return -1;
+    //  else
+    //      return systemList[index].filter->filterSetID;
 
     DataStructures::HashIndex index = systemList.GetIndexOf( systemAddress );
     if( index.IsInvalid() )
@@ -127,9 +127,9 @@ void MessageFilter::SetSystemFilterSet( AddressOrGUID addressOrGUID, int filterS
 {
     // Allocate this filter set if it doesn't exist.
     RakAssert( addressOrGUID.IsUndefined() == false );
-    //	bool objectExists;
-    // 	unsigned index = systemList.GetIndexFromKey(addressOrGUID, &objectExists);
-    // 	if (objectExists==false)
+    //  bool objectExists;
+    //  unsigned index = systemList.GetIndexFromKey(addressOrGUID, &objectExists);
+    //  if (objectExists==false)
     DataStructures::HashIndex index = systemList.GetIndexOf( addressOrGUID );
     if( index.IsInvalid() )
     {
@@ -138,9 +138,9 @@ void MessageFilter::SetSystemFilterSet( AddressOrGUID addressOrGUID, int filterS
 
         FilteredSystem filteredSystem;
         filteredSystem.filter = GetFilterSetByID( filterSetID );
-        //	filteredSystem.addressOrGUID=addressOrGUID;
+        //  filteredSystem.addressOrGUID=addressOrGUID;
         filteredSystem.timeEnteredThisSet = RakNet::GetTimeMS();
-        //	systemList.Insert(addressOrGUID, filteredSystem, true, _FILE_AND_LINE_);
+        //  systemList.Insert(addressOrGUID, filteredSystem, true, _FILE_AND_LINE_);
         systemList.Push( addressOrGUID, filteredSystem, _FILE_AND_LINE_ );
     }
     else

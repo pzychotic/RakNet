@@ -62,14 +62,14 @@ protected:
 
     // All these variables are for path finding with Dijkstra
     // 08/23/06 Won't compile as a DLL inside this struct
-    //	struct
-    //	{
+    //  struct
+    //  {
     bool isValidPath;
     node_type rootNode;
     OrderedList<node_type, node_type> costMatrixIndices;
     weight_type* costMatrix;
     node_type* leastNodeArray;
-    //	} dijkstra;
+    //  } dijkstra;
 
     struct NodeAndParent
     {
@@ -511,7 +511,7 @@ void WeightedGraph<node_type, weight_type, allow_unlinkedNodes>::Print( void )
         else
         {
             for( j = 0; j < adjacencyLists[i]->Size(); j++ )
-                //	RAKNET_DEBUG_PRINTF("%i (%.2f) ", adjacencyLists.GetIndexAtKey(adjacencyLists[i]->GetKeyAtIndex(j)), (float) adjacencyLists[i]->operator[](j) );
+                //  RAKNET_DEBUG_PRINTF("%i (%.2f) ", adjacencyLists.GetIndexAtKey(adjacencyLists[i]->GetKeyAtIndex(j)), (float) adjacencyLists[i]->operator[](j) );
                 RAKNET_DEBUG_PRINTF( "%s (%.2f) ", adjacencyLists[i]->GetKeyAtIndex( j ).systemAddress.ToString(), (float)adjacencyLists[i]->operator[]( j ) );
         }
 

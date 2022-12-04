@@ -23,7 +23,7 @@ int CrossConnectionConvertTest::RunTest( DataStructures::List<RakString> params,
 {
 
     static const unsigned short SERVER_PORT = 1234;
-    //	char serverMode[32];
+    //  char serverMode[32];
     char serverIP[64];
 
     strcpy( serverIP, "127.0.0.1" );
@@ -46,9 +46,9 @@ int CrossConnectionConvertTest::RunTest( DataStructures::List<RakString> params,
 
     client->Ping( serverIP, SERVER_PORT, false );
 
-    //	PacketLogger pl;
-    //	pl.LogHeader();
-    //	rakPeer->AttachPlugin(&pl);
+    //  PacketLogger pl;
+    //  pl.LogHeader();
+    //  rakPeer->AttachPlugin(&pl);
 
     TimeMS connectionAttemptTime = 0, connectionResultDeterminationTime = 0, nextTestStartTime = 0;
 

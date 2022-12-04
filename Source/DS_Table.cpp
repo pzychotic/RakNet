@@ -249,9 +249,9 @@ void Table::Row::UpdateCell( unsigned columnIndex, double value )
     cells[columnIndex]->Clear();
     cells[columnIndex]->Set( value );
 
-    //	cells[columnIndex]->i=value;
-    //	cells[columnIndex]->c=0;
-    //	cells[columnIndex]->isEmpty=false;
+    //  cells[columnIndex]->i=value;
+    //  cells[columnIndex]->c=0;
+    //  cells[columnIndex]->isEmpty=false;
 }
 void Table::Row::UpdateCell( unsigned columnIndex, const char* str )
 {

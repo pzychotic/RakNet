@@ -203,7 +203,7 @@ bool BPlusTree<KeyType, DataType, order>::Delete( const KeyType key, DataType& o
     else if( FindDeleteRebalance( key, root, &underflow, root->keys[0], &returnAction, out ) == false )
         return false;
 
-    //		RakAssert(returnAction.action==ReturnAction::NO_ACTION);
+    //      RakAssert(returnAction.action==ReturnAction::NO_ACTION);
 
     if( underflow && root->size == 0 )
     {
@@ -319,11 +319,11 @@ bool BPlusTree<KeyType, DataType, order>::FixUnderflow( int branchIndex, Page<Ke
         cur->keys[branchIndex - 1] = source->keys[source->size - 1];
         source->size--;
 
-        //		if (branchIndex==0)
-        //		{
-        //			returnAction->action=ReturnAction::SET_BRANCH_KEY;
-        //			returnAction->key1=dest->keys[0];
-        //		}
+        //      if (branchIndex==0)
+        //      {
+        //          returnAction->action=ReturnAction::SET_BRANCH_KEY;
+        //          returnAction->key1=dest->keys[0];
+        //      }
 
         // No underflow
         return false;
@@ -374,8 +374,8 @@ bool BPlusTree<KeyType, DataType, order>::FixUnderflow( int branchIndex, Page<Ke
 
         //cur->keys[branchIndex]=source->keys[0];
 
-        //			returnAction->action=ReturnAction::SET_BRANCH_KEY;
-        //			returnAction->key1=dest->keys[dest->size-1];
+        //          returnAction->action=ReturnAction::SET_BRANCH_KEY;
+        //          returnAction->key1=dest->keys[dest->size-1];
 
         // No underflow
         return false;
@@ -942,7 +942,7 @@ void BPlusTree<KeyType, DataType, order>::FreePages( void )
                 queue.Push( ptr->children[i], _FILE_AND_LINE_ );
         }
         pagePool.Release( ptr, _FILE_AND_LINE_ );
-        //	memset(ptr,0,sizeof(root));
+        //  memset(ptr,0,sizeof(root));
     };
 }
 template<class KeyType, class DataType, int order>

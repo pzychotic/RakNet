@@ -120,7 +120,7 @@ void RNS2_Berkley::GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddres
         uint32_t zero = 0;
         if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
             systemAddressOut->SetToLoopback( 4 );
-        //	systemAddressOut->address.addr4.sin_port=ntohs(systemAddressOut->address.addr4.sin_port);
+        //  systemAddressOut->address.addr4.sin_port=ntohs(systemAddressOut->address.addr4.sin_port);
     }
     else
     {
@@ -132,7 +132,7 @@ void RNS2_Berkley::GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddres
         if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
             systemAddressOut->SetToLoopback( 6 );
 
-        //	systemAddressOut->address.addr6.sin6_port=ntohs(systemAddressOut->address.addr6.sin6_port);
+        //  systemAddressOut->address.addr6.sin6_port=ntohs(systemAddressOut->address.addr6.sin6_port);
     }
 
 #else
@@ -169,7 +169,7 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4( RNS2_BerkleyBindParameters* bindPar
     }
     else
     {
-        //		RAKNET_DEBUG_PRINTF("Binding any on port %i\n", port);
+        //      RAKNET_DEBUG_PRINTF("Binding any on port %i\n", port);
         boundAddress.address.addr4.sin_addr.s_addr = INADDR_ANY;
     }
 
@@ -352,13 +352,13 @@ void RNS2_Berkley::RecvFromBlockingIPV4And6( RNS2RecvStruct* recvFromStruct )
         {
             memcpy( &recvFromStruct->systemAddress.address.addr4, (sockaddr_in*)&their_addr, sizeof( sockaddr_in ) );
             recvFromStruct->systemAddress.debugPort = ntohs( recvFromStruct->systemAddress.address.addr4.sin_port );
-            //	systemAddressOut->address.addr4.sin_port=ntohs( systemAddressOut->address.addr4.sin_port );
+            //  systemAddressOut->address.addr4.sin_port=ntohs( systemAddressOut->address.addr4.sin_port );
         }
         else
         {
             memcpy( &recvFromStruct->systemAddress.address.addr6, (sockaddr_in6*)&their_addr, sizeof( sockaddr_in6 ) );
             recvFromStruct->systemAddress.debugPort = ntohs( recvFromStruct->systemAddress.address.addr6.sin6_port );
-            //	systemAddressOut->address.addr6.sin6_port=ntohs( systemAddressOut->address.addr6.sin6_port );
+            //  systemAddressOut->address.addr6.sin6_port=ntohs( systemAddressOut->address.addr6.sin6_port );
         }
     }
 

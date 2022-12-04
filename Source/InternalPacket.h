@@ -85,7 +85,7 @@ struct InternalPacket : public InternalPacketFixedSizeTransmissionHeader
     /// This causes performance problems and causes those messages to timeout.
     bool messageNumberAssigned;
     /// Was this packet number used this update to track windowing drops or increases?  Each packet number is only used once per update.
-    //	bool allowWindowUpdate;
+    //  bool allowWindowUpdate;
     ///When this packet was created
     RakNet::TimeUS creationTime;
     ///The resendNext time to take action on this packet

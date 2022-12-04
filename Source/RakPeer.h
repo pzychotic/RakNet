@@ -521,7 +521,7 @@ public:
     void AttachPlugin( PluginInterface2* plugin );
 
     /// \brief Detaches a Plugin interface from the instance of the base class (RakPeer or PacketizedTCP) it is attached to.
-    ///	\details This method disables the plugin code from running automatically on base class's updates or message receipt.
+    /// \details This method disables the plugin code from running automatically on base class's updates or message receipt.
     /// If the plugin returns false from PluginInterface::UsesReliabilityLayer(), which is the case for all plugins except PacketLogger, you can call AttachPlugin() and DetachPlugin() for this plugin while RakPeer is active.
     /// \param[in] messageHandler Pointer to a plugin to detach.
     void DetachPlugin( PluginInterface2* messageHandler );
@@ -602,7 +602,7 @@ public:
     /// \sa RakNetStatistics.h
     RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 );
     /// \brief Returns the network statistics of the system at the given index in the remoteSystemList.
-    ///	\return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
+    /// \return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
     bool GetStatistics( const unsigned int index, RakNetStatistics* rns );
     /// \brief Returns the list of systems, and statistics for each of those systems
     /// Each system has one entry in each of the lists, in the same order
@@ -620,9 +620,9 @@ public:
     /// \internal
     // Call manually if RAKPEER_USER_THREADED==1 at least every 30 milliseconds.
     // updateBitStream should be:
-    // 	BitStream updateBitStream( MAXIMUM_MTU_SIZE
+    //  BitStream updateBitStream( MAXIMUM_MTU_SIZE
     // #if LIBCAT_SECURITY==1
-    //	+ cat::AuthenticatedEncryption::OVERHEAD_BYTES
+    //  + cat::AuthenticatedEncryption::OVERHEAD_BYTES
     // #endif
     // );
     bool RunUpdateCycle( BitStream& updateBitStream );
@@ -654,7 +654,7 @@ public:
         RakNet::Time nextPingTime;                                                /// When to next ping this player
         RakNet::Time lastReliableSend;                                            /// When did the last reliable send occur.  Reliable sends must occur at least once every timeoutTime/2 units to notice disconnects
         RakNet::Time connectionTime;                                              /// connection time, if active.
-                                                                                  //		int connectionSocketIndex; // index into connectionSockets to send back on.
+                                                                                  //        int connectionSocketIndex; // index into connectionSockets to send back on.
         RakNetGUID guid;
         int MTUSize;
         // Reference counted socket to send back on
@@ -712,17 +712,17 @@ protected:
     void NotifyAndFlagForShutdown( const SystemAddress systemAddress, bool performImmediate, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority );
     ///Returns how many remote systems initiated a connection to us
     unsigned int GetNumberOfRemoteInitiatedConnections( void ) const;
-    ///	\brief Get a free remote system from the list and assign our systemAddress to it.
+    /// \brief Get a free remote system from the list and assign our systemAddress to it.
     /// \note Should only be called from the update thread - not the user thread.
-    /// \param[in] systemAddress	systemAddress to be assigned
-    /// \param[in] connectionMode	connection mode of the RemoteSystem.
+    /// \param[in] systemAddress    systemAddress to be assigned
+    /// \param[in] connectionMode   connection mode of the RemoteSystem.
     /// \param[in] rakNetSocket
-    /// \param[in] thisIPConnectedRecently	Is this IP connected recently? set to False;
-    /// \param[in] bindingAddress	Address to be binded with the remote system
-    /// \param[in] incomingMTU	MTU for the remote system
+    /// \param[in] thisIPConnectedRecently  Is this IP connected recently? set to False;
+    /// \param[in] bindingAddress   Address to be binded with the remote system
+    /// \param[in] incomingMTU  MTU for the remote system
     RemoteSystemStruct* AssignSystemAddressToRemoteSystemList( const SystemAddress systemAddress, RemoteSystemStruct::ConnectMode connectionMode, RakNetSocket2* incomingRakNetSocket, bool* thisIPConnectedRecently, SystemAddress bindingAddress, int incomingMTU, RakNetGUID guid, bool useSecurity );
-    ///	\brief Adjust the timestamp of the incoming packet to be relative to this system.
-    /// \param[in] data	Data in the incoming packet.
+    /// \brief Adjust the timestamp of the incoming packet to be relative to this system.
+    /// \param[in] data Data in the incoming packet.
     /// \param[in] systemAddress Sender of the incoming packet.
     void ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& systemAddress ) const;
     /// Get the most accurate clock differential for a certain player.

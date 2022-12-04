@@ -377,7 +377,7 @@ void SocketLayer::GetSystemAddress( __UDPSOCKET__ s, SystemAddress* systemAddres
         uint32_t zero = 0;
         if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
             systemAddressOut->SetToLoopback( 4 );
-        //	systemAddressOut->address.addr4.sin_port=ntohs(systemAddressOut->address.addr4.sin_port);
+        //  systemAddressOut->address.addr4.sin_port=ntohs(systemAddressOut->address.addr4.sin_port);
     }
     else
     {
@@ -389,7 +389,7 @@ void SocketLayer::GetSystemAddress( __UDPSOCKET__ s, SystemAddress* systemAddres
         if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
             systemAddressOut->SetToLoopback( 6 );
 
-        //	systemAddressOut->address.addr6.sin6_port=ntohs(systemAddressOut->address.addr6.sin6_port);
+        //  systemAddressOut->address.addr6.sin6_port=ntohs(systemAddressOut->address.addr6.sin6_port);
     }
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 }
@@ -421,12 +421,12 @@ bool SocketLayer::GetFirstBindableIP( char firstBindable[128], int ipProto )
 
     if( ipList[l] == UNASSIGNED_SYSTEM_ADDRESS || l == MAXIMUM_NUMBER_OF_INTERNAL_IDS )
         return false;
-    // 	RAKNET_DEBUG_PRINTF("%i %i %i %i\n",
-    // 		((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[0],
-    // 		((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[1],
-    // 		((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[2],
-    // 		((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[3]
-    // 	);
+    //  RAKNET_DEBUG_PRINTF("%i %i %i %i\n",
+    //      ((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[0],
+    //      ((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[1],
+    //      ((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[2],
+    //      ((char*)(&ipList[l].address.addr4.sin_addr.s_addr))[3]
+    //  );
     ipList[l].ToString( false, firstBindable );
     return true;
 }

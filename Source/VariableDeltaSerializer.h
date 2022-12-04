@@ -140,7 +140,7 @@ public:
     /// unsigned int idx;
     /// for (idx=0; idx < replicaListOut.GetSize(); idx++)
     /// {
-    /// 	((SampleReplica*)replicaListOut[idx])->NotifyReplicaOfMessageDeliveryStatus(packet->guid,msgNumber, packet->data[0]==ID_SND_RECEIPT_ACKED);
+    ///     ((SampleReplica*)replicaListOut[idx])->NotifyReplicaOfMessageDeliveryStatus(packet->guid,msgNumber, packet->data[0]==ID_SND_RECEIPT_ACKED);
     /// }
     ///
     /// \param[in] guid Which system we are sending to

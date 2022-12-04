@@ -243,8 +243,8 @@ PluginReceiveResult FullyConnectedMesh2::OnReceive( Packet* packet )
         OnRequestFCMGuid( packet );
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
     //case ID_FCM2_UPDATE_USER_CONTEXT:
-    //	OnUpdateUserContext(packet);
-    //	return RR_STOP_PROCESSING_AND_DEALLOCATE;
+    //  OnUpdateUserContext(packet);
+    //  return RR_STOP_PROCESSING_AND_DEALLOCATE;
     case ID_FCM2_RESPOND_CONNECTION_COUNT:
         OnRespondConnectionCount( packet );
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
@@ -507,7 +507,7 @@ void FullyConnectedMesh2::CalculateHost( RakNetGUID* rakNetGuid, FCM2Guid* fcm2G
 
     // Return the lowest value of all FCM2Guid
     FCM2Guid lowestFCMGuid = ourFCMGuid;
-    //	SystemAddress associatedSystemAddress=UNASSIGNED_SYSTEM_ADDRESS;
+    //  SystemAddress associatedSystemAddress=UNASSIGNED_SYSTEM_ADDRESS;
     RakNetGUID associatedRakNetGuid = rakPeerInterface->GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS );
 
     unsigned int idx;
@@ -740,7 +740,7 @@ void FullyConnectedMesh2::IncrementTotalConnectionCount( unsigned int i )
     if( i > totalConnectionCount )
     {
         totalConnectionCount = i;
-        //	printf("totalConnectionCount=%i\n",i);
+        //  printf("totalConnectionCount=%i\n",i);
     }
 }
 void FullyConnectedMesh2::SetConnectOnNewRemoteConnection( bool attemptConnection, RakString pw )
@@ -969,12 +969,12 @@ PluginReceiveResult FullyConnectedMesh2::OnVerifiedJoinStart( Packet* packet )
         // Got update to existing list
 
         VerifiedJoinInProgress* vjip = joinsInProgress[curIndex];
-        // 		if (vjip->sentResults==false)
-        // 		{
-        // 			// Got ID_FCM2_VERIFIED_JOIN_START twice before sending ID_FCM2_VERIFIED_JOIN_CAPABLE
-        // 			RakAssert(vjip->sentResults!=false);
-        // 			return RR_STOP_PROCESSING_AND_DEALLOCATE;
-        // 		}
+        //      if (vjip->sentResults==false)
+        //      {
+        //          // Got ID_FCM2_VERIFIED_JOIN_START twice before sending ID_FCM2_VERIFIED_JOIN_CAPABLE
+        //          RakAssert(vjip->sentResults!=false);
+        //          return RR_STOP_PROCESSING_AND_DEALLOCATE;
+        //      }
 
         for( unsigned int i = 0; i < vjip->vjipMembers.Size(); i++ )
         {
@@ -1273,7 +1273,7 @@ void FullyConnectedMesh2::UpdateVerifiedJoinInProgressMember( const AddressOrGUI
     {
         VerifiedJoinInProgress* vjip = joinsInProgress[i];
         //if (vjip->sentResults==true)
-        //	continue;
+        //  continue;
         anythingChanged = false;
 
         unsigned int j;
@@ -1299,7 +1299,7 @@ void FullyConnectedMesh2::UpdateVerifiedJoinInProgressMember( const AddressOrGUI
 bool FullyConnectedMesh2::ProcessVerifiedJoinInProgressIfCompleted( VerifiedJoinInProgress* vjip )
 {
     //if (vjip->sentResults)
-    //	return true;
+    //  return true;
 
     // If no systems in processing state, send results to server
     // Return true if this was done

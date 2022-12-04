@@ -14,12 +14,12 @@
 /*
 Description:
 Tests out the sunctions:
-virtual int RakPeerInterface::GetSplitMessageProgressInterval  	(  	void   	  	 )   	 const "
-virtual void RakPeerInterface::PushBackPacket  	(  	Packet *   	 packet, 		bool  	pushAtHead	  	) 			"
-virtual bool RakPeerInterface::SendList  	(  	char **   	 data, 		const int *  	lengths, 		const int  	numParameters, 		PacketPriority  	priority, 		PacketReliability  	reliability, 		char  	orderingChannel, 		SystemAddress  	systemAddress, 		bool  	broadcast	  	) 			"
-virtual void RakPeerInterface::SetSplitMessageProgressInterval 	( 	int  	interval 	 )
-virtual void RakPeerInterface::SetUnreliableTimeout  	(  	TimeMS   	 timeoutMS  	 )
-virtual Packet* RakPeerInterface::AllocatePacket  	(  	unsigned   	 dataSize  	 )
+virtual int RakPeerInterface::GetSplitMessageProgressInterval   (   void         )       const "
+virtual void RakPeerInterface::PushBackPacket   (   Packet *     packet,        bool    pushAtHead      )           "
+virtual bool RakPeerInterface::SendList     (   char **      data,      const int *     lengths,        const int   numParameters,      PacketPriority      priority,       PacketReliability   reliability,        char    orderingChannel,        SystemAddress   systemAddress,      bool    broadcast       )           "
+virtual void RakPeerInterface::SetSplitMessageProgressInterval  (   int     interval     )
+virtual void RakPeerInterface::SetUnreliableTimeout     (   TimeMS       timeoutMS       )
+virtual Packet* RakPeerInterface::AllocatePacket    (   unsigned     dataSize    )
 AttachPlugin (PluginInterface2 *plugin)=0
 DetachPlugin (PluginInterface2 *plugin)=0
 
@@ -117,10 +117,10 @@ int PacketAndLowLevelTestsTest::RunTest( DataStructures::List<RakString> params,
     //if (TestHelpers::WaitForTestPacket(server,2000))
     //{
 
-    //	if (isVerbose)
-    //		DebugTools::ShowError(errorList[2-1],!noPauses && isVerbose,__LINE__,__FILE__);
+    //  if (isVerbose)
+    //      DebugTools::ShowError(errorList[2-1],!noPauses && isVerbose,__LINE__,__FILE__);
 
-    //	return 2;
+    //  return 2;
     //}
 
     //client->DetachPlugin(myPlug);

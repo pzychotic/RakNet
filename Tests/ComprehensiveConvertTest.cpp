@@ -29,11 +29,11 @@ int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, b
 
     static const int CONNECTIONS_PER_SYSTEM = 4;
 
-    //	DebugTools::ShowError("Note: The conversion of this is on hold until the original sample's problem is known.",!noPauses && isVerbose,__LINE__,__FILE__);
+    //  DebugTools::ShowError("Note: The conversion of this is on hold until the original sample's problem is known.",!noPauses && isVerbose,__LINE__,__FILE__);
 
-    //	return 55;
+    //  return 55;
 
-    //	AutoRPC autoRpcs[NUM_PEERS];
+    //  AutoRPC autoRpcs[NUM_PEERS];
 
     //AutoRPC autoRpcs[NUM_PEERS];
 
@@ -126,7 +126,7 @@ int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, b
         {
             // Disconnect
             peerIndex = randomMT() % NUM_PEERS;
-            //	peers[peerIndex]->Shutdown(randomMT() % 100);
+            //  peers[peerIndex]->Shutdown(randomMT() % 100);
         }
         else if( nextAction < .12f )
         {
@@ -158,10 +158,10 @@ int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, b
             SystemAddress target;
             bool broadcast;
 
-            //	data[0]=ID_RESERVED1+(randomMT()%10);
+            //  data[0]=ID_RESERVED1+(randomMT()%10);
             data[0] = ID_USER_PACKET_ENUM;
             dataLength = 3 + ( randomMT() % 8000 );
-            //			dataLength=600+(randomMT()%7000);
+            //          dataLength=600+(randomMT()%7000);
             priority = (PacketPriority)( randomMT() % (int)NUMBER_OF_PRIORITIES );
             reliability = (PacketReliability)( randomMT() % ( (int)RELIABLE_SEQUENCED + 1 ) );
             orderingChannel = randomMT() % 32;
@@ -197,7 +197,7 @@ int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, b
 
             data[0] = ID_USER_PACKET_ENUM + ( randomMT() % 10 );
             dataLength = 3 + ( randomMT() % 8000 );
-            //			dataLength=600+(randomMT()%7000);
+            //          dataLength=600+(randomMT()%7000);
             priority = (PacketPriority)( randomMT() % (int)NUMBER_OF_PRIORITIES );
             reliability = (PacketReliability)( randomMT() % ( (int)RELIABLE_SEQUENCED + 1 ) );
             orderingChannel = randomMT() % 32;
@@ -217,7 +217,7 @@ int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, b
 #endif
             data[dataLength - 1] = 0;
             sprintf( RPCName, "RPC%i", ( randomMT() % 4 ) + 1 );
-            //				autoRpc[i]->Call(RPCName);
+            //              autoRpc[i]->Call(RPCName);
             //peers[peerIndex]->RPC(RPCName, data, dataLength*8, priority, reliability, orderingChannel, target, broadcast, 0, UNASSIGNED_NETWORK_ID,0);
         }
         else if( nextAction < .181f )

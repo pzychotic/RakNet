@@ -68,7 +68,7 @@ void CCRakNetUDT::Init( CCTimeType curTime, uint32_t maxDatagramPayload )
     packetArrivalHistoryWriteIndex = 0;
     packetArrivalHistoryWriteCount = 0;
     RTT = UNSET_TIME_US;
-    //	RTTVar=UNSET_TIME_US;
+    //  RTTVar=UNSET_TIME_US;
     isInSlowStart = true;
     NAKCount = 1000;
     AvgNAKNum = 1;
@@ -100,7 +100,7 @@ void CCRakNetUDT::Init( CCTimeType curTime, uint32_t maxDatagramPayload )
     nextCongestionControlBlock = 0;
     lastRtt = 0;
 
-    //	B=DEFAULT_TRANSFER_RATE;
+    //  B=DEFAULT_TRANSFER_RATE;
     AS = UNDEFINED_TRANSFER_RATE;
     const MicrosecondsPerByte DEFAULT_BYTE_INTERVAL = (MicrosecondsPerByte)( 1.0 / DEFAULT_TRANSFER_RATE );
     SND = DEFAULT_BYTE_INTERVAL;
@@ -224,9 +224,9 @@ bool CCRakNetUDT::ShouldSendACKs( CCTimeType curTime, CCTimeType estimatedTimeTo
     }
 
 
-    //	CCTimeType remoteRetransmitTime=oldestUnsentAck+rto-RTT*.5;
-    //	CCTimeType ackArrivalTimeIfWeDelay=RTT*.5+estimatedTimeToNextTick+curTime;
-    //	return ackArrivalTimeIfWeDelay<remoteRetransmitTime;
+    //  CCTimeType remoteRetransmitTime=oldestUnsentAck+rto-RTT*.5;
+    //  CCTimeType ackArrivalTimeIfWeDelay=RTT*.5+estimatedTimeToNextTick+curTime;
+    //  return ackArrivalTimeIfWeDelay<remoteRetransmitTime;
 
     // Simplified equation
     // GU: At least one ACK should be sent per SYN, otherwise your protocol will increase slower.
@@ -454,9 +454,9 @@ void CCRakNetUDT::EndSlowStart( void )
 
     // printf("ENDING SLOW START\n");
 #if CC_TIME_TYPE_BYTES == 4
-    //	printf("Initial SND=%f Kilobytes per second\n", 1.0/SND);
+    //  printf("Initial SND=%f Kilobytes per second\n", 1.0/SND);
 #else
-    //	printf("Initial SND=%f Megabytes per second\n", 1.0/SND);
+    //  printf("Initial SND=%f Megabytes per second\n", 1.0/SND);
 #endif
     if( SND > .1 )
         PrintLowBandwidthWarning();
@@ -500,7 +500,7 @@ bool CCRakNetUDT::OnGotPacket( DatagramSequenceNumberType datagramSequenceNumber
     {
         CCTimeType interval = curTime - lastPacketArrivalTime;
 
-        //		printf("Packet arrival gap is %I64u\n", (interval));
+        //      printf("Packet arrival gap is %I64u\n", (interval));
 
         if( isContinuousSend )
         {
@@ -511,10 +511,10 @@ bool CCRakNetUDT::OnGotPacket( DatagramSequenceNumberType datagramSequenceNumber
 
             mostRecentPacketArrivalHistory = (BytesPerMicrosecond)sizeInBytes / (BytesPerMicrosecond)interval;
 
-            //		if (mostRecentPacketArrivalHistory < (BytesPerMicrosecond)0.0035)
-            //		{
-            //			printf("%s:%i LIKELY BUG: Calculated packetArrivalHistory is below 28.8 Kbps modem\nReport to rakkar@jenkinssoftware.com with file and line number\n", _FILE_AND_LINE_);
-            //		}
+            //      if (mostRecentPacketArrivalHistory < (BytesPerMicrosecond)0.0035)
+            //      {
+            //          printf("%s:%i LIKELY BUG: Calculated packetArrivalHistory is below 28.8 Kbps modem\nReport to rakkar@jenkinssoftware.com with file and line number\n", _FILE_AND_LINE_);
+            //      }
 
             packetArrivalHistoryContinuousGaps[packetArrivalHistoryContinuousGapsIndex++] = (int)interval;
             packetArrivalHistoryContinuousGapsIndex &= ( CC_RAKNET_UDT_PACKET_HISTORY_LENGTH - 1 );
@@ -547,8 +547,8 @@ void CCRakNetUDT::OnAck( CCTimeType curTime, CCTimeType rtt, bool hasBAndAS, Byt
 
     if( hasBAndAS )
     {
-        ///	RakAssert(_B!=UNDEFINED_TRANSFER_RATE && _AS!=UNDEFINED_TRANSFER_RATE);
-        //	B=B * .875 + _B * .125;
+        /// RakAssert(_B!=UNDEFINED_TRANSFER_RATE && _AS!=UNDEFINED_TRANSFER_RATE);
+        //  B=B * .875 + _B * .125;
         // AS is packet arrival rate
         RakAssert( _AS != UNDEFINED_TRANSFER_RATE );
         AS = _AS;
@@ -611,7 +611,7 @@ void CCRakNetUDT::OnSendNACK( CCTimeType curTime, uint32_t numBytes )
     (void)curTime;
 
     // This is not accounted for on the remote system, and thus causes bandwidth to be underutilized
-    //	UpdateNextAllowedSend(curTime, numBytes+UDP_HEADER_SIZE);
+    //  UpdateNextAllowedSend(curTime, numBytes+UDP_HEADER_SIZE);
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 void CCRakNetUDT::UpdateWindowSizeAndAckOnAckPreSlowStart( double totalUserDataBytesAcked )
@@ -786,12 +786,12 @@ void CCRakNetUDT::DecreaseTimeBetweenSends( void )
 /*
 void CCRakNetUDT::SetTimeBetweenSendsLimit(unsigned int bitsPerSecond)
 {
-// 	bitsPerSecond / 1000000 = bitsPerMicrosecond
-// 	bitsPerMicrosecond / 8 = BytesPerMicrosecond
-// 	1 / BytesPerMicrosecond = MicrosecondsPerByte
-// 	1 / ( (bitsPerSecond / 1000000)  / 8 ) =
-// 	1 / (bitsPerSecond / 8000000) =
-// 	8000000 / bitsPerSecond
+//  bitsPerSecond / 1000000 = bitsPerMicrosecond
+//  bitsPerMicrosecond / 8 = BytesPerMicrosecond
+//  1 / BytesPerMicrosecond = MicrosecondsPerByte
+//  1 / ( (bitsPerSecond / 1000000)  / 8 ) =
+//  1 / (bitsPerSecond / 8000000) =
+//  8000000 / bitsPerSecond
 
 #if CC_TIME_TYPE_BYTES==4
     MicrosecondsPerByte limit = (MicrosecondsPerByte) 8000 / (MicrosecondsPerByte)bitsPerSecond;

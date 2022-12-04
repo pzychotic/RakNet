@@ -35,7 +35,7 @@ struct timezone
   int tz_dsttime;
 };
 
-#ifdef	__cplusplus
+#ifdef  __cplusplus
 
 void  GetSystemTimeAsFileTime(FILETIME*);
 

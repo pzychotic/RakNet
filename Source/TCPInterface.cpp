@@ -849,7 +849,7 @@ RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop )
 {
     TCPInterface* sts = (TCPInterface*)arguments;
 
-    //	const int BUFF_SIZE=8096;
+    //  const int BUFF_SIZE=8096;
     const unsigned int BUFF_SIZE = 1048576;
     //char data[ BUFF_SIZE ];
     char* data = (char*)rakMalloc_Ex( BUFF_SIZE, _FILE_AND_LINE_ );
@@ -974,12 +974,12 @@ RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop )
                             if( sockAddr.ss_family == AF_INET )
                             {
                                 memcpy( &sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4, (sockaddr_in*)&sockAddr, sizeof( sockaddr_in ) );
-                                //	sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_port=ntohs( sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_port );
+                                //  sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_port=ntohs( sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_port );
                             }
                             else
                             {
                                 memcpy( &sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6, (sockaddr_in6*)&sockAddr, sizeof( sockaddr_in6 ) );
-                                //	sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6.sin6_port=ntohs( sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6.sin6_port );
+                                //  sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6.sin6_port=ntohs( sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6.sin6_port );
                             }
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
@@ -1037,15 +1037,15 @@ RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop )
                     if( FD_ISSET( socketCopy, &exceptionFD ) )
                     {
                         // #ifdef _DO_PRINTF
-                        // 						if (sts->listenSocket!=-1)
-                        // 						{
-                        // 							int err;
-                        // 							int errlen = sizeof(err);
-                        // 							getsockopt__(sts->listenSocket, SOL_SOCKET, SO_ERROR,(char*)&err, &errlen);
-                        // 							in_addr in;
-                        // 							in.s_addr = sts->remoteClients[i].systemAddress.binaryAddress;
-                        // 							RAKNET_DEBUG_PRINTF("Socket error %i on %s:%i\n", err,inet_ntoa( in ), sts->remoteClients[i].systemAddress.GetPort() );
-                        // 						}
+                        //                      if (sts->listenSocket!=-1)
+                        //                      {
+                        //                          int err;
+                        //                          int errlen = sizeof(err);
+                        //                          getsockopt__(sts->listenSocket, SOL_SOCKET, SO_ERROR,(char*)&err, &errlen);
+                        //                          in_addr in;
+                        //                          in.s_addr = sts->remoteClients[i].systemAddress.binaryAddress;
+                        //                          RAKNET_DEBUG_PRINTF("Socket error %i on %s:%i\n", err,inet_ntoa( in ), sts->remoteClients[i].systemAddress.GetPort() );
+                        //                      }
                         //
                         // #endif
                         // Connection lost abruptly
@@ -1064,8 +1064,8 @@ RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop )
 
 
                             // removeme
-                            // 								data[len]=0;
-                            // 								printf(data);
+                            //                              data[len]=0;
+                            //                              printf(data);
 
                             if( len > 0 )
                             {

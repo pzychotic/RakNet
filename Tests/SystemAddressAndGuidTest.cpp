@@ -13,14 +13,14 @@
 /*
 Description:
 Tests:
-virtual unsigned short RakPeerInterface::NumberOfConnections  	(  	void   	  	 )   	 const
-virtual void RakPeerInterface::GetSystemList  	(  	DataStructures::List< SystemAddress > &   	 addresses, 		DataStructures::List< RakNetGUID > &  	guids	  	)
-virtual bool RakPeerInterface::IsActive  	(  	void   	  	 )   	 const
-virtual SystemAddress RakPeerInterface::GetSystemAddressFromIndex  	(  	int   	 index  	 )
-virtual SystemAddress RakPeerInterface::GetSystemAddressFromGuid  	(  	const RakNetGUID   	 input  	 )   	 const
-virtual const RakNetGUID& RakPeerInterface::GetGuidFromSystemAddress  	(  	const SystemAddress   	 input  	 )   	 const
-pure virtual  virtual RakNetGUID RakPeerInterface::GetGUIDFromIndex  	(  	int   	 index  	 )
-virtual SystemAddress RakPeerInterface::GetExternalID  	(  	const SystemAddress   	 target  	 )   	 const
+virtual unsigned short RakPeerInterface::NumberOfConnections    (   void         )       const
+virtual void RakPeerInterface::GetSystemList    (   DataStructures::List< SystemAddress > &      addresses,         DataStructures::List< RakNetGUID > &    guids       )
+virtual bool RakPeerInterface::IsActive     (   void         )       const
+virtual SystemAddress RakPeerInterface::GetSystemAddressFromIndex   (   int      index       )
+virtual SystemAddress RakPeerInterface::GetSystemAddressFromGuid    (   const RakNetGUID     input       )       const
+virtual const RakNetGUID& RakPeerInterface::GetGuidFromSystemAddress    (   const SystemAddress      input       )       const
+pure virtual  virtual RakNetGUID RakPeerInterface::GetGUIDFromIndex     (   int      index       )
+virtual SystemAddress RakPeerInterface::GetExternalID   (   const SystemAddress      target      )       const
 
 Success conditions:
 All functions pass test.

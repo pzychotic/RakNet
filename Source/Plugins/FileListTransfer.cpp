@@ -183,7 +183,7 @@ void FileListTransfer::Send( FileList* fileList, RakPeerInterface* rakPeer, Syst
                 fileToPush->fileListNode.fullPathToFile = fileList->fileList[i].fullPathToFile;
                 fileToPush->fileListNode.fileLengthBytes = fileList->fileList[i].fileLengthBytes;
                 fileToPush->fileListNode.dataLengthBytes = fileList->fileList[i].dataLengthBytes;
-                //	fileToPush->systemAddress=recipient;
+                //  fileToPush->systemAddress=recipient;
                 //fileToPush->setID=setID;
                 fileToPush->packetPriority = priority;
                 fileToPush->orderingChannel = orderingChannel;
@@ -223,9 +223,9 @@ void FileListTransfer::Send( FileList* fileList, RakPeerInterface* rakPeer, Syst
             {
                 if( fileToPushRecipientList[i]->systemAddress == recipient && fileToPushRecipientList[i]->setId == setId )
                 {
-                    // 					ftpr=fileToPushRecipientList[i];
-                    // 					ftpr->AddRef();
-                    // 					break;
+                    //                  ftpr=fileToPushRecipientList[i];
+                    //                  ftpr->AddRef();
+                    //                  break;
                     RakAssert( "setId already in use for this recipient" && 0 );
                 }
             }
@@ -670,7 +670,7 @@ void FileListTransfer::OnReferencePush( Packet* packet, bool isTheFullFile )
     {
         // 12/23/09 Why do I care about ID_DOWNLOAD_PROGRESS for reference pushes?
         // 2/16/2012 I care because a reference push is 16 megabytes by default. Also, if it is the last file "if (ftpr->filesToPush.Size()<2)" or total file size exceeds smallFileTotalSize it always sends a reference push.
-        //		return;
+        //      return;
     }
 
     FileListTransferCBInterface::OnFileStruct onFileStruct;
@@ -793,7 +793,7 @@ void FileListTransfer::OnReferencePush( Packet* packet, bool isTheFullFile )
     }
 
     onFileStruct.numberOfFilesInThisSet = fileListReceiver->setCount;
-    //	onFileStruct.setTotalCompressedTransmissionLength=fileListReceiver->setTotalCompressedTransmissionLength;
+    //  onFileStruct.setTotalCompressedTransmissionLength=fileListReceiver->setTotalCompressedTransmissionLength;
     onFileStruct.byteLengthOfThisSet = fileListReceiver->setTotalFinalLength;
     // Note: mb.flrMemoryBlock may be null here
     onFileStruct.fileData = mb.flrMemoryBlock;
@@ -888,7 +888,7 @@ void FileListTransfer::OnReferencePush( Packet* packet, bool isTheFullFile )
             fps.partTotal = totalNotifications;
 
             // 2/19/2013 Why was this check here? It prevent smaller progress notifications
-            //			if (rakPeerInterface)
+            //          if (rakPeerInterface)
             {
                 // Thus chunk is incomplete
                 fps.iriDataChunk = 0;
@@ -997,7 +997,7 @@ int SendIRIToAddressCB( FileListTransfer::ThreadData threadData, bool* returnOut
                 fileListTransfer->SendListUnified( dataBlocks, lengths, 2, ftp->packetPriority, RELIABLE_ORDERED, ftp->orderingChannel, systemAddress, false );
 
                 // LWS : fixed freed pointer reference
-                //				unsigned int chunkSize = ftp->chunkSize;
+                //              unsigned int chunkSize = ftp->chunkSize;
                 RakNet::OP_DELETE( ftp, _FILE_AND_LINE_ );
                 smallFileTotalSize += bytesRead;
                 //done = bytesRead!=ftp->chunkSize;

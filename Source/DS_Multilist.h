@@ -1229,12 +1229,12 @@ void Multilist<_MultilistType, _DataType, _KeyType, _IndexType>::InsertInOrdered
     _IndexType index;
     index = GetIndexFromKeyInSortedList( key, &objectExists );
 
-    //	if (objectExists)
-    //	{
+    //  if (objectExists)
+    //  {
     // Ordered list only allows unique insertions
-    //		RakAssert("Duplicate insertion into ordered list" && false);
-    //		return;
-    //	}
+    //      RakAssert("Duplicate insertion into ordered list" && false);
+    //      return;
+    //  }
 
     if( index >= dataSize )
     {

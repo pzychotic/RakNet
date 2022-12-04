@@ -21,11 +21,11 @@
 #include "RakAlloca.h"
 
 // #if _USE_RAK_MEMORY_OVERRIDE==1
-// 	#if defined(new)
-// 		#pragma push_macro("new")
-// 		#undef new
-// 		#define RMO_NEW_UNDEF
-// 	#endif
+//  #if defined(new)
+//      #pragma push_macro("new")
+//      #undef new
+//      #define RMO_NEW_UNDEF
+//  #endif
 // #endif
 
 
@@ -146,7 +146,7 @@ RAK_DLL_EXPORT Type* OP_NEW_ARRAY( const int count, const char* file, unsigned i
         return 0;
 
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    //		Type *t;
+    //      Type *t;
     char* buffer = (char*)( GetMalloc_Ex() )( sizeof( int ) + sizeof( Type ) * count, file, line );
     ( (int*)buffer )[0] = count;
     for( int i = 0; i < count; i++ )
@@ -223,8 +223,8 @@ void FreeRakNetFixedHeap( void );
 } // namespace RakNet
 
 // #if _USE_RAK_MEMORY_OVERRIDE==1
-// 	#if defined(RMO_NEW_UNDEF)
-// 	#pragma pop_macro("new")
-// 	#undef RMO_NEW_UNDEF
-// 	#endif
+//  #if defined(RMO_NEW_UNDEF)
+//  #pragma pop_macro("new")
+//  #undef RMO_NEW_UNDEF
+//  #endif
 // #endif

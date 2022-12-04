@@ -316,8 +316,8 @@ public:
     /// \internal
     SharedString* sharedString;
 
-    //	static std::mutex poolMutex;
-    //	static DataStructures::MemoryPool<SharedString> pool;
+    //  static std::mutex poolMutex;
+    //  static DataStructures::MemoryPool<SharedString> pool;
     /// \internal
     static SharedString emptyString;
 

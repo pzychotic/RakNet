@@ -367,7 +367,7 @@ struct LastSerializationResult
     /// \note replica MUST be the first member of this struct because I cast from replica to LastSerializationResult in Update()
     Replica3* replica;
     //bool neverSerialize;
-    //	bool isConstructed;
+    //  bool isConstructed;
     RakNet::Time whenLastSerialized;
 
     void AllocBS( void );

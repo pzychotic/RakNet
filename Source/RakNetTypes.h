@@ -293,7 +293,7 @@ struct RAK_DLL_EXPORT RakNetGUID
         g = _g;
         systemIndex = (SystemIndex)-1;
     }
-    //	uint32_t g[6];
+    //  uint32_t g[6];
     uint64_t g;
 
     // Return the GUID as a string
@@ -330,15 +330,15 @@ struct RAK_DLL_EXPORT RakNetGUID
 /// Index of an invalid SystemAddress
 //const SystemAddress UNASSIGNED_SYSTEM_ADDRESS =
 //{
-//	0xFFFFFFFF, 0xFFFF
+//  0xFFFFFFFF, 0xFFFF
 //};
 #ifndef SWIG
 const SystemAddress UNASSIGNED_SYSTEM_ADDRESS;
 const RakNetGUID UNASSIGNED_RAKNET_GUID( (uint64_t)-1 );
 #endif
 //{
-//	{0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF}
-//	0xFFFFFFFFFFFFFFFF
+//  {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF}
+//  0xFFFFFFFFFFFFFFFF
 //};
 
 

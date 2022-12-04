@@ -97,9 +97,9 @@ BitSize_t RangeList<range_type>::Serialize( BitStream* in, BitSize_t maxBits, bo
     BitSize_t before = in->GetWriteOffset();
     in->Write( countWritten );
     bitsWritten += in->GetWriteOffset() - before;
-    //	RAKNET_DEBUG_PRINTF("%i ", in->GetNumberOfBitsUsed());
+    //  RAKNET_DEBUG_PRINTF("%i ", in->GetNumberOfBitsUsed());
     in->Write( &tempBS, tempBS.GetNumberOfBitsUsed() );
-    //	RAKNET_DEBUG_PRINTF("%i %i \n", tempBS.GetNumberOfBitsUsed(),in->GetNumberOfBitsUsed());
+    //  RAKNET_DEBUG_PRINTF("%i %i \n", tempBS.GetNumberOfBitsUsed(),in->GetNumberOfBitsUsed());
 
     if( clearSerialized && countWritten )
     {

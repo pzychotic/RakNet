@@ -43,7 +43,7 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
     int sender;
 
     // Buffer for input (an ugly hack to keep *nix happy)
-    //	char buff[256];
+    //  char buff[256];
 
     // Used to refer to systems.  We already know the IP
     unsigned short serverPort = 20000;
@@ -52,7 +52,7 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
     server = RakPeerInterface::GetInstance();
     destroyList.Clear( false, _FILE_AND_LINE_ );
     destroyList.Push( server, _FILE_AND_LINE_ );
-    //	server->InitializeSecurity(0,0,0,0);
+    //  server->InitializeSecurity(0,0,0,0);
     SocketDescriptor socketDescriptor( serverPort, 0 );
     server->Startup( NUMBER_OF_CLIENTS, &socketDescriptor, 1 );
     server->SetMaximumIncomingConnections( NUMBER_OF_CLIENTS );

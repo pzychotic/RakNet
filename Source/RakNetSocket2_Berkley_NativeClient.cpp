@@ -37,9 +37,9 @@ void DomainNameToIP_Berkley_IPV4And6( const char* domainName, char ip[65] )
     }
 
     p = res;
-    // 	for(p = res;p != NULL; p = p->ai_next) {
+    //  for(p = res;p != NULL; p = p->ai_next) {
     void* addr;
-    //		char *ipver;
+    //      char *ipver;
 
     // get the pointer to the address itself,
     // different fields in IPv4 and IPv6:
@@ -59,7 +59,7 @@ void DomainNameToIP_Berkley_IPV4And6( const char* domainName, char ip[65] )
         getnameinfo( (struct sockaddr*)ipv6, sizeof( struct sockaddr_in6 ), ip, 1, NULL, 0, NI_NUMERICHOST );
     }
     freeaddrinfo( res ); // free the linked list
-//	}
+//  }
 #else
     (void)domainName;
     (void)ip;

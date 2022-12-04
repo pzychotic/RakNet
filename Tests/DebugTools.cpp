@@ -28,8 +28,8 @@ void DebugTools::ShowError( RakString errorString, bool pause, unsigned int line
 
     //if (pause)
     //{
-    //	printf("Press enter to continue \n");
-    //	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    //	char pauseChar = std::cin.get();
+    //  printf("Press enter to continue \n");
+    //  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    //  char pauseChar = std::cin.get();
     //}
 }

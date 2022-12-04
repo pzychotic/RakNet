@@ -302,10 +302,10 @@ void UDPForwarder::RecvFrom( RakNet::TimeMS curTime, ForwardEntry* forwardEntry 
 
     // Forward to dest
     len = 0;
-    // 	sockaddr_in saOut;
-    // 	saOut.sin_port = forwardTarget.GetPortNetworkOrder(); // User port
-    // 	saOut.sin_addr.s_addr = forwardTarget.address.addr4.sin_addr.s_addr;
-    // 	saOut.sin_family = AF_INET;
+    //  sockaddr_in saOut;
+    //  saOut.sin_port = forwardTarget.GetPortNetworkOrder(); // User port
+    //  saOut.sin_addr.s_addr = forwardTarget.address.addr4.sin_addr.s_addr;
+    //  saOut.sin_family = AF_INET;
     do
     {
 #if RAKNET_SUPPORT_IPV6 == 1

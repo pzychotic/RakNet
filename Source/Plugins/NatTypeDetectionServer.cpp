@@ -169,12 +169,12 @@ void NatTypeDetectionServer::Update( void )
                 }
                 else
                 {
-                    //		RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
+                    //      RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
                 }
             }
             else
             {
-                //	RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
+                //  RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
             }
         }
 
@@ -232,12 +232,12 @@ void NatTypeDetectionServer::Update( void )
             }
             else
             {
-        //		RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
+        //      RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
             }
         }
         else
         {
-        //	RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
+        //  RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
         }
 
         len=NatTypeRecvFrom(data, s3p4, senderAddr);

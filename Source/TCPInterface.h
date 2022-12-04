@@ -165,11 +165,11 @@ protected:
         unsigned int length;
     };
     */
-    //	DataStructures::SingleProducerConsumer<OutgoingMessage> outgoingMessages;
-    //	DataStructures::SingleProducerConsumer<Packet> incomingMessages;
-    //	DataStructures::SingleProducerConsumer<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
-    //	DataStructures::SingleProducerConsumer<RemoteClient*> newRemoteClients;
-    //	DataStructures::ThreadsafeAllocatingQueue<OutgoingMessage> outgoingMessages;
+    //  DataStructures::SingleProducerConsumer<OutgoingMessage> outgoingMessages;
+    //  DataStructures::SingleProducerConsumer<Packet> incomingMessages;
+    //  DataStructures::SingleProducerConsumer<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
+    //  DataStructures::SingleProducerConsumer<RemoteClient*> newRemoteClients;
+    //  DataStructures::ThreadsafeAllocatingQueue<OutgoingMessage> outgoingMessages;
     DataStructures::ThreadsafeAllocatingQueue<Packet> incomingMessages;
     DataStructures::ThreadsafeAllocatingQueue<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
     DataStructures::ThreadsafeAllocatingQueue<RemoteClient*> newRemoteClients;
@@ -185,8 +185,8 @@ protected:
     friend RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop );
     friend RAK_THREAD_DECLARATION( ConnectionAttemptLoop );
 
-    //	void DeleteRemoteClient(RemoteClient *remoteClient, fd_set *exceptionFD);
-    //	void InsertRemoteClient(RemoteClient* remoteClient);
+    //  void DeleteRemoteClient(RemoteClient *remoteClient, fd_set *exceptionFD);
+    //  void InsertRemoteClient(RemoteClient* remoteClient);
     __TCPSOCKET__ SocketConnect( const char* host, unsigned short remotePort, unsigned short socketFamily, const char* bindAddress );
 
     struct ThisPtrPlusSysAddr

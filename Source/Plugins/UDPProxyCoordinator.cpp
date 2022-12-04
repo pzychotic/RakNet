@@ -54,17 +54,17 @@ int UDPProxyCoordinator::ForwardingRequestComp( const SenderAndTargetAddress& ke
 //
 // bool operator<( const DataStructures::MLKeyRef<UDPProxyCoordinator::SenderAndTargetAddress> &inputKey, const UDPProxyCoordinator::ForwardingRequest *cls )
 // {
-// 	return inputKey.Get().senderClientAddress < cls->sata.senderClientAddress ||
-// 		(inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress < cls->sata.targetClientAddress);
+//  return inputKey.Get().senderClientAddress < cls->sata.senderClientAddress ||
+//      (inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress < cls->sata.targetClientAddress);
 // }
 // bool operator>( const DataStructures::MLKeyRef<UDPProxyCoordinator::SenderAndTargetAddress> &inputKey, const UDPProxyCoordinator::ForwardingRequest *cls )
 // {
-// 	return inputKey.Get().senderClientAddress > cls->sata.senderClientAddress ||
-// 		(inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress > cls->sata.targetClientAddress);
+//  return inputKey.Get().senderClientAddress > cls->sata.senderClientAddress ||
+//      (inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress > cls->sata.targetClientAddress);
 // }
 // bool operator==( const DataStructures::MLKeyRef<UDPProxyCoordinator::SenderAndTargetAddress> &inputKey, const UDPProxyCoordinator::ForwardingRequest *cls )
 // {
-// 	return inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress == cls->sata.targetClientAddress;
+//  return inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress == cls->sata.targetClientAddress;
 // }
 
 STATIC_FACTORY_DEFINITIONS( UDPProxyCoordinator, UDPProxyCoordinator );

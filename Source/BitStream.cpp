@@ -48,7 +48,7 @@ BitStream::BitStream()
     data = (unsigned char*)stackData;
 
 #ifdef _DEBUG
-    //	RakAssert( data );
+    //  RakAssert( data );
 #endif
     //memset(data, 0, 32);
     copyData = true;
@@ -399,8 +399,8 @@ bool BitStream::ReadAlignedBytesSafeAlloc( char** outByteArray, unsigned int& in
 // Write numberToWrite bits from the input source
 void BitStream::WriteBits( const unsigned char* inByteArray, BitSize_t numberOfBitsToWrite, const bool rightAlignedBits )
 {
-    //	if (numberOfBitsToWrite<=0)
-    //		return;
+    //  if (numberOfBitsToWrite<=0)
+    //      return;
 
     AddBitsAndReallocate( numberOfBitsToWrite );
 
@@ -527,7 +527,7 @@ void BitStream::WriteCompressed( const unsigned char* inByteArray,
 bool BitStream::ReadBits( unsigned char* inOutByteArray, BitSize_t numberOfBitsToRead, const bool alignBitsToRight )
 {
 #ifdef _DEBUG
-    //	RakAssert( numberOfBitsToRead > 0 );
+    //  RakAssert( numberOfBitsToRead > 0 );
 #endif
     if( numberOfBitsToRead <= 0 )
         return false;
@@ -684,7 +684,7 @@ void BitStream::AddBitsAndReallocate( const BitSize_t numberOfBitsToWrite )
         if( newNumberOfBitsAllocated - ( numberOfBitsToWrite + numberOfBitsUsed ) > 1048576 )
             newNumberOfBitsAllocated = numberOfBitsToWrite + numberOfBitsUsed + 1048576;
 
-        //		BitSize_t newByteOffset = BITS_TO_BYTES( numberOfBitsAllocated );
+        //      BitSize_t newByteOffset = BITS_TO_BYTES( numberOfBitsAllocated );
         // Use realloc and free so we are more efficient than delete and new for resizing
         BitSize_t amountToAllocate = BITS_TO_BYTES( newNumberOfBitsAllocated );
         if( data == (unsigned char*)stackData )

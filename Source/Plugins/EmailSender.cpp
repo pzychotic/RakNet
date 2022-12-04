@@ -329,11 +329,11 @@ const char* EmailSender::GetResponse( TCPInterface* tcpInterface, const SystemAd
                 tcpInterface->StartSSLClient( packet->systemAddress );
                 return "AUTHENTICATE"; // OK
             }
-// 			if (strstr((const char*)packet->data, "250-AUTH LOGIN PLAIN"))
-// 			{
-// 				tcpInterface->StartSSLClient(packet->systemAddress);
-// 				return "AUTHENTICATE"; // OK
-// 			}
+//          if (strstr((const char*)packet->data, "250-AUTH LOGIN PLAIN"))
+//          {
+//              tcpInterface->StartSSLClient(packet->systemAddress);
+//              return "AUTHENTICATE"; // OK
+//          }
 #endif
             if( strstr( (const char*)packet->data, "235" ) )
                 return 0; // Authentication accepted

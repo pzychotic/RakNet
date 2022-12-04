@@ -479,7 +479,7 @@ public:
     virtual void AttachPlugin( PluginInterface2* plugin ) = 0;
 
     /// \brief Detaches a Plugin interface from the instance of the base class (RakPeer or PacketizedTCP) it is attached to.
-    ///	\details This method disables the plugin code from running automatically on base class's updates or message receipt.
+    /// \details This method disables the plugin code from running automatically on base class's updates or message receipt.
     /// If the plugin returns false from PluginInterface::UsesReliabilityLayer(), which is the case for all plugins except PacketLogger, you can call AttachPlugin() and DetachPlugin() for this plugin while RakPeer is active.
     /// \param[in] messageHandler Pointer to a plugin to detach.
     virtual void DetachPlugin( PluginInterface2* messageHandler ) = 0;
@@ -562,7 +562,7 @@ public:
     /// \sa RakNetStatistics.h
     virtual RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 ) = 0;
     /// \brief Returns the network statistics of the system at the given index in the remoteSystemList.
-    ///	\return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
+    /// \return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
     virtual bool GetStatistics( const unsigned int index, RakNetStatistics* rns ) = 0;
     /// \brief Returns the list of systems, and statistics for each of those systems
     /// Each system has one entry in each of the lists, in the same order
@@ -579,9 +579,9 @@ public:
     /// \internal
     // Call manually if RAKPEER_USER_THREADED==1 at least every 30 milliseconds.
     // updateBitStream should be:
-    // 	BitStream updateBitStream( MAXIMUM_MTU_SIZE
+    //  BitStream updateBitStream( MAXIMUM_MTU_SIZE
     // #if LIBCAT_SECURITY==1
-    //	+ cat::AuthenticatedEncryption::OVERHEAD_BYTES
+    //  + cat::AuthenticatedEncryption::OVERHEAD_BYTES
     // #endif
     // );
     virtual bool RunUpdateCycle( BitStream& updateBitStream ) = 0;

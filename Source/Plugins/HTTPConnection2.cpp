@@ -137,9 +137,9 @@ bool HTTPConnection2::HasResponse( void ) const
 }
 int ReadChunkSize( char* txtStart, char** txtEnd )
 {
-    // 	char lengthStr[32];
-    // 	memset(lengthStr, 0, 32);
-    // 	memcpy(lengthStr, txtStart, txtEnd - txtStart);
+    //  char lengthStr[32];
+    //  memset(lengthStr, 0, 32);
+    //  memcpy(lengthStr, txtStart, txtEnd - txtStart);
     return strtoul( txtStart, txtEnd, 16 );
     // return atoi(lengthStr);
 }
@@ -159,7 +159,7 @@ void ReadChunkBlock( size_t& currentChunkSize, size_t& bytesReadSoFar, char* txt
         bytesReadSoFar += bytesToRead;
         if( *txtIn == 0 )
         {
-            //	currentChunkSize=0;
+            //  currentChunkSize=0;
             return;
         }
         // char *newLine = strstr(txtIn, "\r\n");

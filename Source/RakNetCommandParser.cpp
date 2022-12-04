@@ -55,7 +55,7 @@ RakNetCommandParser::RakNetCommandParser()
     RegisterCommand( 0, "GetInternalID", "( void ) const;" );
     RegisterCommand( 1, "GetExternalID", "( const SystemAddress target ) const;" );
     RegisterCommand( 2, "SetTimeoutTime", "( RakNet::TimeMS timeMS, const SystemAddress target );" );
-    //	RegisterCommand(1,"SetMTUSize","( int size );");
+    //  RegisterCommand(1,"SetMTUSize","( int size );");
     RegisterCommand( 0, "GetMTUSize", "( void ) const;" );
     RegisterCommand( 0, "GetNumberOfAddresses", "( void );" );
     RegisterCommand( 1, "GetLocalIP", "( unsigned int index );" );

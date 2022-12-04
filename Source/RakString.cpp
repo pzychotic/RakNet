@@ -325,7 +325,7 @@ const RakString operator+( const RakString& lhs, const RakString& rhs )
         unsigned i;
         for( i = 0; i < 128; i++ )
         {
-            //	RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
+            //  RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
             RakString::SharedString* ss;
             ss = (RakString::SharedString*)rakMalloc_Ex( sizeof( RakString::SharedString ), _FILE_AND_LINE_ );
             ss->refCountMutex = RakNet::OP_NEW<std::mutex>( _FILE_AND_LINE_ );
@@ -1048,8 +1048,8 @@ RakString RakString::FormatForPUTOrPost( const char* type, const char* uri, cons
     if( host.IsEmpty() || remotePath.IsEmpty() )
         return out;
 
-    //	RakString bodyEncoded = body;
-    //	bodyEncoded.URLEncode();
+    //  RakString bodyEncoded = body;
+    //  bodyEncoded.URLEncode();
 
     if( extraHeaders != 0 && extraHeaders[0] )
     {
@@ -1334,8 +1334,8 @@ void RakString::Allocate( size_t len )
         unsigned i;
         for( i = 0; i < 128; i++ )
         {
-            //	RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
-            //		RakString::freeList.Insert((RakString::SharedString*)rakMalloc_Ex(sizeof(RakString::SharedString), _FILE_AND_LINE_), _FILE_AND_LINE_);
+            //  RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
+            //      RakString::freeList.Insert((RakString::SharedString*)rakMalloc_Ex(sizeof(RakString::SharedString), _FILE_AND_LINE_), _FILE_AND_LINE_);
 
             RakString::SharedString* ss;
             ss = (RakString::SharedString*)rakMalloc_Ex( sizeof( RakString::SharedString ), _FILE_AND_LINE_ );

@@ -159,7 +159,7 @@ struct BPSTracker
         total1 += value1;
         lastSec1 += value1;
     }
-    //	void Push2(RakNet::TimeUS time, uint64_t value1, uint64_t value2);
+    //  void Push2(RakNet::TimeUS time, uint64_t value1, uint64_t value2);
     inline uint64_t GetBPS1( CCTimeType time )
     {
         (void)time;
@@ -170,27 +170,27 @@ struct BPSTracker
         (void)time;
         return lastSec1;
     }
-    //	uint64_t GetBPS2(RakNetTimeUS time);
-    //	void GetBPS1And2(RakNetTimeUS time, uint64_t &out1, uint64_t &out2);
+    //  uint64_t GetBPS2(RakNetTimeUS time);
+    //  void GetBPS1And2(RakNetTimeUS time, uint64_t &out1, uint64_t &out2);
     uint64_t GetTotal1( void ) const;
-    //	uint64_t GetTotal2(void) const;
+    //  uint64_t GetTotal2(void) const;
 
     struct TimeAndValue2
     {
         TimeAndValue2();
         ~TimeAndValue2();
         TimeAndValue2( CCTimeType t, uint64_t v1 );
-        //	TimeAndValue2(RakNet::TimeUS t, uint64_t v1, uint64_t v2);
-        //	uint64_t value1, value2;
+        //  TimeAndValue2(RakNet::TimeUS t, uint64_t v1, uint64_t v2);
+        //  uint64_t value1, value2;
         uint64_t value1;
         CCTimeType time;
     };
 
     uint64_t total1, lastSec1;
-    //	uint64_t total2, lastSec2;
+    //  uint64_t total2, lastSec2;
     DataStructures::Queue<TimeAndValue2> dataQueue;
     void ClearExpired1( CCTimeType time );
-    //	void ClearExpired2(RakNet::TimeUS time);
+    //  void ClearExpired2(RakNet::TimeUS time);
 };
 
 /// Datagram reliable, ordered, unordered and sequenced sends.  Flow control.  Message splitting, reassembly, and coalescence.
@@ -341,10 +341,10 @@ private:
     bool CheckSHA1( char code[SHA1_LENGTH], unsigned char* const buffer, unsigned int nbytes );
 
     /// Search the specified list for sequenced packets on the specified ordering channel, optionally skipping those with splitPacketId, and delete them
-    //	void DeleteSequencedPacketsInList( unsigned char orderingChannel, DataStructures::List<InternalPacket*>&theList, int splitPacketId = -1 );
+    //  void DeleteSequencedPacketsInList( unsigned char orderingChannel, DataStructures::List<InternalPacket*>&theList, int splitPacketId = -1 );
 
     /// Search the specified list for sequenced packets with a value less than orderingIndex and delete them
-    //	void DeleteSequencedPacketsInList( unsigned char orderingChannel, DataStructures::Queue<InternalPacket*>&theList );
+    //  void DeleteSequencedPacketsInList( unsigned char orderingChannel, DataStructures::Queue<InternalPacket*>&theList );
 
     /// Returns true if newPacketOrderingIndex is older than the waitingForPacketOrderingIndex
     bool IsOlderOrderedPacket( OrderingIndexType newPacketOrderingIndex, OrderingIndexType waitingForPacketOrderingIndex );
@@ -464,32 +464,32 @@ private:
     InternalPacket* unreliableLinkedListHead;
     void RemoveFromUnreliableLinkedList( InternalPacket* internalPacket );
     void AddToUnreliableLinkedList( InternalPacket* internalPacket );
-    //	unsigned int numPacketsOnResendBuffer;
+    //  unsigned int numPacketsOnResendBuffer;
     //unsigned int blockWindowIncreaseUntilTime;
-    //	DataStructures::RangeList<DatagramSequenceNumberType> acknowlegements;
+    //  DataStructures::RangeList<DatagramSequenceNumberType> acknowlegements;
     // Resend list is a tree of packets we need to resend
 
     // Set to the current time when the resend queue is no longer empty
     // Set to zero when it becomes empty
     // Set to the current time if it is not zero, and we get incoming data
     // If the current time - timeResendQueueNonEmpty is greater than a threshold, we are disconnected
-    //	CCTimeType timeResendQueueNonEmpty;
+    //  CCTimeType timeResendQueueNonEmpty;
     RakNet::TimeMS timeLastDatagramArrived;
 
 
     // If we backoff due to packetloss, don't remeasure until all waiting resends have gone out or else we overcount
-    //	bool packetlossThisSample;
-    //	int backoffThisSample;
-    //	unsigned packetlossThisSampleResendCount;
-    //	CCTimeType lastPacketlossTime;
+    //  bool packetlossThisSample;
+    //  int backoffThisSample;
+    //  unsigned packetlossThisSampleResendCount;
+    //  CCTimeType lastPacketlossTime;
 
     //DataStructures::Queue<InternalPacket*> sendPacketSet[ NUMBER_OF_PRIORITIES ];
     DataStructures::Heap<reliabilityHeapWeightType, InternalPacket*, false> outgoingPacketBuffer;
     reliabilityHeapWeightType outgoingPacketBufferNextWeights[NUMBER_OF_PRIORITIES];
     void InitHeapWeights( void );
     reliabilityHeapWeightType GetNextWeight( int priorityLevel );
-    //	unsigned int messageInSendBuffer[NUMBER_OF_PRIORITIES];
-    //	double bytesInSendBuffer[NUMBER_OF_PRIORITIES];
+    //  unsigned int messageInSendBuffer[NUMBER_OF_PRIORITIES];
+    //  double bytesInSendBuffer[NUMBER_OF_PRIORITIES];
 
 
     DataStructures::OrderedList<SplitPacketIdType, SplitPacketChannel*, SplitPacketChannelComp> splitPacketChannelList;
@@ -502,8 +502,8 @@ private:
     SplitPacketIdType splitPacketId;
     RakNet::TimeMS timeoutTime; // How long to wait in MS before timing someone out
     //int MAX_AVERAGE_PACKETS_PER_SECOND; // Name says it all
-    //	int RECEIVED_PACKET_LOG_LENGTH, requestedReceivedPacketLogLength; // How big the receivedPackets array is
-    //	unsigned int *receivedPackets;
+    //  int RECEIVED_PACKET_LOG_LENGTH, requestedReceivedPacketLogLength; // How big the receivedPackets array is
+    //  unsigned int *receivedPackets;
     RakNetStatistics statistics;
 
     // Algorithm for blending ordered and sequenced on the same channel:
@@ -536,8 +536,8 @@ private:
     OrderingIndexType heapIndexOffsets[NUMBER_OF_ORDERED_STREAMS];
 
 
-    //	CCTimeType histogramStart;
-    //	unsigned histogramBitsSent;
+    //  CCTimeType histogramStart;
+    //  unsigned histogramBitsSent;
 
 
     /// Memory-efficient receivedPackets algorithm:
@@ -558,13 +558,13 @@ private:
 #if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
     CCTimeType ackPing;
 #endif
-    //	CCTimeType ackPingSamples[ACK_PING_SAMPLES_SIZE]; // Must be range of unsigned char to wrap ackPingIndex properly
+    //  CCTimeType ackPingSamples[ACK_PING_SAMPLES_SIZE]; // Must be range of unsigned char to wrap ackPingIndex properly
     CCTimeType ackPingSum;
     unsigned char ackPingIndex;
     //CCTimeType nextLowestPingReset;
     RemoteSystemTimeType remoteSystemTime;
-    //	bool continuousSend;
-    //	CCTimeType lastTimeBetweenPacketsIncrease,lastTimeBetweenPacketsDecrease;
+    //  bool continuousSend;
+    //  CCTimeType lastTimeBetweenPacketsIncrease,lastTimeBetweenPacketsDecrease;
     // Limit changes in throughput to once per ping - otherwise even if lag starts we don't know about it
     // In the meantime the connection is flooded and overrun.
     CCTimeType nextAllowedThroughputSample;
@@ -583,7 +583,7 @@ private:
         char data[MAXIMUM_MTU_SIZE];
         unsigned int length;
         RakNet::TimeMS sendTime;
-        //	SystemAddress systemAddress;
+        //  SystemAddress systemAddress;
         unsigned int extraSocketOptions;
     };
     DataStructures::Queue<DataAndTime*> delayList;

@@ -58,7 +58,7 @@ NetworkID NetworkIDManager::GetNewNetworkID( void )
 }
 unsigned int NetworkIDManager::NetworkIDToHashIndex( NetworkID networkId )
 {
-    //	return SuperFastHash((const char*) &networkId.guid.g,sizeof(networkId.guid.g)) % NETWORK_ID_MANAGER_HASH_LENGTH;
+    //  return SuperFastHash((const char*) &networkId.guid.g,sizeof(networkId.guid.g)) % NETWORK_ID_MANAGER_HASH_LENGTH;
     return (unsigned int)( networkId % NETWORK_ID_MANAGER_HASH_LENGTH );
 }
 void NetworkIDManager::TrackNetworkIDObject( NetworkIDObject* networkIdObject )
@@ -70,7 +70,7 @@ void NetworkIDManager::TrackNetworkIDObject( NetworkIDObject* networkIdObject )
     networkIdObject->nextInstanceForNetworkIDManager = 0;
 
     unsigned int hashIndex = NetworkIDToHashIndex( rawId );
-    //	printf("TrackNetworkIDObject hashIndex=%i guid=%s\n",hashIndex, networkIdObject->GetNetworkID().guid.ToString()); // removeme
+    //  printf("TrackNetworkIDObject hashIndex=%i guid=%s\n",hashIndex, networkIdObject->GetNetworkID().guid.ToString()); // removeme
     if( networkIdHash[hashIndex] == 0 )
     {
         networkIdHash[hashIndex] = networkIdObject;
@@ -102,7 +102,7 @@ void NetworkIDManager::StopTrackingNetworkIDObject( NetworkIDObject* networkIdOb
 
     // RakAssert(networkIdObject->GetNetworkID()!=UNASSIGNED_NETWORK_ID);
     unsigned int hashIndex = NetworkIDToHashIndex( rawId );
-    //	printf("hashIndex=%i\n",hashIndex); // removeme
+    //  printf("hashIndex=%i\n",hashIndex); // removeme
     NetworkIDObject* nio = networkIdHash[hashIndex];
     if( nio == 0 )
     {

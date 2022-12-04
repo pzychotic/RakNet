@@ -13,9 +13,9 @@
 /*
 Description:
 Tests:
-virtual void 	SetRouterInterface (RouterInterface *routerInterface)=0
-virtual void 	RemoveRouterInterface (RouterInterface *routerInterface)=0
-virtual bool 	AdvertiseSystem (const char *host, unsigned short remotePort, const char *data, int dataLength, unsigned connectionSocketIndex=0)=0
+virtual void    SetRouterInterface (RouterInterface *routerInterface)=0
+virtual void    RemoveRouterInterface (RouterInterface *routerInterface)=0
+virtual bool    AdvertiseSystem (const char *host, unsigned short remotePort, const char *data, int dataLength, unsigned connectionSocketIndex=0)=0
 
 Success conditions:
 

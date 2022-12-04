@@ -47,7 +47,7 @@ uint32_t SuperFastHash( const char* data, int length )
     }
     return lastHash;
 
-    //	return SuperFastHashIncremental(data,len,len);
+    //  return SuperFastHashIncremental(data,len,len);
 }
 uint32_t SuperFastHashIncremental( const char* data, int len, unsigned int lastHash )
 {

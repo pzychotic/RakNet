@@ -182,7 +182,7 @@ public:
     static bool GreaterThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
     /// Is a < b, accounting for variable overflow?
     static bool LessThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
-    //	void SetTimeBetweenSendsLimit(unsigned int bitsPerSecond);
+    //  void SetTimeBetweenSendsLimit(unsigned int bitsPerSecond);
     uint64_t GetBytesPerSecondLimitByCongestionControl( void ) const;
 
 protected:
@@ -329,11 +329,11 @@ protected:
 
     bool hasWrittenToPacketPairReceiptHistory;
 
-    //	uint32_t rttHistory[RTT_HISTORY_LENGTH];
-    //	uint32_t rttHistoryIndex;
-    //	uint32_t rttHistoryWriteCount;
-    //	uint32_t rttSum, rttLow;
-    //	CCTimeType lastSndUpdateTime;
+    //  uint32_t rttHistory[RTT_HISTORY_LENGTH];
+    //  uint32_t rttHistoryIndex;
+    //  uint32_t rttHistoryWriteCount;
+    //  uint32_t rttSum, rttLow;
+    //  CCTimeType lastSndUpdateTime;
     double estimatedLinkCapacityBytesPerSecond;
 
     // --------------------------- PROTECTED METHODS ---------------------------
@@ -347,7 +347,7 @@ protected:
 
     /// Calculates the median an array of BytesPerMicrosecond
     static BytesPerMicrosecond CalculateListMedianRecursive( const BytesPerMicrosecond inputList[CC_RAKNET_UDT_PACKET_HISTORY_LENGTH], int inputListLength, int lessThanSum, int greaterThanSum );
-    //	static uint32_t CalculateListMedianRecursive(const uint32_t inputList[RTT_HISTORY_LENGTH], int inputListLength, int lessThanSum, int greaterThanSum);
+    //  static uint32_t CalculateListMedianRecursive(const uint32_t inputList[RTT_HISTORY_LENGTH], int inputListLength, int lessThanSum, int greaterThanSum);
 
     /// Same as GetRTOForRetransmission, but does not factor in ExpCount
     /// This is because the receiver does not know ExpCount for the sender, and even if it did, acks shouldn't be delayed for this reason

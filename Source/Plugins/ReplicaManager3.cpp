@@ -2191,7 +2191,7 @@ void Connection_RM3::SendConstruction( DataStructures::List<Replica3*>& newObjec
 
     // All construction and destruction takes place in the same network message
     // Otherwise, if objects rely on each other being created the same tick to be valid, this won't always be true
-    //	DataStructures::List<LastSerializationResult* > serializedObjects;
+    //  DataStructures::List<LastSerializationResult* > serializedObjects;
     BitSize_t offsetStart, offsetStart2, offsetEnd;
     unsigned int newListIndex, oldListIndex;
     BitStream bsOut;
@@ -2204,7 +2204,7 @@ void Connection_RM3::SendConstruction( DataStructures::List<Replica3*>& newObjec
         rakPeer->Send( &bsOut, sendParameters.priority, RELIABLE_ORDERED, sendParameters.orderingChannel, systemAddress, false, sendParameters.sendReceipt );
     }
 
-    //	LastSerializationResult* lsr;
+    //  LastSerializationResult* lsr;
     bsOut.Reset();
     bsOut.Write( (MessageID)ID_REPLICA_MANAGER_CONSTRUCTION );
     bsOut.Write( worldId );
@@ -2322,7 +2322,7 @@ void Connection_RM3::SendConstruction( DataStructures::List<Replica3*>& newObjec
     }
 
     sp.bitsWrittenSoFar = 0;
-    //	RakNet::Time t = RakNet::GetTimeMS();
+    //  RakNet::Time t = RakNet::GetTimeMS();
     for( newListIndex = 0; newListIndex < newObjects.Size(); newListIndex++ )
     {
         sp.destinationConnection = this;
@@ -2346,7 +2346,7 @@ void Connection_RM3::SendConstruction( DataStructures::List<Replica3*>& newObjec
                 allIndices[z] = true;
             }
             SendSerialize( replica, allIndices, sp.outputBitstream, sp.messageTimestamp, sp.pro, rakPeer, worldId, GetTime() );
-            ///			newObjects[newListIndex]->whenLastSerialized=t;
+            ///         newObjects[newListIndex]->whenLastSerialized=t;
         }
         // else wait for construction request accepted before serializing
     }

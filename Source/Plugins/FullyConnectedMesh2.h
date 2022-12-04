@@ -166,7 +166,7 @@ public:
     /// DataStructures::List<RakNetGUID> guids;
     /// fullyConnectedMesh->GetVerifiedJoinRequiredProcessingList(packet->guid, addresses, guids);
     /// for (unsigned int i=0; i < addresses.Size(); i++)
-    ///		rakPeer[i]->Connect(addresses[i].ToString(false), addresses[i].GetPort(), 0, 0);
+    ///     rakPeer[i]->Connect(addresses[i].ToString(false), addresses[i].GetPort(), 0, 0);
     /// \endcode
     /// \param[in] host Which system sent ID_FCM2_VERIFIED_JOIN_START
     /// \param[out] addresses SystemAddress values of systems to connect to. List has the same number and order as \a guids

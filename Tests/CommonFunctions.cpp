@@ -40,8 +40,8 @@ bool CommonFunctions::ConnectionStateMatchesOptions( RakPeerInterface* peer, Sys
         break;
 
         //case IS_LOOPBACK:
-        //	return isLoopBack;
-        //	break;
+        //  return isLoopBack;
+        //  break;
 
     case IS_NOT_CONNECTED:
         return isNotConnected;
@@ -125,7 +125,7 @@ Packet* CommonFunctions::WaitAndReturnMessageWithID( RakPeerInterface* reciever,
         for( packet = reciever->Receive(); packet; reciever->DeallocatePacket( packet ), packet = reciever->Receive() )
         {
 
-            //	printf("Packet %i\n",packet->data[0]);
+            //  printf("Packet %i\n",packet->data[0]);
             if( packet->data[0] == id )
             {
                 return packet;

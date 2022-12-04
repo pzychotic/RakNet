@@ -44,8 +44,8 @@ void PluginInterface2::SendUnified( const BitStream* bitStream, PacketPriority p
     // Offline mode
     if( broadcast == false && systemIdentifier.rakNetGuid == GetMyGUIDUnified() )
     {
-        //		Packet *packet = AllocatePacketUnified(bitStream->GetNumberOfBytesUsed());
-        //		memcpy(packet->data, bitStream->GetData(), bitStream->GetNumberOfBytesUsed());
+        //      Packet *packet = AllocatePacketUnified(bitStream->GetNumberOfBytesUsed());
+        //      memcpy(packet->data, bitStream->GetData(), bitStream->GetNumberOfBytesUsed());
         Packet packet;
         packet.bitSize = bitStream->GetNumberOfBitsUsed();
         packet.data = bitStream->GetData();
@@ -55,7 +55,7 @@ void PluginInterface2::SendUnified( const BitStream* bitStream, PacketPriority p
         packet.systemAddress = UNASSIGNED_SYSTEM_ADDRESS;
         packet.wasGeneratedLocally = false;
         OnReceive( &packet );
-        //		DeallocPacketUnified(packet);
+        //      DeallocPacketUnified(packet);
 
         Update();
     }
@@ -78,8 +78,8 @@ void PluginInterface2::SendUnified( const char* data, const int length, PacketPr
     // Offline mode
     if( broadcast == false && systemIdentifier.rakNetGuid == GetMyGUIDUnified() )
     {
-        //		Packet *packet = AllocatePacketUnified(bitStream->GetNumberOfBytesUsed());
-        //		memcpy(packet->data, bitStream->GetData(), bitStream->GetNumberOfBytesUsed());
+        //      Packet *packet = AllocatePacketUnified(bitStream->GetNumberOfBytesUsed());
+        //      memcpy(packet->data, bitStream->GetData(), bitStream->GetNumberOfBytesUsed());
         Packet packet;
         packet.bitSize = BYTES_TO_BITS( length );
         packet.data = (unsigned char*)data;
@@ -89,7 +89,7 @@ void PluginInterface2::SendUnified( const char* data, const int length, PacketPr
         packet.systemAddress = UNASSIGNED_SYSTEM_ADDRESS;
         packet.wasGeneratedLocally = false;
         OnReceive( &packet );
-        //		DeallocPacketUnified(packet);
+        //      DeallocPacketUnified(packet);
 
         Update();
     }

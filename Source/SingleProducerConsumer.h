@@ -158,7 +158,7 @@ void SingleProducerConsumer<SingleProducerConsumerType>::CancelWriteLock( Single
 template<class SingleProducerConsumerType>
 void SingleProducerConsumer<SingleProducerConsumerType>::WriteUnlock( void )
 {
-    //	DataPlusPtr *dataContainer = (DataPlusPtr *)structure;
+    //  DataPlusPtr *dataContainer = (DataPlusPtr *)structure;
 
 #ifdef _DEBUG
     RakAssert( writePointer->next != readPointer );

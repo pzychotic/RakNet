@@ -657,16 +657,16 @@ SHValueType StatisticsHistory::TimeAndValueQueue::Interpolate( StatisticsHistory
 {
     if( t2.time == t1.time )
         return ( t1.val + t2.val ) / 2;
-    //	if (t2.time > t1.time)
-    //	{
+    //  if (t2.time > t1.time)
+    //  {
     SHValueType slope = ( t2.val - t1.val ) / ( (SHValueType)t2.time - (SHValueType)t1.time );
     return t1.val + slope * ( (SHValueType)time - (SHValueType)t1.time );
-    // 	}
-    // 	else
-    // 	{
-    // 		SHValueType slope = (t1.val - t2.val) / (SHValueType) (t1.time - t2.time);
-    // 		return t2.val + slope * (SHValueType) (time - t2.time);
-    // 	}
+    //  }
+    //  else
+    //  {
+    //      SHValueType slope = (t1.val - t2.val) / (SHValueType) (t1.time - t2.time);
+    //      return t2.val + slope * (SHValueType) (time - t2.time);
+    //  }
 }
 void StatisticsHistory::TimeAndValueQueue::Clear( void )
 {

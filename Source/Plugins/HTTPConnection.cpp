@@ -80,7 +80,7 @@ void HTTPConnection::Update( void )
     sa = tcp->HasCompletedConnectionAttempt();
     while( sa != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        //		printf("Connected\n");
+        //      printf("Connected\n");
         connectionState = CS_CONNECTED;
         server = sa;
         sa = tcp->HasCompletedConnectionAttempt();
@@ -173,8 +173,8 @@ void HTTPConnection::Update( void )
                          port );
         }
 
-        //	printf(request.C_String());
-        //		request.URLEncode();
+        //  printf(request.C_String());
+        //      request.URLEncode();
         tcp->Send( request.C_String(), (unsigned int)request.GetLength(), server, false );
         connectionState = CS_PROCESSING;
     }
@@ -183,8 +183,8 @@ void HTTPConnection::Update( void )
     }
     }
 
-    //	if (connectionState==CS_PROCESSING && currentProcessingCommand.data.IsEmpty()==false)
-    //		outgoingCommand.PushAtHead(currentProcessingCommand);
+    //  if (connectionState==CS_PROCESSING && currentProcessingCommand.data.IsEmpty()==false)
+    //      outgoingCommand.PushAtHead(currentProcessingCommand);
 }
 bool HTTPConnection::HasRead( void ) const
 {
@@ -232,8 +232,8 @@ void HTTPConnection::ProcessTCPPacket( Packet* packet )
         incomingTemp.URLDecode();
         incomingData += incomingTemp;
 
-        //	printf((const char*) packet->data);
-        //	printf("\n");
+        //  printf((const char*) packet->data);
+        //  printf("\n");
 
         RakAssert( strlen( (char*)packet->data ) == packet->length ); // otherwise it contains Null bytes
 

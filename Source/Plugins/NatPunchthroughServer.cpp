@@ -345,7 +345,7 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
         gprIndex = users[i]->groupPunchthroughRequests.GetIndexFromKey(rakNetGUID, &objectExists);
         if (objectExists)
         {
-//			printf("DEBUG %i\n", __LINE__);
+//          printf("DEBUG %i\n", __LINE__);
 
             BitStream outgoingBs;
             outgoingBs.Write((MessageID)ID_NAT_TARGET_NOT_CONNECTED);
@@ -370,8 +370,8 @@ void NatPunchthroughServer::OnNewConnection( const SystemAddress& systemAddress,
     user->isReady = true;
     users.Insert( rakNetGUID, user, true, _FILE_AND_LINE_ );
 
-    //	printf("Adding to users %s\n", rakNetGUID.ToString());
-    //	printf("DEBUG users[0] guid=%s\n", users[0]->guid.ToString());
+    //  printf("Adding to users %s\n", rakNetGUID.ToString());
+    //  printf("DEBUG users[0] guid=%s\n", users[0]->guid.ToString());
 }
 void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
 {
@@ -392,9 +392,9 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
     i = users.GetIndexFromKey( recipientGuid, &objectExists );
     if( objectExists == false || ca->sender == ca->recipient )
     {
-        // 		printf("DEBUG %i\n", __LINE__);
-        // 		printf("DEBUG recipientGuid=%s\n", recipientGuid.ToString());
-        // 		printf("DEBUG users[0] guid=%s\n", users[0]->guid.ToString());
+        //      printf("DEBUG %i\n", __LINE__);
+        //      printf("DEBUG recipientGuid=%s\n", recipientGuid.ToString());
+        //      printf("DEBUG users[0] guid=%s\n", users[0]->guid.ToString());
 
         outgoingBs.Write( (MessageID)ID_NAT_TARGET_NOT_CONNECTED );
         outgoingBs.Write( recipientGuid );

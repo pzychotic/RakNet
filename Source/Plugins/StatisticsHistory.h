@@ -215,9 +215,9 @@ protected:
     virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
 
     // Too slow
-    // 	virtual bool UsesReliabilityLayer(void) const {return true;}
-    // 	virtual void OnDirectSocketSend(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress);
-    // 	virtual void OnDirectSocketReceive(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress);
+    //  virtual bool UsesReliabilityLayer(void) const {return true;}
+    //  virtual void OnDirectSocketSend(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress);
+    //  virtual void OnDirectSocketReceive(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress);
 
 
     bool addNewConnections;

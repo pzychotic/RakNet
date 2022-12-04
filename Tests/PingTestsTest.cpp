@@ -13,10 +13,10 @@
 /*
 Description:
 Tests out:
-virtual int 	GetAveragePing (const SystemAddress systemAddress)=0
-virtual int 	GetLastPing (const SystemAddress systemAddress) const =0
-virtual int 	GetLowestPing (const SystemAddress systemAddress) const =0
-virtual void 	SetOccasionalPing (bool doPing)=0
+virtual int     GetAveragePing (const SystemAddress systemAddress)=0
+virtual int     GetLastPing (const SystemAddress systemAddress) const =0
+virtual int     GetLowestPing (const SystemAddress systemAddress) const =0
+virtual void    SetOccasionalPing (bool doPing)=0
 
 Ping is tested in CrossConnectionConvertTest,SetOfflinePingResponse and GetOfflinePingResponse tested in OfflineMessagesConvertTest
 

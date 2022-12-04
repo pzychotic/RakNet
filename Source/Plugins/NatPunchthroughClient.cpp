@@ -289,7 +289,7 @@ void NatPunchthroughClient::Update( void )
         {
             // Failed. Tell the user
             OnPunchthroughFailure();
-            //	UpdateGroupPunchOnNatResult(sp.facilitator, sp.targetGuid, sp.targetAddress, 1);
+            //  UpdateGroupPunchOnNatResult(sp.facilitator, sp.targetGuid, sp.targetAddress, 1);
         }
 
         if( sp.testMode == SendPing::PUNCHING_FIXED_PORT )
@@ -495,7 +495,7 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
             bs.IgnoreBytes( 2 );
             uint16_t sessionId;
             bs.Read( sessionId );
-            //			RakAssert(sessionId<100);
+            //          RakAssert(sessionId<100);
             if( sessionId != sp.sessionId )
                 break;
 
@@ -593,7 +593,7 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
                 }
             }
 
-            //		mostRecentNewExternalPort=packet->systemAddress.GetPort();
+            //      mostRecentNewExternalPort=packet->systemAddress.GetPort();
         }
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
     case ID_NAT_ALREADY_IN_PROGRESS: {
@@ -731,7 +731,7 @@ void NatPunchthroughClient::ProcessNextPunchthroughQueue(void)
 */
 void NatPunchthroughClient::OnConnectAtTime( Packet* packet )
 {
-    //	RakAssert(sp.nextActionTime==0);
+    //  RakAssert(sp.nextActionTime==0);
 
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) );
@@ -740,8 +740,8 @@ void NatPunchthroughClient::OnConnectAtTime( Packet* packet )
     bs.Read( sp.sessionId );
     bs.Read( sp.targetAddress );
     int j;
-    //	int k;
-    //	k=0;
+    //  int k;
+    //  k=0;
     for( j = 0; j < MAXIMUM_NUMBER_OF_INTERNAL_IDS; j++ )
         bs.Read( sp.internalIds[j] );
 
@@ -797,9 +797,9 @@ const char* TestModeToString( NatPunchthroughClient::SendPing::TestMode tm )
     case NatPunchthroughClient::SendPing::WAITING_FOR_INTERNAL_IPS_RESPONSE:
         return "WAITING_FOR_INTERNAL_IPS_RESPONSE";
         break;
-        // 		case NatPunchthroughClient::SendPing::SEND_WITH_TTL:
-        // 			return "SEND_WITH_TTL";
-        // 		break;
+        //      case NatPunchthroughClient::SendPing::SEND_WITH_TTL:
+        //          return "SEND_WITH_TTL";
+        //      break;
     case NatPunchthroughClient::SendPing::TESTING_EXTERNAL_IPS_FACILITATOR_PORT_TO_FACILITATOR_PORT:
         return "TESTING_EXTERNAL_IPS_FACILITATOR_PORT_TO_FACILITATOR_PORT";
         break;
@@ -831,7 +831,7 @@ void NatPunchthroughClient::SendOutOfBand( SystemAddress sa, MessageID oobId )
     BitStream oob;
     oob.Write( oobId );
     oob.Write( sp.sessionId );
-    //	RakAssert(sp.sessionId<100);
+    //  RakAssert(sp.sessionId<100);
     if( oobId == ID_NAT_ESTABLISH_BIDIRECTIONAL )
         oob.Write( sa.GetPort() );
     char ipAddressString[32];
@@ -1036,7 +1036,7 @@ void NatPunchthroughClient::SendPunchthrough( RakNetGUID destination, const Syst
     outgoingBs.Write( destination );
     rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, facilitator, false );
 
-    //	RakAssert(rakPeerInterface->GetSystemAddressFromGuid(destination)==UNASSIGNED_SYSTEM_ADDRESS);
+    //  RakAssert(rakPeerInterface->GetSystemAddressFromGuid(destination)==UNASSIGNED_SYSTEM_ADDRESS);
 
     if( natPunchthroughDebugInterface )
     {

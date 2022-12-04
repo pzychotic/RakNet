@@ -246,10 +246,10 @@ SystemAddress TelnetTransport::HasNewIncomingConnection( void )
         // Tell the other side to use line mode
         // http://www.faqs.org/rfcs/rfc1184.html
         // IAC DO LINEMODE
-    //	command[0]=255; // IAC
-    //	command[1]=252; // DO
-    //	command[2]=34; // LINEMODE
-    //	tcpInterface->Send((const char*)command, 3, newConnection);
+    //  command[0]=255; // IAC
+    //  command[1]=252; // DO
+    //  command[2]=34; // LINEMODE
+    //  tcpInterface->Send((const char*)command, 3, newConnection);
 
     */
 

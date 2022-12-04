@@ -398,9 +398,9 @@ void CSHA1::HMAC( unsigned char* sharedKey, int sharedKeyLength, unsigned char* 
 
     memcpy( output, secondHash.GetHash(), SHA1_LENGTH );
 
-    // 	char report[128];
-    // 	memset(report,0,128);
-    // 	secondHash.ReportHash( report, 0 );
+    //  char report[128];
+    //  memset(report,0,128);
+    //  secondHash.ReportHash( report, 0 );
 }
 
 } // namespace RakNet

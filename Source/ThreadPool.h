@@ -233,8 +233,8 @@ void* WorkerThread( void* arguments )
             threadPool->quitAndIncomingDataEvents.WaitOnEvent( 1000 );
         }
         // #else
-        // 		if (userCallback==0)
-        // 			RakSleep(30);
+        //      if (userCallback==0)
+        //          RakSleep(30);
         // #endif
 
         threadPool->runThreadsMutex.lock();
@@ -520,12 +520,12 @@ template<class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::IsWorking( void )
 {
     bool isWorking;
-    //	workingThreadCountMutex.lock();
-    //	isWorking=numThreadsWorking!=0;
-    //	workingThreadCountMutex.unlock();
+    //  workingThreadCountMutex.lock();
+    //  isWorking=numThreadsWorking!=0;
+    //  workingThreadCountMutex.unlock();
 
-    //	if (isWorking)
-    //		return true;
+    //  if (isWorking)
+    //      return true;
 
     // Bug fix: Originally the order of these two was reversed.
     // It's possible with the thread timing that working could have been false, then it picks up the data in the other thread, then it checks

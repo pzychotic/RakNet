@@ -14,16 +14,16 @@
 Description:
 
 Tests:
-virtual void RakPeerInterface::AddToSecurityExceptionList  	(  	const char *   	 ip  	 )
-virtual void RakPeerInterface::AddToBanList  	(  	const char *   	 IP, 		TimeMS  	milliseconds = 0	  	)
-virtual void RakPeerInterface::GetIncomingPassword  	(  	char *   	 passwordData, 		int *  	passwordDataLength	  	)
-virtual void RakPeerInterface::InitializeSecurity  	(  	const char *   	 pubKeyE, 		const char *  	pubKeyN, 		const char *  	privKeyP, 		const char *  	privKeyQ	  	)
-virtual bool RakPeerInterface::IsBanned  	(  	const char *   	 IP  	 )
-virtual bool RakPeerInterface::IsInSecurityExceptionList  	(  	const char *   	 ip  	 )
-virtual void RakPeerInterface::RemoveFromSecurityExceptionList  	(  	const char *   	 ip  	 )
-virtual void RakPeerInterface::RemoveFromBanList  	(  	const char *   	 IP  	 )
-virtual void RakPeerInterface::SetIncomingPassword  	(  	const char *   	 passwordData, 		int  	passwordDataLength	  	)
-virtual void 	ClearBanList (void)=0
+virtual void RakPeerInterface::AddToSecurityExceptionList   (   const char *     ip      )
+virtual void RakPeerInterface::AddToBanList     (   const char *     IP,        TimeMS      milliseconds = 0        )
+virtual void RakPeerInterface::GetIncomingPassword      (   char *       passwordData,      int *   passwordDataLength      )
+virtual void RakPeerInterface::InitializeSecurity   (   const char *     pubKeyE,       const char *    pubKeyN,        const char *    privKeyP,       const char *    privKeyQ        )
+virtual bool RakPeerInterface::IsBanned     (   const char *     IP      )
+virtual bool RakPeerInterface::IsInSecurityExceptionList    (   const char *     ip      )
+virtual void RakPeerInterface::RemoveFromSecurityExceptionList      (   const char *     ip      )
+virtual void RakPeerInterface::RemoveFromBanList    (   const char *     IP      )
+virtual void RakPeerInterface::SetIncomingPassword      (   const char *     passwordData,      int     passwordDataLength      )
+virtual void    ClearBanList (void)=0
 
 Success conditions:
 All functions pass tests.
@@ -425,7 +425,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
         client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
         client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
 
-        //	Packet *packet;
+        //  Packet *packet;
 
         entryTime=GetTimeMS();
         while(GetTimeMS()-entryTime<1000)

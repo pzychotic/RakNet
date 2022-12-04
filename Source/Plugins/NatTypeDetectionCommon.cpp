@@ -22,7 +22,7 @@ bool CanConnect( NATTypeDetectionResult type1, NATTypeDetectionResult type2 )
     /// If one system is NAT_TYPE_PORT_RESTRICTED, the other must be NAT_TYPE_PORT_RESTRICTED or less
     bool connectionGraph[NAT_TYPE_COUNT][NAT_TYPE_COUNT] =
         {
-            // None,	Full Cone,	Address Restricted,		Port Restricted,	Symmetric,	Unknown,	InProgress,	Supports_UPNP
+            // None,    Full Cone,  Address Restricted,     Port Restricted,    Symmetric,  Unknown,    InProgress, Supports_UPNP
             { true, true, true, true, true, false, false, true },       // None
             { true, true, true, true, true, false, false, true },       // Full Cone
             { true, true, true, true, true, false, false, true },       // Address restricted

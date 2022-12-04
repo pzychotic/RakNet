@@ -754,19 +754,19 @@ void CloudServer::OnUnsubscribeRequest( Packet* packet )
             return;
     }
 
-    //	CloudDataList *cloudDataList;
+    //  CloudDataList *cloudDataList;
     bool dataRepositoryExists;
-    //	unsigned int dataRepositoryIndex;
+    //  unsigned int dataRepositoryIndex;
 
     for( index = 0; index < keyCount; index++ )
     {
         CloudKey cloudKey = cloudKeys[index];
 
-        //	dataRepositoryIndex =
+        //  dataRepositoryIndex =
         dataRepository.GetIndexFromKey( cloudKey, &dataRepositoryExists );
         if( dataRepositoryExists == false )
             continue;
-        //		cloudDataList = dataRepository[dataRepositoryIndex];
+        //      cloudDataList = dataRepository[dataRepositoryIndex];
 
         unsigned int keySubscriberIndex;
         bool hasKeySubscriber;
@@ -786,7 +786,7 @@ void CloudServer::OnUnsubscribeRequest( Packet* packet )
 }
 void CloudServer::OnServerToServerGetRequest( Packet* packet )
 {
-    //	unsigned int remoteServerIndex;
+    //  unsigned int remoteServerIndex;
     bool objectExists;
     //remoteServerIndex =
     remoteServers.GetIndexFromKey( packet->guid, &objectExists );
@@ -1167,7 +1167,7 @@ void CloudServer::ProcessAndTransmitGetRequest( GetRequest* getRequest )
     BitStream bsOut;
     bsOut.Write( (MessageID)ID_CLOUD_GET_RESPONSE );
 
-    //	BufferedGetResponseFromServer getResponse;
+    //  BufferedGetResponseFromServer getResponse;
     CloudQueryResult cloudQueryResult;
     cloudQueryResult.cloudQuery = getRequest->cloudQueryWithAddresses.cloudQuery;
     cloudQueryResult.subscribeToResults = getRequest->cloudQueryWithAddresses.cloudQuery.subscribeToResults;
@@ -1374,7 +1374,7 @@ void CloudServer::OnSendUploadedAndSubscribedKeysToServer( Packet* packet )
     RemoteServer* remoteServer = remoteServers[index];
     remoteServer->gotSubscribedAndUploadedKeys = true;
 
-    //	unsigned int insertionIndex;
+    //  unsigned int insertionIndex;
     bool alreadyHasKey;
     uint16_t numUploadedKeys, numSubscribedKeys;
     bsIn.Read( numUploadedKeys );
@@ -1383,7 +1383,7 @@ void CloudServer::OnSendUploadedAndSubscribedKeysToServer( Packet* packet )
         CloudKey cloudKey;
         cloudKey.Serialize( false, &bsIn );
 
-        //	insertionIndex =
+        //  insertionIndex =
         remoteServer->uploadedKeys.GetIndexFromKey( cloudKey, &alreadyHasKey );
         if( alreadyHasKey == false )
             remoteServer->uploadedKeys.Insert( cloudKey, cloudKey, true, _FILE_AND_LINE_ );
@@ -1417,9 +1417,9 @@ void CloudServer::OnSendUploadedKeyToServers( Packet* packet )
     RemoteServer* remoteServer = remoteServers[index];
     CloudKey cloudKey;
     cloudKey.Serialize( false, &bsIn );
-    //	unsigned int insertionIndex;
+    //  unsigned int insertionIndex;
     bool alreadyHasKey;
-    //	insertionIndex =
+    //  insertionIndex =
     remoteServer->uploadedKeys.GetIndexFromKey( cloudKey, &alreadyHasKey );
     if( alreadyHasKey == false )
         remoteServer->uploadedKeys.Insert( cloudKey, cloudKey, true, _FILE_AND_LINE_ );
@@ -1436,9 +1436,9 @@ void CloudServer::OnSendSubscribedKeyToServers( Packet* packet )
     RemoteServer* remoteServer = remoteServers[index];
     CloudKey cloudKey;
     cloudKey.Serialize( false, &bsIn );
-    //	unsigned int insertionIndex;
+    //  unsigned int insertionIndex;
     bool alreadyHasKey;
-    //	insertionIndex =
+    //  insertionIndex =
     remoteServer->subscribedKeys.GetIndexFromKey( cloudKey, &alreadyHasKey );
 
     // Do not need to send current values, the Get request will do that as the Get request is sent at the same time

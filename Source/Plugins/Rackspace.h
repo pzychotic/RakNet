@@ -371,7 +371,7 @@ protected:
     struct RackspaceOperation
     {
         RackspaceOperationType type;
-        //	RakString stringInfo;
+        //  RakString stringInfo;
         SystemAddress connectionAddress;
         bool isPendingAuthentication;
         RakString incomingStream;

@@ -206,7 +206,7 @@ unsigned OrderedList<key_type, data_type, default_comparison_function>::Remove( 
     index = GetIndexFromKey( key, &objectExists, cf );
 
     // Can't find the element to remove if this assert hits
-    //	RakAssert(objectExists==true);
+    //  RakAssert(objectExists==true);
     if( objectExists == false )
     {
         RakAssert( objectExists == true );

@@ -177,7 +177,7 @@ public:
     static bool GreaterThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
     /// Is a < b, accounting for variable overflow?
     static bool LessThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
-    //	void SetTimeBetweenSendsLimit(unsigned int bitsPerSecond);
+    //  void SetTimeBetweenSendsLimit(unsigned int bitsPerSecond);
     uint64_t GetBytesPerSecondLimitByCongestionControl( void ) const;
 
 protected:

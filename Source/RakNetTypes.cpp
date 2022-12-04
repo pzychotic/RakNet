@@ -388,16 +388,16 @@ void SystemAddress::FixForIPVersion( const SystemAddress& boundAddressToSocket )
         }
 #endif
 
-        // 		if (boundAddressToSocket.GetIPVersion()==4)
-        // 		{
-        // 			// Some kind of bug with sendto: returns "The requested address is not valid in its context." if loopback doesn't have the same IP address
-        // 			address.addr4.sin_addr.s_addr=boundAddressToSocket.address.addr4.sin_addr.s_addr;
-        // 		}
+        //      if (boundAddressToSocket.GetIPVersion()==4)
+        //      {
+        //          // Some kind of bug with sendto: returns "The requested address is not valid in its context." if loopback doesn't have the same IP address
+        //          address.addr4.sin_addr.s_addr=boundAddressToSocket.address.addr4.sin_addr.s_addr;
+        //      }
     }
 }
 bool SystemAddress::IsLANAddress( void )
 {
-//	return address.addr4.sin_addr.S_un.S_un_b.s_b1==10 || address.addr4.sin_addr.S_un.s_b1==192;
+//  return address.addr4.sin_addr.S_un.S_un_b.s_b1==10 || address.addr4.sin_addr.S_un.s_b1==192;
 #if defined( __WIN32__ )
     return address.addr4.sin_addr.S_un.S_un_b.s_b1 == 10 || address.addr4.sin_addr.S_un.S_un_b.s_b1 == 192;
 #else
@@ -439,8 +439,8 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         char IPPart[22];
         char portPart[10];
         // Only write the valid parts, don't change existing if invalid
-        //	binaryAddress=UNASSIGNED_SYSTEM_ADDRESS.binaryAddress;
-        //	port=UNASSIGNED_SYSTEM_ADDRESS.port;
+        //  binaryAddress=UNASSIGNED_SYSTEM_ADDRESS.binaryAddress;
+        //  port=UNASSIGNED_SYSTEM_ADDRESS.port;
         for( index = 0; str[index] && str[index] != portDelineator && index < 22; index++ )
         {
             if( str[index] != '.' && ( str[index] < '0' || str[index] > '9' ) )
@@ -569,17 +569,17 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
 #if RAKNET_SUPPORT_IPV6 == 1
     if( servinfo->ai_family == AF_INET )
     {
-        // 		if (ipVersion==6)
-        // 		{
-        //			address.addr4.sin_family=AF_INET6;
-        // 			memset(&address.addr6,0,sizeof(address.addr6));
-        // 			memcpy(address.addr6.sin6_addr.s6_addr+12,&((struct sockaddr_in *)servinfo->ai_addr)->sin_addr.s_addr,sizeof(unsigned long));
-        // 		}
-        // 		else
-        // 		{
+        //      if (ipVersion==6)
+        //      {
+        //          address.addr4.sin_family=AF_INET6;
+        //          memset(&address.addr6,0,sizeof(address.addr6));
+        //          memcpy(address.addr6.sin6_addr.s6_addr+12,&((struct sockaddr_in *)servinfo->ai_addr)->sin_addr.s_addr,sizeof(unsigned long));
+        //      }
+        //      else
+        //      {
         address.addr4.sin_family = AF_INET;
         memcpy( &address.addr4, (struct sockaddr_in*)servinfo->ai_addr, sizeof( struct sockaddr_in ) );
-        //		}
+        //      }
     }
     else
     {

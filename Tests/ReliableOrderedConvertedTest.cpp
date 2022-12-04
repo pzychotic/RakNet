@@ -152,10 +152,10 @@ int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> param
     receiver->Startup( 32, &SocketDescriptor( localPort, 0 ), 1 );
     receiver->SetMaximumIncomingConnections( 32 );
 
-    //	if (sender)
-    //		sender->ApplyNetworkSimulator(128000, 50, 100);
-    //	if (receiver)
-    //		receiver->ApplyNetworkSimulator(128000, 50, 100);
+    //  if (sender)
+    //      sender->ApplyNetworkSimulator(128000, 50, 100);
+    //  if (receiver)
+    //      receiver->ApplyNetworkSimulator(128000, 50, 100);
 
     /*printf("How long to run this test for, in seconds?\n");
     Gets(str, sizeof(str));
@@ -208,7 +208,7 @@ int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> param
         while( doSend && currentTime > nextSend )
         {
             streamNumberSender = 0;
-            //	streamNumber = randomMT() % 32;
+            //  streamNumber = randomMT() % 32;
             // Do the send
             bitStream.Reset();
             bitStream.Write( (unsigned char)( ID_USER_PACKET_ENUM + 1 ) );
@@ -233,8 +233,8 @@ int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> param
             nextSend += sendInterval;
 
             // Test halting
-            //	if (rand()%20==0)
-            //		nextSend+=1000;
+            //  if (rand()%20==0)
+            //      nextSend+=1000;
         }
 
         packet = receiver->Receive();

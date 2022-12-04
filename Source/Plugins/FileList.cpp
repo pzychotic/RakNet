@@ -69,7 +69,7 @@ namespace RakNet {
 
 //int RAK_DLL_EXPORT FileListNodeComp( char * const &key, const FileListNode &data )
 //{
-//	return strcmp(key, data.filename);
+//  return strcmp(key, data.filename);
 //}
 
 
@@ -191,7 +191,7 @@ void FileList::AddFile( const char* filename, const char* fullPathToFile, const 
     }
 
     FileListNode n;
-    //	size_t fileNameLen = strlen(filename);
+    //  size_t fileNameLen = strlen(filename);
     if( dataLength && data )
     {
         if( takeDataPointer )
@@ -277,7 +277,7 @@ void FileList::AddFilesFromDirectory( const char* applicationDirectory, const ch
             return;
         }
 
-        //		RAKNET_DEBUG_PRINTF("Adding %s. %i remaining.\n", fullPath, dirList.Size());
+        //      RAKNET_DEBUG_PRINTF("Adding %s. %i remaining.\n", fullPath, dirList.Size());
         for( unsigned int flpcIndex = 0; flpcIndex < fileListProgressCallbacks.Size(); flpcIndex++ )
             fileListProgressCallbacks[flpcIndex]->OnDirectory( this, fullPath, dirList.Size() );
 
@@ -314,26 +314,26 @@ void FileList::AddFilesFromDirectory( const char* applicationDirectory, const ch
                             BitStream::ReverseBytesInPlace( (unsigned char*)&hash, sizeof( hash ) );
                         memcpy( fileData, &hash, HASH_LENGTH );
 
-                        //					sha1.Reset();
-                        //					sha1.Update( ( unsigned char* ) fileData+HASH_LENGTH, fileInfo.size );
-                        //					sha1.Final();
-                        //					memcpy(fileData, sha1.GetHash(), HASH_LENGTH);
+                        //                  sha1.Reset();
+                        //                  sha1.Update( ( unsigned char* ) fileData+HASH_LENGTH, fileInfo.size );
+                        //                  sha1.Final();
+                        //                  memcpy(fileData, sha1.GetHash(), HASH_LENGTH);
                         // File data and hash
                         AddFile( (const char*)fullPath + rootLen, fullPath, fileData, fileInfo.size + HASH_LENGTH, fileInfo.size, context );
                     }
                 }
                 else if( writeHash )
                 {
-                    //					sha1.Reset();
-                    //					DR_SHA1.hashFile((char*)fullPath);
-                    //					sha1.Final();
+                    //                  sha1.Reset();
+                    //                  DR_SHA1.hashFile((char*)fullPath);
+                    //                  sha1.Final();
 
                     unsigned int hash = SuperFastHashFile( fullPath );
                     if( BitStream::DoEndianSwap() )
                         BitStream::ReverseBytesInPlace( (unsigned char*)&hash, sizeof( hash ) );
 
                     // Hash only
-                    //	AddFile((const char*)fullPath+rootLen, (const char*)sha1.GetHash(), HASH_LENGTH, fileInfo.size, context);
+                    //  AddFile((const char*)fullPath+rootLen, (const char*)sha1.GetHash(), HASH_LENGTH, fileInfo.size, context);
                     AddFile( (const char*)fullPath + rootLen, fullPath, (const char*)&hash, HASH_LENGTH, fileInfo.size, context );
                 }
                 else if( writeData )
@@ -540,11 +540,11 @@ void FileList::GetDeltaToCurrent( FileList* input, FileList* output, const char*
 void FileList::ListMissingOrChangedFiles( const char* applicationDirectory, FileList* missingOrChangedFiles, bool alwaysWriteHash, bool neverWriteHash )
 {
     unsigned fileLength;
-    //	CSHA1 sha1;
+    //  CSHA1 sha1;
     FILE* fp;
     char fullPath[512];
     unsigned i;
-    //	char *fileData;
+    //  char *fileData;
 
     for( i = 0; i < fileList.Size(); i++ )
     {
@@ -569,14 +569,14 @@ void FileList::ListMissingOrChangedFiles( const char* applicationDirectory, File
             else
             {
 
-                //				fileData= (char*) rakMalloc_Ex( fileLength, _FILE_AND_LINE_ );
-                //				fread(fileData, fileLength, 1, fp);
+                //              fileData= (char*) rakMalloc_Ex( fileLength, _FILE_AND_LINE_ );
+                //              fread(fileData, fileLength, 1, fp);
 
-                //				sha1.Reset();
-                //				sha1.Update( ( unsigned char* ) fileData, fileLength );
-                //				sha1.Final();
+                //              sha1.Reset();
+                //              sha1.Update( ( unsigned char* ) fileData, fileLength );
+                //              sha1.Final();
 
-                //				rakFree_Ex(fileData, _FILE_AND_LINE_ );
+                //              rakFree_Ex(fileData, _FILE_AND_LINE_ );
 
                 unsigned int hash = SuperFastHashFilePtr( fp );
                 if( BitStream::DoEndianSwap() )
@@ -586,7 +586,7 @@ void FileList::ListMissingOrChangedFiles( const char* applicationDirectory, File
                 if( fileLength != fileList[i].fileLengthBytes || memcmp( &hash, fileList[i].data, HASH_LENGTH ) != 0 )
                 {
                     if( neverWriteHash == false )
-                        //	missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), (const char*)sha1.GetHash(), HASH_LENGTH, fileLength, 0);
+                        //  missingOrChangedFiles->AddFile(fileList[i].filename.C_String(), (const char*)sha1.GetHash(), HASH_LENGTH, fileLength, 0);
                         missingOrChangedFiles->AddFile( fileList[i].filename.C_String(), fileList[i].fullPathToFile.C_String(), (const char*)&hash, HASH_LENGTH, fileLength, FileListNodeContext( 0, 0, 0, 0 ), false );
                     else
                         missingOrChangedFiles->AddFile( fileList[i].filename.C_String(), fileList[i].fullPathToFile.C_String(), 0, 0, fileLength, FileListNodeContext( 0, 0, 0, 0 ), false );
@@ -601,7 +601,7 @@ void FileList::PopulateDataFromDisk( const char* applicationDirectory, bool writ
     FILE* fp;
     char fullPath[512];
     unsigned i;
-    //	CSHA1 sha1;
+    //  CSHA1 sha1;
 
     i = 0;
     while( i < fileList.Size() )
@@ -626,13 +626,13 @@ void FileList::PopulateDataFromDisk( const char* applicationDirectory, bool writ
                         fileList[i].data = (char*)rakMalloc_Ex( fileList[i].fileLengthBytes + HASH_LENGTH, _FILE_AND_LINE_ );
                         RakAssert( fileList[i].data );
                         fread( fileList[i].data + HASH_LENGTH, fileList[i].fileLengthBytes, 1, fp );
-                        //						sha1.Reset();
-                        //						sha1.Update((unsigned char*)fileList[i].data+HASH_LENGTH, fileList[i].fileLength);
-                        //						sha1.Final();
+                        //                      sha1.Reset();
+                        //                      sha1.Update((unsigned char*)fileList[i].data+HASH_LENGTH, fileList[i].fileLength);
+                        //                      sha1.Final();
                         unsigned int hash = SuperFastHash( fileList[i].data + HASH_LENGTH, fileList[i].fileLengthBytes );
                         if( BitStream::DoEndianSwap() )
                             BitStream::ReverseBytesInPlace( (unsigned char*)&hash, sizeof( hash ) );
-                        //						memcpy(fileList[i].data, sha1.GetHash(), HASH_LENGTH);
+                        //                      memcpy(fileList[i].data, sha1.GetHash(), HASH_LENGTH);
                         memcpy( fileList[i].data, &hash, HASH_LENGTH );
                     }
                     else
@@ -645,9 +645,9 @@ void FileList::PopulateDataFromDisk( const char* applicationDirectory, bool writ
                             fileList[i].data = (char*)rakMalloc_Ex( fileList[i].fileLengthBytes, _FILE_AND_LINE_ );
                         RakAssert( fileList[i].data );
                         fread( fileList[i].data, fileList[i].fileLengthBytes, 1, fp );
-                        //		sha1.Reset();
-                        //		sha1.Update((unsigned char*)fileList[i].data, fileList[i].fileLength);
-                        //		sha1.Final();
+                        //      sha1.Reset();
+                        //      sha1.Update((unsigned char*)fileList[i].data, fileList[i].fileLength);
+                        //      sha1.Final();
                         unsigned int hash = SuperFastHash( fileList[i].data, fileList[i].fileLengthBytes );
                         if( BitStream::DoEndianSwap() )
                             BitStream::ReverseBytesInPlace( (unsigned char*)&hash, sizeof( hash ) );

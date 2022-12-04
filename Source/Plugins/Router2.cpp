@@ -293,8 +293,8 @@ PluginReceiveResult Router2::OnReceive( Packet* packet )
                 sa.ToString( false, buff2 );
                 debugInterface->ShowDiagnostic( FormatStringTS( buff, "Got ID_ROUTER_2_REPLY_TO_SENDER_PORT %i on address %s, replying with ID_ROUTER_2_MINI_PUNCH_REPLY at %s:%i\n", sa.GetPort(), buff2, _FILE_AND_LINE_ ) );
 
-                //						packet->systemAddress.ToString(true,buff2);
-                //						debugInterface->ShowDiagnostic(FormatStringTS(buff,"Got ID_ROUTER_2_REPLY_TO_SENDER_PORT on address %s (%I64d), "
+                //                      packet->systemAddress.ToString(true,buff2);
+                //                      debugInterface->ShowDiagnostic(FormatStringTS(buff,"Got ID_ROUTER_2_REPLY_TO_SENDER_PORT on address %s (%I64d), "
                 //                                       "replying with ID_ROUTER_2_MINI_PUNCH_REPLY at %s:%i\n", buff2,packet->guid.g, __FILE__, __LINE__));
             }
 
@@ -333,7 +333,7 @@ PluginReceiveResult Router2::OnReceive( Packet* packet )
     }
     else if( packet->data[0] == ID_ROUTER_2_FORWARDING_ESTABLISHED )
     {
-        //		printf("Got ID_ROUTER_2_FORWARDING_ESTABLISHED\n");
+        //      printf("Got ID_ROUTER_2_FORWARDING_ESTABLISHED\n");
         if( OnForwardingSuccess( packet ) == false )
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
     }
@@ -512,7 +512,7 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
             }
 
             // This should not be removed - the connection is still forwarded, but perhaps through another system
-            //			forwardedConnectionList.RemoveAtIndexFast(forwardedConnectionIndex);
+            //          forwardedConnectionList.RemoveAtIndexFast(forwardedConnectionIndex);
         }
         else
             forwardedConnectionIndex++;
@@ -630,7 +630,7 @@ bool Router2::UpdateForwarding( ConnnectRequest* connectionRequest )
     {
         connectionRequest->connectionRequestSystemsMutex.unlock();
 
-        //	printf("Router2 failed at %s:%i\n", __FILE__, __LINE__);
+        //  printf("Router2 failed at %s:%i\n", __FILE__, __LINE__);
         if( connectionRequest->returnConnectionLostOnFailure )
         {
             ReturnToUser( ID_CONNECTION_LOST, connectionRequest->endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, true ); // This is a connection which was previously established. Rerouting is not possible.
@@ -679,10 +679,10 @@ bool Router2::UpdateForwarding( ConnnectRequest* connectionRequest )
 
         RequestForwarding( connectionRequest );
     }
-    // 	else if (connectionRequest->requestState==REQUEST_STATE_REQUEST_FORWARDING)
-    // 	{
-    // 		RequestForwarding(connectionRequestIndex);
-    // 	}
+    //  else if (connectionRequest->requestState==REQUEST_STATE_REQUEST_FORWARDING)
+    //  {
+    //      RequestForwarding(connectionRequestIndex);
+    //  }
 
     return true;
 }
