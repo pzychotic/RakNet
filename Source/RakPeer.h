@@ -685,7 +685,6 @@ public:
 protected:
 
     friend void UpdateNetworkLoop( void* arg );
-    //friend void RecvFromLoop( void* arg );
 
     friend bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data, const int length, RakPeer* rakPeer, RakNetSocket2* rakNetSocket, bool* isOfflineMessage, RakNet::TimeUS timeRead );
     friend void ProcessNetworkPacket( const SystemAddress systemAddress, const char* data, const int length, RakPeer* rakPeer, RakNet::TimeUS timeRead, BitStream& updateBitStream );
@@ -737,9 +736,6 @@ protected:
     volatile bool endThreads;
     ///true if the peer thread is active.
     volatile bool isMainLoopThreadActive;
-
-    //std::atomic<uint32_t> isRecvFromLoopThreadActive;
-
 
     bool occasionalPing; /// Do we occasionally ping the other systems?*/
     ///Store the maximum number of peers allowed to connect

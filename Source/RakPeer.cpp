@@ -188,7 +188,6 @@ RakPeer::RakPeer()
     isMainLoopThreadActive = false;
     incomingDatagramEventHandler = 0;
 
-    // isRecvfromThreadActive=false;
 #if defined( GET_TIME_SPIKE_LIMIT ) && GET_TIME_SPIKE_LIMIT > 0
     occasionalPing = true;
 #else
@@ -464,10 +463,9 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         ClearBufferedPackets();
         ClearSocketQueryOutput();
 
+#if RAKPEER_USER_THREADED != 1
         if( isMainLoopThreadActive == false )
         {
-#if RAKPEER_USER_THREADED != 1
-
             int errorCode = RakThread::Create( UpdateNetworkLoop, this, threadPriority );
 
             if( errorCode != 0 )
@@ -475,42 +473,13 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
                 Shutdown( 0, 0 );
                 return FAILED_TO_CREATE_NETWORK_THREAD;
             }
-            //RakAssert(isRecvFromLoopThreadActive == 0);
-#endif // RAKPEER_USER_THREADED!=1
-
-            /*
-            for (i=0; i<socketDescriptorCount; i++)
-            {
-                RakPeerAndIndex *rpai = RakNet::OP_NEW<RakPeerAndIndex>(_FILE_AND_LINE_);
-                rpai->s=socketList[i];
-                rpai->rakPeer=this;
-
-#if RAKPEER_USER_THREADED!=1
-
-                errorCode = RakThread::Create(RecvFromLoop, rpai, threadPriority);
-
-                if ( errorCode != 0 )
-                {
-                    Shutdown( 0, 0 );
-                    return FAILED_TO_CREATE_NETWORK_THREAD;
-                }
-#endif // RAKPEER_USER_THREADED!=1
-                }
-            */
-
-            /*
-#if RAKPEER_USER_THREADED!=1
-
-            while ( isRecvFromLoopThreadActive < socketDescriptorCount )
-                RakSleep(10);
-                #endif // RAKPEER_USER_THREADED!=1
-            */
         }
 
-#if RAKPEER_USER_THREADED != 1
         // Wait for the threads to activate.  When they are active they will set these variables to true
         while( isMainLoopThreadActive == false )
+        {
             RakSleep( 10 );
+        }
 #endif // RAKPEER_USER_THREADED!=1
     }
 
@@ -902,7 +871,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
         }
     }
 #endif
-
 
 #endif // RAKPEER_USER_THREADED!=1
 
