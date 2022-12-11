@@ -170,15 +170,8 @@ protected:
 
 
     template<class ThreadInputType, class ThreadOutputType>
-    friend RAK_THREAD_DECLARATION( WorkerThread );
+    friend void WorkerThread( void* arg );
 
-    /*
-#ifdef _WIN32
-    friend unsigned __stdcall WorkerThread( LPVOID arguments );
-#else
-    friend void* WorkerThread( void* arguments );
-#endif
-    */
 
     /// \internal
     bool runThreads;
@@ -193,17 +186,9 @@ protected:
 };
 
 template<class ThreadInputType, class ThreadOutputType>
-RAK_THREAD_DECLARATION( WorkerThread )
-/*
-#ifdef _WIN32
-unsigned __stdcall WorkerThread( LPVOID arguments )
-#else
-void* WorkerThread( void* arguments )
-#endif
-*/
+void WorkerThread( void* arg )
 {
-    ThreadPool<ThreadInputType, ThreadOutputType>* threadPool = (ThreadPool<ThreadInputType, ThreadOutputType>*)arguments;
-
+    ThreadPool<ThreadInputType, ThreadOutputType>* threadPool = (ThreadPool<ThreadInputType, ThreadOutputType>*)arg;
 
     bool returnOutput;
     ThreadOutputType ( *userCallback )( ThreadInputType, bool*, void* );
@@ -282,8 +267,6 @@ void* WorkerThread( void* arguments )
         threadPool->perThreadDataDestructor( perThreadData );
     else if( threadPool->threadDataInterface )
         threadPool->threadDataInterface->PerThreadDestructor( perThreadData, threadPool->tdiContext );
-
-    return 0;
 }
 template<class InputType, class OutputType>
 ThreadPool<InputType, OutputType>::ThreadPool()

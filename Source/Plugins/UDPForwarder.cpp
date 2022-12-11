@@ -17,6 +17,7 @@
 #include "SocketLayer.h"
 #include "WSAStartupSingleton.h"
 #include "RakSleep.h"
+#include "RakThread.h"
 #include "SocketDefines.h"
 #include "errno.h"
 
@@ -28,7 +29,7 @@ namespace RakNet {
 
 static const unsigned short DEFAULT_MAX_FORWARD_ENTRIES = 64;
 
-RAK_THREAD_DECLARATION( UpdateUDPForwarderGlobal );
+void UpdateUDPForwarderGlobal( void* arg );
 
 UDPForwarder::ForwardEntry::ForwardEntry()
 {
@@ -530,9 +531,9 @@ void UDPForwarder::UpdateUDPForwarder( void )
     }
 }
 
-RAK_THREAD_DECLARATION( UpdateUDPForwarderGlobal )
+void UpdateUDPForwarderGlobal( void* arg )
 {
-    UDPForwarder* udpForwarder = (UDPForwarder*)arguments;
+    UDPForwarder* udpForwarder = (UDPForwarder*)arg;
 
     udpForwarder->threadRunning++;
     while( udpForwarder->isRunning > 0 )
@@ -548,8 +549,6 @@ RAK_THREAD_DECLARATION( UpdateUDPForwarderGlobal )
             RakSleep( 0 );
     }
     udpForwarder->threadRunning--;
-
-    return 0;
 }
 
 } // namespace RakNet

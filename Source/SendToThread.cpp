@@ -9,9 +9,8 @@
  */
 
 #include "SendToThread.h"
+
 #ifdef USE_THREADED_SEND
-#include "RakThread.h"
-//#include "GetTime.h"
 
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL != 1
 #include "CCRakNetUDT.h"

@@ -21,7 +21,6 @@
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "Export.h"
-#include "RakThread.h"
 #include "DS_Queue.h"
 #include "RakNetDefines.h"
 #include "SocketIncludes.h"
@@ -182,8 +181,8 @@ protected:
     std::mutex blockingSocketListMutex;
 
 
-    friend RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop );
-    friend RAK_THREAD_DECLARATION( ConnectionAttemptLoop );
+    friend void UpdateTCPInterfaceLoop( void* arg );
+    friend void ConnectionAttemptLoop( void* arg );
 
     //  void DeleteRemoteClient(RemoteClient *remoteClient, fd_set *exceptionFD);
     //  void InsertRemoteClient(RemoteClient* remoteClient);

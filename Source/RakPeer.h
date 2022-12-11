@@ -23,7 +23,6 @@
 #include "DS_List.h"
 #include "Export.h"
 #include "RakString.h"
-#include "RakThread.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"
@@ -684,8 +683,9 @@ public:
     };
 
 protected:
-    friend RAK_THREAD_DECLARATION( UpdateNetworkLoop );
-    //friend RAK_THREAD_DECLARATION(RecvFromLoop);
+
+    friend void UpdateNetworkLoop( void* arg );
+    //friend void RecvFromLoop( void* arg );
 
     friend bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data, const int length, RakPeer* rakPeer, RakNetSocket2* rakNetSocket, bool* isOfflineMessage, RakNet::TimeUS timeRead );
     friend void ProcessNetworkPacket( const SystemAddress systemAddress, const char* data, const int length, RakPeer* rakPeer, RakNet::TimeUS timeRead, BitStream& updateBitStream );

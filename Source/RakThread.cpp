@@ -21,13 +21,9 @@
 
 namespace RakNet {
 
-#if defined( _WIN32 )
-int RakThread::Create( unsigned __stdcall start_address( void* ), void* arglist, int priority )
-#else
-int RakThread::Create( void* start_address( void* ), void* arglist, int priority )
-#endif
+int RakThread::Create( std::function<void( void* )> func, void* arg, int priority )
 {
-    std::thread aThread( start_address, arglist );
+    std::thread aThread( func, arg );
     std::thread::native_handle_type hThread = aThread.native_handle();
 
     if( hThread != nullptr )

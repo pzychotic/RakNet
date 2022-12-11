@@ -27,6 +27,7 @@ typedef int socklen_t;
 #include "RakAssert.h"
 #include <stdio.h>
 #include "RakSleep.h"
+#include "RakThread.h"
 #include "StringCompressor.h"
 #include "StringTable.h"
 #include "Itoa.h"
@@ -45,8 +46,8 @@ typedef int socklen_t;
 
 namespace RakNet {
 
-RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop );
-RAK_THREAD_DECLARATION( ConnectionAttemptLoop );
+void UpdateTCPInterfaceLoop( void* arg );
+void ConnectionAttemptLoop( void* arg );
 
 STATIC_FACTORY_DEFINITIONS( TCPInterface, TCPInterface );
 
@@ -804,12 +805,9 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 #endif // __native_client__
 }
 
-RAK_THREAD_DECLARATION( ConnectionAttemptLoop )
+void ConnectionAttemptLoop( void* arg )
 {
-
-
-    TCPInterface::ThisPtrPlusSysAddr* s = (TCPInterface::ThisPtrPlusSysAddr*)arguments;
-
+    TCPInterface::ThisPtrPlusSysAddr* s = (TCPInterface::ThisPtrPlusSysAddr*)arg;
 
     SystemAddress systemAddress = s->systemAddress;
     TCPInterface* tcpInterface = s->tcpInterface;
@@ -829,7 +827,7 @@ RAK_THREAD_DECLARATION( ConnectionAttemptLoop )
         tcpInterface->failedConnectionAttemptMutex.lock();
         tcpInterface->failedConnectionAttempts.Push( systemAddress, _FILE_AND_LINE_ );
         tcpInterface->failedConnectionAttemptMutex.unlock();
-        return 0;
+        return;
     }
 
     tcpInterface->remoteClients[newRemoteClientIndex].socket = sockfd;
@@ -841,13 +839,11 @@ RAK_THREAD_DECLARATION( ConnectionAttemptLoop )
         std::lock_guard<std::mutex> guard( tcpInterface->completedConnectionAttemptMutex );
         tcpInterface->completedConnectionAttempts.Push( systemAddress, _FILE_AND_LINE_ );
     }
-
-    return 0;
 }
 
-RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop )
+void UpdateTCPInterfaceLoop( void* arg )
 {
-    TCPInterface* sts = (TCPInterface*)arguments;
+    TCPInterface* sts = (TCPInterface*)arg;
 
     //  const int BUFF_SIZE=8096;
     const unsigned int BUFF_SIZE = 1048576;
@@ -1145,8 +1141,6 @@ RAK_THREAD_DECLARATION( UpdateTCPInterfaceLoop )
     sts->threadRunning--;
 
     rakFree_Ex( data, _FILE_AND_LINE_ );
-
-    return 0;
 }
 
 void RemoteClient::SetActive( bool a )

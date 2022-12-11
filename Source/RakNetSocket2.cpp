@@ -12,6 +12,7 @@
 #include "RakMemoryOverride.h"
 #include "RakAssert.h"
 #include "RakSleep.h"
+#include "RakThread.h"
 #include "SocketDefines.h"
 #include "GetTime.h"
 #include <stdio.h>
@@ -308,14 +309,11 @@ RNS2BindResult RNS2_Berkley::BindShared( RNS2_BerkleyBindParameters* bindParamet
     return br;
 }
 
-RAK_THREAD_DECLARATION( RNS2_Berkley::RecvFromLoop )
+void RNS2_Berkley::RecvFromLoop( void* arg )
 {
-
-
-    RNS2_Berkley* b = (RNS2_Berkley*)arguments;
+    RNS2_Berkley* b = (RNS2_Berkley*)arg;
 
     b->RecvFromLoopInt();
-    return 0;
 }
 unsigned RNS2_Berkley::RecvFromLoopInt( void )
 {
@@ -367,7 +365,6 @@ RNS2_Berkley::~RNS2_Berkley()
 int RNS2_Berkley::CreateRecvPollingThread( int threadPriority )
 {
     endThreads = false;
-
 
     int errorCode = RakThread::Create( RecvFromLoop, this, threadPriority );
 

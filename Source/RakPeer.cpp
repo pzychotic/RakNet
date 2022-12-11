@@ -39,6 +39,7 @@
 #include "StringTable.h"
 #include "RakNetTypes.h"
 #include "RakSleep.h"
+#include "RakThread.h"
 #include "RakAssert.h"
 #include "RakNetVersion.h"
 #include "gettimeofday.h"
@@ -82,8 +83,7 @@ extern void Console2GetIPAndPort(unsigned int, char *, unsigned short *, unsigne
 
 namespace RakNet {
 
-RAK_THREAD_DECLARATION( UpdateNetworkLoop );
-RAK_THREAD_DECLARATION( RecvFromLoop );
+void UpdateNetworkLoop( void* arg );
 
 static const int NUM_MTU_SIZES = 3;
 static const int mtuSizes[NUM_MTU_SIZES] = { MAXIMUM_MTU_SIZE, 1200, 576 };
@@ -5698,9 +5698,9 @@ void RakPeer::OnRNS2Recv( RNS2RecvStruct* recvStruct )
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-RAK_THREAD_DECLARATION( UpdateNetworkLoop )
+void UpdateNetworkLoop( void* arg )
 {
-    RakPeer* rakPeer = (RakPeer*)arguments;
+    RakPeer* rakPeer = (RakPeer*)arg;
 
     BitStream updateBitStream( MAXIMUM_MTU_SIZE
 #if LIBCAT_SECURITY == 1
@@ -5728,8 +5728,6 @@ RAK_THREAD_DECLARATION( UpdateNetworkLoop )
     }
 
     rakPeer->isMainLoopThreadActive = false;
-
-    return 0;
 }
 
 void RakPeer::CallPluginCallbacks( DataStructures::List<PluginInterface2*>& pluginList, Packet* packet )

@@ -21,7 +21,6 @@
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
 #include "RakString.h"
-#include "RakThread.h"
 #include "DS_Queue.h"
 #include "DS_List.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
@@ -105,7 +104,8 @@ public:
 
 
 protected:
-    friend RAK_THREAD_DECLARATION( UpdateUDPForwarderGlobal );
+
+    friend void UpdateUDPForwarderGlobal( void* arg );
 
     void UpdateUDPForwarder( void );
     void RecvFrom( RakNet::TimeMS curTime, ForwardEntry* forwardEntry );

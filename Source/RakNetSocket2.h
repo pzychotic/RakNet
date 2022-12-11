@@ -12,7 +12,6 @@
 
 #include "RakNetTypes.h"
 #include "MTUSize.h"
-#include "RakThread.h"
 #include "DS_Queue.h"
 //#include "DS_ThreadsafeAllocatingQueue.h"
 #include "Export.h"
@@ -301,7 +300,7 @@ protected:
 #endif
 
     SocketLayerOverride* slo;
-    static RAK_THREAD_DECLARATION( RecvFromLoop );
+    static void RecvFromLoop( void* arg );
 };
 
 

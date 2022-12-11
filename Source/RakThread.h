@@ -12,37 +12,27 @@
 
 #include "Export.h"
 
-namespace RakNet {
+#include <functional>
 
-/// To define a thread, use RAK_THREAD_DECLARATION(functionName);
-#if defined( _WIN32 )
-#define RAK_THREAD_DECLARATION( functionName ) unsigned __stdcall functionName( void* arguments )
-#else
-#define RAK_THREAD_DECLARATION( functionName ) void* functionName( void* arguments )
-#endif
+namespace RakNet {
 
 class RAK_DLL_EXPORT RakThread
 {
 public:
+
     /// Create a thread, simplified to be cross platform without all the extra junk
     /// To then start that thread, call RakThread::Create(functionName, arguments);
-    /// \param[in] start_address Function you want to call
-    /// \param[in] arglist Arguments to pass to the function
+    /// \param[in] func Function you want to call
+    /// \param[in] arg Argument to pass to the function
     /// \return 0=success. >0 = error code
+    static int Create( std::function<void( void* )> func, void* arg, int priority = 0 );
 
-    /*
-    nice value  Win32 Priority
-    -20 to -16  THREAD_PRIORITY_HIGHEST
-    -15 to -6   THREAD_PRIORITY_ABOVE_NORMAL
-    -5 to +4    THREAD_PRIORITY_NORMAL
-    +5 to +14   THREAD_PRIORITY_BELOW_NORMAL
-    +15 to +19  THREAD_PRIORITY_LOWEST
-    */
-#if defined( _WIN32 )
-    static int Create( unsigned __stdcall start_address( void* ), void* arglist, int priority = 0 );
-#else
-    static int Create( void* start_address( void* ), void* arglist, int priority = 0 );
-#endif
+    // nice value  Win32 Priority
+    // -20 to -16  THREAD_PRIORITY_HIGHEST
+    // -15 to -6   THREAD_PRIORITY_ABOVE_NORMAL
+    // -5  to +4   THREAD_PRIORITY_NORMAL
+    // +5  to +14  THREAD_PRIORITY_BELOW_NORMAL
+    // +15 to +19  THREAD_PRIORITY_LOWEST
 };
 
 } // namespace RakNet
