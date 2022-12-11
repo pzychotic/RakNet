@@ -25,7 +25,7 @@ class RAK_DLL_EXPORT RakThread
 {
 public:
     /// Create a thread, simplified to be cross platform without all the extra junk
-    /// To then start that thread, call RakCreateThread(functionName, arguments);
+    /// To then start that thread, call RakThread::Create(functionName, arguments);
     /// \param[in] start_address Function you want to call
     /// \param[in] arglist Arguments to pass to the function
     /// \return 0=success. >0 = error code

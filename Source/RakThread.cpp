@@ -10,16 +10,14 @@
 
 #include "RakThread.h"
 #include "RakAssert.h"
-#include "RakNetDefines.h"
-#include "RakMemoryOverride.h"
 
 #if defined( _WIN32 )
 #include "WindowsIncludes.h"
-#include <stdio.h>
-#include <process.h>
+#include <processthreadsapi.h>
 #else
 #include <pthread.h>
 #endif
+#include <thread>
 
 namespace RakNet {
 
@@ -29,34 +27,29 @@ int RakThread::Create( unsigned __stdcall start_address( void* ), void* arglist,
 int RakThread::Create( void* start_address( void* ), void* arglist, int priority )
 #endif
 {
+    std::thread aThread( start_address, arglist );
+    std::thread::native_handle_type hThread = aThread.native_handle();
+
+    if( hThread != nullptr )
+    {
 #ifdef _WIN32
-    unsigned threadID = 0;
-    HANDLE threadHandle = (HANDLE)_beginthreadex( NULL, MAX_ALLOCA_STACK_ALLOCATION * 2, start_address, arglist, 0, &threadID );
+        BOOL res = SetThreadPriority( hThread, priority );
+        RakAssert( res != FALSE && "SetThreadPriority in RakThread.cpp failed." );
+#else
+        int policy;
+        sched_param param;
+        int resGet = pthread_getschedparam( hThread, &policy, &param );
+        RakAssert( resGet == 0 && "pthread_getschedparam in RakThread.cpp failed." );
+        param.sched_priority = priority;
+        int resSet = pthread_setschedparam( hThread, policy, &param );
+        RakAssert( resSet == 0 && "pthread_setschedparam in RakThread.cpp failed." );
+#endif
 
-    SetThreadPriority( threadHandle, priority );
-
-    if( threadHandle == 0 )
-    {
-        return 1;
-    }
-    else
-    {
-        CloseHandle( threadHandle );
+        aThread.detach();
         return 0;
     }
-#else
-    pthread_t threadHandle;
-    // Create thread linux
-    pthread_attr_t attr;
-    sched_param param;
-    param.sched_priority = priority;
-    pthread_attr_init( &attr );
-    pthread_attr_setschedparam( &attr, &param );
-    pthread_attr_setstacksize( &attr, MAX_ALLOCA_STACK_ALLOCATION * 2 );
-    pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_DETACHED );
-    int res = pthread_create( &threadHandle, &attr, start_address, arglist );
-    RakAssert( res == 0 && "pthread_create in RakThread.cpp failed." ) return res;
-#endif
+
+    return 1;
 }
 
 } // namespace RakNet
