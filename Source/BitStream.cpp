@@ -26,11 +26,7 @@
 #else
 #include <arpa/inet.h>
 #include <memory.h>
-#if defined( ANDROID )
-#include <math.h>
-#else
 #include <cmath>
-#endif
 #endif
 #include <float.h>
 

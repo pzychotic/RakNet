@@ -102,8 +102,6 @@ RakWString& RakWString::operator=( const char* const str )
 {
     Clear();
 
-// Not supported on android
-#if !defined( ANDROID )
     if( str == 0 )
         return *this;
     if( str[0] == 0 )
@@ -125,10 +123,6 @@ RakWString& RakWString::operator=( const char* const str )
         Clear();
         return *this;
     }
-#else
-    // mbstowcs not supported on android
-    RakAssert( "mbstowcs not supported on Android" && 0 );
-#endif // defined(ANDROID)
 
     return *this;
 }

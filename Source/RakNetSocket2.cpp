@@ -24,9 +24,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <errno.h> // error numbers
-#if !defined( ANDROID )
 #include <ifaddrs.h>
-#endif
 #include <netinet/in.h>
 #include <net/if.h>
 #include <sys/types.h>

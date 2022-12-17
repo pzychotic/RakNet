@@ -36,9 +36,7 @@
 #include <arpa/inet.h>
 #include <errno.h> // error numbers
 #include <stdio.h> // RAKNET_DEBUG_PRINTF
-#if !defined( ANDROID )
 #include <ifaddrs.h>
-#endif
 #include <netinet/in.h>
 #include <net/if.h>
 #include <sys/types.h>
