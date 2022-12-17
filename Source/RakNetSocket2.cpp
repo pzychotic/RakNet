@@ -36,7 +36,6 @@
 #include "RakNetSocket2_Windows_Linux.cpp"
 #include "RakNetSocket2_Windows_Linux_360.cpp"
 #include "RakNetSocket2_Berkley.cpp"
-#include "RakNetSocket2_Berkley_NativeClient.cpp"
 #undef RAKNET_SOCKET_2_INLINE_FUNCTIONS
 
 #ifndef INVALID_SOCKET
