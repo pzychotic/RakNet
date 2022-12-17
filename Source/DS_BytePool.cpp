@@ -10,10 +10,8 @@
 
 #include "DS_BytePool.h"
 #include "RakAssert.h"
-#ifndef __APPLE__
 // Use stdlib and not malloc for compatibility
 #include <stdlib.h>
-#endif
 
 namespace RakNet { namespace DataStructures {
 

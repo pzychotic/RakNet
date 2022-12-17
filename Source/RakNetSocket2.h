@@ -16,15 +16,6 @@
 //#include "DS_ThreadsafeAllocatingQueue.h"
 #include "Export.h"
 
-// For CFSocket
-// https://developer.apple.com/library/mac/#documentation/CoreFOundation/Reference/CFSocketRef/Reference/reference.html
-// Reason: http://sourceforge.net/p/open-dis/discussion/683284/thread/0929d6a0
-#if defined( __APPLE__ )
-#import <CoreFoundation/CoreFoundation.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#endif
-
 #include <atomic>
 #include <mutex>
 
@@ -215,11 +206,6 @@ protected:
     std::atomic<uint32_t> isRecvFromLoopThreadActive;
     volatile bool endThreads;
     // Constructor not called!
-
-#if defined( __APPLE__ )
-    // http://sourceforge.net/p/open-dis/discussion/683284/thread/0929d6a0
-    CFSocketRef _cfSocket;
-#endif
 
     SocketLayerOverride* slo;
     static void RecvFromLoop( void* arg );

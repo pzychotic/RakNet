@@ -19,18 +19,13 @@
 //#include <asm/arch/io.h>
 #elif defined( _WIN32 ) || defined( __CYGWIN__ )
 #include <io.h>
-
-
-#elif !defined( __APPLE__ ) && !defined( __APPLE_CC__ ) && !defined( __PPC__ ) && !defined( __FreeBSD__ ) && !defined( __S3E__ )
+#elif !defined( __PPC__ ) && !defined( __FreeBSD__ ) && !defined( __S3E__ )
 #include <sys/io.h>
 #endif
-
 
 #ifdef _WIN32
 // For mkdir
 #include <direct.h>
-
-
 #else
 #include <sys/stat.h>
 #endif
@@ -51,8 +46,6 @@ static const unsigned HASH_LENGTH = 4;
 
 #if defined( _WIN32 )
 #include <malloc.h>
-
-
 #else
 #if !defined( __FreeBSD__ )
 #include <alloca.h>

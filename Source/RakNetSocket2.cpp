@@ -109,14 +109,6 @@ bool IRNS2_Berkley::IsPortInUse( unsigned short port, const char* hostAddress, u
     return bindResult == BR_FAILED_TO_BIND_SOCKET;
 }
 
-#if defined( __APPLE__ )
-void SocketReadCallback( CFSocketRef s, CFSocketCallBackType type, CFDataRef address, const void* data, void* info )
-// This C routine is called by CFSocket when there's data waiting on our
-// UDP socket.  It just redirects the call to Objective-C code.
-{
-}
-#endif
-
 RNS2BindResult RNS2_Berkley::BindShared( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line )
 {
     RNS2BindResult br;
@@ -140,13 +132,6 @@ RNS2BindResult RNS2_Berkley::BindShared( RNS2_BerkleyBindParameters* bindParamet
         return BR_FAILED_SEND_TEST;
 
     memcpy( &binding, bindParameters, sizeof( RNS2_BerkleyBindParameters ) );
-
-    /*
-#if defined(__APPLE__)
-    const CFSocketContext   context = { 0, this, NULL, NULL, NULL };
-    _cfSocket = CFSocketCreateWithNative(NULL, rns2Socket, kCFSocketReadCallBack, SocketReadCallback, &context);
-#endif
-    */
 
     return br;
 }
@@ -195,12 +180,6 @@ RNS2_Berkley::~RNS2_Berkley()
 {
     if( rns2Socket != INVALID_SOCKET )
     {
-        /*
-#if defined(__APPLE__)
-        CFSocketInvalidate(_cfSocket);
-#endif
-        */
-
         closesocket__( rns2Socket );
     }
 }

@@ -58,9 +58,7 @@
 
 #define REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE 8
 
-#if !defined( __APPLE__ ) && !defined( __APPLE_CC__ )
 #include <stdlib.h> // malloc
-#endif
 
 
 #if defined( _WIN32 )
