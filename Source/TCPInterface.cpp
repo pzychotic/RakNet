@@ -153,11 +153,6 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
 
 bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnections, unsigned short maxConnections, int _threadPriority, unsigned short socketFamily, const char* bindAddress )
 {
-#ifdef __native_client__
-    return false;
-#else
-    (void)socketFamily;
-
     if( isStarted > 0 )
         return false;
 
@@ -165,12 +160,8 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
 
     if( threadPriority == -99999 )
     {
-
-
 #if defined( _WIN32 )
         threadPriority = 0;
-
-
 #else
         threadPriority = 1000;
 #endif
@@ -183,7 +174,6 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
         maxConnections = 1;
     remoteClientsLength = maxConnections;
     remoteClients = RakNet::OP_NEW_ARRAY<RemoteClient>( maxConnections, _FILE_AND_LINE_ );
-
 
     listenSocket = 0;
     if( maxIncomingConnections > 0 )
@@ -205,7 +195,6 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
         messageHandlerList[i]->OnRakPeerStartup();
 
     return true;
-#endif // __native_client__
 }
 void TCPInterface::Stop( void )
 {
@@ -213,7 +202,6 @@ void TCPInterface::Stop( void )
     for( i = 0; i < messageHandlerList.Size(); i++ )
         messageHandlerList[i]->OnRakPeerShutdown();
 
-#ifndef __native_client__
     if( isStarted == 0 )
         return;
 
@@ -283,9 +271,6 @@ void TCPInterface::Stop( void )
     startSSL.Clear( _FILE_AND_LINE_ );
     activeSSLConnections.Clear( false, _FILE_AND_LINE_ );
 #endif
-
-
-#endif // __native_client__
 }
 SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort, bool block, unsigned short socketFamily, const char* bindAddress )
 {
@@ -725,16 +710,10 @@ unsigned int TCPInterface::GetOutgoingDataBufferSize( SystemAddress systemAddres
 }
 __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remotePort, unsigned short socketFamily, const char* bindAddress )
 {
-#ifdef __native_client__
-    return 0;
-#else
-    int connectResult;
-    (void)connectResult;
+#if RAKNET_SUPPORT_IPV6 != 1
     (void)socketFamily;
 
-#if RAKNET_SUPPORT_IPV6 != 1
     sockaddr_in serverAddress;
-
 
     struct hostent* server;
     server = gethostbyname( host );
@@ -754,7 +733,9 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
         serverAddress.sin_addr.s_addr = inet_addr__( bindAddress );
     }
     else
+    {
         serverAddress.sin_addr.s_addr = INADDR_ANY;
+    }
 
     int sock_opt = 1024 * 256;
     setsockopt__( sockfd, SOL_SOCKET, SO_RCVBUF, (char*)&sock_opt, sizeof( sock_opt ) );
@@ -766,10 +747,9 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     blockingSocketListMutex.unlock();
 
     // This is blocking
-    connectResult = connect__( sockfd, (struct sockaddr*)&serverAddress, sizeof( struct sockaddr ) );
+    int connectResult = connect__( sockfd, (struct sockaddr*)&serverAddress, sizeof( struct sockaddr ) );
 
 #else
-
 
     struct addrinfo hints, *res;
     int sockfd;
@@ -783,7 +763,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     blockingSocketListMutex.lock();
     blockingSocketList.Insert( sockfd, _FILE_AND_LINE_ );
     blockingSocketListMutex.unlock();
-    connectResult = connect__( sockfd, res->ai_addr, res->ai_addrlen );
+    int connectResult = connect__( sockfd, res->ai_addr, res->ai_addrlen );
     freeaddrinfo( res ); // free the linked-list
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
@@ -802,7 +782,6 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     }
 
     return sockfd;
-#endif // __native_client__
 }
 
 void ConnectionAttemptLoop( void* arg )
@@ -1293,19 +1272,11 @@ int RemoteClient::Recv( char* data, const int dataSize )
 #else
 int RemoteClient::Send( const char* data, unsigned int length )
 {
-#ifdef __native_client__
-    return -1;
-#else
     return send__( socket, data, length, 0 );
-#endif
 }
 int RemoteClient::Recv( char* data, const int dataSize )
 {
-#ifdef __native_client__
-    return -1;
-#else
     return recv__( socket, data, dataSize, 0 );
-#endif
 }
 #endif
 

@@ -28,13 +28,6 @@
 #include <atomic>
 #include <mutex>
 
-// #define TEST_NATIVE_CLIENT_ON_WINDOWS
-
-#ifdef TEST_NATIVE_CLIENT_ON_WINDOWS
-#define __native_client__
-typedef int PP_Resource;
-#endif
-
 namespace RakNet {
 
 class RakNetSocket2;
@@ -76,8 +69,6 @@ struct RNS2_SendParameters
 
 struct RNS2RecvStruct
 {
-
-
     char data[MAXIMUM_MTU_SIZE];
 
     int bytesRead;
@@ -137,75 +128,6 @@ protected:
     unsigned int userConnectionSocketIndex;
 };
 
-
-#if defined( __native_client__ )
-struct NativeClientBindParameters
-{
-    _PP_Instance_ nativeClientInstance;
-    unsigned short port;
-    const char* forceHostAddress;
-    bool is_ipv6;
-    RNS2EventHandler* eventHandler;
-};
-class RNS2_NativeClient;
-struct RNS2_SendParameters_NativeClient : public RNS2_SendParameters
-{
-    RNS2_NativeClient* socket2;
-};
-class RNS2_NativeClient : public RakNetSocket2
-{
-public:
-    RNS2_NativeClient();
-    virtual ~RNS2_NativeClient();
-    RNS2BindResult Bind( NativeClientBindParameters* bindParameters, const char* file, unsigned int line );
-    RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
-    const NativeClientBindParameters* GetBindings( void ) const;
-
-    // ----------- STATICS ------------
-    static bool IsPortInUse( unsigned short port, const char* hostAddress, unsigned short addressFamily, int type );
-    static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-
-    // RNS2_NativeClient doesn't automatically call recvfrom in a thread - user must call Update() from the main thread
-    // This causes buffered sends to send, until send is asynch pending
-    // It causes recvfrom events to trigger the callback, and push a message to the event handler
-    //
-    // Example:
-    //
-    // DataStructures::List< RakNetSocket2* > sockets;
-    // rakPeerInterface->GetSockets(sockets);
-    // for (unsigned int i=0; i < sockets.Size(); i++)
-    // {
-    //   ((RNS2_NativeClient*)sockets[i])->Update();
-    // }
-
-    void Update( void );
-
-protected:
-    void ProcessBufferedSend( void );
-    static void SendImmediate( RNS2_SendParameters_NativeClient* sp );
-    static void DeallocSP( RNS2_SendParameters_NativeClient* sp );
-    static RNS2_SendParameters_NativeClient* CloneSP( RNS2_SendParameters* sp, RNS2_NativeClient* socket2, const char* file, unsigned int line );
-    static void onRecvFrom( void* pData, int32_t dataSize );
-    void IssueReceiveCall( void );
-    static void onSocketBound( void* pData, int32_t dataSize );
-    static void onSendTo( void* pData, int32_t dataSize );
-    void BufferSend( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
-    PP_Resource rns2Socket;
-    NativeClientBindParameters binding;
-    bool sendInProgress;
-    std::mutex sendInProgressMutex;
-
-    enum BindState
-    {
-        BS_UNBOUND,
-        BS_IN_PROGRESS,
-        BS_BOUND,
-        BS_FAILED
-    } bindState;
-    DataStructures::Queue<RNS2_SendParameters_NativeClient*> bufferedSends;
-    std::mutex bufferedSendsMutex;
-};
-#else // defined(__native_client__)
 
 class RAK_DLL_EXPORT SocketLayerOverride
 {
@@ -346,7 +268,5 @@ protected:
 };
 
 #endif // Linux
-
-#endif // !defined(__native_client__)
 
 } // namespace RakNet

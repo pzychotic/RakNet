@@ -33,56 +33,23 @@ NatTypeDetectionServer::~NatTypeDetectionServer()
 {
     Shutdown();
 }
-void NatTypeDetectionServer::Startup(
-    const char* nonRakNetIP2,
-    const char* nonRakNetIP3,
-    const char* nonRakNetIP4
-#ifdef __native_client__
-    ,
-    _PP_Instance_ chromeInstance
-#endif
-)
+void NatTypeDetectionServer::Startup( const char* nonRakNetIP2, const char* nonRakNetIP3, const char* nonRakNetIP4 )
 {
     DataStructures::List<RakNetSocket2*> sockets;
     rakPeerInterface->GetSockets( sockets );
     char str[64];
     sockets[0]->GetBoundAddress().ToString( false, str );
-    s1p2 =
-        CreateNonblockingBoundSocket( str,
-#ifdef __native_client__
-                                      chromeInstance,
-#endif
-                                      this );
-
-    s2p3 =
-        CreateNonblockingBoundSocket( nonRakNetIP2,
-#ifdef __native_client__
-                                      chromeInstance,
-#endif
-                                      this );
-
-
-    s3p4 =
-        CreateNonblockingBoundSocket( nonRakNetIP3,
-#ifdef __native_client__
-                                      chromeInstance,
-#endif
-                                      this );
-
-    s4p5 =
-        CreateNonblockingBoundSocket( nonRakNetIP4,
-#ifdef __native_client__
-                                      chromeInstance,
-#endif
-                                      this );
+    s1p2 = CreateNonblockingBoundSocket( str, this );
+    s2p3 = CreateNonblockingBoundSocket( nonRakNetIP2, this );
+    s3p4 = CreateNonblockingBoundSocket( nonRakNetIP3, this );
+    s4p5 = CreateNonblockingBoundSocket( nonRakNetIP4, this );
 
     strcpy( s3p4Address, nonRakNetIP3 );
 
-
-#if !defined( __native_client__ )
     if( s3p4->IsBerkleySocket() )
+    {
         ( (RNS2_Berkley*)s3p4 )->CreateRecvPollingThread( 0 );
-#endif
+    }
 }
 void NatTypeDetectionServer::Shutdown()
 {
@@ -98,10 +65,10 @@ void NatTypeDetectionServer::Shutdown()
     }
     if( s3p4 != 0 )
     {
-#if !defined( __native_client__ )
         if( s3p4->IsBerkleySocket() )
+        {
             ( (RNS2_Berkley*)s3p4 )->BlockOnStopRecvPollingThread();
-#endif
+        }
 
         RakNet::OP_DELETE( s3p4, _FILE_AND_LINE_ );
         s3p4 = 0;

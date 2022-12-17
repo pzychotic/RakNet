@@ -65,15 +65,7 @@ public:
     /// \param[in] nonRakNetIP2 First unused external IP
     /// \param[in] nonRakNetIP3 Second unused external IP
     /// \param[in] nonRakNetIP4 Third unused external IP
-    void Startup(
-        const char* nonRakNetIP2,
-        const char* nonRakNetIP3,
-        const char* nonRakNetIP4
-#ifdef __native_client__
-        ,
-        _PP_Instance_ chromeInstance
-#endif
-    );
+    void Startup( const char* nonRakNetIP2, const char* nonRakNetIP3, const char* nonRakNetIP4 );
 
     // Releases the sockets created in Startup();
     void Shutdown( void );

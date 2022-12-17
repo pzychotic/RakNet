@@ -13,9 +13,6 @@
 #ifndef RAKNETSOCKET2_BERKLEY_NATIVE_CLIENT_CPP
 #define RAKNETSOCKET2_BERKLEY_NATIVE_CLIENT_CPP
 
-// Every platform except native client supports Berkley sockets
-#if !defined( __native_client__ )
-
 namespace RakNet {
 
 // Shared on most platforms, but excluded from the listed
@@ -103,8 +100,6 @@ void DomainNameToIP_Berkley( const char* domainName, char ip[65] )
 }
 
 } // namespace RakNet
-
-#endif // !defined(__native_client__)
 
 #endif // file header
 

@@ -168,7 +168,6 @@ void UDPForwarder::StopForwarding( SystemAddress source, SystemAddress destinati
 }
 void UDPForwarder::RecvFrom( RakNet::TimeMS curTime, ForwardEntry* forwardEntry )
 {
-#ifndef __native_client__
     char data[MAXIMUM_MTU_SIZE];
 
 #if RAKNET_SUPPORT_IPV6 == 1
@@ -263,12 +262,8 @@ void UDPForwarder::RecvFrom( RakNet::TimeMS curTime, ForwardEntry* forwardEntry 
 
     bool confirmed1 = forwardEntry->addr1Confirmed != UNASSIGNED_SYSTEM_ADDRESS;
     bool confirmed2 = forwardEntry->addr2Confirmed != UNASSIGNED_SYSTEM_ADDRESS;
-    bool matchConfirmed1 =
-        confirmed1 &&
-        forwardEntry->addr1Confirmed == receivedAddr;
-    bool matchConfirmed2 =
-        confirmed2 &&
-        forwardEntry->addr2Confirmed == receivedAddr;
+    bool matchConfirmed1 = confirmed1 && forwardEntry->addr1Confirmed == receivedAddr;
+    bool matchConfirmed2 = confirmed2 && forwardEntry->addr2Confirmed == receivedAddr;
     bool matchUnconfirmed1 = forwardEntry->addr1Unconfirmed.EqualsExcludingPort( receivedAddr );
     bool matchUnconfirmed2 = forwardEntry->addr2Unconfirmed.EqualsExcludingPort( receivedAddr );
 
@@ -333,7 +328,6 @@ void UDPForwarder::RecvFrom( RakNet::TimeMS curTime, ForwardEntry* forwardEntry 
     } while( len == 0 );
 
     forwardEntry->timeLastDatagramForwarded = curTime;
-#endif // __native_client__
 }
 void UDPForwarder::UpdateUDPForwarder( void )
 {

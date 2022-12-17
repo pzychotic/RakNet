@@ -32,7 +32,6 @@ PacketOutputWindowLogger::~PacketOutputWindowLogger()
 void PacketOutputWindowLogger::WriteLog( const char* str )
 {
 #if defined( _WIN32 )
-
 #if defined( UNICODE )
     RakWString str2 = str;
     str2 += "\n";
@@ -41,12 +40,8 @@ void PacketOutputWindowLogger::WriteLog( const char* str )
     RakString str2 = str;
     str2 += "\n";
     OutputDebugString( str2.C_String() );
-#endif
-// DS_APR
-#elif defined( __native_client__ )
-    fprintf( stderr, "%s\n", str );
-// /DS_APR
-#endif
+#endif // UNICODE
+#endif // _WIN32
 }
 
 } // namespace RakNet

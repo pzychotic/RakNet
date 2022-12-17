@@ -60,13 +60,7 @@ RAK_DLL_EXPORT const char* NATTypeDetectionResultToString( NATTypeDetectionResul
 RAK_DLL_EXPORT const char* NATTypeDetectionResultToStringFriendly( NATTypeDetectionResult type );
 
 /// \internal
-RAK_DLL_EXPORT RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr
-#ifdef __native_client__
-                                                            ,
-                                                            _PP_Instance_ chromeInstance
-#endif
-                                                            ,
-                                                            RNS2EventHandler* eventHandler );
+RAK_DLL_EXPORT RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHandler* eventHandler );
 
 /// \internal
 //int NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RNS2EventHandler *eventHandler);

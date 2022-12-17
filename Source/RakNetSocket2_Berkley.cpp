@@ -13,19 +13,15 @@
 #ifndef RAKNETSOCKET2_BERKLEY_CPP
 #define RAKNETSOCKET2_BERKLEY_CPP
 
-// Every platform except native client supports Berkley sockets
-#if !defined( __native_client__ )
-
 #include "Itoa.h"
 
 namespace RakNet {
 
 void RNS2_Berkley::SetSocketOptions( void )
 {
-    int r;
     // This doubles the max throughput rate
     int sock_opt = 1024 * 256;
-    r = setsockopt__( rns2Socket, SOL_SOCKET, SO_RCVBUF, (char*)&sock_opt, sizeof( sock_opt ) );
+    int r = setsockopt__( rns2Socket, SOL_SOCKET, SO_RCVBUF, (char*)&sock_opt, sizeof( sock_opt ) );
     RakAssert( r == 0 );
 
     // Immediate hard close. Don't linger the socket, or recreating the socket quickly on Vista fails.
@@ -436,8 +432,6 @@ void RNS2_Berkley::RecvFromBlocking( RNS2RecvStruct* recvFromStruct )
 }
 
 } // namespace RakNet
-
-#endif // !defined(__native_client__)
 
 #endif // file header
 

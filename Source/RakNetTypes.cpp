@@ -85,11 +85,7 @@ bool NonNumericHostString( const char* host )
 
 SocketDescriptor::SocketDescriptor()
 {
-#ifdef __native_client__
-    blockingSocket = false;
-#else
     blockingSocket = true;
-#endif
     port = 0;
     hostAddress[0] = 0;
     extraSocketOptions = 0;
@@ -98,11 +94,7 @@ SocketDescriptor::SocketDescriptor()
 
 SocketDescriptor::SocketDescriptor( unsigned short _port, const char* _hostAddress )
 {
-#ifdef __native_client__
-    blockingSocket = false;
-#else
     blockingSocket = true;
-#endif
     port = _port;
     if( _hostAddress )
         strcpy( hostAddress, _hostAddress );

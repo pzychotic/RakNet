@@ -13,8 +13,6 @@
 #ifndef RAKNETSOCKET2_WINDOWS_LINUX_CPP
 #define RAKNETSOCKET2_WINDOWS_LINUX_CPP
 
-#if !defined( __native_client__ )
-
 namespace RakNet {
 
 #if RAKNET_SUPPORT_IPV6 == 1
@@ -109,8 +107,6 @@ void GetMyIP_Windows_Linux( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_I
 }
 
 } // namespace RakNet
-
-#endif // Windows and Linux
 
 #endif // file header
 

@@ -92,25 +92,9 @@ const char* NATTypeDetectionResultToStringFriendly( NATTypeDetectionResult type 
 }
 
 
-RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr
-#ifdef __native_client__
-                                             ,
-                                             _PP_Instance_ chromeInstance
-#endif
-                                             ,
-                                             RNS2EventHandler* eventHandler )
+RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHandler* eventHandler )
 {
     RakNetSocket2* r2 = RakNetSocket2Allocator::AllocRNS2();
-#if defined( __native_client__ )
-    NativeClientBindParameters ncbp;
-    RNS2_NativeClient* nativeClientSocket = (RNS2_NativeClient*)r2;
-    ncbp.eventHandler = eventHandler;
-    ncbp.forceHostAddress = (char*)bindAddr;
-    ncbp.is_ipv6 = false;
-    ncbp.nativeClientInstance = chromeInstance;
-    ncbp.port = 0;
-    nativeClientSocket->Bind( &ncbp, _FILE_AND_LINE_ );
-#else
     if( r2->IsBerkleySocket() )
     {
         RNS2_BerkleyBindParameters bbp;
@@ -148,7 +132,6 @@ RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr
     {
         RakAssert( "TODO" && 0 );
     }
-#endif
 
     return r2;
 }
@@ -156,9 +139,6 @@ RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr
 /*
 int NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RNS2EventHandler *eventHandler)
 {
-#if defined(__native_client__)
-    RakAssert("TODO" && 0);
-#else
     if (socket->IsBerkleySocket())
     {
         RNS2RecvStruct *recvFromStruct;
@@ -175,7 +155,6 @@ int NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RN
         return recvFromStruct->bytesRead;
     }
     return 0;
-#endif
 }
 */
 

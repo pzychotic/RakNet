@@ -44,19 +44,13 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
         rakPeerInterface->GetSockets( sockets );
         char str[64];
         sockets[0]->GetBoundAddress().ToString( false, str );
-        c2 = CreateNonblockingBoundSocket( str
-#ifdef __native_client__
-                                           ,
-                                           sockets[0]->chromeInstance
-#endif
-                                           ,
-                                           this );
+        c2 = CreateNonblockingBoundSocket( str, this );
     }
 
-#if !defined( __native_client__ )
     if( c2->IsBerkleySocket() )
+    {
         ( (RNS2_Berkley*)c2 )->CreateRecvPollingThread( 0 );
-#endif
+    }
 
     serverAddress = _serverAddress;
 
@@ -192,10 +186,10 @@ void NatTypeDetectionClient::Shutdown( void )
     serverAddress = UNASSIGNED_SYSTEM_ADDRESS;
     if( c2 != 0 )
     {
-#if !defined( __native_client__ )
         if( c2->IsBerkleySocket() )
+        {
             ( (RNS2_Berkley*)c2 )->BlockOnStopRecvPollingThread();
-#endif
+        }
 
         RakNet::OP_DELETE( c2, _FILE_AND_LINE_ );
         c2 = 0;
@@ -203,7 +197,9 @@ void NatTypeDetectionClient::Shutdown( void )
 
     std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
     while( bufferedPackets.Size() )
+    {
         RakNet::OP_DELETE( bufferedPackets.Pop(), _FILE_AND_LINE_ );
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

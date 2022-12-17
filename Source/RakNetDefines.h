@@ -69,14 +69,10 @@
 #endif
 
 #ifndef RakAssert
-#if defined( __native_client__ )
-#define RakAssert( x )
-#else
 #if defined( _DEBUG )
 #define RakAssert( x ) assert( x );
 #else
 #define RakAssert( x )
-#endif
 #endif
 #endif
 

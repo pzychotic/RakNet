@@ -22,12 +22,6 @@
 #include <netdb.h>
 #endif
 
-/*
-#if defined(__native_client__)
-using namespace pp;
-#endif
-*/
-
 #if USE_SLIDING_WINDOW_CONGESTION_CONTROL != 1
 #include "CCRakNetUDT.h"
 #else
@@ -78,13 +72,8 @@ void PrepareAddrInfoHints( addrinfo* hints )
 
 void SocketLayer::SetSocketOptions( __UDPSOCKET__ listenSocket, bool blockingSocket, bool setBroadcast )
 {
-#ifdef __native_client__
-    (void)listenSocket;
-#else
-    int sock_opt = 1;
-
     // This doubles the max throughput rate
-    sock_opt = 1024 * 256;
+    int sock_opt = 1024 * 256;
     setsockopt__( listenSocket, SOL_SOCKET, SO_RCVBUF, (char*)&sock_opt, sizeof( sock_opt ) );
 
     // Immediate hard close. Don't linger the socket, or recreating the socket quickly on Vista fails.
@@ -92,11 +81,9 @@ void SocketLayer::SetSocketOptions( __UDPSOCKET__ listenSocket, bool blockingSoc
     sock_opt = 0;
     setsockopt__( listenSocket, SOL_SOCKET, SO_LINGER, (char*)&sock_opt, sizeof( sock_opt ) );
 
-
     // This doesn't make much difference: 10% maybe
     sock_opt = 1024 * 16;
     setsockopt__( listenSocket, SOL_SOCKET, SO_SNDBUF, (char*)&sock_opt, sizeof( sock_opt ) );
-
 
     if( blockingSocket == false )
     {
@@ -131,7 +118,6 @@ void SocketLayer::SetSocketOptions( __UDPSOCKET__ listenSocket, bool blockingSoc
 #endif
         }
     }
-#endif
 }
 
 
@@ -313,9 +299,6 @@ unsigned short SocketLayer::GetLocalPort( __UDPSOCKET__ s )
 }
 void SocketLayer::GetSystemAddress_Old( __UDPSOCKET__ s, SystemAddress* systemAddressOut )
 {
-#if defined( __native_client__ )
-    *systemAddressOut = UNASSIGNED_SYSTEM_ADDRESS;
-#else
     sockaddr_in sa;
     memset( &sa, 0, sizeof( sockaddr_in ) );
     socklen_t len = sizeof( sa );
@@ -339,7 +322,6 @@ void SocketLayer::GetSystemAddress_Old( __UDPSOCKET__ s, SystemAddress* systemAd
 
     systemAddressOut->SetPortNetworkOrder( sa.sin_port );
     systemAddressOut->address.addr4.sin_addr.s_addr = sa.sin_addr.s_addr;
-#endif
 }
 
 void SocketLayer::GetSystemAddress( __UDPSOCKET__ s, SystemAddress* systemAddressOut )

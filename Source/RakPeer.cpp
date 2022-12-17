@@ -331,16 +331,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
     {
         RakNetSocket2* r2 = RakNetSocket2Allocator::AllocRNS2();
         r2->SetUserConnectionSocketIndex( i );
-#if defined( __native_client__ )
-        NativeClientBindParameters ncbp;
-        RNS2_NativeClient* nativeClientSocket = (RNS2_NativeClient*)r2;
-        ncbp.eventHandler = this;
-        ncbp.forceHostAddress = (char*)socketDescriptors[i].hostAddress;
-        ncbp.is_ipv6 = socketDescriptors[i].socketFamily == AF_INET6;
-        ncbp.nativeClientInstance = socketDescriptors[i].chromeInstance;
-        ncbp.port = socketDescriptors[i].port;
-        nativeClientSocket->Bind( &ncbp, _FILE_AND_LINE_ );
-#else
         if( r2->IsBerkleySocket() )
         {
             RNS2_BerkleyBindParameters bbp;
@@ -388,30 +378,27 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         {
             RakAssert( "TODO" && 0 );
         }
-#endif
 
         socketList.Push( r2, _FILE_AND_LINE_ );
     }
 
-#if !defined( __native_client__ )
     for( i = 0; i < socketDescriptorCount; i++ )
     {
         if( socketList[i]->IsBerkleySocket() )
+        {
             ( (RNS2_Berkley*)socketList[i] )->CreateRecvPollingThread( threadPriority );
+        }
     }
-#endif
 
     for( i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
     {
         if( ipList[i] == UNASSIGNED_SYSTEM_ADDRESS )
             break;
-#if !defined( __native_client__ )
         if( socketList[0]->IsBerkleySocket() )
         {
             unsigned short port = ( (RNS2_Berkley*)socketList[0] )->GetBoundAddress().GetPort();
             ipList[i].SetPortHostOrder( port );
         }
-#endif
     }
 
 
@@ -846,7 +833,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 //  RakNet::TimeMS timeout;
 #if RAKPEER_USER_THREADED != 1
 
-#if !defined( __native_client__ )
     for( i = 0; i < socketList.Size(); i++ )
     {
         if( socketList[i]->IsBerkleySocket() )
@@ -854,7 +840,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
             ( (RNS2_Berkley*)socketList[i] )->SignalStopRecvPollingThread();
         }
     }
-#endif
 
     while( isMainLoopThreadActive )
     {
@@ -862,7 +847,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
         RakSleep( 15 );
     }
 
-#if !defined( __native_client__ )
     for( i = 0; i < socketList.Size(); i++ )
     {
         if( socketList[i]->IsBerkleySocket() )
@@ -870,7 +854,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
             ( (RNS2_Berkley*)socketList[i] )->BlockOnStopRecvPollingThread();
         }
     }
-#endif
 
 #endif // RAKPEER_USER_THREADED!=1
 
@@ -2350,7 +2333,6 @@ void RakPeer::SetUnreliableTimeout( RakNet::TimeMS timeoutMS )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex )
 {
-#if !defined( __native_client__ )
     char fakeData[2];
     fakeData[0] = 0;
     fakeData[1] = 1;
@@ -2368,7 +2350,6 @@ void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, uns
             pluginListNTS[i]->OnDirectSocketSend( (const char*)bsp.data, BYTES_TO_BITS( bsp.length ), bsp.systemAddress );
         socketList[realIndex]->Send( &bsp, _FILE_AND_LINE_ );
     }
-#endif
 }
 
 
@@ -4634,15 +4615,15 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bsp.data = (char*)bsOut.GetData();
             bsp.length = bsOut.GetNumberOfBytesUsed();
             bsp.systemAddress = systemAddress;
-#if !defined( __native_client__ )
             if( rakNetSocket->IsBerkleySocket() )
+            {
                 ( (RNS2_Berkley*)rakNetSocket )->SetDoNotFragment( 1 );
-#endif
+            }
             rakNetSocket->Send( &bsp, _FILE_AND_LINE_ );
-#if !defined( __native_client__ )
             if( rakNetSocket->IsBerkleySocket() )
+            {
                 ( (RNS2_Berkley*)rakNetSocket )->SetDoNotFragment( 0 );
-#endif
+            }
         }
         else if( (unsigned char)( data )[0] == ID_OPEN_CONNECTION_REQUEST_2 )
         {
@@ -4976,7 +4957,6 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
 
     // This is here so RecvFromBlocking actually gets data from the same thread
 
-#if !defined( __native_client__ )
     if( socketList[0]->IsBerkleySocket() && static_cast<RNS2_Berkley*>( socketList[0] )->GetSocketLayerOverride() )
     {
         int len;
@@ -4986,10 +4966,11 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
         {
             len = static_cast<RNS2_Berkley*>( socketList[0] )->GetSocketLayerOverride()->RakNetRecvFrom( dataOut, &sender, true );
             if( len > 0 )
+            {
                 ProcessNetworkPacket( sender, dataOut, len, this, socketList[0], RakNet::GetTimeUS(), updateBitStream );
+            }
         } while( len > 0 );
     }
-#endif
 
     RNS2RecvStruct* recvFromStruct;
     while( ( recvFromStruct = PopBufferedPacket() ) != 0 )
@@ -5159,10 +5140,11 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                         socketToUse = rcs->socket;
 
                     rcs->systemAddress.FixForIPVersion( socketToUse->GetBoundAddress() );
-#if !defined( __native_client__ )
+
                     if( socketToUse->IsBerkleySocket() )
+                    {
                         ( (RNS2_Berkley*)socketToUse )->SetDoNotFragment( 1 );
-#endif
+                    }
 
                     RakNet::Time sendToStart = RakNet::GetTime();
 
@@ -5189,19 +5171,23 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                                 rcs->nextRequestTime = timeMS;
                             }
                             else
+                            {
                                 rcs->requestsMade = (unsigned char)( rcs->sendConnectionAttemptCount + 1 );
+                            }
                         }
                     }
-#if !defined( __native_client__ )
                     if( socketToUse->IsBerkleySocket() )
+                    {
                         ( (RNS2_Berkley*)socketToUse )->SetDoNotFragment( 0 );
-#endif
+                    }
 
                     requestedConnectionQueueIndex++;
                 }
             }
             else
+            {
                 requestedConnectionQueueIndex++;
+            }
 
             requestedConnectionQueueMutex.lock();
         }
@@ -5404,9 +5390,6 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                         //                  newIncomingConnectionStruct.Deserialize( nICS_BS );
 
                         bool usesOverride = false;
-#if defined( __native_client__ )
-                        remoteSystem->myExternalSystemAddress = bsSystemAddress;
-#else
                         // A dummy override address should never be added as an external address. When
                         // communicating through a socket overlay dummy addresses are needed which can be
                         // mapped to the underlying layer (e.g. a Steam user ID). Upon connecting RakNet
@@ -5420,7 +5403,6 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                             usesOverride = socketOverride && socketOverride->IsOverrideAddress( bsSystemAddress );
                         }
                         remoteSystem->myExternalSystemAddress = usesOverride ? UNASSIGNED_SYSTEM_ADDRESS : bsSystemAddress;
-#endif
 
                         // Bug: If A connects to B through R, A's firstExternalID is set to R. If A tries to send to R, sends to loopback because R==firstExternalID
                         // Correct fix is to specify in Connect() if target is through a proxy.
@@ -5560,16 +5542,12 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
 
                             // The remote system told us our external IP, so save it
                             bool usesOverride = false;
-#if defined( __native_client__ )
-                            remoteSystem->myExternalSystemAddress = externalID;
-#else
                             if( remoteSystem->rakNetSocket->IsBerkleySocket() )
                             {
                                 const SocketLayerOverride* socketOverride = static_cast<RNS2_Berkley*>( remoteSystem->rakNetSocket )->GetSocketLayerOverride();
                                 usesOverride = socketOverride && socketOverride->IsOverrideAddress( externalID );
                             }
                             remoteSystem->myExternalSystemAddress = usesOverride ? UNASSIGNED_SYSTEM_ADDRESS : externalID;
-#endif
                             remoteSystem->connectMode = RemoteSystemStruct::CONNECTED;
 
 
