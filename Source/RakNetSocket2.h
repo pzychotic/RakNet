@@ -13,7 +13,6 @@
 #include "RakNetTypes.h"
 #include "MTUSize.h"
 #include "DS_Queue.h"
-//#include "DS_ThreadsafeAllocatingQueue.h"
 #include "Export.h"
 
 #include <atomic>
@@ -81,14 +80,9 @@ public:
     RNS2EventHandler() {}
     virtual ~RNS2EventHandler() {}
 
-    //      bufferedPackets.Push(recvFromStruct);
-    //      quitAndDataEvents.SetEvent();
     virtual void OnRNS2Recv( RNS2RecvStruct* recvStruct ) = 0;
     virtual void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line ) = 0;
     virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line ) = 0;
-
-    // recvFromStruct=bufferedPackets.Allocate( _FILE_AND_LINE_ );
-    //  DataStructures::ThreadsafeAllocatingQueue<RNS2RecvStruct> bufferedPackets;
 };
 
 class RakNetSocket2
@@ -232,10 +226,6 @@ public:
     RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
     // ----------- STATICS ------------
     static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-
-protected:
-    static void GetMyIPIPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-    static void GetMyIPIPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
 };
 
 #else
@@ -247,10 +237,6 @@ public:
 
     // ----------- STATICS ------------
     static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-
-protected:
-    static void GetMyIPIPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-    static void GetMyIPIPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
 };
 
 #endif // Linux
