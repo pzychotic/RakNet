@@ -136,28 +136,6 @@ RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHand
     return r2;
 }
 
-/*
-int NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RNS2EventHandler *eventHandler)
-{
-    if (socket->IsBerkleySocket())
-    {
-        RNS2RecvStruct *recvFromStruct;
-        recvFromStruct=AllocRNS2RecvStruct(_FILE_AND_LINE_);
-        if (recvFromStruct != NULL)
-        {
-            recvFromStruct->socket=this;
-            socket->RecvFromBlocking(recvFromStruct);
-        }
-        if (recvFromStruct->bytesRead>0)
-        {
-            sender = recvFromStruct->systemAddress;
-        }
-        return recvFromStruct->bytesRead;
-    }
-    return 0;
-}
-*/
-
 } // namespace RakNet
 
 #endif // #if _RAKNET_SUPPORT_NatTypeDetectionServer==1 || _RAKNET_SUPPORT_NatTypeDetectionClient==1

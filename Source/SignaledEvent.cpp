@@ -80,11 +80,6 @@ void SignaledEvent::SetEvent( void )
 void SignaledEvent::WaitOnEvent( int timeoutMs )
 {
 #ifdef _WIN32
-    //  WaitForMultipleObjects(
-    //      2,
-    //      eventList,
-    //      false,
-    //      timeoutMs);
     WaitForSingleObjectEx( eventList, timeoutMs, FALSE );
 #else
 

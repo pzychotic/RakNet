@@ -84,14 +84,6 @@ void Tree<TreeType>::AddChild( TreeType& newData )
 template<class TreeType>
 void Tree<TreeType>::DeleteDecendants( void )
 {
-    /*
-    List<Tree*> output;
-    LevelOrderTraversal(output);
-    unsigned i;
-    for (i=0; i < output.Size(); i++)
-        RakNet::OP_DELETE(output[i], _FILE_AND_LINE_);
-*/
-
     // Already recursive to do this
     unsigned int i;
     for( i = 0; i < children.Size(); i++ )

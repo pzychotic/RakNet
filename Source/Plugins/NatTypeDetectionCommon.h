@@ -62,9 +62,6 @@ RAK_DLL_EXPORT const char* NATTypeDetectionResultToStringFriendly( NATTypeDetect
 /// \internal
 RAK_DLL_EXPORT RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHandler* eventHandler );
 
-/// \internal
-//int NatTypeRecvFrom(char *data, RakNetSocket2* socket, SystemAddress &sender, RNS2EventHandler *eventHandler);
-
 } // namespace RakNet
 
 #endif // #if _RAKNET_SUPPORT_NatTypeDetectionServer==1 || _RAKNET_SUPPORT_NatTypeDetectionClient==1

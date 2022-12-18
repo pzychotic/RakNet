@@ -149,26 +149,6 @@ protected:
     RemoteClient* remoteClients;
     int remoteClientsLength;
 
-    // Assuming remoteClients is only used by one thread!
-    // DataStructures::List<RemoteClient*> remoteClients;
-    // Use this thread-safe queue to add to remoteClients
-    // DataStructures::Queue<RemoteClient*> remoteClientsInsertionQueue;
-    // std::mutex remoteClientsInsertionQueueMutex;
-
-    /*
-    struct OutgoingMessage
-    {
-        unsigned char* data;
-        SystemAddress systemAddress;
-        bool broadcast;
-        unsigned int length;
-    };
-    */
-    //  DataStructures::SingleProducerConsumer<OutgoingMessage> outgoingMessages;
-    //  DataStructures::SingleProducerConsumer<Packet> incomingMessages;
-    //  DataStructures::SingleProducerConsumer<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
-    //  DataStructures::SingleProducerConsumer<RemoteClient*> newRemoteClients;
-    //  DataStructures::ThreadsafeAllocatingQueue<OutgoingMessage> outgoingMessages;
     DataStructures::ThreadsafeAllocatingQueue<Packet> incomingMessages;
     DataStructures::ThreadsafeAllocatingQueue<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
     DataStructures::ThreadsafeAllocatingQueue<RemoteClient*> newRemoteClients;
@@ -184,8 +164,6 @@ protected:
     friend void UpdateTCPInterfaceLoop( void* arg );
     friend void ConnectionAttemptLoop( void* arg );
 
-    //  void DeleteRemoteClient(RemoteClient *remoteClient, fd_set *exceptionFD);
-    //  void InsertRemoteClient(RemoteClient* remoteClient);
     __TCPSOCKET__ SocketConnect( const char* host, unsigned short remotePort, unsigned short socketFamily, const char* bindAddress );
 
     struct ThisPtrPlusSysAddr

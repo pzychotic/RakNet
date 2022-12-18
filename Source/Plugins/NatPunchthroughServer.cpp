@@ -335,27 +335,6 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
             StartPunchthroughForUser( freedUpInProgressUsers[i] );
         }
     }
-
-    /*
-    // Also remove from groupPunchthroughRequests
-    for (i=0; i < users.Size(); i++)
-    {
-        bool objectExists;
-        unsigned int gprIndex;
-        gprIndex = users[i]->groupPunchthroughRequests.GetIndexFromKey(rakNetGUID, &objectExists);
-        if (objectExists)
-        {
-//          printf("DEBUG %i\n", __LINE__);
-
-            BitStream outgoingBs;
-            outgoingBs.Write((MessageID)ID_NAT_TARGET_NOT_CONNECTED);
-            outgoingBs.Write(rakNetGUID);
-            rakPeerInterface->Send(&outgoingBs,HIGH_PRIORITY,RELIABLE_ORDERED,0,users[i]->systemAddress,false);
-
-            users[i]->groupPunchthroughRequests.RemoveAtIndex(gprIndex);
-        }
-    }
-    */
 }
 
 void NatPunchthroughServer::OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming )

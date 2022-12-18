@@ -324,20 +324,11 @@ struct RAK_DLL_EXPORT RakNetGUID
     bool operator<( const RakNetGUID& right ) const;
 };
 
-/// Index of an invalid SystemAddress
-//const SystemAddress UNASSIGNED_SYSTEM_ADDRESS =
-//{
-//  0xFFFFFFFF, 0xFFFF
-//};
 #ifndef SWIG
+/// Index of an invalid SystemAddress
 const SystemAddress UNASSIGNED_SYSTEM_ADDRESS;
 const RakNetGUID UNASSIGNED_RAKNET_GUID( (uint64_t)-1 );
 #endif
-//{
-//  {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF}
-//  0xFFFFFFFFFFFFFFFF
-//};
-
 
 struct RAK_DLL_EXPORT AddressOrGUID
 {

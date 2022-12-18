@@ -96,11 +96,9 @@ protected:
     void SendForwardingRequest( SystemAddress sourceAddress, SystemAddress targetAddress, SystemAddress serverAddress, RakNet::TimeMS timeoutOnNoDataMS );
 
     // Logged in servers
-    //DataStructures::Multilist<ML_UNORDERED_LIST, SystemAddress> serverList;
     DataStructures::List<SystemAddress> serverList;
 
     // Forwarding requests in progress
-    //DataStructures::Multilist<ML_ORDERED_LIST, ForwardingRequest*, SenderAndTargetAddress> forwardingRequestList;
     DataStructures::OrderedList<SenderAndTargetAddress, ForwardingRequest*, ForwardingRequestComp> forwardingRequestList;
 
     RakString remoteLoginPassword;

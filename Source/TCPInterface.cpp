@@ -373,7 +373,7 @@ bool TCPInterface::IsSSLActive( SystemAddress systemAddress )
     return activeSSLConnections.GetIndexOf( systemAddress ) != -1;
 }
 #endif
-void TCPInterface::Send( const char* data, unsigned length, const SystemAddress& systemAddress, bool broadcast )
+void TCPInterface::Send( const char* data, unsigned int length, const SystemAddress& systemAddress, bool broadcast )
 {
     SendList( &data, &length, 1, systemAddress, broadcast );
 }
@@ -1036,11 +1036,6 @@ void UpdateTCPInterfaceLoop( void* arg )
                         {
                             // if recv returns 0 this was a graceful close
                             len = sts->remoteClients[i].Recv( data, BUFF_SIZE );
-
-
-                            // removeme
-                            //                              data[len]=0;
-                            //                              printf(data);
 
                             if( len > 0 )
                             {

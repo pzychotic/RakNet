@@ -116,7 +116,6 @@ protected:
 
     // s1p1 is rakpeer itself
     RakNetSocket2 *s1p2, *s2p3, *s3p4, *s4p5;
-    //unsigned short s1p2Port, s2p3Port, s3p4Port, s4p5Port;
     char s3p4Address[64];
 };
 

@@ -47,8 +47,6 @@
 
 namespace RakNet {
 
-typedef int64_t FCM2Guid;
-
 /// \brief Implements two way authentication
 /// \details Given two systems, each of whom known a common password / identifier pair, verify the password without transmitting it
 /// This can be used to determine what permissions are should be allowed to the other system

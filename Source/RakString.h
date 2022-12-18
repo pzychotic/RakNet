@@ -316,13 +316,9 @@ public:
     /// \internal
     SharedString* sharedString;
 
-    //  static std::mutex poolMutex;
-    //  static DataStructures::MemoryPool<SharedString> pool;
     /// \internal
     static SharedString emptyString;
 
-    //static SharedString *sharedStringFreeList;
-    //static unsigned int sharedStringFreeListAllocationCount;
     /// \internal
     /// List of free objects to reduce memory reallocations
     static DataStructures::List<SharedString*> freeList;

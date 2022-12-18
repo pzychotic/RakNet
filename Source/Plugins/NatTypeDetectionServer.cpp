@@ -151,67 +151,6 @@ void NatTypeDetectionServer::Update( void )
         recvStruct = bufferedPackets.Size() > 0 ? bufferedPackets.Pop() : 0;
     }
 
-    /*
-
-    // Only socket that receives messages is s3p4, to see if the external address is different than that of the connection to rakPeerInterface
-    char data[ MAXIMUM_MTU_SIZE ];
-    int len;
-    SystemAddress senderAddr;
-    len=NatTypeRecvFrom(data, s3p4, senderAddr);
-    // Client is asking us if this is port restricted. Only client requests of this type come in on s3p4
-    while (len>0 && data[0]==NAT_TYPE_PORT_RESTRICTED)
-    {
-        BitStream bsIn((unsigned char*) data,len,false);
-        RakNetGUID senderGuid;
-        bsIn.IgnoreBytes(sizeof(MessageID));
-        bool readSuccess = bsIn.Read(senderGuid);
-        RakAssert(readSuccess);
-        if (readSuccess)
-        {
-            unsigned int i = GetDetectionAttemptIndex(senderGuid);
-            if (i!=(unsigned int)-1)
-            {
-                bs.Reset();
-                bs.Write((unsigned char) ID_NAT_TYPE_DETECTION_RESULT);
-                // If different, then symmetric
-                if (senderAddr!=natDetectionAttempts[i].systemAddress)
-                {
-
-                #ifdef NTDS_VERBOSE
-                    printf("Determined client is symmetric\n");
-                #endif
-                    bs.Write((unsigned char) NAT_TYPE_SYMMETRIC);
-                }
-                else
-                {
-                    // else port restricted
-
-                    #ifdef NTDS_VERBOSE
-                    printf("Determined client is port restricted\n");
-                    #endif
-                    bs.Write((unsigned char) NAT_TYPE_PORT_RESTRICTED);
-                }
-
-                rakPeerInterface->Send(&bs,HIGH_PRIORITY,RELIABLE,0,natDetectionAttempts[i].systemAddress,false);
-
-                // Done
-                natDetectionAttempts.RemoveAtIndexFast(i);
-            }
-            else
-            {
-        //      RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
-            }
-        }
-        else
-        {
-        //  RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
-        }
-
-        len=NatTypeRecvFrom(data, s3p4, senderAddr);
-    }
-    */
-
-
     while( i < (int)natDetectionAttempts.Size() )
     {
         if( time > natDetectionAttempts[i].nextStateTime )

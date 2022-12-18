@@ -28,8 +28,6 @@ SendToThread::SendToThreadBlock* SendToWorkerThread( SendToThread::SendToThreadB
 {
     (void)perThreadData;
     *returnOutput = false;
-    //  RakNet::TimeUS *mostRecentTime=(RakNet::TimeUS *)input->data;
-    //  *mostRecentTime=RakNet::GetTimeUS();
     SocketLayer::SendTo( input->s, input->data, input->dataWriteOffset, input->systemAddress, _FILE_AND_LINE_ );
     SendToThread::objectQueue.Push( input );
     return 0;

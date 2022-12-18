@@ -18,11 +18,7 @@
 
 #include "GetTime.h"
 
-#if defined( _WIN32 )
-//DWORD mProcMask;
-//DWORD mSysMask;
-//HANDLE mThread;
-#else
+#if !defined( _WIN32 )
 #include <sys/time.h>
 #include <unistd.h>
 RakNet::TimeUS initialTime;
@@ -80,17 +76,6 @@ RakNet::TimeUS GetTimeUS_Windows( void )
     if( initialized == false )
     {
         initialized = true;
-
-        // Save the current process
-        //      HANDLE mProc = GetCurrentProcess();
-
-        // Get the current Affinity
-#if _MSC_VER >= 1400 && defined( _M_X64 )
-//      GetProcessAffinityMask(mProc, (PDWORD_PTR)&mProcMask, (PDWORD_PTR)&mSysMask);
-#else
-//      GetProcessAffinityMask(mProc, &mProcMask, &mSysMask);
-#endif
-        //      mThread = GetCurrentThread();
     }
 
     // 9/26/2010 In China running LuDaShi, QueryPerformanceFrequency has to be called every time because CPU clock speeds can be different

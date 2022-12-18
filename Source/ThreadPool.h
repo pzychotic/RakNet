@@ -502,14 +502,6 @@ void ThreadPool<InputType, OutputType>::ClearOutput( void )
 template<class InputType, class OutputType>
 bool ThreadPool<InputType, OutputType>::IsWorking( void )
 {
-    bool isWorking;
-    //  workingThreadCountMutex.lock();
-    //  isWorking=numThreadsWorking!=0;
-    //  workingThreadCountMutex.unlock();
-
-    //  if (isWorking)
-    //      return true;
-
     // Bug fix: Originally the order of these two was reversed.
     // It's possible with the thread timing that working could have been false, then it picks up the data in the other thread, then it checks
     // here and sees there is no data.  So it thinks the thread is not working when it was.
@@ -521,7 +513,7 @@ bool ThreadPool<InputType, OutputType>::IsWorking( void )
 
     // Need to check is working again, in case the thread was between the first and second checks
     workingThreadCountMutex.lock();
-    isWorking = numThreadsWorking != 0;
+    bool isWorking = numThreadsWorking != 0;
     workingThreadCountMutex.unlock();
 
     return isWorking;

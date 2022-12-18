@@ -792,15 +792,7 @@ void StatisticsHistoryPlugin::Update( void )
     }
     */
 }
-/*
-void StatisticsHistoryPlugin::OnDirectSocketSend(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress)
-{
-    // Would have to use GetGuidFromSystemAddress for every send
-}
-void StatisticsHistoryPlugin::OnDirectSocketReceive(const char *data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress)
-{
-}
-*/
+
 void StatisticsHistoryPlugin::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
 {
     (void)lostConnectionReason;

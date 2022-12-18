@@ -19,8 +19,6 @@
 
 namespace RakNet {
 
-// DEFINE_MULTILIST_PTR_TO_MEMBER_COMPARISONS(LastSerializationResult,Replica3*,replica);
-
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 bool PRO::operator==( const PRO& right ) const

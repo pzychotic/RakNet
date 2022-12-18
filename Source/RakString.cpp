@@ -23,10 +23,7 @@
 
 namespace RakNet {
 
-//DataStructures::MemoryPool<RakString::SharedString> RakString::pool;
 RakString::SharedString RakString::emptyString = { 0, 0, 0, (char*)"", (char*)"" };
-//RakString::SharedString *RakString::sharedStringFreeList=0;
-//unsigned int RakString::sharedStringFreeListAllocationCount=0;
 DataStructures::List<RakString::SharedString*> RakString::freeList;
 
 class RakStringCleanup
@@ -301,7 +298,6 @@ const RakString operator+( const RakString& lhs, const RakString& rhs )
             rhs.sharedString->refCountMutex->unlock();
             return RakString( rhs.sharedString );
         }
-        // rhs.sharedString->refCountMutex->unlock();
     }
     if( rhs.IsEmpty() )
     {
@@ -318,20 +314,16 @@ const RakString operator+( const RakString& lhs, const RakString& rhs )
     RakString::SharedString* sharedString;
 
     RakString::LockMutex();
-    // sharedString = RakString::pool.Allocate( _FILE_AND_LINE_ );
     if( RakString::freeList.Size() == 0 )
     {
-        //RakString::sharedStringFreeList=(RakString::SharedString*) rakRealloc_Ex(RakString::sharedStringFreeList,(RakString::sharedStringFreeListAllocationCount+1024)*sizeof(RakString::SharedString), _FILE_AND_LINE_);
         unsigned i;
         for( i = 0; i < 128; i++ )
         {
-            //  RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
             RakString::SharedString* ss;
             ss = (RakString::SharedString*)rakMalloc_Ex( sizeof( RakString::SharedString ), _FILE_AND_LINE_ );
             ss->refCountMutex = RakNet::OP_NEW<std::mutex>( _FILE_AND_LINE_ );
             RakString::freeList.Insert( ss, _FILE_AND_LINE_ );
         }
-        //RakString::sharedStringFreeListAllocationCount+=1024;
     }
     sharedString = RakString::freeList[RakString::freeList.Size() - 1];
     RakString::freeList.RemoveAtIndex( RakString::freeList.Size() - 1 );
@@ -1048,9 +1040,6 @@ RakString RakString::FormatForPUTOrPost( const char* type, const char* uri, cons
     if( host.IsEmpty() || remotePath.IsEmpty() )
         return out;
 
-    //  RakString bodyEncoded = body;
-    //  bodyEncoded.URLEncode();
-
     if( extraHeaders != 0 && extraHeaders[0] )
     {
         out.Set( "%s %s HTTP/1.1\r\n"
@@ -1065,8 +1054,6 @@ RakString RakString::FormatForPUTOrPost( const char* type, const char* uri, cons
                  extraHeaders,
                  host.C_String(),
                  contentType,
-                 //bodyEncoded.GetLength(),
-                 //bodyEncoded.C_String());
                  strlen( body ),
                  body );
     }
@@ -1082,8 +1069,6 @@ RakString RakString::FormatForPUTOrPost( const char* type, const char* uri, cons
                  remotePath.C_String(),
                  host.C_String(),
                  contentType,
-                 //bodyEncoded.GetLength(),
-                 //bodyEncoded.C_String());
                  strlen( body ),
                  body );
     }
@@ -1327,22 +1312,16 @@ void RakString::Clear( void )
 void RakString::Allocate( size_t len )
 {
     RakString::LockMutex();
-    // sharedString = RakString::pool.Allocate( _FILE_AND_LINE_ );
     if( RakString::freeList.Size() == 0 )
     {
-        //RakString::sharedStringFreeList=(RakString::SharedString*) rakRealloc_Ex(RakString::sharedStringFreeList,(RakString::sharedStringFreeListAllocationCount+1024)*sizeof(RakString::SharedString), _FILE_AND_LINE_);
         unsigned i;
         for( i = 0; i < 128; i++ )
         {
-            //  RakString::freeList.Insert(RakString::sharedStringFreeList+i+RakString::sharedStringFreeListAllocationCount);
-            //      RakString::freeList.Insert((RakString::SharedString*)rakMalloc_Ex(sizeof(RakString::SharedString), _FILE_AND_LINE_), _FILE_AND_LINE_);
-
             RakString::SharedString* ss;
             ss = (RakString::SharedString*)rakMalloc_Ex( sizeof( RakString::SharedString ), _FILE_AND_LINE_ );
             ss->refCountMutex = RakNet::OP_NEW<std::mutex>( _FILE_AND_LINE_ );
             RakString::freeList.Insert( ss, _FILE_AND_LINE_ );
         }
-        //RakString::sharedStringFreeListAllocationCount+=1024;
     }
     sharedString = RakString::freeList[RakString::freeList.Size() - 1];
     RakString::freeList.RemoveAtIndex( RakString::freeList.Size() - 1 );
@@ -1526,11 +1505,6 @@ void RakString::Free( void )
         const size_t smallStringSize = 128 - sizeof( unsigned int ) - sizeof( size_t ) - sizeof( char* ) * 2;
         if( sharedString->bytesUsed > smallStringSize )
             rakFree_Ex( sharedString->bigString, _FILE_AND_LINE_ );
-        /*
-        poolMutex->lock();
-        pool.Release(sharedString);
-        poolMutex->unlock();
-        */
 
         RakString::LockMutex();
         RakString::freeList.Insert( sharedString, _FILE_AND_LINE_ );

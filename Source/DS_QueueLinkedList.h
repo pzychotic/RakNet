@@ -38,7 +38,6 @@ public:
     void Push( const QueueType& input );
     unsigned int Size( void );
     void Clear( void );
-    void Compress( void );
 
 private:
     LinkedList<QueueType> data;

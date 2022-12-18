@@ -113,7 +113,4 @@ protected:
     size_t c_strCharLength;
 };
 
-
-const RakWString RAK_DLL_EXPORT operator+( const RakWString& lhs, const RakWString& rhs );
-
 } // namespace RakNet

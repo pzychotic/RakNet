@@ -26,10 +26,6 @@ namespace RakNet {
 static const int DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME = 2000;
 static const int DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR = DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME + 1000;
 
-// bool operator<( const DataStructures::MLKeyRef<unsigned short> &inputKey, const UDPProxyCoordinator::ServerWithPing &cls ) {return inputKey.Get() < cls.ping;}
-// bool operator>( const DataStructures::MLKeyRef<unsigned short> &inputKey, const UDPProxyCoordinator::ServerWithPing &cls ) {return inputKey.Get() > cls.ping;}
-// bool operator==( const DataStructures::MLKeyRef<unsigned short> &inputKey, const UDPProxyCoordinator::ServerWithPing &cls ) {return inputKey.Get() == cls.ping;}
-
 int UDPProxyCoordinator::ServerWithPingComp( const unsigned short& key, const UDPProxyCoordinator::ServerWithPing& data )
 {
     if( key < data.ping )
@@ -51,21 +47,6 @@ int UDPProxyCoordinator::ForwardingRequestComp( const SenderAndTargetAddress& ke
         return 1;
     return 0;
 }
-//
-// bool operator<( const DataStructures::MLKeyRef<UDPProxyCoordinator::SenderAndTargetAddress> &inputKey, const UDPProxyCoordinator::ForwardingRequest *cls )
-// {
-//  return inputKey.Get().senderClientAddress < cls->sata.senderClientAddress ||
-//      (inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress < cls->sata.targetClientAddress);
-// }
-// bool operator>( const DataStructures::MLKeyRef<UDPProxyCoordinator::SenderAndTargetAddress> &inputKey, const UDPProxyCoordinator::ForwardingRequest *cls )
-// {
-//  return inputKey.Get().senderClientAddress > cls->sata.senderClientAddress ||
-//      (inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress > cls->sata.targetClientAddress);
-// }
-// bool operator==( const DataStructures::MLKeyRef<UDPProxyCoordinator::SenderAndTargetAddress> &inputKey, const UDPProxyCoordinator::ForwardingRequest *cls )
-// {
-//  return inputKey.Get().senderClientAddress == cls->sata.senderClientAddress && inputKey.Get().targetClientAddress == cls->sata.targetClientAddress;
-// }
 
 STATIC_FACTORY_DEFINITIONS( UDPProxyCoordinator, UDPProxyCoordinator );
 
@@ -534,9 +515,7 @@ void UDPProxyCoordinator::Clear( void )
 }
 void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )
 {
-    //DataStructures::Multilist<ML_ORDERED_LIST,UDPProxyCoordinator::ServerWithPing,unsigned short> swpList;
     DataStructures::OrderedList<unsigned short, UDPProxyCoordinator::ServerWithPing, ServerWithPingComp> swpList;
-    // swpList.SetSortOrder(true);
 
     if( sourceServerPings.Size() == 0 && targetServerPings.Size() == 0 )
         return;

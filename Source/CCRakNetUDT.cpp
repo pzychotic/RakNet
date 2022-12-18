@@ -81,7 +81,6 @@ void CCRakNetUDT::Init( CCTimeType curTime, uint32_t maxDatagramPayload )
     CWND = CWND_MIN_THRESHOLD;
     lastUpdateWindowSizeAndAck = 0;
     lastTransmitOfBAndAS = 0;
-    ExpCount = 1.0;
     totalUserDataBytesSent = 0;
     oldestUnsentAck = 0;
     MAXIMUM_MTU_INCLUDING_UDP_HEADER = maxDatagramPayload;
@@ -133,35 +132,6 @@ void CCRakNetUDT::Update( CCTimeType curTime, bool hasDataToSendOrResend )
     (void)curTime;
 
     return;
-
-    // I suspect this is causing major lag
-
-    /*
-    if (hasDataToSendOrResend==false)
-    halveSNDOnNoDataTime=0;
-    else if (halveSNDOnNoDataTime==0)
-    {
-    UpdateHalveSNDOnNoDataTime(curTime);
-    ExpCount=1.0;
-    }
-
-    // If you send, and get no data at all from that time to RTO, then halve send rate7
-    if (HasHalveSNDOnNoDataTimeElapsed(curTime))
-    {
-    /// 2000 bytes per second
-    /// 0.0005 seconds per byte
-    /// 0.5 milliseconds per byte
-    /// 500 microseconds per byte
-    // printf("No incoming data, halving send rate\n");
-    SND*=2.0;
-    CapMinSnd(_FILE_AND_LINE_);
-    ExpCount+=1.0;
-    if (ExpCount>8.0)
-    ExpCount=8.0;
-
-    UpdateHalveSNDOnNoDataTime(curTime);
-    }
-    */
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 int CCRakNetUDT::GetRetransmissionBandwidth( CCTimeType curTime, CCTimeType timeSinceLastTick, uint32_t unacknowledgedBytes, bool isContinuousSend )
@@ -783,25 +753,6 @@ void CCRakNetUDT::DecreaseTimeBetweenSends( void )
     // SND=0 then increment=near 0
     SND *= ( .99 - increment );
 }
-/*
-void CCRakNetUDT::SetTimeBetweenSendsLimit(unsigned int bitsPerSecond)
-{
-//  bitsPerSecond / 1000000 = bitsPerMicrosecond
-//  bitsPerMicrosecond / 8 = BytesPerMicrosecond
-//  1 / BytesPerMicrosecond = MicrosecondsPerByte
-//  1 / ( (bitsPerSecond / 1000000)  / 8 ) =
-//  1 / (bitsPerSecond / 8000000) =
-//  8000000 / bitsPerSecond
-
-#if CC_TIME_TYPE_BYTES==4
-    MicrosecondsPerByte limit = (MicrosecondsPerByte) 8000 / (MicrosecondsPerByte)bitsPerSecond;
-#else
-    MicrosecondsPerByte limit = (MicrosecondsPerByte) 8000000 / (MicrosecondsPerByte)bitsPerSecond;
-#endif
-    if (limit > SND)
-        SND=limit;
-}
-*/
 
 } // namespace RakNet
 

@@ -78,8 +78,6 @@ public:
     /// to allow remote users to turn on or off command echo
     /// \return 0 if you do not need a command parser - otherwise the desired derivation of CommandParserInterface
     virtual CommandParserInterface* GetCommandParser( void ) = 0;
-
-protected:
 };
 
 } // namespace RakNet

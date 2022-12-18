@@ -146,22 +146,10 @@ public:
     /// Punchthrough a NAT. Doesn't connect, just tries to setup the routing table
     /// \param[in] destination The system to punch. Must already be connected to \a facilitator
     /// \param[in] facilitator A system we are already connected to running the NatPunchthroughServer plugin
-    /// \sa OpenNATGroup()
     /// You will get ID_NAT_PUNCHTHROUGH_SUCCEEDED on success
     /// You will get ID_NAT_TARGET_NOT_CONNECTED, ID_NAT_TARGET_UNRESPONSIVE, ID_NAT_CONNECTION_TO_TARGET_LOST, ID_NAT_ALREADY_IN_PROGRESS, or ID_NAT_PUNCHTHROUGH_FAILED on failures of various types
     /// However, if you lose connection to the facilitator, you may not necessarily get above
     bool OpenNAT( RakNetGUID destination, const SystemAddress& facilitator );
-
-    /*
-    /// \deprecated See FullyConnectedMesh2::StartVerifiedJoin() which is more flexible
-    /// Same as calling OpenNAT for a list of systems, but reply is delayed until all systems pass.
-    /// This is useful for peer to peer games where you want to connect to every system in the remote session, not just one particular system
-    /// \note For cloud computing, all systems in the group must be connected to the same facilitator since we're only specifying one
-    /// You will get ID_NAT_GROUP_PUNCH_SUCCEEDED on success
-    /// You will get ID_NAT_TARGET_NOT_CONNECTED, ID_NAT_ALREADY_IN_PROGRESS, or ID_NAT_GROUP_PUNCH_FAILED on failures of various types
-    /// However, if you lose connection to the facilitator, you may not necessarily get above
-    bool OpenNATGroup(DataStructures::List<RakNetGUID> destinationSystems, const SystemAddress &facilitator);
-    */
 
     /// Modify the system configuration if desired
     /// Don't modify the variables in the structure while punchthrough is in progress
@@ -210,7 +198,6 @@ public:
         {
             TESTING_INTERNAL_IPS,
             WAITING_FOR_INTERNAL_IPS_RESPONSE,
-            //SEND_WITH_TTL,
             TESTING_EXTERNAL_IPS_FACILITATOR_PORT_TO_FACILITATOR_PORT,
             TESTING_EXTERNAL_IPS_1024_TO_FACILITATOR_PORT,
             TESTING_EXTERNAL_IPS_FACILITATOR_PORT_TO_1024,
@@ -228,12 +215,9 @@ public:
 #endif
 protected:
     unsigned short mostRecentExternalPort;
-    //void OnNatGroupPunchthroughRequest(Packet *packet);
     void OnFailureNotification( Packet* packet );
-    //void OnNatGroupPunchthroughReply(Packet *packet);
     void OnGetMostRecentPort( Packet* packet );
     void OnConnectAtTime( Packet* packet );
-    unsigned int GetPendingOpenNATIndex( RakNetGUID destination, const SystemAddress& facilitator );
     void SendPunchthrough( RakNetGUID destination, const SystemAddress& facilitator );
     void QueueOpenNAT( RakNetGUID destination, const SystemAddress& facilitator );
     void SendQueuedOpenNAT( void );
@@ -274,27 +258,6 @@ protected:
         INCAPABLE_PORT_STRIDE
     } hasPortStride;
     RakNet::Time portStrideCalTimeout;
-
-    /*
-    struct TimeAndGuid
-    {
-        RakNet::Time time;
-        RakNetGUID guid;
-    };
-    DataStructures::List<TimeAndGuid> groupRequestsInProgress;
-
-    struct GroupPunchRequest
-    {
-        SystemAddress facilitator;
-        DataStructures::List<RakNetGUID> pendingList;
-        DataStructures::List<RakNetGUID> passedListGuid;
-        DataStructures::List<SystemAddress> passedListAddress;
-        DataStructures::List<RakNetGUID> failedList;
-        DataStructures::List<RakNetGUID> ignoredList;
-    };
-    DataStructures::List<GroupPunchRequest*> groupPunchRequests;
-    void UpdateGroupPunchOnNatResult(SystemAddress facilitator, RakNetGUID targetSystem, SystemAddress targetSystemAddress, int result); // 0=failed, 1=success, 2=ignore
-    */
 };
 
 } // namespace RakNet

@@ -162,7 +162,6 @@ public:
     BytesPerMicrosecond GetLocalSendRate( void ) const { return 0; }
     BytesPerMicrosecond GetLocalReceiveRate( CCTimeType currentTime ) const;
     BytesPerMicrosecond GetRemoveReceiveRate( void ) const { return 0; }
-    //BytesPerMicrosecond GetEstimatedBandwidth(void) const {return B;}
     BytesPerMicrosecond GetEstimatedBandwidth( void ) const { return GetLinkCapacityBytesPerSecond() * 1000000.0; }
     double GetLinkCapacityBytesPerSecond( void ) const { return 0; }
 
@@ -177,7 +176,6 @@ public:
     static bool GreaterThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
     /// Is a < b, accounting for variable overflow?
     static bool LessThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
-    //  void SetTimeBetweenSendsLimit(unsigned int bitsPerSecond);
     uint64_t GetBytesPerSecondLimitByCongestionControl( void ) const;
 
 protected:

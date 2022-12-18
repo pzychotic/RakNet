@@ -961,7 +961,6 @@ protected:
     char my_public_key[cat::EasyHandshake::PUBLIC_KEY_BYTES];
     cat::ServerEasyHandshake* _server_handshake;
     cat::CookieJar* _cookie_jar;
-    bool InitializeClientSecurity( RequestedConnectionStruct* rcs, const char* public_key );
 #endif
 
     virtual void OnRNS2Recv( RNS2RecvStruct* recvStruct );

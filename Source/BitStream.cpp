@@ -975,49 +975,6 @@ void BitStream::SetWriteOffset( const BitSize_t offset )
     numberOfBitsUsed = offset;
 }
 
-/*
-BitSize_t BitStream::GetWriteOffset( void ) const
-{
-return numberOfBitsUsed;
-}
-
-// Returns the length in bits of the stream
-BitSize_t BitStream::GetNumberOfBitsUsed( void ) const
-{
-return GetWriteOffset();
-}
-
-// Returns the length in bytes of the stream
-BitSize_t BitStream::GetNumberOfBytesUsed( void ) const
-{
-return BITS_TO_BYTES( numberOfBitsUsed );
-}
-
-// Returns the number of bits into the stream that we have read
-BitSize_t BitStream::GetReadOffset( void ) const
-{
-return readOffset;
-}
-
-
-// Sets the read bit index
-void BitStream::SetReadOffset( const BitSize_t newReadOffset )
-{
-readOffset=newReadOffset;
-}
-
-// Returns the number of bits left in the stream that haven't been read
-BitSize_t BitStream::GetNumberOfUnreadBits( void ) const
-{
-return numberOfBitsUsed - readOffset;
-}
-// Exposes the internal data
-unsigned char* BitStream::GetData( void ) const
-{
-return data;
-}
-
-*/
 // If we used the constructor version with copy data off, this makes sure it is set to on and the data pointed to is copied.
 void BitStream::AssertCopyData( void )
 {

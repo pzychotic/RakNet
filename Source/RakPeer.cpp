@@ -60,25 +60,6 @@
 
 #include <stdlib.h> // malloc
 
-
-#if defined( _WIN32 )
-//
-#else
-/*
-#include <alloca.h> // Console 2
-#include <stdlib.h>
-extern bool _extern_Console2LoadModules(void);
-extern int _extern_Console2GetConnectionStatus(void);
-extern int _extern_Console2GetLobbyStatus(void);
-//extern bool Console2StartupFluff(unsigned int *);
-extern void Console2ShutdownFluff(void);
-//extern unsigned int Console2ActivateConnection(unsigned int, void *);
-//extern bool Console2BlockOnEstablished(void);
-extern void Console2GetIPAndPort(unsigned int, char *, unsigned short *, unsigned int );
-//extern void Console2DeactivateConnection(unsigned int, unsigned int);
-*/
-#endif
-
 namespace RakNet {
 
 void UpdateNetworkLoop( void* arg );
@@ -87,14 +68,6 @@ static const int NUM_MTU_SIZES = 3;
 static const int mtuSizes[NUM_MTU_SIZES] = { MAXIMUM_MTU_SIZE, 1200, 576 };
 
 static RakNetRandom rnr;
-
-/*
-struct RakPeerAndIndex
-{
-    RakNetSocket2 *s;
-    RakPeer *rakPeer;
-};
-*/
 
 static const unsigned int MAX_OFFLINE_DATA_LENGTH = 400; // I set this because I limit ID_CONNECTION_REQUEST to 512 bytes, and the password is appended to that packet.
 
@@ -306,9 +279,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
     {
         rnr.SeedMT( GenerateSeedFromGuid() );
     }
-
-    //RakPeerAndIndex rpai[32];
-    //RakAssert(socketDescriptorCount<32);
 
     RakAssert( socketDescriptors && socketDescriptorCount >= 1 );
 
@@ -880,17 +850,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     packetAllocationPoolMutex.lock();
     packetAllocationPool.Clear( _FILE_AND_LINE_ );
     packetAllocationPoolMutex.unlock();
-
-    /*
-    if (isRecvFromLoopThreadActive > 0)
-    {
-        timeout = RakNet::GetTimeMS()+1000;
-        while ( isRecvFromLoopThreadActive > 0 && RakNet::GetTimeMS() < timeout )
-        {
-            RakSleep(30);
-        }
-    }
-    */
 
     DerefAllSockets();
 
@@ -5251,10 +5210,6 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
             if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED || remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
             {
 
-                //                  BitStream undeliveredMessages;
-                //                  remoteSystem->reliabilityLayer.GetUndeliveredMessages(&undeliveredMessages,remoteSystem->MTUSize);
-
-                //                  packet=AllocPacket(sizeof( char ) + undeliveredMessages.GetNumberOfBytesUsed());
                 packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
                 if( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
                     packet->data[0] = ID_CONNECTION_ATTEMPT_FAILED; // Attempted a connection and couldn't
@@ -5262,8 +5217,6 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                     packet->data[0] = ID_CONNECTION_LOST; // DeadConnection
                 else
                     packet->data[0] = ID_DISCONNECTION_NOTIFICATION; // DeadConnection
-
-                //                  memcpy(packet->data+1, undeliveredMessages.GetData(), undeliveredMessages.GetNumberOfBytesUsed());
 
                 packet->guid = remoteSystem->guid;
                 packet->systemAddress = systemAddress;

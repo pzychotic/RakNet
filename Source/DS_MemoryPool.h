@@ -60,7 +60,6 @@ public:
 
 protected:
     int BlocksPerPage( void ) const;
-    void AllocateFirst( void );
     bool InitPage( Page* page, Page* prev, const char* file, unsigned int line );
 
     // availablePages contains pages which have room to give the user new blocks.  We return these blocks from the head of the list
@@ -75,7 +74,6 @@ template<class MemoryBlockType>
 MemoryPool<MemoryBlockType>::MemoryPool()
 {
 #ifndef _DISABLE_MEMORY_POOL
-    //AllocateFirst();
     availablePagesSize = 0;
     unavailablePagesSize = 0;
     memoryPoolPageSize = 16384;

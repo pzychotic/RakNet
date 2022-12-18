@@ -255,16 +255,6 @@ public:
     /// \param[in] worldId A \a worldId value previously added with AddWorld()
     void RemoveWorld( WorldId worldId );
 
-    /// \brief Get one of the WorldId values added with AddWorld()
-    /// \details WorldId 0 is created by default. Worlds will not necessarily be in the order added with AddWorld(). Edit RemoveWorld() changing RemoveAtIndexFast() to RemoveAtIndex() to preserve order.
-    /// \param[in] index A value between 0 and GetWorldCount()-1
-    /// \return One of the WorldId values added with AddWorld()
-    WorldId GetWorldIdAtIndex( unsigned int index );
-
-    /// \brief Returns the number of world id specifiers in memory, added with AddWorld() and removed with RemoveWorld()
-    /// \return The number of worlds added
-    unsigned int GetWorldCount( void ) const;
-
     /// \details Sets the networkIDManager instance that this plugin relys upon.<BR>
     /// Uses whatever instance is attached to RakPeerInterface if unset.<BR>
     /// To support multiple worlds, you should set it to a different manager for each instance of the plugin
@@ -366,8 +356,6 @@ struct LastSerializationResult
     /// The replica instance we serialized
     /// \note replica MUST be the first member of this struct because I cast from replica to LastSerializationResult in Update()
     Replica3* replica;
-    //bool neverSerialize;
-    //  bool isConstructed;
     RakNet::Time whenLastSerialized;
 
     void AllocBS( void );
@@ -701,7 +689,7 @@ protected:
     friend class ReplicaManager3;
 
 private:
-    Connection_RM3(){};
+    Connection_RM3(){}
 
     ConstructionMode constructionMode;
 };

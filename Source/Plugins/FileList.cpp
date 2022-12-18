@@ -57,12 +57,6 @@ static const unsigned HASH_LENGTH = 4;
 
 namespace RakNet {
 
-//int RAK_DLL_EXPORT FileListNodeComp( char * const &key, const FileListNode &data )
-//{
-//  return strcmp(key, data.filename);
-//}
-
-
 STATIC_FACTORY_DEFINITIONS( FileListProgress, FileListProgress )
 STATIC_FACTORY_DEFINITIONS( FLP_Printf, FLP_Printf )
 STATIC_FACTORY_DEFINITIONS( FileList, FileList )

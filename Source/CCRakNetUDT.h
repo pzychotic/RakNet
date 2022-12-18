@@ -37,7 +37,6 @@ typedef double MicrosecondsPerByte;
 
 /// CC_RAKNET_UDT_PACKET_HISTORY_LENGTH should be a power of 2 for the writeIndex variables to wrap properly
 #define CC_RAKNET_UDT_PACKET_HISTORY_LENGTH 64
-#define RTT_HISTORY_LENGTH 64
 
 /// Sizeof an UDP header in byte
 #define UDP_HEADER_SIZE 28
@@ -167,7 +166,6 @@ public:
     BytesPerMicrosecond GetLocalSendRate( void ) const { return 1.0 / SND; }
     BytesPerMicrosecond GetLocalReceiveRate( CCTimeType currentTime ) const;
     BytesPerMicrosecond GetRemoveReceiveRate( void ) const { return AS; }
-    //BytesPerMicrosecond GetEstimatedBandwidth(void) const {return B;}
     BytesPerMicrosecond GetEstimatedBandwidth( void ) const { return GetLinkCapacityBytesPerSecond() * 1000000.0; }
     double GetLinkCapacityBytesPerSecond( void ) const { return estimatedLinkCapacityBytesPerSecond; };
 
@@ -182,7 +180,6 @@ public:
     static bool GreaterThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
     /// Is a < b, accounting for variable overflow?
     static bool LessThan( DatagramSequenceNumberType a, DatagramSequenceNumberType b );
-    //  void SetTimeBetweenSendsLimit(unsigned int bitsPerSecond);
     uint64_t GetBytesPerSecondLimitByCongestionControl( void ) const;
 
 protected:
@@ -296,11 +293,6 @@ protected:
     /// This is to prevent speeding up faster than congestion control can compensate for
     CCTimeType lastUpdateWindowSizeAndAck;
 
-    /// Every time SND is halved due to timeout, the RTO is increased
-    /// This is to prevent massive retransmissions to an unresponsive system
-    /// Reset on any data arriving
-    double ExpCount;
-
     /// Total number of user data bytes sent
     /// Used to adjust the window size, on ACK, during slow start
     uint64_t totalUserDataBytesSent;
@@ -329,11 +321,6 @@ protected:
 
     bool hasWrittenToPacketPairReceiptHistory;
 
-    //  uint32_t rttHistory[RTT_HISTORY_LENGTH];
-    //  uint32_t rttHistoryIndex;
-    //  uint32_t rttHistoryWriteCount;
-    //  uint32_t rttSum, rttLow;
-    //  CCTimeType lastSndUpdateTime;
     double estimatedLinkCapacityBytesPerSecond;
 
     // --------------------------- PROTECTED METHODS ---------------------------
@@ -347,7 +334,6 @@ protected:
 
     /// Calculates the median an array of BytesPerMicrosecond
     static BytesPerMicrosecond CalculateListMedianRecursive( const BytesPerMicrosecond inputList[CC_RAKNET_UDT_PACKET_HISTORY_LENGTH], int inputListLength, int lessThanSum, int greaterThanSum );
-    //  static uint32_t CalculateListMedianRecursive(const uint32_t inputList[RTT_HISTORY_LENGTH], int inputListLength, int lessThanSum, int greaterThanSum);
 
     /// Same as GetRTOForRetransmission, but does not factor in ExpCount
     /// This is because the receiver does not know ExpCount for the sender, and even if it did, acks shouldn't be delayed for this reason
@@ -359,18 +345,11 @@ protected:
     /// Does the named conversion
     inline double BytesPerMicrosecondToPacketsPerMillisecond( BytesPerMicrosecond in );
 
-    /// Update the round trip time, from ACK or ACK2
-    //void UpdateRTT(CCTimeType rtt);
-
     /// Update the corresponding variables pre-slow start
     void UpdateWindowSizeAndAckOnAckPreSlowStart( double totalUserDataBytesAcked );
 
     /// Update the corresponding variables post-slow start
     void UpdateWindowSizeAndAckOnAckPerSyn( CCTimeType curTime, CCTimeType rtt, bool isContinuousSend, DatagramSequenceNumberType sequenceNumber );
-
-
-    /// Sets halveSNDOnNoDataTime to the future, and also resets ExpCount, which is used to multiple the RTO on no data arriving at all
-    void ResetOnDataArrivalHalveSNDOnNoDataTime( CCTimeType curTime );
 
     // Init array
     void InitPacketArrivalHistory( void );

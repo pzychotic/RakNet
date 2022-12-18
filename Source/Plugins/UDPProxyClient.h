@@ -157,12 +157,10 @@ public:
         SenderAndTargetAddress sata;
         RakNet::TimeMS startPingTime;
         SystemAddress coordinatorAddressForPings;
-        //DataStructures::Multilist<ML_UNORDERED_LIST, ServerWithPing> serversToPing;
         DataStructures::List<ServerWithPing> serversToPing;
         bool AreAllServersPinged( void ) const;
         void SendPingedServersToCoordinator( RakPeerInterface* rakPeerInterface );
     };
-    //DataStructures::Multilist<ML_UNORDERED_LIST, PingServerGroup*> pingServerGroups;
     DataStructures::List<PingServerGroup*> pingServerGroups;
 
 protected:

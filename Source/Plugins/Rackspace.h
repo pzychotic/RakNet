@@ -382,9 +382,6 @@ protected:
 
     TCPInterface* tcpInterface;
 
-    // RackspaceOperationType currentOperation;
-    // DataStructures::Queue<RackspaceOperation> nextOperationQueue;
-
     DataStructures::List<RackspaceOperation> operations;
     bool HasOperationOfType( RackspaceOperationType t );
     unsigned int GetOperationOfTypeIndex( RackspaceOperationType t );

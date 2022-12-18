@@ -66,9 +66,6 @@ protected:
     float gridWidth, gridHeight;
     int gridCellWidthCount, gridCellHeightCount;
 
-
-    // int gridWidth, gridHeight;
-
 #ifdef _USE_ORDERED_LIST
     DataStructures::OrderedList<void*, void*>* grid;
 #else

@@ -55,7 +55,6 @@ RakNetCommandParser::RakNetCommandParser()
     RegisterCommand( 0, "GetInternalID", "( void ) const;" );
     RegisterCommand( 1, "GetExternalID", "( const SystemAddress target ) const;" );
     RegisterCommand( 2, "SetTimeoutTime", "( RakNet::TimeMS timeMS, const SystemAddress target );" );
-    //  RegisterCommand(1,"SetMTUSize","( int size );");
     RegisterCommand( 0, "GetMTUSize", "( void ) const;" );
     RegisterCommand( 0, "GetNumberOfAddresses", "( void );" );
     RegisterCommand( 1, "GetLocalIP", "( unsigned int index );" );
@@ -236,12 +235,6 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
         peer->SetTimeoutTime( atoi( parameterList[0] ), SystemAddress( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    /*
-    else if (strcmp(command, "SetMTUSize")==0)
-    {
-        ReturnResult(peer->SetMTUSize(atoi(parameterList[0]), UNASSIGNED_SYSTEM_ADDRESS), command, transport, systemAddress);
-    }
-    */
     else if( strcmp( command, "GetMTUSize" ) == 0 )
     {
         ReturnResult( peer->GetMTUSize( UNASSIGNED_SYSTEM_ADDRESS ), command, transport, systemAddress );
