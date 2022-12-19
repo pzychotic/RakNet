@@ -36,14 +36,11 @@ namespace RakNet {
 // Use the functions for a DLL, or just reassign the variable if using source
 extern RAK_DLL_EXPORT void* ( *rakMalloc )( size_t size );
 extern RAK_DLL_EXPORT void* ( *rakRealloc )( void* p, size_t size );
-extern RAK_DLL_EXPORT void ( *rakFree )( void* p );
+extern RAK_DLL_EXPORT void  ( *rakFree )( void* p );
 extern RAK_DLL_EXPORT void* ( *rakMalloc_Ex )( size_t size, const char* file, unsigned int line );
 extern RAK_DLL_EXPORT void* ( *rakRealloc_Ex )( void* p, size_t size, const char* file, unsigned int line );
-extern RAK_DLL_EXPORT void ( *rakFree_Ex )( void* p, const char* file, unsigned int line );
-extern RAK_DLL_EXPORT void ( *notifyOutOfMemory )( const char* file, const long line );
-extern RAK_DLL_EXPORT void* ( *dlMallocMMap )( size_t size );
-extern RAK_DLL_EXPORT void* ( *dlMallocDirectMMap )( size_t size );
-extern RAK_DLL_EXPORT int ( *dlMallocMUnmap )( void* ptr, size_t size );
+extern RAK_DLL_EXPORT void  ( *rakFree_Ex )( void* p, const char* file, unsigned int line );
+extern RAK_DLL_EXPORT void  ( *notifyOutOfMemory )( const char* file, const long line );
 
 // Change to a user defined allocation function
 void RAK_DLL_EXPORT SetMalloc( void* ( *userFunction )( size_t size ) );
@@ -54,19 +51,13 @@ void RAK_DLL_EXPORT SetRealloc_Ex( void* ( *userFunction )( void* p, size_t size
 void RAK_DLL_EXPORT SetFree_Ex( void ( *userFunction )( void* p, const char* file, unsigned int line ) );
 // Change to a user defined out of memory function
 void RAK_DLL_EXPORT SetNotifyOutOfMemory( void ( *userFunction )( const char* file, const long line ) );
-void RAK_DLL_EXPORT SetDLMallocMMap( void* ( *userFunction )( size_t size ) );
-void RAK_DLL_EXPORT SetDLMallocDirectMMap( void* ( *userFunction )( size_t size ) );
-void RAK_DLL_EXPORT SetDLMallocMUnmap( int ( *userFunction )( void* ptr, size_t size ) );
 
 extern RAK_DLL_EXPORT void* ( *GetMalloc() )( size_t size );
 extern RAK_DLL_EXPORT void* ( *GetRealloc() )( void* p, size_t size );
-extern RAK_DLL_EXPORT void ( *GetFree() )( void* p );
+extern RAK_DLL_EXPORT void  ( *GetFree() )( void* p );
 extern RAK_DLL_EXPORT void* ( *GetMalloc_Ex() )( size_t size, const char* file, unsigned int line );
 extern RAK_DLL_EXPORT void* ( *GetRealloc_Ex() )( void* p, size_t size, const char* file, unsigned int line );
-extern RAK_DLL_EXPORT void ( *GetFree_Ex() )( void* p, const char* file, unsigned int line );
-extern RAK_DLL_EXPORT void* ( *GetDLMallocMMap() )( size_t size );
-extern RAK_DLL_EXPORT void* ( *GetDLMallocDirectMMap() )( size_t size );
-extern RAK_DLL_EXPORT int ( *GetDLMallocMUnmap() )( void* ptr, size_t size );
+extern RAK_DLL_EXPORT void  ( *GetFree_Ex() )( void* p, const char* file, unsigned int line );
 
 template<class Type>
 RAK_DLL_EXPORT Type* OP_NEW( const char* file, unsigned int line )
@@ -201,24 +192,10 @@ RAK_DLL_EXPORT void OP_DELETE_ARRAY( Type* buff, const char* file, unsigned int 
 
 void RAK_DLL_EXPORT* _RakMalloc( size_t size );
 void RAK_DLL_EXPORT* _RakRealloc( void* p, size_t size );
-void RAK_DLL_EXPORT _RakFree( void* p );
+void RAK_DLL_EXPORT  _RakFree( void* p );
 void RAK_DLL_EXPORT* _RakMalloc_Ex( size_t size, const char* file, unsigned int line );
 void RAK_DLL_EXPORT* _RakRealloc_Ex( void* p, size_t size, const char* file, unsigned int line );
-void RAK_DLL_EXPORT _RakFree_Ex( void* p, const char* file, unsigned int line );
-void RAK_DLL_EXPORT* _DLMallocMMap( size_t size );
-void RAK_DLL_EXPORT* _DLMallocDirectMMap( size_t size );
-int RAK_DLL_EXPORT _DLMallocMUnmap( void* p, size_t size );
-
-// Call to make RakNet allocate a large block of memory, and do all subsequent allocations in that memory block
-// Initial and reallocations will be done through whatever function is pointed to by yourMMapFunction, and yourDirectMMapFunction (default is malloc)
-// Allocations will be freed through whatever function is pointed to by yourMUnmapFunction (default free)
-void UseRaknetFixedHeap( size_t initialCapacity,
-                         void* ( *yourMMapFunction )( size_t size ) = _DLMallocMMap,
-                         void* ( *yourDirectMMapFunction )( size_t size ) = _DLMallocDirectMMap,
-                         int ( *yourMUnmapFunction )( void* p, size_t size ) = _DLMallocMUnmap );
-
-// Free memory allocated from UseRaknetFixedHeap
-void FreeRakNetFixedHeap( void );
+void RAK_DLL_EXPORT  _RakFree_Ex( void* p, const char* file, unsigned int line );
 
 } // namespace RakNet
 
