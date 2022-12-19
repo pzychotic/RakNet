@@ -44,24 +44,19 @@ namespace RakNet {
 
 RakNetSocket2* RakNetSocket2Allocator::AllocRNS2( void )
 {
-    RakNetSocket2* s2 = RakNet::OP_NEW<RNS2_Berkley>( _FILE_AND_LINE_ );
-#if defined( _WIN32 )
-    s2->SetSocketType( RNS2T_WINDOWS );
-#else
-    s2->SetSocketType( RNS2T_LINUX );
-#endif
-    return s2;
+    return RakNet::OP_NEW<RNS2_Berkley>( _FILE_AND_LINE_ );
 }
-void RakNetSocket2Allocator::DeallocRNS2( RakNetSocket2* s ) { RakNet::OP_DELETE( s, _FILE_AND_LINE_ ); }
+void RakNetSocket2Allocator::DeallocRNS2( RakNetSocket2* s )
+{
+    RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
+}
 
 RakNetSocket2::RakNetSocket2() { eventHandler = 0; }
 RakNetSocket2::~RakNetSocket2() {}
 void RakNetSocket2::SetRecvEventHandler( RNS2EventHandler* _eventHandler ) { eventHandler = _eventHandler; }
-RNS2Type RakNetSocket2::GetSocketType( void ) const { return socketType; }
-void RakNetSocket2::SetSocketType( RNS2Type t ) { socketType = t; }
 bool RakNetSocket2::IsBerkleySocket( void ) const
 {
-    return socketType != RNS2T_CHROME && socketType != RNS2T_WINDOWS_STORE_8;
+    return true;
 }
 SystemAddress RakNetSocket2::GetBoundAddress( void ) const { return boundAddress; }
 

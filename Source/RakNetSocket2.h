@@ -35,19 +35,6 @@ enum RNS2BindResult
 
 typedef int RNS2SendResult;
 
-enum RNS2Type
-{
-    RNS2T_WINDOWS_STORE_8,
-    RNS2T_PS3,
-    RNS2T_PS4,
-    RNS2T_CHROME,
-    RNS2T_VITA,
-    RNS2T_XBOX_360,
-    RNS2T_XBOX_720,
-    RNS2T_WINDOWS,
-    RNS2T_LINUX
-};
-
 struct RNS2_SendParameters
 {
     RNS2_SendParameters() { ttl = 0; }
@@ -94,8 +81,6 @@ public:
     // In order for the handler to trigger, some platforms must call PollRecvFrom, some platforms this create an internal thread.
     void SetRecvEventHandler( RNS2EventHandler* _eventHandler );
     virtual RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line ) = 0;
-    RNS2Type GetSocketType( void ) const;
-    void SetSocketType( RNS2Type t );
     bool IsBerkleySocket( void ) const;
     SystemAddress GetBoundAddress( void ) const;
     unsigned int GetUserConnectionSocketIndex( void ) const;
@@ -108,7 +93,6 @@ public:
 
 protected:
     RNS2EventHandler* eventHandler;
-    RNS2Type socketType;
     SystemAddress boundAddress;
     unsigned int userConnectionSocketIndex;
 };
