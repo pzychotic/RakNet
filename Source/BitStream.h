@@ -26,11 +26,6 @@
 #include "RakWString.h"
 #include "RakAssert.h"
 
-// MSWin uses _copysign, others use copysign...
-#ifndef _WIN32
-#define _copysign copysign
-#endif
-
 namespace RakNet {
 
 /// This class allows you to write and read native types as a string of bits.  BitStream is used extensively throughout RakNet and is designed to be used by users as well.
@@ -1632,7 +1627,6 @@ void BitStream::WriteOrthMatrix(
     templateType m10, templateType m11, templateType m12,
     templateType m20, templateType m21, templateType m22 )
 {
-
     double qw;
     double qx;
     double qy;
@@ -1665,9 +1659,9 @@ void BitStream::WriteOrthMatrix(
         qy = 0.0;
     if( qz < 0.0 )
         qz = 0.0;
-    qx = _copysign( (double)qx, (double)( m21 - m12 ) );
-    qy = _copysign( (double)qy, (double)( m02 - m20 ) );
-    qz = _copysign( (double)qz, (double)( m10 - m01 ) );
+    qx = std::copysign( qx, (double)( m21 - m12 ) );
+    qy = std::copysign( qy, (double)( m02 - m20 ) );
+    qz = std::copysign( qz, (double)( m10 - m01 ) );
 
     WriteNormQuat( qw, qx, qy, qz );
 }
