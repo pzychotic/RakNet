@@ -17,6 +17,142 @@
 
 namespace RakNet {
 
+#if RAKNET_SUPPORT_IPV6 == 1
+
+void PrepareAddrInfoHints2( addrinfo* hints )
+{
+    memset( hints, 0, sizeof( addrinfo ) ); // make sure the struct is empty
+    hints->ai_socktype = SOCK_DGRAM;        // UDP sockets
+    hints->ai_flags = AI_PASSIVE;           // fill in my IP for me
+}
+
+void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
+{
+    int idx = 0;
+    char ac[80];
+    int err = gethostname( ac, sizeof( ac ) );
+    RakAssert( err != -1 );
+
+    struct addrinfo hints;
+    struct addrinfo *servinfo = 0, *aip; // will point to the results
+    PrepareAddrInfoHints2( &hints );
+    getaddrinfo( ac, "", &hints, &servinfo );
+
+    for( idx = 0, aip = servinfo; aip != NULL && idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS; aip = aip->ai_next, idx++ )
+    {
+        if( aip->ai_family == AF_INET )
+        {
+            struct sockaddr_in* ipv4 = (struct sockaddr_in*)aip->ai_addr;
+            memcpy( &addresses[idx].address.addr4, ipv4, sizeof( sockaddr_in ) );
+        }
+        else
+        {
+            struct sockaddr_in6* ipv6 = (struct sockaddr_in6*)aip->ai_addr;
+            memcpy( &addresses[idx].address.addr4, ipv6, sizeof( sockaddr_in6 ) );
+        }
+    }
+
+    freeaddrinfo( servinfo ); // free the linked-list
+
+    while( idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS )
+    {
+        addresses[idx] = UNASSIGNED_SYSTEM_ADDRESS;
+        idx++;
+    }
+}
+
+#else
+
+#if( defined( __GNUC__ ) || defined( __GCCXML__ ) ) && !defined( __WIN32__ )
+#include <netdb.h>
+#endif
+void GetMyIP_Windows_Linux_IPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
+{
+    int idx = 0;
+    char ac[80];
+    int err = gethostname( ac, sizeof( ac ) );
+    (void)err;
+    RakAssert( err != -1 );
+
+    struct hostent* phe = gethostbyname( ac );
+
+    if( phe == 0 )
+    {
+        RakAssert( phe != 0 );
+        return;
+    }
+    for( idx = 0; idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS; ++idx )
+    {
+        if( phe->h_addr_list[idx] == 0 )
+            break;
+
+        memcpy( &addresses[idx].address.addr4.sin_addr, phe->h_addr_list[idx], sizeof( struct in_addr ) );
+    }
+
+    while( idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS )
+    {
+        addresses[idx] = UNASSIGNED_SYSTEM_ADDRESS;
+        idx++;
+    }
+}
+
+#endif // RAKNET_SUPPORT_IPV6==1
+
+void GetMyIP_Windows_Linux( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
+{
+#if RAKNET_SUPPORT_IPV6 == 1
+    GetMyIP_Windows_Linux_IPV4And6( addresses );
+#else
+    GetMyIP_Windows_Linux_IPV4( addresses );
+#endif
+}
+
+RNS2SendResult RNS2_Berkley::Send_NoVDP( RNS2Socket rns2Socket, RNS2_SendParameters* sendParameters, const char* file, unsigned int line )
+{
+    (void)file;
+    (void)line;
+
+    int len = 0;
+    do
+    {
+        int oldTTL = -1;
+        if( sendParameters->ttl > 0 )
+        {
+            socklen_t opLen = sizeof( oldTTL );
+            // Get the current TTL
+            if( getsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, &opLen ) != -1 )
+            {
+                int newTTL = sendParameters->ttl;
+                setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&newTTL, sizeof( newTTL ) );
+            }
+        }
+
+        if( sendParameters->systemAddress.address.addr4.sin_family == AF_INET )
+        {
+            len = sendto__( rns2Socket, sendParameters->data, sendParameters->length, 0, (const sockaddr*)&sendParameters->systemAddress.address.addr4, sizeof( sockaddr_in ) );
+        }
+        else
+        {
+#if RAKNET_SUPPORT_IPV6 == 1
+            len = sendto__( rns2Socket, sendParameters->data, sendParameters->length, 0, (const sockaddr*)&sendParameters->systemAddress.address.addr6, sizeof( sockaddr_in6 ) );
+#endif
+        }
+
+        if( len < 0 )
+        {
+            RAKNET_DEBUG_PRINTF( "sendto failed with code %i for char %i and length %i.\n", len, sendParameters->data[0], sendParameters->length );
+        }
+
+        if( oldTTL != -1 )
+        {
+            setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, sizeof( oldTTL ) );
+        }
+
+    } while( len == 0 );
+
+    return len;
+}
+
 void RNS2_Berkley::SetSocketOptions( void )
 {
     // This doubles the max throughput rate
@@ -29,7 +165,6 @@ void RNS2_Berkley::SetSocketOptions( void )
     sock_opt = 0;
     r = setsockopt__( rns2Socket, SOL_SOCKET, SO_LINGER, (char*)&sock_opt, sizeof( sock_opt ) );
     // Do not assert, ignore failure
-
 
     // This doesn't make much difference: 10% maybe
     sock_opt = 1024 * 16;
@@ -53,7 +188,6 @@ void RNS2_Berkley::SetBroadcastSocket( int broadcast )
 }
 void RNS2_Berkley::SetIPHdrIncl( int ipHdrIncl )
 {
-
     setsockopt__( rns2Socket, IPPROTO_IP, IP_HDRINCL, (char*)&ipHdrIncl, sizeof( ipHdrIncl ) );
 }
 void RNS2_Berkley::SetDoNotFragment( int opt )
@@ -140,7 +274,6 @@ void RNS2_Berkley::GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddres
 
 RNS2BindResult RNS2_Berkley::BindSharedIPV4( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line )
 {
-
     (void)file;
     (void)line;
 
@@ -234,7 +367,6 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4( RNS2_BerkleyBindParameters* bindPar
 }
 RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line )
 {
-
     (void)file;
     (void)line;
     (void)bindParameters;
@@ -357,7 +489,6 @@ void RNS2_Berkley::RecvFromBlockingIPV4And6( RNS2RecvStruct* recvFromStruct )
             //  systemAddressOut->address.addr6.sin6_port=ntohs( systemAddressOut->address.addr6.sin6_port );
         }
     }
-
 
 #else
     (void)recvFromStruct;

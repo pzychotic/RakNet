@@ -147,24 +147,13 @@ struct RNS2_BerkleyBindParameters
     RNS2EventHandler* eventHandler;
 };
 
-// Every platform can use the Berkley sockets interface
-class IRNS2_Berkley : public RakNetSocket2
-{
-public:
-    // ----------- STATICS ------------
-    // For addressFamily, use AF_INET
-    // For type, use SOCK_DGRAM
-    static bool IsPortInUse( unsigned short port, const char* hostAddress, unsigned short addressFamily, int type );
-
-    // ----------- MEMBERS ------------
-    virtual RNS2BindResult Bind( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line ) = 0;
-};
-// Every platform that uses Berkley sockets, except native client, can compile some common functions
-class RNS2_Berkley : public IRNS2_Berkley
+// Every platform that uses Berkley sockets, can compile some common functions
+class RNS2_Berkley : public RakNetSocket2
 {
 public:
     RNS2_Berkley();
     virtual ~RNS2_Berkley();
+
     int CreateRecvPollingThread( int threadPriority );
     void SignalStopRecvPollingThread( void );
     void BlockOnStopRecvPollingThread( void );
@@ -172,14 +161,23 @@ public:
     RNS2Socket GetSocket( void ) const;
     void SetDoNotFragment( int opt );
 
+    RNS2BindResult Bind( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
+    RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
+
     void SetSocketLayerOverride( SocketLayerOverride* _slo );
     SocketLayerOverride* GetSocketLayerOverride( void );
+
+    // For addressFamily, use AF_INET
+    // For type, use SOCK_DGRAM
+    static bool IsPortInUse( unsigned short port, const char* hostAddress, unsigned short addressFamily, int type );
 
 protected:
     // Used by other classes
     RNS2BindResult BindShared( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
     RNS2BindResult BindSharedIPV4( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
     RNS2BindResult BindSharedIPV4And6( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
+
+    static RNS2SendResult Send_NoVDP( RNS2Socket rns2Socket, RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
 
     static void GetSystemAddressIPV4( RNS2Socket rns2Socket, SystemAddress* systemAddressOut );
     static void GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddress* systemAddressOut );
@@ -204,41 +202,5 @@ protected:
     SocketLayerOverride* slo;
     static void RecvFromLoop( void* arg );
 };
-
-
-#if defined( _WIN32 ) || defined( __GNUC__ ) || defined( __GCCXML__ ) || defined( __S3E__ )
-class RNS2_Windows_Linux_360
-{
-public:
-protected:
-    static RNS2SendResult Send_Windows_Linux_360NoVDP( RNS2Socket rns2Socket, RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
-};
-#endif
-
-#if defined( _WIN32 )
-
-class RNS2_Windows : public RNS2_Berkley, public RNS2_Windows_Linux_360
-{
-public:
-    RNS2_Windows();
-    virtual ~RNS2_Windows();
-    RNS2BindResult Bind( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
-    RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
-    // ----------- STATICS ------------
-    static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-};
-
-#else
-class RNS2_Linux : public RNS2_Berkley, public RNS2_Windows_Linux_360
-{
-public:
-    RNS2BindResult Bind( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
-    RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
-
-    // ----------- STATICS ------------
-    static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-};
-
-#endif // Linux
 
 } // namespace RakNet
