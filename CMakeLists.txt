@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.8 )
+cmake_minimum_required( VERSION 3.10 )
 
 project( RakNet )
 
@@ -13,6 +13,9 @@ option( RAKNET_ENABLE_DLL       "Generate the DLL project if true."             
 option( RAKNET_ENABLE_STATIC    "Generate the static library project if true."          TRUE )
 option( RAKNET_ENABLE_PLUGINS   "Include sources from Plugins directory in the build."  TRUE )
 option( RAKNET_ENABLE_TESTS     "Generate the test project if true. Needs static lib!"  TRUE )
+
+set( CMAKE_CXX_STANDARD 17 )
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
 if( MSVC )
     add_definitions( -D_CRT_SECURE_NO_WARNINGS )

@@ -1,5 +1,5 @@
 if( RAKNET_ENABLE_PLUGINS )
-add_subdirectory( Plugins )
+    add_subdirectory( Plugins )
 endif()
 
 file( GLOB CURRENT_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/*.h )
