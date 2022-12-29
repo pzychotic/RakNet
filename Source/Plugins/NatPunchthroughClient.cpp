@@ -17,7 +17,6 @@
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 #include "GetTime.h"
-#include "Itoa.h"
 #include "RakString.h"
 
 namespace RakNet {
@@ -804,15 +803,6 @@ void NatPunchthroughClient::OnClosedConnection( const SystemAddress& systemAddre
             failedAttemptList.RemoveAtIndexFast( i );
         }
     }
-}
-void NatPunchthroughClient::GetUPNPPortMappings( char* externalPort, char* internalPort, const SystemAddress& natPunchthroughServerAddress )
-{
-    DataStructures::List<RakNetSocket2*> sockets;
-    rakPeerInterface->GetSockets( sockets );
-    Itoa( sockets[0]->GetBoundAddress().GetPort(), internalPort, 10 );
-    if( mostRecentExternalPort == 0 )
-        mostRecentExternalPort = rakPeerInterface->GetExternalID( natPunchthroughServerAddress ).GetPort();
-    Itoa( mostRecentExternalPort, externalPort, 10 );
 }
 void NatPunchthroughClient::OnFailureNotification( Packet* packet )
 {
