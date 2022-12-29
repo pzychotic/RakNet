@@ -15,10 +15,12 @@
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 #include "TCPInterface.h"
-#include "RakSleep.h"
 #include "RakNetDefines.h"
 #include "DS_Queue.h"
 //#include "GetTime.h"
+
+#include <chrono>
+#include <thread>
 
 namespace RakNet {
 
@@ -359,7 +361,7 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
     while( gotBlockingReturnValue == false )
     {
         // TODO - block, filter until gotBlockingReturnValue==true or ID_CONNECTION_LOST or ID_DISCONNECTION_NOTIFICXATION or ID_RPC_REMOTE_ERROR/RPC_ERROR_FUNCTION_NOT_REGISTERED
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
 
         packet = rakPeerInterface->Receive();
 

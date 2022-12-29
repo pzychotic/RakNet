@@ -16,10 +16,12 @@
 #include "MTUSize.h"
 #include "SocketLayer.h"
 #include "WSAStartupSingleton.h"
-#include "RakSleep.h"
 #include "RakThread.h"
 #include "SocketDefines.h"
 #include "errno.h"
+
+#include <chrono>
+#include <thread>
 
 #ifndef INVALID_SOCKET
 #define INVALID_SOCKET -1
@@ -79,7 +81,7 @@ void UDPForwarder::Startup( void )
     }
 
     while( threadRunning == 0 )
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
 }
 void UDPForwarder::Shutdown( void )
 {
@@ -88,7 +90,7 @@ void UDPForwarder::Shutdown( void )
     isRunning--;
 
     while( threadRunning > 0 )
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
 
     unsigned int j;
     for( j = 0; j < forwardListNotUpdated.Size(); j++ )
@@ -136,7 +138,7 @@ UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAd
 
     while( 1 )
     {
-        RakSleep( 0 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
         std::lock_guard<std::mutex> guard( startForwardingOutputMutex );
         for( unsigned int i = 0; i < startForwardingOutput.Size(); i++ )
         {
@@ -535,12 +537,16 @@ void UpdateUDPForwarderGlobal( void* arg )
         udpForwarder->UpdateUDPForwarder();
 
         // 12/1/2010 Do not change from 0
-        // See http://www.jenkinssoftware.com/forum/index.php?topic=4033.0;topicseen
+        // See http://www.jenkinssoftware.com/forum/index.php?topic=4033.0
         // Avoid 100% reported CPU usage
         if( udpForwarder->forwardListNotUpdated.Size() == 0 )
-            RakSleep( 30 );
+        {
+            std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
+        }
         else
-            RakSleep( 0 );
+        {
+            std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
+        }
     }
     udpForwarder->threadRunning--;
 }

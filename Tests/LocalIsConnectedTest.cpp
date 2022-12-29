@@ -10,6 +10,9 @@
 
 #include "LocalIsConnectedTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description:
 Tests
@@ -70,7 +73,7 @@ int LocalIsConnectedTest::RunTest( DataStructures::List<RakString> params, bool 
             lastConnect = client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 ) == CONNECTION_ATTEMPT_STARTED;
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !lastConnect ) //Use thise method to only check if the connect function fails, detecting connected client is done next
@@ -94,7 +97,7 @@ int LocalIsConnectedTest::RunTest( DataStructures::List<RakString> params, bool 
         return 3;
     }
 
-    RakSleep( 1000 );
+    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
     client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 );
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true ) )
@@ -114,7 +117,7 @@ int LocalIsConnectedTest::RunTest( DataStructures::List<RakString> params, bool 
             client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )

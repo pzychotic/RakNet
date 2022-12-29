@@ -26,7 +26,6 @@ typedef int socklen_t;
 #include <string.h>
 #include "RakAssert.h"
 #include <stdio.h>
-#include "RakSleep.h"
 #include "RakThread.h"
 #include "StringCompressor.h"
 #include "StringTable.h"
@@ -44,6 +43,8 @@ typedef int socklen_t;
 #endif
 
 #include <charconv>
+#include <chrono>
+#include <thread>
 
 namespace RakNet {
 
@@ -191,7 +192,9 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
         return false;
 
     while( threadRunning == 0 )
-        RakSleep( 0 );
+    {
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
+    }
 
     unsigned int i;
     for( i = 0; i < messageHandlerList.Size(); i++ )
@@ -236,9 +239,11 @@ void TCPInterface::Stop( void )
 
     // Wait for the thread to stop
     while( threadRunning > 0 )
-        RakSleep( 15 );
+    {
+        std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
+    }
 
-    RakSleep( 100 );
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     listenSocket = 0;
 
@@ -1116,7 +1121,7 @@ void UpdateTCPInterfaceLoop( void* arg )
         }
 
         // Sleep 0 on Linux monopolizes the CPU
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     }
     sts->threadRunning--;
 

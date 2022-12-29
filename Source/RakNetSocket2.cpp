@@ -11,7 +11,6 @@
 #include "RakNetSocket2.h"
 #include "RakMemoryOverride.h"
 #include "RakAssert.h"
-#include "RakSleep.h"
 #include "RakThread.h"
 #include "SocketDefines.h"
 #include "GetTime.h"
@@ -147,7 +146,7 @@ unsigned RNS2_Berkley::RecvFromLoopInt( void )
             }
             else
             {
-                RakSleep( 0 );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
                 binding.eventHandler->DeallocRNS2RecvStruct( recvFromStruct, _FILE_AND_LINE_ );
             }
         }
@@ -198,7 +197,7 @@ void RNS2_Berkley::BlockOnStopRecvPollingThread( void )
     {
         // Get recvfrom to unblock
         Send( &bsp, _FILE_AND_LINE_ );
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     }
 }
 const RNS2_BerkleyBindParameters* RNS2_Berkley::GetBindings( void ) const { return &binding; }
@@ -216,7 +215,7 @@ RNS2BindResult RNS2_Berkley::Bind( RNS2_BerkleyBindParameters* bindParameters, c
     if( bindResult == BR_FAILED_TO_BIND_SOCKET )
     {
         // Sometimes windows will fail if the socket is recreated too quickly
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
         bindResult = BindShared( bindParameters, file, line );
     }
     return bindResult;

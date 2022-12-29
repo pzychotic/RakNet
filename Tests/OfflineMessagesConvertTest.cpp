@@ -10,6 +10,9 @@
 
 #include "OfflineMessagesConvertTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description:
 Description: Tests / Demonstrates sending messages to systems you are not connected to.
@@ -77,7 +80,7 @@ int OfflineMessagesConvertTest::RunTest( DataStructures::List<RakString> params,
         printf( "Systems started.  Waiting for advertise system packet\n" );
 
     // Wait for connection to complete
-    RakSleep( 300 );
+    std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
 
     if( isVerbose )
         printf( "Sending advertise system from %s\n", peer1->GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS ).ToString() );
@@ -169,7 +172,7 @@ int OfflineMessagesConvertTest::RunTest( DataStructures::List<RakString> params,
             peer2->DeallocatePacket( packet );
         }
 
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     }
 
     if( !recievedProperOfflineData )

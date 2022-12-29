@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include "Rand.h"
 #include "RakNetStatistics.h"
-#include "RakSleep.h"
 #include "RakMemoryOverride.h"
 
 #include "DebugTools.h"

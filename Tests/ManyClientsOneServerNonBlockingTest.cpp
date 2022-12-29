@@ -10,6 +10,9 @@
 
 #include "ManyClientsOneServerNonBlockingTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 What is being done here is having 256 clients connect to one server, disconnect, connect again.
 
@@ -105,7 +108,7 @@ int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString
             }
         }
 
-        //RakSleep(100);
+        //std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
         //Connect
 
@@ -276,7 +279,7 @@ int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString
                 packet = clientList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     entryTime = GetTimeMS();
@@ -432,7 +435,7 @@ int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString
                 packet = clientList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     //Connect
@@ -610,7 +613,7 @@ int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString
                 packet = clientList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     for( int i = 0; i < clientNum; i++ )

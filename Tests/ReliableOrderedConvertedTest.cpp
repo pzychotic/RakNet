@@ -10,6 +10,9 @@
 
 #include "ReliableOrderedConvertedTest.h"
 
+#include <chrono>
+#include <thread>
+
 FILE* fp;
 int memoryUsage = 0;
 
@@ -327,7 +330,7 @@ int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> param
             packet = receiver->Receive();
         }
 
-        RakSleep( 0 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
 
         currentTime = GetTimeMS();
     }

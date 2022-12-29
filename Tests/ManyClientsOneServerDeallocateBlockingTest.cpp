@@ -10,6 +10,9 @@
 
 #include "ManyClientsOneServerDeallocateBlockingTest.h"
 
+#include <chrono>
+#include <thread>
+
 void ManyClientsOneServerDeallocateBlockingTest::WaitForConnectionRequestsToComplete( RakPeerInterface** clientList, int clientNum, bool isVerbose )
 {
     bool msgWasPrinted = false;
@@ -26,7 +29,7 @@ void ManyClientsOneServerDeallocateBlockingTest::WaitForConnectionRequestsToComp
                 msgWasPrinted = true;
             }
 
-            RakSleep( 30 );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
         }
     }
 }
@@ -101,7 +104,7 @@ void ManyClientsOneServerDeallocateBlockingTest::WaitAndPrintResults( RakPeerInt
         }
     }
 
-    //RakSleep(100);
+    //std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     // Log all events per peer
     for( int i = 0; i < clientNum; i++ ) //Receive for all peers
@@ -299,7 +302,7 @@ int ManyClientsOneServerDeallocateBlockingTest::RunTest( DataStructures::List<Ra
             }
         }
 
-        RakSleep( 2000 ); //Allow connections to timeout.
+        std::this_thread::sleep_for( std::chrono::milliseconds( 2000 ) ); //Allow connections to timeout.
 
         //Connect
 
@@ -328,7 +331,7 @@ int ManyClientsOneServerDeallocateBlockingTest::RunTest( DataStructures::List<Ra
 
     printf( "Connecting clients\n" );
 
-    RakSleep( 2000 ); //Allow connections to timeout.
+    std::this_thread::sleep_for( std::chrono::milliseconds( 2000 ) ); //Allow connections to timeout.
 
     //Connect
 

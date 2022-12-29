@@ -10,6 +10,9 @@
 
 #include "ConnectWithSocketTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description:
 virtual ConnectionAttemptResult RakPeerInterface::ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey=0, unsigned sendConnectionAttemptCount=12, unsigned timeBetweenSendConnectionAttemptsMS=500, RakNet::TimeMS timeoutTime=0 )
@@ -85,7 +88,7 @@ int ConnectWithSocketTest::RunTest( DataStructures::List<RakString> params, bool
             client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, theSocket );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
@@ -124,7 +127,7 @@ int ConnectWithSocketTest::RunTest( DataStructures::List<RakString> params, bool
             client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, theSocket );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )

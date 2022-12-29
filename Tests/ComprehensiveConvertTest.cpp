@@ -10,6 +10,9 @@
 
 #include "ComprehensiveConvertTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description: Does a little bit of everything forever. This is an internal sample just to see if RakNet crashes or leaks memory over a long period of time.
 
@@ -275,7 +278,7 @@ int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, b
         for( i = 0; i < NUM_PEERS; i++ )
             peers[i]->DeallocatePacket( peers[i]->Receive() );
 
-        RakSleep( 0 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
     }
 
 

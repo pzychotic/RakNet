@@ -17,7 +17,6 @@
 #include "MessageIdentifiers.h"
 #include "BitStream.h"
 #include "RakPeer.h"
-#include "RakSleep.h"
 #include "DebugTools.h"
 #include "CommonFunctions.h"
 #include "RakTimer.h"

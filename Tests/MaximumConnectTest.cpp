@@ -10,6 +10,9 @@
 
 #include "MaximumConnectTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 What is being done here is having 8 peers all connect to eachother over the max defined connection.
 
@@ -166,7 +169,7 @@ int MaximumConnectTest::RunTest( DataStructures::List<RakString> params, bool is
                 packet = peerList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     DataStructures::List<SystemAddress> systemList;

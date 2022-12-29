@@ -21,8 +21,10 @@
 #include "TCPInterface.h"
 #include "GetTime.h"
 #include "BitStream.h"
-#include "RakSleep.h"
+
 #include <stdio.h>
+#include <chrono>
+#include <thread>
 
 namespace RakNet {
 
@@ -56,7 +58,7 @@ const char* EmailSender::Send( const char* hostAddress, unsigned short hostPort,
             }
             break;
         }
-        RakSleep( 250 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
     }
 
     if( packet == 0 )
@@ -292,7 +294,7 @@ const char* EmailSender::Send( const char* hostAddress, unsigned short hostPort,
 
     tcpInterface.Send( "QUIT\r\n", (unsigned int)strlen( "QUIT\r\n" ), emailServer, false );
 
-    RakSleep( 30 );
+    std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     if( doPrintf )
     {
         packet = tcpInterface.Receive();
@@ -355,7 +357,7 @@ const char* EmailSender::GetResponse( TCPInterface* tcpInterface, const SystemAd
         }
         if( RakNet::GetTimeMS() > timeout )
             return "Timed out";
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 }
 

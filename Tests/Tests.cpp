@@ -23,9 +23,7 @@ when adding new test cases. While I do not use the paramslist, it is available.
 
 int main( int argc, char* argv[] )
 {
-
     int returnVal;
-    char str[512];
     int numTests = 0;
     int testListSize = 0;
     int passedTests = 0;

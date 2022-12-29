@@ -10,6 +10,9 @@
 
 #include "PeerConnectDisconnectWithCancelPendingTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 What is being done here is having 8 peers all connect to eachother, disconnect, connect again.
 
@@ -105,7 +108,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
             }
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
         //Clear pending if not finished
 
         for( int i = 0; i < peerNum; i++ )
@@ -119,7 +122,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
             }
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
         //Connect
 
         for( int i = 0; i < peerNum; i++ )
@@ -234,7 +237,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
                 packet = peerList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     while( GetTimeMS() - entryTime < 2000 ) //Run for 2 Secoonds to process incoming disconnects
@@ -318,7 +321,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
                 packet = peerList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     //Connect
@@ -330,7 +333,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
             peerList[i]->CancelConnectionAttempt( SystemAddress( "127.0.0.1", 60000 + j ) ); //Make sure a connection is not pending before trying to connect.
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
         for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
         {
@@ -436,7 +439,7 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
                 packet = peerList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     for( int i = 0; i < peerNum; i++ )

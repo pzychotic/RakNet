@@ -10,6 +10,9 @@
 
 #include "EightPeerTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 What is being done here is having 8 peers all connect to eachother and be
 connected. Then it check if they all connect. If so send data in ordered reliable mode for 100
@@ -124,7 +127,7 @@ int EightPeerTest::RunTest( DataStructures::List<RakString> params, bool isVerbo
 
         if( k >= numPackets - 3 ) //This is our last 3 packets, give it time to send packet and arrive on interface, 2 seconds is more than enough
         {
-            RakSleep( 300 );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
             if( k == numPackets )
             {
                 finishTimer = GetTimeMS();
@@ -143,7 +146,7 @@ int EightPeerTest::RunTest( DataStructures::List<RakString> params, bool isVerbo
 
                     if( !packet )
                     {
-                        RakSleep( 1 );
+                        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
                     }
 
                     if( waittime > 1000 ) //Check for packet every millisec and if one second has passed move on, don't block execution
@@ -277,7 +280,7 @@ int EightPeerTest::RunTest( DataStructures::List<RakString> params, bool isVerbo
                 packet = peerList[i]->Receive();
             }
         }
-        RakSleep( 0 ); //If needed for testing
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
     for( int i = 0; i < peerNum; i++ )

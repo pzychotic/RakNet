@@ -10,6 +10,9 @@
 
 #include "DroppedConnectionConvertTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description:
 
@@ -71,9 +74,11 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
         }
         clients[index]->SetTimeoutTime( 5000, UNASSIGNED_SYSTEM_ADDRESS );
 
-        RakSleep( 1000 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
         if( isVerbose )
+        {
             printf( "%i. ", index );
+        }
     }
 
     TimeMS entryTime = GetTimeMS(); //Loop entry time
@@ -217,7 +222,7 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
             //Wait half the timeout time, the other half after receive so we don't drop all connections only missing ones, Active ait so the threads run on linux
             while( !timeoutWaitTimer.IsExpired() )
             {
-                RakSleep( 50 );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
             }
             dropTest = true;
         }
@@ -328,7 +333,7 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
             timeoutWaitTimer.Start();
             while( !timeoutWaitTimer.IsExpired() )
             {
-                RakSleep( 50 );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
             }
         }
         // 11/29/05 - No longer necessary since I added the keepalive
@@ -343,7 +348,7 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
 
         // Sleep so this loop doesn't take up all the CPU time
 
-        RakSleep( 10 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
     }
 
     return 0;

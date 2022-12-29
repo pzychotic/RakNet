@@ -10,6 +10,9 @@
 
 #include "ManyClientsOneServerBlockingTest.h"
 
+#include <chrono>
+#include <thread>
+
 void ManyClientsOneServerBlockingTest::WaitForConnectionRequestsToComplete( RakPeerInterface** clientList, int clientNum, bool isVerbose )
 {
     bool msgWasPrinted = false;
@@ -26,7 +29,7 @@ void ManyClientsOneServerBlockingTest::WaitForConnectionRequestsToComplete( RakP
                 msgWasPrinted = true;
             }
 
-            RakSleep( 30 );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
         }
     }
 }
@@ -261,7 +264,7 @@ int ManyClientsOneServerBlockingTest::RunTest( DataStructures::List<RakString> p
             }
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
         //Connect
 

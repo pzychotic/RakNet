@@ -10,7 +10,10 @@
 
 #include "CrossConnectionConvertTest.h"
 
-/*
+#include <chrono>
+#include <thread>
+
+ /*
 Description: Tests what happens if two instances of RakNet connect to each other at the same time. This has caused handshaking problems in the past.
 
 Success conditions:
@@ -198,7 +201,7 @@ int CrossConnectionConvertTest::RunTest( DataStructures::List<RakString> params,
             client->Ping( serverIP, SERVER_PORT, false );
             nextTestStartTime = 0;
         }
-        RakSleep( 0 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
     }
     if( isVerbose )
         printf( "Test succeeded.\n" );

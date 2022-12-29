@@ -10,6 +10,9 @@
 
 #include "SecurityFunctionsTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description:
 
@@ -110,7 +113,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
@@ -133,7 +136,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), badPass, (int)strlen( badPass ) );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
@@ -155,7 +158,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
@@ -185,7 +188,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !server->IsBanned( "127.0.0.1" ) )
@@ -224,7 +227,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
@@ -254,7 +257,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !server->IsBanned( "127.0.0.1" ) )
@@ -293,7 +296,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
             client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
@@ -353,8 +356,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
                 client->Connect("127.0.0.1",serverAddress.port,thePassword,strlen(thePassword));
             }
 
-            RakSleep(100);
-
+            std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
         }
 
         char str2[]="AAAAAAAAAA";
@@ -417,8 +419,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
                 client->Connect("127.0.0.1",serverAddress.port,thePassword,strlen(thePassword));
             }
 
-            RakSleep(100);
-
+            std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
         }
 
         str2[0]=(char)(ID_USER_PACKET_ENUM+1);
@@ -468,8 +469,7 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
                 client->Connect("127.0.0.1",serverAddress.port,thePassword,strlen(thePassword));
             }
 
-            RakSleep(100);
-
+            std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
         }
 
         str2[0]=(char)(ID_USER_PACKET_ENUM+1);

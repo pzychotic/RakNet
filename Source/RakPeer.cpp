@@ -38,7 +38,6 @@
 #include "StringCompressor.h"
 #include "StringTable.h"
 #include "RakNetTypes.h"
-#include "RakSleep.h"
 #include "RakThread.h"
 #include "RakAssert.h"
 #include "RakNetVersion.h"
@@ -59,6 +58,8 @@
 #define REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE 8
 
 #include <stdlib.h> // malloc
+#include <chrono>
+#include <thread>
 
 namespace RakNet {
 
@@ -433,7 +434,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         // Wait for the threads to activate.  When they are active they will set these variables to true
         while( isMainLoopThreadActive == false )
         {
-            RakSleep( 10 );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
         }
 #endif // RAKPEER_USER_THREADED!=1
     }
@@ -779,7 +780,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
             // This will probably cause the update thread to run which will probably
             // send the disconnection notification
 
-            RakSleep( 15 );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
             time = RakNet::GetTimeMS();
         }
     }
@@ -812,7 +813,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     while( isMainLoopThreadActive )
     {
         endThreads = true;
-        RakSleep( 15 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
     }
 
     for( i = 0; i < socketList.Size(); i++ )
@@ -2436,7 +2437,7 @@ RakNetSocket2* RakPeer::GetSocket( const SystemAddress target )
         if( isMainLoopThreadActive == false )
             return 0;
 
-        RakSleep( 0 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
 
         sqo = socketQueryOutput.Pop();
         if( sqo )
@@ -2472,7 +2473,7 @@ void RakPeer::GetSockets( DataStructures::List<RakNetSocket2*>& sockets )
         if( isMainLoopThreadActive == false )
             return;
 
-        RakSleep( 0 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
 
         sqo = socketQueryOutput.Pop();
         if( sqo )
@@ -3919,8 +3920,7 @@ uint64_t RakPeerInterface::Get64BitUniqueRandomNumber( void )
         for( int i = 0; i < 4; i++ )
         {
             lastTime = RakNet::GetTimeUS();
-            RakSleep( 1 );
-            RakSleep( 0 );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
             thisTime = RakNet::GetTimeUS();
             RakNet::TimeUS diff = thisTime - lastTime;
             diffByte ^= (unsigned char)( ( diff & 15 ) << ( i * 2 ) );

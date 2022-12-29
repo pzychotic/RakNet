@@ -15,14 +15,15 @@
 #include "Export.h"
 #include "RakThread.h"
 #include "SignaledEvent.h"
-#include "RakSleep.h"
 
 #ifdef _WIN32
 #else
 #include <unistd.h>
 #endif
 
+#include <chrono>
 #include <mutex>
+#include <thread>
 
 namespace RakNet {
 
@@ -219,7 +220,7 @@ void WorkerThread( void* arg )
         }
         // #else
         //      if (userCallback==0)
-        //          RakSleep(30);
+        //          std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
         // #endif
 
         threadPool->runThreadsMutex.lock();
@@ -324,10 +325,12 @@ bool ThreadPool<InputType, OutputType>::StartThreads( int numThreads, int stackS
     bool done = false;
     while( done == false )
     {
-        RakSleep( 50 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
         std::lock_guard<std::mutex> guard( numThreadsRunningMutex );
         if( numThreadsRunning == numThreads )
+        {
             done = true;
+        }
     }
 
     return true;
@@ -357,10 +360,12 @@ void ThreadPool<InputType, OutputType>::StopThreads( void )
     {
         quitAndIncomingDataEvents.SetEvent();
 
-        RakSleep( 50 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
         std::lock_guard<std::mutex> guard( numThreadsRunningMutex );
         if( numThreadsRunning == 0 )
+        {
             done = true;
+        }
     }
 
     quitAndIncomingDataEvents.CloseEvent();
@@ -541,7 +546,7 @@ bool ThreadPool<InputType, OutputType>::Pause( void )
     workingThreadCountMutex.lock();
     while( numThreadsWorking > 0 )
     {
-        RakSleep( 30 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     }
     return true;
 }

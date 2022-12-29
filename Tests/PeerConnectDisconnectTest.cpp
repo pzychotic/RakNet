@@ -10,6 +10,9 @@
 
 #include "PeerConnectDisconnectTest.h"
 
+#include <chrono>
+#include <thread>
+
 void PeerConnectDisconnectTest::WaitForConnectionRequestsToComplete( RakPeerInterface** peerList, int peerNum, bool isVerbose )
 {
     bool msgWasPrinted = false;
@@ -28,7 +31,7 @@ void PeerConnectDisconnectTest::WaitForConnectionRequestsToComplete( RakPeerInte
                     msgWasPrinted = true;
                 }
 
-                RakSleep( 30 );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
             }
         }
     }
@@ -195,7 +198,7 @@ int PeerConnectDisconnectTest::RunTest( DataStructures::List<RakString> params, 
             }
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
         //Connect
 

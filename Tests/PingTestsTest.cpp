@@ -10,6 +10,9 @@
 
 #include "PingTestsTest.h"
 
+#include <chrono>
+#include <thread>
+
 /*
 Description:
 Tests out:
@@ -94,7 +97,7 @@ int PingTestsTest::RunTest( DataStructures::List<RakString> params, bool isVerbo
             nextPing = GetTimeMS() + 30;
         }
 
-        RakSleep( 3 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
     }
 
     int averagePing = sender2->GetAveragePing( currentSystem );
@@ -177,7 +180,7 @@ int PingTestsTest::RunTest( DataStructures::List<RakString> params, bool isVerbo
                 printf( "Send packet id %i\n", packet->data[0] );
         }
 
-        RakSleep( 3 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
     }
 
     averagePing = sender->GetAveragePing( currentSystem );

@@ -10,6 +10,9 @@
 
 #include "CommonFunctions.h"
 
+#include <chrono>
+#include <thread>
+
 CommonFunctions::CommonFunctions( void )
 {
 }
@@ -70,7 +73,7 @@ bool CommonFunctions::WaitAndConnect( RakPeerInterface* peer, char* ip, unsigned
             peer->Connect( ip, port, 0, 0 );
         }
 
-        RakSleep( 100 );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     if( ConnectionStateMatchesOptions( peer, connectToAddress, true ) )
