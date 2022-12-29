@@ -22,10 +22,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "Itoa.h"
 #include <time.h>
 #include "SocketIncludes.h"
 #include "gettimeofday.h"
+
+#include <charconv>
 
 namespace RakNet {
 
@@ -367,8 +368,10 @@ const char* PacketLogger::UserIDTOString( unsigned char Id )
 {
     // Users should override this
     static char str[256];
-    Itoa( Id, str, 10 );
-    return (const char*)str;
+    auto res = std::to_chars( str, str + 255, Id );
+    RakAssert( res.ec == std::errc() );
+    res.ptr = '\0';
+    return str;
 }
 const char* PacketLogger::IDTOString( unsigned char Id )
 {

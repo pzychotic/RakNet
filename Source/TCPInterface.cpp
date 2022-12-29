@@ -30,7 +30,6 @@ typedef int socklen_t;
 #include "RakThread.h"
 #include "StringCompressor.h"
 #include "StringTable.h"
-#include "Itoa.h"
 #include "SocketLayer.h"
 #include "SocketDefines.h"
 #if( defined( __GNUC__ ) || defined( __GCCXML__ ) ) && !defined( __WIN32__ )
@@ -43,6 +42,8 @@ typedef int socklen_t;
 #ifdef _WIN32
 #include "WSAStartupSingleton.h"
 #endif
+
+#include <charconv>
 
 namespace RakNet {
 
@@ -117,7 +118,9 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
     hints.ai_flags = AI_PASSIVE;             // fill in my IP for me
     struct addrinfo *servinfo = 0, *aip;     // will point to the results
     char portStr[32];
-    Itoa( port, portStr, 10 );
+    auto res = std::to_chars( portStr, portStr + 31, port );
+    RakAssert( res.ec == std::errc() );
+    *res.ptr = '\0';
 
     getaddrinfo( 0, portStr, &hints, &servinfo );
     for( aip = servinfo; aip != NULL; aip = aip->ai_next )
@@ -757,7 +760,10 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     hints.ai_family = socketFamily;
     hints.ai_socktype = SOCK_STREAM;
     char portStr[32];
-    Itoa( remotePort, portStr, 10 );
+    auto res = std::to_chars( portStr, portStr + 31, remotePort );
+    RakAssert( res.ec == std::errc() );
+    *res.ptr = '\0';
+
     getaddrinfo( host, portStr, &hints, &res );
     sockfd = socket__( res->ai_family, res->ai_socktype, res->ai_protocol );
     blockingSocketListMutex.lock();

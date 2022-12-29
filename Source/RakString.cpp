@@ -17,8 +17,8 @@
 #include "LinuxStrings.h"
 #include "StringCompressor.h"
 #include <stdlib.h>
-#include "Itoa.h"
 
+#include <charconv>
 #include <mutex>
 
 namespace RakNet {
@@ -873,7 +873,9 @@ RakString& RakString::URLEncode( void )
             ( c >= 123 ) )
         {
             char buff[3];
-            Itoa( c, buff, 16 );
+            auto res = std::to_chars( buff, buff + 2, c, 16 );
+            RakAssert( res.ec == std::errc() );
+            *res.ptr = '\0';
             output[outputIndex++] = '%';
             output[outputIndex++] = buff[0];
             output[outputIndex++] = buff[1];

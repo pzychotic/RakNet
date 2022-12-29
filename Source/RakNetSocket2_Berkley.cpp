@@ -13,7 +13,7 @@
 #ifndef RAKNETSOCKET2_BERKLEY_CPP
 #define RAKNETSOCKET2_BERKLEY_CPP
 
-#include "Itoa.h"
+#include <charconv>
 
 namespace RakNet {
 
@@ -379,8 +379,9 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bin
     PrepareAddrInfoHints2( &hints );
     hints.ai_family = bindParameters->addressFamily;
     char portStr[32];
-    Itoa( bindParameters->port, portStr, 10 );
-
+    auto res = std::to_chars( portStr, portStr + 31, bindParameters->port );
+    RakAssert( res.ec == std::errc() );
+    *res.ptr = '\0';
 
     // On Ubuntu, "" returns "No address associated with hostname" while 0 works.
     if( bindParameters->hostAddress &&

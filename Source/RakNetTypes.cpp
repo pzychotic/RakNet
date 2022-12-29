@@ -34,8 +34,9 @@
 #include <arpa/inet.h>
 #endif
 
-#include "Itoa.h"
 #include "SuperFastHash.h"
+
+#include <charconv>
 #include <stdlib.h>
 
 namespace RakNet {
@@ -274,7 +275,9 @@ void SystemAddress::ToString_Old( bool writePort, char* dest, char portDelineato
     if( writePort )
     {
         strcat( dest, portStr );
-        Itoa( GetPort(), dest + strlen( dest ), 10 );
+        auto res = std::to_chars( dest, dest + strlen( dest ), GetPort() );
+        RakAssert( res.ec == std::errc() );
+        *res.ptr = '\0';
     }
 }
 const char* SystemAddress::ToString( bool writePort, char portDelineator ) const
@@ -323,7 +326,9 @@ void SystemAddress::ToString_New( bool writePort, char* dest, char portDelineato
         ch[0] = portDelineator;
         ch[1] = 0;
         strcat( dest, (const char*)ch );
-        Itoa( ntohs( address.addr4.sin_port ), dest + strlen( dest ), 10 );
+        auto res = std::to_chars( dest, dest + strlen( dest ), ntohs( address.addr4.sin_port ) );
+        RakAssert( res.ec == std::errc() );
+        *res.ptr = '\0';
     }
 }
 #endif // #if RAKNET_SUPPORT_IPV6!=1
