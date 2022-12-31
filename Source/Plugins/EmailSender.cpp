@@ -312,8 +312,7 @@ const char* EmailSender::Send( const char* hostAddress, unsigned short hostPort,
 const char* EmailSender::GetResponse( TCPInterface* tcpInterface, const SystemAddress& emailServer, bool doPrintf )
 {
     Packet* packet;
-    RakNet::TimeMS timeout;
-    timeout = RakNet::GetTimeMS() + 5000;
+    RakNet::TimeMS timeout = RakNet::GetTimeMS() + 5000;
     while( 1 )
     {
         if( tcpInterface->HasLostConnection() == emailServer )

@@ -8,135 +8,39 @@
  *
  */
 
-/// \file
-///
-
-
-#if defined( _WIN32 )
-#include "WindowsIncludes.h"
-#endif
-
 #include "GetTime.h"
 
-#if !defined( _WIN32 )
-#include <sys/time.h>
-#include <unistd.h>
-RakNet::TimeUS initialTime;
-#endif
+#include <chrono>
 
-#if defined( GET_TIME_SPIKE_LIMIT ) && GET_TIME_SPIKE_LIMIT > 0
-#include <mutex>
-#endif
+using namespace std::chrono;
 
 namespace RakNet {
 
-static bool initialized = false;
-
-#if defined( GET_TIME_SPIKE_LIMIT ) && GET_TIME_SPIKE_LIMIT > 0
-RakNet::TimeUS lastNormalizedReturnedValue = 0;
-RakNet::TimeUS lastNormalizedInputValue = 0;
-/// This constraints timer forward jumps to 1 second, and does not let it jump backwards
-/// See http://support.microsoft.com/kb/274323 where the timer can sometimes jump forward by hours or days
-/// This also has the effect where debugging a sending system won't treat the time spent halted past 1 second as elapsed network time
-RakNet::TimeUS NormalizeTime( RakNet::TimeUS timeIn )
+RakNet::Time RakNet::GetTime()
 {
-    RakNet::TimeUS diff, lastNormalizedReturnedValueCopy;
-    static std::mutex mutex;
-    std::lock_guard<std::mutex> guard( mutex );
-
-    if( timeIn >= lastNormalizedInputValue )
-    {
-        diff = timeIn - lastNormalizedInputValue;
-        if( diff > GET_TIME_SPIKE_LIMIT )
-            lastNormalizedReturnedValue += GET_TIME_SPIKE_LIMIT;
-        else
-            lastNormalizedReturnedValue += diff;
-    }
-    else
-        lastNormalizedReturnedValue += GET_TIME_SPIKE_LIMIT;
-
-    lastNormalizedInputValue = timeIn;
-    lastNormalizedReturnedValueCopy = lastNormalizedReturnedValue;
-
-    return lastNormalizedReturnedValueCopy;
-}
-#endif // #if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
-RakNet::Time RakNet::GetTime( void )
-{
-    return ( RakNet::Time )( GetTimeUS() / 1000 );
-}
-RakNet::TimeMS RakNet::GetTimeMS( void )
-{
-    return ( RakNet::TimeMS )( GetTimeUS() / 1000 );
+    auto now = high_resolution_clock::now();
+    return (RakNet::Time)duration_cast<milliseconds>( now.time_since_epoch() ).count();
 }
 
-#if defined( _WIN32 )
-RakNet::TimeUS GetTimeUS_Windows( void )
+RakNet::TimeMS RakNet::GetTimeMS()
 {
-    if( initialized == false )
-    {
-        initialized = true;
-    }
-
-    // 9/26/2010 In China running LuDaShi, QueryPerformanceFrequency has to be called every time because CPU clock speeds can be different
-    RakNet::TimeUS curTime;
-    LARGE_INTEGER PerfVal;
-    LARGE_INTEGER yo1;
-
-    QueryPerformanceFrequency( &yo1 );
-    QueryPerformanceCounter( &PerfVal );
-
-    __int64 quotient, remainder;
-    quotient = ( ( PerfVal.QuadPart ) / yo1.QuadPart );
-    remainder = ( ( PerfVal.QuadPart ) % yo1.QuadPart );
-    curTime = (RakNet::TimeUS)quotient * (RakNet::TimeUS)1000000 + ( remainder * (RakNet::TimeUS)1000000 / yo1.QuadPart );
-
-#if defined( GET_TIME_SPIKE_LIMIT ) && GET_TIME_SPIKE_LIMIT > 0
-    return NormalizeTime( curTime );
-#else
-    return curTime;
-#endif // #if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
+    auto now = high_resolution_clock::now();
+    return (RakNet::TimeMS)duration_cast<milliseconds>( now.time_since_epoch() ).count();
 }
-#elif defined( __GNUC__ ) || defined( __GCCXML__ ) || defined( __S3E__ )
-RakNet::TimeUS GetTimeUS_Linux( void )
+
+RakNet::TimeUS RakNet::GetTimeUS()
 {
-    timeval tp;
-    if( initialized == false )
-    {
-        gettimeofday( &tp, 0 );
-        initialized = true;
-        // I do this because otherwise RakNet::Time in milliseconds won't work as it will underflow when dividing by 1000 to do the conversion
-        initialTime = ( tp.tv_sec ) * (RakNet::TimeUS)1000000 + ( tp.tv_usec );
-    }
-
-    // GCC
-    RakNet::TimeUS curTime;
-    gettimeofday( &tp, 0 );
-
-    curTime = ( tp.tv_sec ) * (RakNet::TimeUS)1000000 + ( tp.tv_usec );
-
-#if defined( GET_TIME_SPIKE_LIMIT ) && GET_TIME_SPIKE_LIMIT > 0
-    return NormalizeTime( curTime - initialTime );
-#else
-    return curTime - initialTime;
-#endif // #if defined(GET_TIME_SPIKE_LIMIT) && GET_TIME_SPIKE_LIMIT>0
+    auto now = high_resolution_clock::now();
+    return (RakNet::TimeUS)duration_cast<microseconds>( now.time_since_epoch() ).count();
 }
-#endif
 
-RakNet::TimeUS RakNet::GetTimeUS( void )
-{
-#if defined( _WIN32 )
-    return GetTimeUS_Windows();
-#else
-    return GetTimeUS_Linux();
-#endif
-}
 bool RakNet::GreaterThan( RakNet::Time a, RakNet::Time b )
 {
     // a > b?
     const RakNet::Time halfSpan = ( RakNet::Time )( ( ( RakNet::Time )(const RakNet::Time)-1 ) / (RakNet::Time)2 );
     return b != a && b - a > halfSpan;
 }
+
 bool RakNet::LessThan( RakNet::Time a, RakNet::Time b )
 {
     // a < b?

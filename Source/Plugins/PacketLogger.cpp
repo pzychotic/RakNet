@@ -14,19 +14,16 @@
 #include "Plugins/PacketLogger.h"
 #include <cstdio>
 #include <cstdlib>
-#include <ctime>
 #include "InternalPacket.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-#include <time.h>
 #include "SocketIncludes.h"
-#include "gettimeofday.h"
 
 #include <charconv>
+#include <chrono>
+#include <ctime>
 
 namespace RakNet {
 
@@ -393,37 +390,15 @@ void PacketLogger::SetSuffix( const char* _suffix )
 }
 void PacketLogger::GetLocalTime( char buffer[128] )
 {
-#if defined( _WIN32 ) && !defined( __GNUC__ ) && !defined( __GCCXML__ )
-    time_t rawtime;
-    struct timeval tv;
-    // If you get an arror about an incomplete type, just delete this file
-    struct timezone tz;
-    gettimeofday( &tv, &tz );
-    // time ( &rawtime );
-    rawtime = tv.tv_sec;
+    using namespace std::chrono;
 
-    struct tm* timeinfo;
-    timeinfo = localtime( &rawtime );
-    strftime( buffer, 128, "%x %X", timeinfo );
-    char buff[32];
-    sprintf( buff, ".%i", tv.tv_usec );
-    strcat( buffer, buff );
+    auto clock_now  = system_clock::now();
+    auto time_now   = system_clock::to_time_t( clock_now );
+    auto local_time = *std::localtime( &time_now );
+    auto duration   = clock_now.time_since_epoch();
 
-    // Commented version puts the time first
-    /*
-    struct tm * timeinfo;
-    timeinfo = localtime ( &rawtime );
-    strftime (buffer,128,"%X",timeinfo);
-    char buff[32];
-    sprintf(buff, ".%i ", tv.tv_usec);
-    strcat(buffer,buff);
-    char buff2[32];
-    strftime (buff2,32,"%x",timeinfo);
-    strcat(buffer,buff2);
-    */
-#else
-    buffer[0] = 0;
-#endif
+    size_t pos = std::strftime( buffer, 128, "%x %X", &local_time );
+    sprintf( buffer + pos, ".%lld", ( duration_cast<microseconds>( duration ) - duration_cast<seconds>( duration ) ).count() );
 }
 void PacketLogger::SetLogDirectMessages( bool send )
 {

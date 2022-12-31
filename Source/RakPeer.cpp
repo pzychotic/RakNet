@@ -29,7 +29,6 @@
 // #define RMO_NEW_UNDEF_ALLOCATING_QUEUE
 // #endif
 
-#include <time.h>
 #include <string.h>
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
@@ -41,7 +40,6 @@
 #include "RakThread.h"
 #include "RakAssert.h"
 #include "RakNetVersion.h"
-#include "gettimeofday.h"
 #include "RakAlloca.h"
 #include "WSAStartupSingleton.h"
 
@@ -3902,19 +3900,11 @@ union Buff6AndBuff8
 uint64_t RakPeerInterface::Get64BitUniqueRandomNumber( void )
 {
     // Mac address is a poor solution because you can't have multiple connections from the same system
-    uint64_t g;
-#if defined( _WIN32 )
-    g = RakNet::GetTimeUS();
-#else
-    struct timeval tv;
-    gettimeofday( &tv, NULL );
-    g = tv.tv_usec + tv.tv_sec * 1000000;
-#endif
+    uint64_t g = RakNet::GetTimeUS();
 
     RakNet::TimeUS lastTime, thisTime;
-    int j;
     // Sleep a small random time, then use the last 4 bits as a source of randomness
-    for( j = 0; j < 4; j++ )
+    for( int j = 0; j < 4; j++ )
     {
         unsigned char diffByte = 0;
         for( int i = 0; i < 4; i++ )

@@ -94,14 +94,6 @@
 /// Uncomment if you want to link in the DLMalloc library to use with RakMemoryOverride
 // #define _LINK_DL_MALLOC
 
-#ifndef GET_TIME_SPIKE_LIMIT
-/// Workaround for http://support.microsoft.com/kb/274323
-/// If two calls between RakNet::GetTime() happen farther apart than this time in microseconds, this delta will be returned instead
-/// Note: This will cause ID_TIMESTAMP to be temporarily inaccurate if you set a breakpoint that pauses the UpdateNetworkLoop() thread in RakPeer
-/// Define in RakNetDefinesOverrides.h to enable (non-zero) or disable (0)
-#define GET_TIME_SPIKE_LIMIT 0
-#endif
-
 // Use sliding window congestion control instead of ping based congestion control
 #ifndef USE_SLIDING_WINDOW_CONGESTION_CONTROL
 #define USE_SLIDING_WINDOW_CONGESTION_CONTROL 1
