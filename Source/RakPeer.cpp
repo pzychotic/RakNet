@@ -291,10 +291,8 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 
     DerefAllSockets();
 
-
-    int i;
     // Go through all socket descriptors and precreate sockets on the specified addresses
-    for( i = 0; i < socketDescriptorCount; i++ )
+    for( unsigned int i = 0; i < socketDescriptorCount; i++ )
     {
         RakNetSocket2* r2 = RakNetSocket2Allocator::AllocRNS2();
         r2->SetUserConnectionSocketIndex( i );
@@ -349,7 +347,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         socketList.Push( r2, _FILE_AND_LINE_ );
     }
 
-    for( i = 0; i < socketDescriptorCount; i++ )
+    for( unsigned int i = 0; i < socketDescriptorCount; i++ )
     {
         if( socketList[i]->IsBerkleySocket() )
         {
@@ -357,7 +355,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         }
     }
 
-    for( i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
+    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
     {
         if( ipList[i] == UNASSIGNED_SYSTEM_ADDRESS )
             break;
@@ -384,7 +382,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 
         activeSystemList = RakNet::OP_NEW_ARRAY<RemoteSystemStruct*>( maximumNumberOfPeers, _FILE_AND_LINE_ );
 
-        for( i = 0; i < maximumNumberOfPeers; i++ )
+        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
         {
             // remoteSystemList in Single thread
             remoteSystemList[i].isActive = false;
@@ -437,12 +435,12 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 #endif // RAKPEER_USER_THREADED!=1
     }
 
-    for( i = 0; i < pluginListTS.Size(); i++ )
+    for( unsigned int i = 0; i < pluginListTS.Size(); i++ )
     {
         pluginListTS[i]->OnRakPeerStartup();
     }
 
-    for( i = 0; i < pluginListNTS.Size(); i++ )
+    for( unsigned int i = 0; i < pluginListNTS.Size(); i++ )
     {
         pluginListNTS[i]->OnRakPeerStartup();
     }
