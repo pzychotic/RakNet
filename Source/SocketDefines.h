@@ -33,4 +33,3 @@
 #define send__ send
 #define setsockopt__ setsockopt
 #define shutdown__ shutdown
-#define WSASendTo__ WSASendTo
