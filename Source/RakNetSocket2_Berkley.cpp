@@ -228,7 +228,7 @@ void RNS2_Berkley::GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddres
     {
 #if defined( _WIN32 ) && defined( _DEBUG )
         DWORD dwIOError = GetLastError();
-        LPVOID messageBuffer;
+        LPSTR messageBuffer;
         FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                        (LPTSTR)&messageBuffer, 0, NULL );
@@ -461,7 +461,7 @@ void RNS2_Berkley::RecvFromBlockingIPV4And6( RNS2RecvStruct* recvFromStruct )
         DWORD dwIOError = GetLastError();
         if( dwIoError != 10035 )
         {
-            LPVOID messageBuffer;
+            LPSTR messageBuffer;
             FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                            NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                            (LPTSTR)&messageBuffer, 0, NULL );
@@ -529,7 +529,7 @@ void RNS2_Berkley::RecvFromBlockingIPV4( RNS2RecvStruct* recvFromStruct )
         else if ( dwIOError != WSAEWOULDBLOCK && dwIOError != WSAEADDRNOTAVAIL)
         {
 #if defined(_WIN32) && defined(_DEBUG)
-            LPVOID messageBuffer;
+            LPSTR messageBuffer;
             FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                 NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),  // Default language
                 ( LPTSTR ) & messageBuffer, 0, NULL );

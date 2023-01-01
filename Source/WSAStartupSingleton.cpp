@@ -37,7 +37,7 @@ void WSAStartupSingleton::AddRef( void )
     {
 #if defined( _DEBUG )
         DWORD dwIOError = GetLastError();
-        LPVOID messageBuffer;
+        LPSTR messageBuffer;
         FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                        (LPTSTR)&messageBuffer, 0, NULL );

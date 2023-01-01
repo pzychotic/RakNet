@@ -105,7 +105,7 @@ void SocketLayer::SetSocketOptions( __UDPSOCKET__ listenSocket, bool blockingSoc
             // See http://support.microsoft.com/kb/819124
             // http://blogs.msdn.com/wndp/archive/2007/03/19/winsock-so-exclusiveaddruse-on-vista.aspx
             // http://msdn.microsoft.com/en-us/library/ms740621(VS.85).aspx
-            LPVOID messageBuffer;
+            LPSTR messageBuffer;
             FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                            NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                            (LPTSTR)&messageBuffer, 0, NULL );
@@ -207,13 +207,12 @@ RakString SocketLayer::GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, RakString 
 void GetMyIP_Win32( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 {
     int idx = 0;
-    idx = 0;
     char ac[80];
     if( gethostname( ac, sizeof( ac ) ) == -1 )
     {
 #if defined( _WIN32 )
         DWORD dwIOError = GetLastError();
-        LPVOID messageBuffer;
+        LPSTR messageBuffer;
         FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                        (LPTSTR)&messageBuffer, 0, NULL );
@@ -254,7 +253,7 @@ void GetMyIP_Win32( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
     {
 #if defined( _WIN32 )
         DWORD dwIOError = GetLastError();
-        LPVOID messageBuffer;
+        LPSTR messageBuffer;
         FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                        (LPTSTR)&messageBuffer, 0, NULL );
@@ -304,7 +303,7 @@ void SocketLayer::GetSystemAddress_Old( __UDPSOCKET__ s, SystemAddress* systemAd
     {
 #if defined( _WIN32 ) && defined( _DEBUG )
         DWORD dwIOError = GetLastError();
-        LPVOID messageBuffer;
+        LPSTR messageBuffer;
         FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                        (LPTSTR)&messageBuffer, 0, NULL );
@@ -335,7 +334,7 @@ void SocketLayer::GetSystemAddress( __UDPSOCKET__ s, SystemAddress* systemAddres
     {
 #if defined( _WIN32 ) && defined( _DEBUG )
         DWORD dwIOError = GetLastError();
-        LPVOID messageBuffer;
+        LPSTR messageBuffer;
         FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL, dwIOError, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ), // Default language
                        (LPTSTR)&messageBuffer, 0, NULL );
