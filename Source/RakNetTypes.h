@@ -153,9 +153,6 @@ struct RAK_DLL_EXPORT SocketDescriptor
     /// \pre RAKNET_SUPPORT_IPV6 must be set to 1 in RakNetDefines.h for AF_INET6
     short socketFamily;
 
-    // Set to true to use a blocking socket (default, do not change unless you have a reason to)
-    bool blockingSocket;
-
     unsigned int extraSocketOptions;
 };
 
