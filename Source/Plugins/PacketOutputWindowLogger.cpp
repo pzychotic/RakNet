@@ -13,13 +13,11 @@
 
 #include "Plugins/PacketOutputWindowLogger.h"
 
-#if defined( UNICODE )
-#include "RakWString.h"
-#endif
-#include "RakString.h"
 #if defined( _WIN32 )
 #include "WindowsIncludes.h"
 #endif
+#include <cstring>
+#include <string>
 
 namespace RakNet {
 
@@ -33,14 +31,17 @@ void PacketOutputWindowLogger::WriteLog( const char* str )
 {
 #if defined( _WIN32 )
 #if defined( UNICODE )
-    RakWString str2 = str;
-    str2 += "\n";
-    OutputDebugString( str2.C_String() );
+    const size_t len = std::strlen( str );
+    std::wstring s( len, L' ' );
+    s.resize( std::mbstowcs( s.data(), str, len ) );
+    s += L'\n';
 #else
-    RakString str2 = str;
-    str2 += "\n";
-    OutputDebugString( str2.C_String() );
+    std::string s( str );
+    s += '\n';
 #endif // UNICODE
+
+    OutputDebugString( s.c_str() );
+
 #endif // _WIN32
 }
 
