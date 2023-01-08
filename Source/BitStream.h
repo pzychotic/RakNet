@@ -23,7 +23,6 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "RakString.h"
-#include "RakWString.h"
 #include "RakAssert.h"
 
 namespace RakNet {
@@ -653,10 +652,6 @@ public:
     {
         RakString::Serialize( inStringVar, this );
     }
-    inline void Write( const wchar_t* const inStringVar )
-    {
-        RakWString::Serialize( inStringVar, this );
-    }
     inline void Write( const unsigned char* const inTemplateVar )
     {
         Write( (const char*)inTemplateVar );
@@ -672,10 +667,6 @@ public:
     inline void WriteCompressed( const char* const inStringVar )
     {
         RakString::SerializeCompressed( inStringVar, this, 0, false );
-    }
-    inline void WriteCompressed( const wchar_t* const inStringVar )
-    {
-        RakWString::Serialize( inStringVar, this );
     }
     inline void WriteCompressed( const unsigned char* const inTemplateVar )
     {
@@ -1010,19 +1001,9 @@ inline void BitStream::Write( const RakString& inTemplateVar )
     inTemplateVar.Serialize( this );
 }
 template<>
-inline void BitStream::Write( const RakWString& inTemplateVar )
-{
-    inTemplateVar.Serialize( this );
-}
-template<>
 inline void BitStream::Write( const char* const& inStringVar )
 {
     RakString::Serialize( inStringVar, this );
-}
-template<>
-inline void BitStream::Write( const wchar_t* const& inStringVar )
-{
-    RakWString::Serialize( inStringVar, this );
 }
 template<>
 inline void BitStream::Write( const unsigned char* const& inTemplateVar )
@@ -1162,19 +1143,9 @@ inline void BitStream::WriteCompressed( const RakString& inTemplateVar )
     inTemplateVar.SerializeCompressed( this, 0, false );
 }
 template<>
-inline void BitStream::WriteCompressed( const RakWString& inTemplateVar )
-{
-    inTemplateVar.Serialize( this );
-}
-template<>
 inline void BitStream::WriteCompressed( const char* const& inStringVar )
 {
     RakString::SerializeCompressed( inStringVar, this, 0, false );
-}
-template<>
-inline void BitStream::WriteCompressed( const wchar_t* const& inStringVar )
-{
-    RakWString::Serialize( inStringVar, this );
 }
 template<>
 inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar )
@@ -1360,19 +1331,9 @@ inline bool BitStream::Read( RakString& outTemplateVar )
     return outTemplateVar.Deserialize( this );
 }
 template<>
-inline bool BitStream::Read( RakWString& outTemplateVar )
-{
-    return outTemplateVar.Deserialize( this );
-}
-template<>
 inline bool BitStream::Read( char*& varString )
 {
     return RakString::Deserialize( varString, this );
-}
-template<>
-inline bool BitStream::Read( wchar_t*& varString )
-{
-    return RakWString::Deserialize( varString, this );
 }
 template<>
 inline bool BitStream::Read( unsigned char*& varString )
@@ -1491,19 +1452,9 @@ inline bool BitStream::ReadCompressed( RakString& outTemplateVar )
     return outTemplateVar.DeserializeCompressed( this, false );
 }
 template<>
-inline bool BitStream::ReadCompressed( RakWString& outTemplateVar )
-{
-    return outTemplateVar.Deserialize( this );
-}
-template<>
 inline bool BitStream::ReadCompressed( char*& outTemplateVar )
 {
     return RakString::DeserializeCompressed( outTemplateVar, this, false );
-}
-template<>
-inline bool BitStream::ReadCompressed( wchar_t*& outTemplateVar )
-{
-    return RakWString::Deserialize( outTemplateVar, this );
 }
 template<>
 inline bool BitStream::ReadCompressed( unsigned char*& outTemplateVar )
