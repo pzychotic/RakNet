@@ -43,9 +43,8 @@ GetConnectionState
 GetLocalIP
 GetInternalID
 */
-int LocalIsConnectedTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int LocalIsConnectedTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     RakPeerInterface *server, *client;
     destroyList.Clear( false, _FILE_AND_LINE_ );
 
@@ -205,54 +204,28 @@ int LocalIsConnectedTest::RunTest( DataStructures::List<RakString> params, bool 
     return 0;
 }
 
-RakString LocalIsConnectedTest::GetTestName()
+std::string LocalIsConnectedTest::GetTestName() const
 {
-
     return "LocalIsConnectedTest";
 }
 
-RakString LocalIsConnectedTest::ErrorCodeToString( int errorCode )
+std::string LocalIsConnectedTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Client could not connect after 5 seconds";
-        break;
-    case 2:
-        return "IsConnected did not detect connected client";
-        break;
-    case 3:
-        return "IsConnected did not detect disconnecting client";
-        break;
-    case 4:
-        return "IsConnected did not detect connecting client";
-        break;
-
-    case 5:
-        return "IsLocalIP failed test";
-        break;
-
-    case 6:
-        return "Sendloopback failed test";
-        break;
-
-    case 7:
-        return "GetLocalIP failed test";
-        break;
-
-    case 8:
-        return "GetInternalID failed test";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                                         break;
+    case  1: return "Client could not connect after 5 seconds";         break;
+    case  2: return "IsConnected did not detect connected client";      break;
+    case  3: return "IsConnected did not detect disconnecting client";  break;
+    case  4: return "IsConnected did not detect connecting client";     break;
+    case  5: return "IsLocalIP failed test";                            break;
+    case  6: return "Sendloopback failed test";                         break;
+    case  7: return "GetLocalIP failed test";                           break;
+    case  8: return "GetInternalID failed test";                        break;
+    default: return "Undefined Error";                                  break;
     }
+    // clang-format on
 }
 
 LocalIsConnectedTest::LocalIsConnectedTest( void )

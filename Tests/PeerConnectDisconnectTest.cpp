@@ -136,9 +136,8 @@ During the very first connect loop any connect returns false.
 Connect function returns false and peer is not connected to anything.
 
 */
-int PeerConnectDisconnectTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int PeerConnectDisconnectTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     const int peerNum = 8;
     const int maxConnections = peerNum * 3; //Max allowed connections for test set to times 3 to eliminate problem variables
     RakPeerInterface* peerList[peerNum];    //A list of 8 peers
@@ -294,33 +293,22 @@ int PeerConnectDisconnectTest::RunTest( DataStructures::List<RakString> params, 
     return 0;
 }
 
-RakString PeerConnectDisconnectTest::GetTestName()
+std::string PeerConnectDisconnectTest::GetTestName() const
 {
-
     return "PeerConnectDisconnectTest";
 }
 
-RakString PeerConnectDisconnectTest::ErrorCodeToString( int errorCode )
+std::string PeerConnectDisconnectTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "The connect function failed.";
-        break;
-
-    case 2:
-        return "Peers did not connect normally.";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                         break;
+    case  1: return "The connect function failed.";     break;
+    case  2: return "Peers did not connect normally.";  break;
+    default: return "Undefined Error";                  break;
     }
+    // clang-format on
 }
 
 PeerConnectDisconnectTest::PeerConnectDisconnectTest( void )

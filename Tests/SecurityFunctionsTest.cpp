@@ -69,9 +69,8 @@ IsInSecurityExceptionList //Disabled because of RakNetStatistics changes
 RemoveFromSecurityExceptionList //Disabled because of RakNetStatistics changes
 
 */
-int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int SecurityFunctionsTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     char thePassword[] = "password";
     server = RakPeerInterface::GetInstance();
 
@@ -499,73 +498,32 @@ int SecurityFunctionsTest::RunTest( DataStructures::List<RakString> params, bool
     return 0;
 }
 
-RakString SecurityFunctionsTest::GetTestName()
+std::string SecurityFunctionsTest::GetTestName() const
 {
-
     return "SecurityFunctionsTest";
 }
 
-RakString SecurityFunctionsTest::ErrorCodeToString( int errorCode )
+std::string SecurityFunctionsTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Client connected with no password";
-        break;
-
-    case 2:
-        return "Client connected with wrong password";
-        break;
-
-    case 3:
-        return "Client failed to connect with correct password";
-        break;
-
-    case 4:
-        return "Client was banned but connected anyways";
-        break;
-
-    case 5:
-        return "GetIncomingPassword returned wrong password";
-        break;
-
-    case 6:
-        return "IsBanned does not show localhost as banned";
-        break;
-
-    case 7:
-        return "Localhost was not unbanned";
-        break;
-
-    case 8:
-        return "Client failed to connect after banlist removal";
-        break;
-
-    case 9:
-        return "Client failed to connect after banlist removal with clear function";
-        break;
-
-    case 10:
-        return "Client did not connect encrypted";
-        break;
-
-    case 11:
-        return "Client connected encrypted but shouldn't have";
-        break;
-
-    case 12:
-        return "IsInSecurityExceptionList does not register localhost addition";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                                                             break;
+    case  1: return "Client connected with no password";                                    break;
+    case  2: return "Client connected with wrong password";                                 break;
+    case  3: return "Client failed to connect with correct password";                       break;
+    case  4: return "Client was banned but connected anyways";                              break;
+    case  5: return "GetIncomingPassword returned wrong password";                          break;
+    case  6: return "IsBanned does not show localhost as banned";                           break;
+    case  7: return "Localhost was not unbanned";                                           break;
+    case  8: return "Client failed to connect after banlist removal";                       break;
+    case  9: return "Client failed to connect after banlist removal with clear function";   break;
+    case 10: return "Client did not connect encrypted";                                     break;
+    case 11: return "Client connected encrypted but shouldn't have";                        break;
+    case 12: return "IsInSecurityExceptionList does not register localhost addition";       break;
+    default: return "Undefined Error";                                                      break;
     }
+    // clang-format on
 }
 
 SecurityFunctionsTest::SecurityFunctionsTest( void )

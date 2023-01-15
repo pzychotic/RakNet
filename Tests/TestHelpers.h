@@ -10,9 +10,6 @@
 
 #pragma once
 
-
-#include "RakString.h"
-
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 #include "BitStream.h"
@@ -35,7 +32,6 @@ public:
 
     static bool WaitAndConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee, int millisecondsToWait );
     static bool ConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee );
-    ///static bool BroadCastTestPacket(RakPeerInterface *sender);
     static bool BroadCastTestPacket( RakPeerInterface* sender, PacketReliability rel = RELIABLE_ORDERED, PacketPriority pr = HIGH_PRIORITY, int typeNum = ID_USER_PACKET_ENUM + 1 );
     static bool WaitForTestPacket( RakPeerInterface* reciever, int millisecondsToWait );
     static void RecieveForXTime( RakPeerInterface* reciever, int millisecondsToWait );

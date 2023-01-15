@@ -34,9 +34,8 @@ Random timout detection fails.
 
 static const int NUMBER_OF_CLIENTS = 9;
 
-int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int DroppedConnectionConvertTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     RakPeerInterface* server;
     RakPeerInterface* clients[NUMBER_OF_CLIENTS];
     unsigned index, connectionCount;
@@ -354,36 +353,23 @@ int DroppedConnectionConvertTest::RunTest( DataStructures::List<RakString> param
     return 0;
 }
 
-RakString DroppedConnectionConvertTest::GetTestName()
+std::string DroppedConnectionConvertTest::GetTestName() const
 {
     return "DroppedConnectionConvertTest";
 }
 
-RakString DroppedConnectionConvertTest::ErrorCodeToString( int errorCode )
+std::string DroppedConnectionConvertTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Client has more than one connection";
-        break;
-
-    case 2:
-        return "Connect failed";
-        break;
-
-    case 3:
-        return "Timeout not detected";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                             break;
+    case  1: return "Client has more than one connection";  break;
+    case  2: return "Connect failed";                       break;
+    case  3: return "Timeout not detected";                 break;
+    default: return "Undefined Error";                      break;
     }
+    // clang-format on
 }
 
 void DroppedConnectionConvertTest::DestroyPeers()

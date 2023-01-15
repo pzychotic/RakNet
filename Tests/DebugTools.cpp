@@ -8,22 +8,23 @@
  *
  */
 
+#include <cassert>
 #include <iostream>
 #include <limits>
 
 #include "DebugTools.h"
 
-DebugTools::DebugTools( void )
+DebugTools::DebugTools()
 {
 }
 
-DebugTools::~DebugTools( void )
+DebugTools::~DebugTools()
 {
 }
 
-void DebugTools::ShowError( RakString errorString, bool pause, unsigned int lineNum, const char* fileName )
+void DebugTools::ShowError( const std::string& errorString, bool pause, unsigned int lineNum, const char* fileName )
 {
-    printf( "%s\nFile:%s \nLine: %i\n", errorString.C_String(), fileName, lineNum );
+    printf( "%s\nFile:%s \nLine: %i\n", errorString.c_str(), fileName, lineNum );
     assert( false );
 
     //if (pause)

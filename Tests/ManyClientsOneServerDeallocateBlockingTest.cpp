@@ -230,7 +230,7 @@ Connect
 IsConnected
 
 */
-int ManyClientsOneServerDeallocateBlockingTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int ManyClientsOneServerDeallocateBlockingTest::RunTest( bool isVerbose, bool noPauses )
 {
     //Initializations of the arrays
     for( int i = 0; i < clientNum; i++ )
@@ -391,37 +391,23 @@ int ManyClientsOneServerDeallocateBlockingTest::RunTest( DataStructures::List<Ra
     return 0;
 }
 
-RakString ManyClientsOneServerDeallocateBlockingTest::GetTestName()
+std::string ManyClientsOneServerDeallocateBlockingTest::GetTestName() const
 {
-
     return "ManyClientsOneServerDeallocateBlockingTest";
 }
 
-RakString ManyClientsOneServerDeallocateBlockingTest::ErrorCodeToString( int errorCode )
+std::string ManyClientsOneServerDeallocateBlockingTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "The connect function failed";
-        break;
-
-    case 2:
-        return "Peers did not connect normally";
-        break;
-
-    case 3:
-        return "GetTimeoutTime did not match the timeout that was set";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                                                 break;
+    case  1: return "The connect function failed";                              break;
+    case  2: return "Peers did not connect normally";                           break;
+    case  3: return "GetTimeoutTime did not match the timeout that was set";    break;
+    default: return "Undefined Error";                                          break;
     }
+    // clang-format on
 }
 
 ManyClientsOneServerDeallocateBlockingTest::ManyClientsOneServerDeallocateBlockingTest( void )

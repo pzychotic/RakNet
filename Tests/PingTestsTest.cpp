@@ -41,9 +41,8 @@ GetLowestPing
 SetOccasionalPing
 */
 
-int PingTestsTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int PingTestsTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     RakPeerInterface *sender, *sender2, *receiver;
     destroyList.Clear( false, _FILE_AND_LINE_ );
 
@@ -222,49 +221,26 @@ int PingTestsTest::TestAverageValue( int averagePing, int line, bool noPauses, b
     return 0;
 }
 
-RakString PingTestsTest::GetTestName()
+std::string PingTestsTest::GetTestName() const
 {
-
     return "PingTestsTest";
 }
 
-RakString PingTestsTest::ErrorCodeToString( int errorCode )
+std::string PingTestsTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Problem with the average ping time,should never be less than 0 in this test";
-        break;
-
-    case 2:
-        return "Could not connect after 5 seconds";
-        break;
-
-    case 3:
-        return "Problem with the last ping time,greater then 100MS for localhost";
-        break;
-
-    case 4:
-        return "The lowest ping for localhost should drop below 10MS at least once";
-        break;
-
-    case 5:
-        return "There is a problem if the lastping is lower than the lowestping stat";
-        break;
-
-    case 6:
-        return "Average Ping should not be greater than 10MS for localhost. Command line pings typically give < 1ms";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                                                                     break;
+    case  1: return "Problem with the average ping time,should never be less than 0 in this test";  break;
+    case  2: return "Could not connect after 5 seconds";                                            break;
+    case  3: return "Problem with the last ping time,greater then 100MS for localhost";             break;
+    case  4: return "The lowest ping for localhost should drop below 10MS at least once";           break;
+    case  5: return "There is a problem if the lastping is lower than the lowestping stat";         break;
+    case  6: return "Average Ping should not be greater than 10MS for localhost.";                  break;
+    default: return "Undefined Error";                                                              break;
     }
+    // clang-format on
 }
 
 PingTestsTest::PingTestsTest( void )

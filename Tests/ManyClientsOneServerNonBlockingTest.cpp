@@ -41,9 +41,8 @@ During the very first connect loop any connect returns false.
 Connect function returns false and peer is not connected to anything.
 
 */
-int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int ManyClientsOneServerNonBlockingTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     const int clientNum = 256;
 
     RakPeerInterface* clientList[clientNum]; //A list of clients
@@ -641,33 +640,22 @@ int ManyClientsOneServerNonBlockingTest::RunTest( DataStructures::List<RakString
     return 0;
 }
 
-RakString ManyClientsOneServerNonBlockingTest::GetTestName()
+std::string ManyClientsOneServerNonBlockingTest::GetTestName() const
 {
-
     return "ManyClientsOneServerNonBlockingTest";
 }
 
-RakString ManyClientsOneServerNonBlockingTest::ErrorCodeToString( int errorCode )
+std::string ManyClientsOneServerNonBlockingTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "The connect function failed.";
-        break;
-
-    case 2:
-        return "Peers did not connect normally.";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                         break;
+    case  1: return "The connect function failed.";     break;
+    case  2: return "Peers did not connect normally.";  break;
+    default: return "Undefined Error";                  break;
     }
+    // clang-format on
 }
 
 ManyClientsOneServerNonBlockingTest::ManyClientsOneServerNonBlockingTest( void )

@@ -27,9 +27,8 @@ Connect fails without pending ops or current connection.
 
 */
 
-int ComprehensiveConvertTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int ComprehensiveConvertTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     static const int CONNECTIONS_PER_SYSTEM = 4;
 
     //  DebugTools::ShowError("Note: The conversion of this is on hold until the original sample's problem is known.",!noPauses && isVerbose,__LINE__,__FILE__);
@@ -292,29 +291,21 @@ void ComprehensiveConvertTest::DestroyPeers()
         RakPeerInterface::DestroyInstance( peers[i] );
 }
 
-RakString ComprehensiveConvertTest::GetTestName()
+std::string ComprehensiveConvertTest::GetTestName() const
 {
-
     return "ComprehensiveConvertTest";
 }
 
-RakString ComprehensiveConvertTest::ErrorCodeToString( int errorCode )
+std::string ComprehensiveConvertTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Connect function failed";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                 break;
+    case  1: return "Connect function failed";  break;
+    default: return "Undefined Error";          break;
     }
+    // clang-format on
 }
 
 ComprehensiveConvertTest::ComprehensiveConvertTest( void )

@@ -22,9 +22,8 @@ Everything connects and sends normally.
 Failure conditions:
 Expected values from ping/pong do not occur within expected time.
 */
-int CrossConnectionConvertTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int CrossConnectionConvertTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     static const unsigned short SERVER_PORT = 1234;
     //  char serverMode[32];
     char serverIP[64];
@@ -209,29 +208,21 @@ int CrossConnectionConvertTest::RunTest( DataStructures::List<RakString> params,
     return 0;
 }
 
-RakString CrossConnectionConvertTest::GetTestName()
+std::string CrossConnectionConvertTest::GetTestName() const
 {
-
     return "CrossConnectionConvertTest";
 }
 
-RakString CrossConnectionConvertTest::ErrorCodeToString( int errorCode )
+std::string CrossConnectionConvertTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Did not recieve expected response";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                             break;
+    case  1: return "Did not recieve expected response";    break;
+    default: return "Undefined Error";                      break;
     }
+    // clang-format on
 }
 
 void CrossConnectionConvertTest::DestroyPeers()

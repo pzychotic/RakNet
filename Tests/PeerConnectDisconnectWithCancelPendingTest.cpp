@@ -44,9 +44,8 @@ Connect function returns false and peer is not connected to anything.
 Pending request is not canceled.
 
 */
-int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int PeerConnectDisconnectWithCancelPendingTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     const int peerNum = 8;
     const int maxConnections = peerNum * 3; //Max allowed connections for test set to times 3 to eliminate problem variables
     RakPeerInterface* peerList[peerNum];    //A list of 8 peers
@@ -462,37 +461,23 @@ int PeerConnectDisconnectWithCancelPendingTest::RunTest( DataStructures::List<Ra
     return 0;
 }
 
-RakString PeerConnectDisconnectWithCancelPendingTest::GetTestName()
+std::string PeerConnectDisconnectWithCancelPendingTest::GetTestName() const
 {
-
     return "PeerConnectDisconnectWithCancelPendingTest";
 }
 
-RakString PeerConnectDisconnectWithCancelPendingTest::ErrorCodeToString( int errorCode )
+std::string PeerConnectDisconnectWithCancelPendingTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "The connect function failed.";
-        break;
-
-    case 2:
-        return "Peers did not connect normally.";
-        break;
-
-    case 3:
-        return "Pending connection was not canceled.";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                             break;
+    case  1: return "The connect function failed.";         break;
+    case  2: return "Peers did not connect normally.";      break;
+    case  3: return "Pending connection was not canceled."; break;
+    default: return "Undefined Error";                      break;
     }
+    // clang-format on
 }
 
 PeerConnectDisconnectWithCancelPendingTest::PeerConnectDisconnectWithCancelPendingTest( void )

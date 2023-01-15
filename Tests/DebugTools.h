@@ -10,14 +10,12 @@
 
 #pragma once
 
+#include <string>
 
-#include "RakString.h"
-
-using namespace RakNet;
 class DebugTools
 {
 public:
-    DebugTools( void );
-    ~DebugTools( void );
-    static void ShowError( RakString errorString, bool pause, unsigned int lineNum, const char* fileName );
+    DebugTools();
+    ~DebugTools();
+    static void ShowError( const std::string& errorString, bool pause, unsigned int lineNum, const char* fileName );
 };

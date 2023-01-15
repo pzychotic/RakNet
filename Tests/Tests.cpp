@@ -10,7 +10,6 @@
 
 #include "IncludeAllTests.h"
 
-#include "RakString.h"
 #include "DS_List.h"
 
 using namespace RakNet;
@@ -29,7 +28,7 @@ int main( int argc, char* argv[] )
     int passedTests = 0;
     DataStructures::List<TestInterface*> testList; //Pointer list
     DataStructures::List<int> testResultList;      //A list of pass and/or fail and the error codes
-    DataStructures::List<RakString> testsToRun;    //A list of tests to run
+    DataStructures::List<std::string> testsToRun;  //A list of tests to run
     DataStructures::List<int> testsToRunIndexes;   //A list of tests to run by index
 
     //Add all the tests to the test list
@@ -58,8 +57,6 @@ int main( int argc, char* argv[] )
     bool isVerbose = true;
     bool disallowTestToPause = false;
 
-    DataStructures::List<RakString> testcases;
-
     if( argc > 1 ) //we have command line arguments
     {
 
@@ -69,15 +66,13 @@ int main( int argc, char* argv[] )
         }
     }
 
-    DataStructures::List<RakString> noParamsList;
-
     if( testsToRun.Size() == 0 && testsToRunIndexes.Size() == 0 )
     {
         numTests = testListSize;
         for( int i = 0; i < testListSize; i++ )
         {
-            printf( "\n\nRunning test %s.\n\n", testList[i]->GetTestName().C_String() );
-            returnVal = testList[i]->RunTest( noParamsList, isVerbose, disallowTestToPause );
+            printf( "\n\nRunning test %s.\n\n", testList[i]->GetTestName().c_str() );
+            returnVal = testList[i]->RunTest( isVerbose, disallowTestToPause );
             testList[i]->DestroyPeers();
 
             if( returnVal == 0 )
@@ -86,7 +81,7 @@ int main( int argc, char* argv[] )
             }
             else
             {
-                printf( "Test %s returned with error %s", testList[i]->GetTestName().C_String(), testList[i]->ErrorCodeToString( returnVal ).C_String() );
+                printf( "Test %s returned with error %s", testList[i]->GetTestName().c_str(), testList[i]->ErrorCodeToString( returnVal ).c_str() );
             }
         }
     }
@@ -95,17 +90,14 @@ int main( int argc, char* argv[] )
     {
         int TestsToRunSize = testsToRun.Size();
 
-        RakString testName;
         for( int i = 0; i < TestsToRunSize; i++ )
         {
-            testName = testsToRun[i];
+            const std::string& testName = testsToRun[i];
 
             for( int j = 0; j < testListSize; j++ )
             {
-
-                if( testList[j]->GetTestName().StrICmp( testName ) == 0 )
+                if( testList[j]->GetTestName() == testName )
                 {
-
                     testsToRunIndexes.Push( j, _FILE_AND_LINE_ );
                 }
             }
@@ -122,8 +114,8 @@ int main( int argc, char* argv[] )
             if( testsToRunIndexes[i] < testListSize )
             {
 
-                printf( "\n\nRunning test %s.\n\n", testList[testsToRunIndexes[i]]->GetTestName().C_String() );
-                returnVal = testList[testsToRunIndexes[i]]->RunTest( noParamsList, isVerbose, disallowTestToPause );
+                printf( "\n\nRunning test %s.\n\n", testList[testsToRunIndexes[i]]->GetTestName().c_str() );
+                returnVal = testList[testsToRunIndexes[i]]->RunTest( isVerbose, disallowTestToPause );
                 testList[i]->DestroyPeers();
 
                 if( returnVal == 0 )
@@ -132,7 +124,7 @@ int main( int argc, char* argv[] )
                 }
                 else
                 {
-                    printf( "Test %s returned with error %s", testList[testsToRunIndexes[i]]->GetTestName().C_String(), testList[testsToRunIndexes[i]]->ErrorCodeToString( returnVal ).C_String() );
+                    printf( "Test %s returned with error %s", testList[testsToRunIndexes[i]]->GetTestName().c_str(), testList[testsToRunIndexes[i]]->ErrorCodeToString( returnVal ).c_str() );
                 }
             }
         }

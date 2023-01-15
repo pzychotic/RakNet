@@ -68,9 +68,8 @@ All packets are not in order.
 
 */
 
-int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int ReliableOrderedConvertedTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     RakPeerInterface *sender, *receiver;
     unsigned int packetNumberSender[32], packetNumberReceiver[32], receivedPacketNumberReceiver, receivedTimeReceiver;
     char str[256];
@@ -110,7 +109,6 @@ int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> param
     sendInterval=30;
     else
     sendInterval=atoi(str);*/
-    //possible future params
 
     sendInterval = 30;
 
@@ -356,33 +354,21 @@ int ReliableOrderedConvertedTest::RunTest( DataStructures::List<RakString> param
     return 0;
 }
 
-RakString ReliableOrderedConvertedTest::GetTestName()
+std::string ReliableOrderedConvertedTest::GetTestName() const
 {
-
     return "ReliableOrderedConvertedTest";
 }
 
-RakString ReliableOrderedConvertedTest::ErrorCodeToString( int errorCode )
+std::string ReliableOrderedConvertedTest::ErrorCodeToString( int errorCode ) const
 {
-
-    RakString returnString;
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        returnString = "The very last error for this object was ";
-        returnString += lastError;
-        return returnString;
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                                                             break;
+    case  1: return std::string( "The very last error for this object was " ) + lastError;  break;
+    default: return "Undefined Error";                                                      break;
     }
+    // clang-format on
 }
 
 ReliableOrderedConvertedTest::ReliableOrderedConvertedTest( void )

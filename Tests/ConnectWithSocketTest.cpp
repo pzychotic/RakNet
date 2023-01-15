@@ -37,7 +37,7 @@ GetSockets
 GetSocket
 
 */
-int ConnectWithSocketTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int ConnectWithSocketTest::RunTest( bool isVerbose, bool noPauses )
 {
     destroyList.Clear( false, _FILE_AND_LINE_ );
 
@@ -153,15 +153,13 @@ int ConnectWithSocketTest::RunTest( DataStructures::List<RakString> params, bool
     return 0;
 }
 
-RakString ConnectWithSocketTest::GetTestName()
+std::string ConnectWithSocketTest::GetTestName() const
 {
-
     return "ConnectWithSocketTest";
 }
 
-RakString ConnectWithSocketTest::ErrorCodeToString( int errorCode )
+std::string ConnectWithSocketTest::ErrorCodeToString( int errorCode ) const
 {
-
     if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
     {
         return errorList[errorCode - 1];

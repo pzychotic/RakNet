@@ -34,7 +34,7 @@ All packets are not recieved.
 All packets are not in order.
 Disconnection.
 */
-int EightPeerTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int EightPeerTest::RunTest( bool isVerbose, bool noPauses )
 {
     const int peerNum = 8;
     RakPeerInterface* peerList[peerNum];              //A list of 8 peers
@@ -310,45 +310,25 @@ int EightPeerTest::RunTest( DataStructures::List<RakString> params, bool isVerbo
     return 0;
 }
 
-RakString EightPeerTest::GetTestName()
+std::string EightPeerTest::GetTestName() const
 {
-
     return "EightPeerTest";
 }
 
-RakString EightPeerTest::ErrorCodeToString( int errorCode )
+std::string EightPeerTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-
-    case 1:
-        return "Connect function returned failure.";
-        break;
-
-    case 2:
-        return "Peers failed to connect.";
-        break;
-
-    case 3:
-        return "There was a disconnection.";
-        break;
-
-    case 4:
-        return "Not ordered.";
-        break;
-
-    case 5:
-        return "Not reliable.";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                             break;
+    case  1: return "Connect function returned failure.";   break;
+    case  2: return "Peers failed to connect.";             break;
+    case  3: return "There was a disconnection.";           break;
+    case  4: return "Not ordered.";                         break;
+    case  5: return "Not reliable.";                        break;
+    default: return "Undefined Error";                      break;
     }
+    // clang-format on
 }
 
 EightPeerTest::EightPeerTest( void )

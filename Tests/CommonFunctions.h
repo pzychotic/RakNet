@@ -10,8 +10,6 @@
 
 #pragma once
 
-#include "RakString.h"
-
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 #include "BitStream.h"

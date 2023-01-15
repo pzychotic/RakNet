@@ -37,9 +37,8 @@ GetOfflinePingResponse
 AdvertiseSystem
 Ping
 */
-int OfflineMessagesConvertTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int OfflineMessagesConvertTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     bool recievedProperOfflineData = false;
     bool recievedProperPingData = false;
 
@@ -194,41 +193,25 @@ int OfflineMessagesConvertTest::RunTest( DataStructures::List<RakString> params,
     return 0;
 }
 
-RakString OfflineMessagesConvertTest::GetTestName()
+std::string OfflineMessagesConvertTest::GetTestName() const
 {
-
     return "OfflineMessagesConvertTest";
 }
 
-RakString OfflineMessagesConvertTest::ErrorCodeToString( int errorCode )
+std::string OfflineMessagesConvertTest::ErrorCodeToString( int errorCode ) const
 {
-
+    // clang-format off
     switch( errorCode )
     {
-
-    case 0:
-        return "No error";
-        break;
-    case 1:
-        return "Unexpected advertise data";
-        break;
-    case 2:
-        return "Wrong ping response";
-        break;
-    case 3:
-        return "Never got proper offline data";
-        break;
-    case 4:
-        return "Never got proper ping data";
-        break;
-
-    case 5:
-        return "GetOfflinePingResponse failed.";
-        break;
-
-    default:
-        return "Undefined Error";
+    case  0: return "No error";                         break;
+    case  1: return "Unexpected advertise data";        break;
+    case  2: return "Wrong ping response";              break;
+    case  3: return "Never got proper offline data";    break;
+    case  4: return "Never got proper ping data";       break;
+    case  5: return "GetOfflinePingResponse failed.";   break;
+    default: return "Undefined Error";                  break;
     }
+    // clang-format on
 }
 
 OfflineMessagesConvertTest::OfflineMessagesConvertTest( void )

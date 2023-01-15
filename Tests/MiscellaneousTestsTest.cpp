@@ -34,7 +34,7 @@ RemoveRouterInterface
 AdvertiseSystem
 
 */
-int MiscellaneousTestsTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int MiscellaneousTestsTest::RunTest( bool isVerbose, bool noPauses )
 {
     destroyList.Clear( false, _FILE_AND_LINE_ );
 
@@ -59,15 +59,13 @@ int MiscellaneousTestsTest::RunTest( DataStructures::List<RakString> params, boo
     return 0;
 }
 
-RakString MiscellaneousTestsTest::GetTestName()
+std::string MiscellaneousTestsTest::GetTestName() const
 {
-
     return "MiscellaneousTestsTest";
 }
 
-RakString MiscellaneousTestsTest::ErrorCodeToString( int errorCode )
+std::string MiscellaneousTestsTest::ErrorCodeToString( int errorCode ) const
 {
-
     if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
     {
         return errorList[errorCode - 1];

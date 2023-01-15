@@ -103,9 +103,8 @@ bool TestHelpers::WaitForTestPacket( RakPeerInterface* reciever, int millisecond
     return false;
 }
 
-void RecieveForXTime( RakPeerInterface* reciever, int millisecondsToWait )
+void TestHelpers::RecieveForXTime( RakPeerInterface* reciever, int millisecondsToWait )
 {
-
     RakTimer timer( millisecondsToWait );
 
     Packet* packet;

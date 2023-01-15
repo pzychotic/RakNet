@@ -12,8 +12,6 @@
 
 #include "TestInterface.h"
 
-#include "RakString.h"
-
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 #include "BitStream.h"
@@ -30,15 +28,15 @@ class PacketAndLowLevelTestsTest : public TestInterface
 public:
     PacketAndLowLevelTestsTest( void );
     ~PacketAndLowLevelTestsTest( void );
-    int RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses ); //should return 0 if no error, or the error number
-    RakString GetTestName();
-    RakString ErrorCodeToString( int errorCode );
+    int RunTest( bool isVerbose, bool noPauses ); //should return 0 if no error, or the error number
+    std::string GetTestName() const;
+    std::string ErrorCodeToString( int errorCode ) const;
     void DestroyPeers();
 
 protected:
     void FloodWithHighPriority( RakPeerInterface* client );
 
 private:
-    DataStructures::List<RakString> errorList;
+    DataStructures::List<std::string> errorList;
     DataStructures::List<RakPeerInterface*> destroyList;
 };

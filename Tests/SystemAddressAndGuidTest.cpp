@@ -65,9 +65,8 @@ GetGUIDFromIndex
 GetExternalID
 
 */
-int SystemAddressAndGuidTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int SystemAddressAndGuidTest::RunTest( bool isVerbose, bool noPauses )
 {
-
     RakPeerInterface *server, *client;
     destroyList.Clear( false, _FILE_AND_LINE_ );
 
@@ -262,15 +261,13 @@ int SystemAddressAndGuidTest::RunTest( DataStructures::List<RakString> params, b
     return 0;
 }
 
-RakString SystemAddressAndGuidTest::GetTestName()
+std::string SystemAddressAndGuidTest::GetTestName() const
 {
-
     return "SystemAddressAndGuidTest";
 }
 
-RakString SystemAddressAndGuidTest::ErrorCodeToString( int errorCode )
+std::string SystemAddressAndGuidTest::ErrorCodeToString( int errorCode ) const
 {
-
     if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
     {
         return errorList[errorCode - 1];

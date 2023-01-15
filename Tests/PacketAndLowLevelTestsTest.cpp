@@ -10,7 +10,6 @@
 
 #include "PacketAndLowLevelTestsTest.h"
 
-
 /*
 Description:
 Tests out the sunctions:
@@ -45,7 +44,7 @@ AttachPlugin
 DetachPlugin
 
 */
-int PacketAndLowLevelTestsTest::RunTest( DataStructures::List<RakString> params, bool isVerbose, bool noPauses )
+int PacketAndLowLevelTestsTest::RunTest( bool isVerbose, bool noPauses )
 {
     RakPeerInterface *server, *client;
     destroyList.Clear( false, _FILE_AND_LINE_ );
@@ -285,15 +284,13 @@ void PacketAndLowLevelTestsTest::FloodWithHighPriority( RakPeerInterface* client
     }
 }
 
-RakString PacketAndLowLevelTestsTest::GetTestName()
+std::string PacketAndLowLevelTestsTest::GetTestName() const
 {
-
     return "PacketAndLowLevelTestsTest";
 }
 
-RakString PacketAndLowLevelTestsTest::ErrorCodeToString( int errorCode )
+std::string PacketAndLowLevelTestsTest::ErrorCodeToString( int errorCode ) const
 {
-
     if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
     {
         return errorList[errorCode - 1];
