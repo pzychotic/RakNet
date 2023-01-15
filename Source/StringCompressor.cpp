@@ -15,7 +15,6 @@
 #include "StringCompressor.h"
 #include "DS_HuffmanEncodingTree.h"
 #include "BitStream.h"
-#include "RakString.h"
 #include "RakAssert.h"
 #include <string.h>
 
@@ -453,39 +452,5 @@ bool StringCompressor::DecodeString( std::string* output, int maxCharsToWrite, B
     return out;
 }
 #endif
-
-void StringCompressor::EncodeString( const RakString* input, int maxCharsToWrite, BitStream* output, uint8_t languageId )
-{
-    EncodeString( input->C_String(), maxCharsToWrite, output, languageId );
-}
-bool StringCompressor::DecodeString( RakString* output, int maxCharsToWrite, BitStream* input, uint8_t languageId )
-{
-    if( maxCharsToWrite <= 0 )
-    {
-        output->Clear();
-        return true;
-    }
-
-    char* destinationBlock;
-    bool out;
-
-#if USE_ALLOCA == 1
-    if( maxCharsToWrite < MAX_ALLOCA_STACK_ALLOCATION )
-    {
-        destinationBlock = (char*)alloca( maxCharsToWrite );
-        out = DecodeString( destinationBlock, maxCharsToWrite, input, languageId );
-        *output = destinationBlock;
-    }
-    else
-#endif
-    {
-        destinationBlock = (char*)rakMalloc_Ex( maxCharsToWrite, _FILE_AND_LINE_ );
-        out = DecodeString( destinationBlock, maxCharsToWrite, input, languageId );
-        *output = destinationBlock;
-        rakFree_Ex( destinationBlock, _FILE_AND_LINE_ );
-    }
-
-    return out;
-}
 
 } // namespace RakNet

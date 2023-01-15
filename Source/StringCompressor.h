@@ -28,7 +28,6 @@ namespace RakNet {
 
 /// Forward declarations
 class BitStream;
-class RakString;
 class HuffmanEncodingTree;
 
 /// \brief Writes and reads strings to and from bitstreams.
@@ -71,9 +70,6 @@ public:
     void EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output, uint8_t languageId = 0 );
     bool DecodeString( std::string* output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
 #endif
-
-    void EncodeString( const RakString* input, int maxCharsToWrite, BitStream* output, uint8_t languageId = 0 );
-    bool DecodeString( RakString* output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
 
     /// Used so I can allocate and deallocate this singleton at runtime
     static void AddReference( void );

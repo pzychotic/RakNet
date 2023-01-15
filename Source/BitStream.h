@@ -613,10 +613,6 @@ public:
     /// \return How many bits have been allocated internally
     BitSize_t GetNumberOfBitsAllocated( void ) const;
 
-    /// \brief Read strings, non reference.
-    bool Read( char* varString );
-    bool Read( unsigned char* varString );
-
     /// Write zeros until the bitstream is filled up to \a bytes
     void PadWithZeroToByteLength( unsigned int bytes );
 
@@ -993,13 +989,7 @@ inline void BitStream::Write( const RakNetGUID& inTemplateVar )
     Write( inTemplateVar.g );
 }
 
-/// \brief Write a string to a bitstream.
-/// \param[in] var The value to write
-template<>
-inline void BitStream::Write( const RakString& inTemplateVar )
-{
-    inTemplateVar.Serialize( this );
-}
+// Write a string to a bitstream.
 template<>
 inline void BitStream::Write( const char* const& inStringVar )
 {
@@ -1136,12 +1126,7 @@ inline void BitStream::WriteCompressed( const double& inTemplateVar )
     Write( (uint32_t)( ( varCopy + 1.0 ) * 2147483648.0 ) );
 }
 
-/// Compress the string
-template<>
-inline void BitStream::WriteCompressed( const RakString& inTemplateVar )
-{
-    inTemplateVar.SerializeCompressed( this, 0, false );
-}
+// Compress the string
 template<>
 inline void BitStream::WriteCompressed( const char* const& inStringVar )
 {
@@ -1324,12 +1309,6 @@ inline bool BitStream::Read( RakNetGUID& outTemplateVar )
     return Read( outTemplateVar.g );
 }
 
-
-template<>
-inline bool BitStream::Read( RakString& outTemplateVar )
-{
-    return outTemplateVar.Deserialize( this );
-}
 template<>
 inline bool BitStream::Read( char*& varString )
 {
@@ -1445,12 +1424,6 @@ inline bool BitStream::ReadCompressed( double& outTemplateVar )
     return false;
 }
 
-/// For strings
-template<>
-inline bool BitStream::ReadCompressed( RakString& outTemplateVar )
-{
-    return outTemplateVar.DeserializeCompressed( this, false );
-}
 template<>
 inline bool BitStream::ReadCompressed( char*& outTemplateVar )
 {

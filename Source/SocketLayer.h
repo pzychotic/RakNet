@@ -18,7 +18,8 @@
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "MTUSize.h"
-#include "RakString.h"
+
+#include <string>
 
 namespace RakNet {
 
@@ -30,7 +31,7 @@ public:
     /// \param[in] inSock the socket
     /// \param[in] inIpString The ip of the interface you wish to retrieve the subnet mask from
     /// \return Returns the ip dotted subnet mask if successful, otherwise returns empty string ("")
-    static RakString GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, RakString inIpString );
+    static std::string GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, const std::string& inIpString );
 
     /// Retrieve all local IP address in a string format.
     /// \param[in] s The socket whose port we are referring to

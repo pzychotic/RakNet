@@ -18,6 +18,7 @@
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_DynDNS == 1 && _RAKNET_SUPPORT_TCPInterface == 1
 
+#include "RakNetTypes.h"
 #include "RakString.h"
 
 namespace RakNet {

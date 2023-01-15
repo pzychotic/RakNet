@@ -61,6 +61,54 @@
 
 namespace RakNet {
 
+namespace {
+
+bool IPAddressMatch( const char* pszIpToCheck, const char* pszIpToCheckFor )
+{
+    if( pszIpToCheckFor == 0 || pszIpToCheckFor[0] == 0 || strlen( pszIpToCheckFor ) > 15 )
+        return false;
+
+    unsigned int characterIndex = 0;
+
+    while( true )
+    {
+        if( pszIpToCheck[characterIndex] == pszIpToCheckFor[characterIndex] )
+        {
+            // Equal characters
+            if( pszIpToCheckFor[characterIndex] == 0 )
+            {
+                // End of the string and the strings match
+                return true;
+            }
+
+            characterIndex++;
+        }
+        else
+        {
+            if( pszIpToCheck[characterIndex] == 0 || pszIpToCheckFor[characterIndex] == 0 )
+            {
+                // End of one of the strings
+                break;
+            }
+
+            // Characters do not match
+            if( pszIpToCheck[characterIndex] == '*' )
+            {
+                // Domain is banned.
+                return true;
+            }
+
+            // Characters do not match and it is not a *
+            break;
+        }
+    }
+
+    // No match found.
+    return false;
+}
+
+} // namespace
+
 void UpdateNetworkLoop( void* arg );
 
 static const int NUM_MTU_SIZES = 3;
@@ -547,7 +595,7 @@ void RakPeer::DisableSecurity( void )
 void RakPeer::AddToSecurityExceptionList( const char* ip )
 {
     std::lock_guard<std::mutex> guard( securityExceptionMutex );
-    securityExceptionList.Insert( RakString( ip ), _FILE_AND_LINE_ );
+    securityExceptionList.Insert( std::string( ip ), _FILE_AND_LINE_ );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -556,24 +604,25 @@ void RakPeer::RemoveFromSecurityExceptionList( const char* ip )
     if( securityExceptionList.Size() == 0 )
         return;
 
+    std::lock_guard<std::mutex> guard( securityExceptionMutex );
     if( ip == 0 )
     {
-        std::lock_guard<std::mutex> guard( securityExceptionMutex );
         securityExceptionList.Clear( false, _FILE_AND_LINE_ );
     }
     else
     {
         unsigned i = 0;
-        std::lock_guard<std::mutex> guard( securityExceptionMutex );
         while( i < securityExceptionList.Size() )
         {
-            if( securityExceptionList[i].IPAddressMatch( ip ) )
+            if( IPAddressMatch( securityExceptionList[i].c_str(), ip ) )
             {
                 securityExceptionList[i] = securityExceptionList[securityExceptionList.Size() - 1];
                 securityExceptionList.RemoveAtIndex( securityExceptionList.Size() - 1 );
             }
             else
+            {
                 i++;
+            }
         }
     }
 }
@@ -583,11 +632,10 @@ bool RakPeer::IsInSecurityExceptionList( const char* ip )
     if( securityExceptionList.Size() == 0 )
         return false;
 
-    unsigned i = 0;
     std::lock_guard<std::mutex> guard( securityExceptionMutex );
-    for( ; i < securityExceptionList.Size(); i++ )
+    for( unsigned int i = 0; i < securityExceptionList.Size(); i++ )
     {
-        if( securityExceptionList[i].IPAddressMatch( ip ) )
+        if( IPAddressMatch( securityExceptionList[i].c_str(), ip ) )
         {
             return true;
         }

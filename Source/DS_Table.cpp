@@ -158,30 +158,6 @@ void Table::Cell::Get( char* output, int* outputLength )
     if( outputLength )
         *outputLength = (int)i;
 }
-RakString Table::Cell::ToString( ColumnType columnType )
-{
-    if( isEmpty )
-        return RakString();
-
-    if( columnType == NUMERIC )
-    {
-        return RakString( "%f", i );
-    }
-    else if( columnType == STRING )
-    {
-        return RakString( c );
-    }
-    else if( columnType == BINARY )
-    {
-        return RakString( "<Binary>" );
-    }
-    else if( columnType == POINTER )
-    {
-        return RakString( "%p", ptr );
-    }
-
-    return RakString();
-}
 Table::Cell::Cell( double numericValue, char* charValue, void* ptr, ColumnType type )
 {
     SetByType( numericValue, charValue, ptr, type );

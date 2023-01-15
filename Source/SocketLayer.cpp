@@ -119,10 +119,9 @@ void SocketLayer::SetSocketOptions( __UDPSOCKET__ listenSocket, bool blockingSoc
 }
 
 
-RakString SocketLayer::GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, RakString inIpString )
+std::string SocketLayer::GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, const std::string& inIpString )
 {
-    RakString netMaskString;
-    RakString ipString;
+    std::string ipString;
 
 #if defined( _WIN32 )
     INTERFACE_INFO InterfaceList[20];
@@ -144,11 +143,11 @@ RakString SocketLayer::GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, RakString 
         if( inIpString == ipString )
         {
             pAddress = (sockaddr_in*)&( InterfaceList[i].iiNetmask );
-            netMaskString = inet_ntoa( pAddress->sin_addr );
-            return netMaskString;
+            return inet_ntoa( pAddress->sin_addr );
         }
     }
     return "";
+
 #else
 
     int fd, fd2;
@@ -191,9 +190,8 @@ RakString SocketLayer::GetSubNetForSocketAndIp( __UDPSOCKET__ inSock, RakString 
 
             close( fd );
             close( fd2 );
-            netMaskString = inet_ntoa( ( (struct sockaddr_in*)&ifr2.ifr_addr )->sin_addr );
 
-            return netMaskString;
+            return inet_ntoa( ( (struct sockaddr_in*)&ifr2.ifr_addr )->sin_addr );
         }
     }
 

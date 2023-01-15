@@ -22,7 +22,6 @@
 #include "BitStream.h"
 #include "DS_List.h"
 #include "Export.h"
-#include "RakString.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"
@@ -927,7 +926,7 @@ protected:
     bool ( *incomingDatagramEventHandler )( RNS2RecvStruct* );
 
     // Systems in this list will not go through the secure connection process, even when secure connections are turned on. Wildcards are accepted.
-    DataStructures::List<RakString> securityExceptionList;
+    DataStructures::List<std::string> securityExceptionList;
 
     SystemAddress ipList[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
 

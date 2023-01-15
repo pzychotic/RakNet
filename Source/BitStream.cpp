@@ -1022,14 +1022,6 @@ void BitStream::ReverseBytesInPlace( unsigned char* inOutData, const unsigned in
     }
 }
 
-bool BitStream::Read( char* varString )
-{
-    return RakString::Deserialize( varString, this );
-}
-bool BitStream::Read( unsigned char* varString )
-{
-    return RakString::Deserialize( (char*)varString, this );
-}
 void BitStream::WriteAlignedVar8( const char* inByteArray )
 {
     RakAssert( ( numberOfBitsUsed & 7 ) == 0 );

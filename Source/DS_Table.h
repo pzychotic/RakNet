@@ -17,7 +17,6 @@
 #include "DS_BPlusTree.h"
 #include "RakMemoryOverride.h"
 #include "Export.h"
-#include "RakString.h"
 
 #define _TABLE_BPLUS_TREE_ORDER 16
 #define _TABLE_MAX_COLUMN_NAME_LENGTH 64
@@ -83,8 +82,6 @@ public:
 
         /// Binary
         void Get( char* output, int* outputLength );
-
-        RakNet::RakString ToString( ColumnType columnType );
 
         // assignment operator and copy constructor
         Cell& operator=( const Cell& input );
