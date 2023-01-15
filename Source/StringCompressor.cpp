@@ -417,19 +417,7 @@ bool StringCompressor::DecodeString( char* output, int maxCharsToWrite, BitStrea
 
     return true;
 }
-#ifdef _CSTRING_COMPRESSOR
-void StringCompressor::EncodeString( const CString& input, int maxCharsToWrite, BitStream* output )
-{
-    LPTSTR p = input;
-    EncodeString( p, maxCharsToWrite * sizeof( TCHAR ), output, languageID );
-}
-bool StringCompressor::DecodeString( CString& output, int maxCharsToWrite, BitStream* input, uint8_t languageId )
-{
-    LPSTR p = output.GetBuffer( maxCharsToWrite * sizeof( TCHAR ) );
-    DecodeString( p, maxCharsToWrite * sizeof( TCHAR ), input, languageID );
-    output.ReleaseBuffer( 0 )
-}
-#endif
+
 #ifdef _STD_STRING_COMPRESSOR
 void StringCompressor::EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output, uint8_t languageId )
 {
@@ -465,6 +453,7 @@ bool StringCompressor::DecodeString( std::string* output, int maxCharsToWrite, B
     return out;
 }
 #endif
+
 void StringCompressor::EncodeString( const RakString* input, int maxCharsToWrite, BitStream* output, uint8_t languageId )
 {
     EncodeString( input->C_String(), maxCharsToWrite, output, languageId );

@@ -67,11 +67,6 @@ public:
     /// \param[in] languageID Which language to use
     bool DecodeString( char* output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
 
-#ifdef _CSTRING_COMPRESSOR
-    void EncodeString( const CString& input, int maxCharsToWrite, BitStream* output, uint8_t languageId = 0 );
-    bool DecodeString( CString& output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
-#endif
-
 #ifdef _STD_STRING_COMPRESSOR
     void EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output, uint8_t languageId = 0 );
     bool DecodeString( std::string* output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
