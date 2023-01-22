@@ -39,7 +39,7 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "DS_Hash.h"
 #include "DS_Queue.h"
 

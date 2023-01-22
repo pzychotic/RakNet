@@ -18,7 +18,7 @@
 #if _RAKNET_SUPPORT_HTTPConnection == 1 && _RAKNET_SUPPORT_TCPInterface == 1
 
 #include "Export.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
 #include "DS_Queue.h"

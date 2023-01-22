@@ -22,7 +22,7 @@
 #include "PluginInterface2.h"
 #include "DS_OrderedList.h"
 #include "UDPForwarder.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 namespace RakNet {
 

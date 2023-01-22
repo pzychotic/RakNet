@@ -19,7 +19,7 @@
 #if _RAKNET_SUPPORT_DynDNS == 1 && _RAKNET_SUPPORT_TCPInterface == 1
 
 #include "RakNetTypes.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 namespace RakNet {
 

@@ -20,7 +20,7 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "BitStream.h"
 #include "DS_Queue.h"
 #include "DS_OrderedList.h"

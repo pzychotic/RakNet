@@ -9,7 +9,7 @@
 
 #include <dirent.h>
 
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 #define _A_NORMAL 0x00 // Normal file
 #define _A_RDONLY 0x01 // Read-only file

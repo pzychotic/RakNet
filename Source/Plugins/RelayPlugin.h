@@ -18,7 +18,7 @@
 #if _RAKNET_SUPPORT_RelayPlugin == 1
 
 #include "PluginInterface2.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "DS_Hash.h"
 
 /// \defgroup RELAY_PLUGIN_GROUP RelayPlugin

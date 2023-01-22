@@ -17,7 +17,7 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 #include "BitStream.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 // #define NTDS_VERBOSE
 

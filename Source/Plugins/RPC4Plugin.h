@@ -21,7 +21,7 @@
 #include "PacketPriority.h"
 #include "RakNetTypes.h"
 #include "BitStream.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "DS_Hash.h"
 #include "DS_OrderedList.h"
 

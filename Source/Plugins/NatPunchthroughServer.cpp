@@ -13,6 +13,7 @@
 
 #include "Plugins/NatPunchthroughServer.h"
 #include "Plugins/PacketLogger.h"
+#include "Plugins/RakString.h"
 #include "BitStream.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"

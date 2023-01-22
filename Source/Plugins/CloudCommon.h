@@ -14,7 +14,7 @@
 #if _RAKNET_SUPPORT_CloudClient == 1 || _RAKNET_SUPPORT_CloudServer == 1
 
 #include "RakNetTypes.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 namespace RakNet {
 

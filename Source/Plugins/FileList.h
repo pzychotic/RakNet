@@ -21,7 +21,7 @@
 #include "DS_List.h"
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 namespace RakNet {
 

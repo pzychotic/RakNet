@@ -22,7 +22,7 @@
 #include "DS_OrderedList.h"
 #include "DS_Hash.h"
 #include "Export.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 /// MessageIdentifier (ID_*) values shoudln't go higher than this.  Change it if you do.
 #define MESSAGE_FILTER_MAX_MESSAGE_ID 256

@@ -17,7 +17,7 @@
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 #include "GetTime.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 
 namespace RakNet {
 

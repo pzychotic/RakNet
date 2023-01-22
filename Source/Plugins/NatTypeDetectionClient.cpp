@@ -14,7 +14,7 @@
 #include "Plugins/NatTypeDetectionClient.h"
 #include "BitStream.h"
 #include "SocketIncludes.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 

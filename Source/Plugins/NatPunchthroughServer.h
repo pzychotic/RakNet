@@ -22,12 +22,12 @@
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
 #include "DS_OrderedList.h"
-#include "RakString.h"
 
 namespace RakNet {
 
 /// Forward declarations
 struct Packet;
+class RakString;
 #if _RAKNET_SUPPORT_PacketLogger == 1
 class PacketLogger;
 #endif

@@ -21,7 +21,7 @@
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
 #include "DS_List.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "BitStream.h"
 
 #include <stdint.h>

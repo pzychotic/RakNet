@@ -21,7 +21,7 @@
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_OrderedList.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "DS_Queue.h"
 #include "DS_Hash.h"
 

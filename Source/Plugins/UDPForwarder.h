@@ -20,7 +20,7 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
-#include "RakString.h"
+#include "Plugins/RakString.h"
 #include "DS_Queue.h"
 #include "DS_List.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
