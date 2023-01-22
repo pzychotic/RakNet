@@ -662,7 +662,7 @@ public:
     }
     inline void WriteCompressed( const char* const inStringVar )
     {
-        RakString::SerializeCompressed( inStringVar, this, 0, false );
+        RakString::SerializeCompressed( inStringVar, this );
     }
     inline void WriteCompressed( const unsigned char* const inTemplateVar )
     {
@@ -1130,7 +1130,7 @@ inline void BitStream::WriteCompressed( const double& inTemplateVar )
 template<>
 inline void BitStream::WriteCompressed( const char* const& inStringVar )
 {
-    RakString::SerializeCompressed( inStringVar, this, 0, false );
+    RakString::SerializeCompressed( inStringVar, this );
 }
 template<>
 inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar )
@@ -1427,12 +1427,12 @@ inline bool BitStream::ReadCompressed( double& outTemplateVar )
 template<>
 inline bool BitStream::ReadCompressed( char*& outTemplateVar )
 {
-    return RakString::DeserializeCompressed( outTemplateVar, this, false );
+    return RakString::DeserializeCompressed( outTemplateVar, this );
 }
 template<>
 inline bool BitStream::ReadCompressed( unsigned char*& outTemplateVar )
 {
-    return RakString::DeserializeCompressed( (char*)outTemplateVar, this, false );
+    return RakString::DeserializeCompressed( (char*)outTemplateVar, this );
 }
 
 /// \brief Read any integral type from a bitstream.

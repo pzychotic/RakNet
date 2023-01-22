@@ -15,10 +15,6 @@
 #pragma once
 
 #include "Export.h"
-#include "DS_Map.h"
-#include "RakMemoryOverride.h"
-
-#include <stdint.h>
 
 #ifdef _STD_STRING_COMPRESSOR
 #include <string>
@@ -33,7 +29,6 @@ class HuffmanEncodingTree;
 /// \brief Writes and reads strings to and from bitstreams.
 ///
 /// Only works with ASCII strings.  The default compression is for English.
-/// You can call GenerateTreeFromStrings to compress and decompress other languages efficiently as well.
 class RAK_DLL_EXPORT StringCompressor
 {
 public:
@@ -45,30 +40,23 @@ public:
     /// \return the unique instance of the StringCompressor
     static StringCompressor* Instance( void );
 
-    /// Given an array of strings, such as a chat log, generate the optimal encoding tree for it.
-    /// This function is optional and if it is not called a default tree will be used instead.
-    /// \param[in] input An array of bytes which should point to text.
-    /// \param[in] inputLength Length of \a input
-    /// \param[in] languageID An identifier for the language / string table to generate the tree for.  English is automatically created with ID 0 in the constructor.
-    void GenerateTreeFromStrings( unsigned char* input, unsigned inputLength, uint8_t languageId );
-
     /// Writes input to output, compressed.  Takes care of the null terminator for you.
     /// \param[in] input Pointer to an ASCII string
     /// \param[in] maxCharsToWrite The max number of bytes to write of \a input.  Use 0 to mean no limit.
     /// \param[out] output The bitstream to write the compressed string to
     /// \param[in] languageID Which language to use
-    void EncodeString( const char* input, int maxCharsToWrite, BitStream* output, uint8_t languageId = 0 );
+    void EncodeString( const char* input, int maxCharsToWrite, BitStream* output );
 
     /// Writes input to output, uncompressed.  Takes care of the null terminator for you.
     /// \param[out] output A block of bytes to receive the output
     /// \param[in] maxCharsToWrite Size, in bytes, of \a output .  A NULL terminator will always be appended to the output string.  If the maxCharsToWrite is not large enough, the string will be truncated.
     /// \param[in] input The bitstream containing the compressed string
     /// \param[in] languageID Which language to use
-    bool DecodeString( char* output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
+    bool DecodeString( char* output, int maxCharsToWrite, BitStream* input );
 
 #ifdef _STD_STRING_COMPRESSOR
-    void EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output, uint8_t languageId = 0 );
-    bool DecodeString( std::string* output, int maxCharsToWrite, BitStream* input, uint8_t languageId = 0 );
+    void EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output );
+    bool DecodeString( std::string* output, int maxCharsToWrite, BitStream* input );
 #endif
 
     /// Used so I can allocate and deallocate this singleton at runtime
@@ -83,8 +71,8 @@ private:
     /// Singleton instance
     static StringCompressor* instance;
 
-    /// Pointer to the huffman encoding trees.
-    DataStructures::Map<int, HuffmanEncodingTree*> huffmanEncodingTrees;
+    /// Pointer to the huffman encoding tree.
+    HuffmanEncodingTree* m_pHuffmanEncodingTree;
 
     static int referenceCount;
 };

@@ -679,11 +679,9 @@ void RakString::Serialize( const char* str, BitStream* bs )
     bs->WriteAlignedBytes( (const unsigned char*)str, (const unsigned int)l );
 }
 
-void RakString::SerializeCompressed( const char* str, BitStream* bs, uint8_t languageId, bool writeLanguageId )
+void RakString::SerializeCompressed( const char* str, BitStream* bs )
 {
-    if( writeLanguageId )
-        bs->WriteCompressed( languageId );
-    StringCompressor::Instance()->EncodeString( str, 0xFFFF, bs, languageId );
+    StringCompressor::Instance()->EncodeString( str, 0xFFFF, bs );
 }
 
 bool RakString::Deserialize( char* str, BitStream* bs )
@@ -701,14 +699,9 @@ bool RakString::Deserialize( char* str, BitStream* bs )
     return b;
 }
 
-bool RakString::DeserializeCompressed( char* str, BitStream* bs, bool readLanguageId )
+bool RakString::DeserializeCompressed( char* str, BitStream* bs )
 {
-    uint8_t languageId;
-    if( readLanguageId )
-        bs->ReadCompressed( languageId );
-    else
-        languageId = 0;
-    return StringCompressor::Instance()->DecodeString( str, 0xFFFF, bs, languageId );
+    return StringCompressor::Instance()->DecodeString( str, 0xFFFF, bs );
 }
 
 void RakString::Clear( void )

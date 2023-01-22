@@ -157,13 +157,13 @@ public:
     static void Serialize( const char* str, BitStream* bs );
 
     /// Static version of the SerializeCompressed function
-    static void SerializeCompressed( const char* str, BitStream* bs, uint8_t languageId = 0, bool writeLanguageId = false );
+    static void SerializeCompressed( const char* str, BitStream* bs );
 
     /// Static version of the Deserialize() function
     static bool Deserialize( char* str, BitStream* bs );
 
     /// Static version of the DeserializeCompressed() function
-    static bool DeserializeCompressed( char* str, BitStream* bs, bool readLanguageId = false );
+    static bool DeserializeCompressed( char* str, BitStream* bs );
 
     /// \internal
     static size_t GetSizeToAllocate( size_t bytes )

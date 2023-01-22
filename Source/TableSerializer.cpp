@@ -233,7 +233,7 @@ bool TableSerializer::DeserializeCell( BitStream* in, DataStructures::Table::Cel
 }
 void TableSerializer::SerializeFilterQuery( BitStream* in, DataStructures::Table::FilterQuery* query )
 {
-    StringCompressor::Instance()->EncodeString( query->columnName, _TABLE_MAX_COLUMN_NAME_LENGTH, in, 0 );
+    StringCompressor::Instance()->EncodeString( query->columnName, _TABLE_MAX_COLUMN_NAME_LENGTH, in );
     in->WriteCompressed( query->columnIndex );
     in->Write( (unsigned char)query->operation );
     in->Write( query->cellValue->isEmpty );
@@ -248,7 +248,7 @@ bool TableSerializer::DeserializeFilterQuery( BitStream* out, DataStructures::Ta
 {
     bool b;
     RakAssert( query->cellValue );
-    StringCompressor::Instance()->DecodeString( query->columnName, _TABLE_MAX_COLUMN_NAME_LENGTH, out, 0 );
+    StringCompressor::Instance()->DecodeString( query->columnName, _TABLE_MAX_COLUMN_NAME_LENGTH, out );
     out->ReadCompressed( query->columnIndex );
     unsigned char op;
     out->Read( op );
