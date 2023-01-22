@@ -11,7 +11,6 @@
 #include "RakString.h"
 #include "RakAssert.h"
 #include "RakMemoryOverride.h"
-#include "BitStream.h"
 #include <string.h>
 #include "LinuxStrings.h"
 #include "StringCompressor.h"
@@ -670,38 +669,6 @@ void RakString::FreeMemoryNoMutex( void )
         rakFree_Ex( freeList[i], _FILE_AND_LINE_ );
     }
     freeList.Clear( false, _FILE_AND_LINE_ );
-}
-
-void RakString::Serialize( const char* str, BitStream* bs )
-{
-    unsigned short l = (unsigned short)strlen( str );
-    bs->Write( l );
-    bs->WriteAlignedBytes( (const unsigned char*)str, (const unsigned int)l );
-}
-
-void RakString::SerializeCompressed( const char* str, BitStream* bs )
-{
-    StringCompressor::Instance()->EncodeString( str, 0xFFFF, bs );
-}
-
-bool RakString::Deserialize( char* str, BitStream* bs )
-{
-    bool b;
-    unsigned short l;
-    b = bs->Read( l );
-    if( b && l > 0 )
-        b = bs->ReadAlignedBytes( (unsigned char*)str, l );
-
-    if( b == false )
-        str[0] = 0;
-
-    str[l] = 0;
-    return b;
-}
-
-bool RakString::DeserializeCompressed( char* str, BitStream* bs )
-{
-    return StringCompressor::Instance()->DecodeString( str, 0xFFFF, bs );
 }
 
 void RakString::Clear( void )

@@ -25,9 +25,6 @@ class mutex;
 
 namespace RakNet {
 
-/// Forward declarations
-class BitStream;
-
 /// \brief String class
 /// \details Has the following improvements over std::string
 /// -Reference counting: Suitable to store in lists
@@ -152,18 +149,6 @@ public:
     static void FreeMemory( void );
     /// \internal
     static void FreeMemoryNoMutex( void );
-
-    /// Static version of the Serialize function
-    static void Serialize( const char* str, BitStream* bs );
-
-    /// Static version of the SerializeCompressed function
-    static void SerializeCompressed( const char* str, BitStream* bs );
-
-    /// Static version of the Deserialize() function
-    static bool Deserialize( char* str, BitStream* bs );
-
-    /// Static version of the DeserializeCompressed() function
-    static bool DeserializeCompressed( char* str, BitStream* bs );
 
     /// \internal
     static size_t GetSizeToAllocate( size_t bytes )

@@ -12,12 +12,13 @@
 ///
 
 #include "BitStream.h"
+#include "RakNetDefines.h"
+#include "SocketIncludes.h"
+#include "StringCompressor.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#include "SocketIncludes.h"
-#include "RakNetDefines.h"
 
 #if defined( _WIN32 )
 #include "WindowsIncludes.h"
@@ -1167,6 +1168,37 @@ void BitStream::WriteFloat16( float inOutFloat, float floatMin, float floatMax )
     if( percentile > 65535.0f )
         percentile = 65535.0f;
     Write( (unsigned short)percentile );
+}
+
+void BitStream::Serialize( const char* str )
+{
+    unsigned short l = (unsigned short)strlen( str );
+    Write( l );
+    WriteAlignedBytes( (const unsigned char*)str, (const unsigned int)l );
+}
+
+bool BitStream::Deserialize( char* str )
+{
+    unsigned short l;
+    bool b = Read( l );
+    if( b && l > 0 )
+        b = ReadAlignedBytes( (unsigned char*)str, l );
+
+    if( b == false )
+        str[0] = 0;
+
+    str[l] = 0;
+    return b;
+}
+
+void BitStream::SerializeCompressed( const char* str )
+{
+    StringCompressor::Instance()->EncodeString( str, 0xFFFF, this );
+}
+
+bool BitStream::DeserializeCompressed( char* str )
+{
+    return StringCompressor::Instance()->DecodeString( str, 0xFFFF, this );
 }
 
 } // namespace RakNet

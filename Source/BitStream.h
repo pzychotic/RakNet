@@ -22,7 +22,6 @@
 #include "RakNetDefines.h"
 #include "Export.h"
 #include "RakNetTypes.h"
-#include "RakString.h"
 #include "RakAssert.h"
 
 namespace RakNet {
@@ -642,11 +641,11 @@ public:
 
     inline void Write( const std::string& inStringVar )
     {
-        RakString::Serialize( inStringVar.c_str(), this );
+        Serialize( inStringVar.c_str() );
     }
     inline void Write( const char* const inStringVar )
     {
-        RakString::Serialize( inStringVar, this );
+        Serialize( inStringVar );
     }
     inline void Write( const unsigned char* const inTemplateVar )
     {
@@ -662,7 +661,7 @@ public:
     }
     inline void WriteCompressed( const char* const inStringVar )
     {
-        RakString::SerializeCompressed( inStringVar, this );
+        SerializeCompressed( inStringVar );
     }
     inline void WriteCompressed( const unsigned char* const inTemplateVar )
     {
@@ -720,11 +719,13 @@ private:
     /// \brief Assume the input source points to a compressed native type. Decompress and read it.
     bool ReadCompressed( unsigned char* inOutByteArray, const unsigned int size, const bool unsignedData );
 
+    void Serialize( const char* str );
+    bool Deserialize( char* str );
+    void SerializeCompressed( const char* str );
+    bool DeserializeCompressed( char* str );
 
     BitSize_t numberOfBitsUsed;
-
     BitSize_t numberOfBitsAllocated;
-
     BitSize_t readOffset;
 
     unsigned char* data;
@@ -993,7 +994,7 @@ inline void BitStream::Write( const RakNetGUID& inTemplateVar )
 template<>
 inline void BitStream::Write( const char* const& inStringVar )
 {
-    RakString::Serialize( inStringVar, this );
+    Serialize( inStringVar );
 }
 template<>
 inline void BitStream::Write( const unsigned char* const& inTemplateVar )
@@ -1130,7 +1131,7 @@ inline void BitStream::WriteCompressed( const double& inTemplateVar )
 template<>
 inline void BitStream::WriteCompressed( const char* const& inStringVar )
 {
-    RakString::SerializeCompressed( inStringVar, this );
+    SerializeCompressed( inStringVar );
 }
 template<>
 inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar )
@@ -1312,12 +1313,12 @@ inline bool BitStream::Read( RakNetGUID& outTemplateVar )
 template<>
 inline bool BitStream::Read( char*& varString )
 {
-    return RakString::Deserialize( varString, this );
+    return Deserialize( varString );
 }
 template<>
 inline bool BitStream::Read( unsigned char*& varString )
 {
-    return RakString::Deserialize( (char*)varString, this );
+    return Deserialize( (char*)varString );
 }
 
 /// \brief Read any integral type from a bitstream.
@@ -1427,12 +1428,12 @@ inline bool BitStream::ReadCompressed( double& outTemplateVar )
 template<>
 inline bool BitStream::ReadCompressed( char*& outTemplateVar )
 {
-    return RakString::DeserializeCompressed( outTemplateVar, this );
+    return DeserializeCompressed( outTemplateVar );
 }
 template<>
 inline bool BitStream::ReadCompressed( unsigned char*& outTemplateVar )
 {
-    return RakString::DeserializeCompressed( (char*)outTemplateVar, this );
+    return DeserializeCompressed( (char*)outTemplateVar );
 }
 
 /// \brief Read any integral type from a bitstream.
