@@ -553,4 +553,4 @@ void UpdateUDPForwarderGlobal( void* arg )
 
 } // namespace RakNet
 
-#endif // #if _RAKNET_SUPPORT_FileOperations==1
+#endif // #if _RAKNET_SUPPORT_UDPForwarder==1
