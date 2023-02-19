@@ -23,11 +23,12 @@
 #include "SocketIncludes.h"
 #include "DS_OrderedList.h"
 
+#include <string>
+
 namespace RakNet {
 
 /// Forward declarations
 struct Packet;
-class RakString;
 #if _RAKNET_SUPPORT_PacketLogger == 1
 class PacketLogger;
 #endif
@@ -127,7 +128,7 @@ public:
         bool HasConnectionAttemptToUser( User* user );
         void DerefConnectionAttempt( ConnectionAttempt* ca );
         void DeleteConnectionAttempt( ConnectionAttempt* ca );
-        void LogConnectionAttempts( RakString& rs );
+        void LogConnectionAttempts( std::string& rs );
     };
     RakNet::Time lastUpdate;
     static int NatPunchthroughUserComp( const RakNetGUID& key, User* const& data );

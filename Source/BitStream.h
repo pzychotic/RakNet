@@ -639,43 +639,6 @@ public:
     /// \internal Unrolled inner loop, for when performance is critical
     bool ReadAlignedVar32( char* inOutByteArray );
 
-    inline void Write( const std::string& inStringVar )
-    {
-        Serialize( inStringVar.c_str() );
-    }
-    inline void Write( const char* const inStringVar )
-    {
-        Serialize( inStringVar );
-    }
-    inline void Write( const unsigned char* const inTemplateVar )
-    {
-        Write( (const char*)inTemplateVar );
-    }
-    inline void Write( char* const inTemplateVar )
-    {
-        Write( (const char*)inTemplateVar );
-    }
-    inline void Write( unsigned char* const inTemplateVar )
-    {
-        Write( (const char*)inTemplateVar );
-    }
-    inline void WriteCompressed( const char* const inStringVar )
-    {
-        SerializeCompressed( inStringVar );
-    }
-    inline void WriteCompressed( const unsigned char* const inTemplateVar )
-    {
-        WriteCompressed( (const char*)inTemplateVar );
-    }
-    inline void WriteCompressed( char* const inTemplateVar )
-    {
-        WriteCompressed( (const char*)inTemplateVar );
-    }
-    inline void WriteCompressed( unsigned char* const inTemplateVar )
-    {
-        WriteCompressed( (const char*)inTemplateVar );
-    }
-
     inline static bool DoEndianSwap( void )
     {
 #ifndef __BITSTREAM_NATIVE_END
@@ -719,10 +682,11 @@ private:
     /// \brief Assume the input source points to a compressed native type. Decompress and read it.
     bool ReadCompressed( unsigned char* inOutByteArray, const unsigned int size, const bool unsignedData );
 
-    void Serialize( const char* str );
-    bool Deserialize( char* str );
-    void SerializeCompressed( const char* str );
-    bool DeserializeCompressed( char* str );
+    void Serialize( const std::string& str );
+    bool Deserialize( std::string& str );
+
+    void SerializeCompressed( const std::string& str );
+    bool DeserializeCompressed( std::string& str );
 
     BitSize_t numberOfBitsUsed;
     BitSize_t numberOfBitsAllocated;
@@ -992,25 +956,16 @@ inline void BitStream::Write( const RakNetGUID& inTemplateVar )
 
 // Write a string to a bitstream.
 template<>
-inline void BitStream::Write( const char* const& inStringVar )
+inline void BitStream::Write( const std::string& inTemplateVar )
 {
-    Serialize( inStringVar );
+    Serialize( inTemplateVar );
 }
+
+// keep these for now to force linker errors when using them by accident
 template<>
-inline void BitStream::Write( const unsigned char* const& inTemplateVar )
-{
-    Write( (const char*)inTemplateVar );
-}
+inline void BitStream::Write( const char* const& inTemplateVar );
 template<>
-inline void BitStream::Write( char* const& inTemplateVar )
-{
-    Write( (const char*)inTemplateVar );
-}
-template<>
-inline void BitStream::Write( unsigned char* const& inTemplateVar )
-{
-    Write( (const char*)inTemplateVar );
-}
+inline void BitStream::Write( const unsigned char* const& inTemplateVar );
 
 /// \brief Write any integral type to a bitstream.
 /// \details If the current value is different from the last value
@@ -1129,26 +1084,16 @@ inline void BitStream::WriteCompressed( const double& inTemplateVar )
 
 // Compress the string
 template<>
-inline void BitStream::WriteCompressed( const char* const& inStringVar )
+inline void BitStream::WriteCompressed( const std::string& inTemplateVar )
 {
-    SerializeCompressed( inStringVar );
-}
-template<>
-inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar )
-{
-    WriteCompressed( (const char*)inTemplateVar );
-}
-template<>
-inline void BitStream::WriteCompressed( char* const& inTemplateVar )
-{
-    WriteCompressed( (const char*)inTemplateVar );
-}
-template<>
-inline void BitStream::WriteCompressed( unsigned char* const& inTemplateVar )
-{
-    WriteCompressed( (const char*)inTemplateVar );
+    SerializeCompressed( inTemplateVar );
 }
 
+// ??? uncomment to find and fix usage in RPC4Plugin
+//template<>
+//inline void BitStream::WriteCompressed( const char* const& inTemplateVar );
+template<>
+inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar );
 
 /// \brief Write any integral type to a bitstream.
 /// \details If the current value is different from the last value
@@ -1311,15 +1256,16 @@ inline bool BitStream::Read( RakNetGUID& outTemplateVar )
 }
 
 template<>
-inline bool BitStream::Read( char*& varString )
+inline bool BitStream::Read( std::string& outTemplateVar )
 {
-    return Deserialize( varString );
+    return Deserialize( outTemplateVar );
 }
+
+// keep these for now to force linker errors when using them by accident
 template<>
-inline bool BitStream::Read( unsigned char*& varString )
-{
-    return Deserialize( (char*)varString );
-}
+inline bool BitStream::Read( char*& outTemplateVar );
+template<>
+inline bool BitStream::Read( unsigned char*& outTemplateVar );
 
 /// \brief Read any integral type from a bitstream.
 /// \details If the written value differed from the value compared against in the write function,
@@ -1426,15 +1372,15 @@ inline bool BitStream::ReadCompressed( double& outTemplateVar )
 }
 
 template<>
-inline bool BitStream::ReadCompressed( char*& outTemplateVar )
+inline bool BitStream::ReadCompressed( std::string& outTemplateVar )
 {
     return DeserializeCompressed( outTemplateVar );
 }
+
 template<>
-inline bool BitStream::ReadCompressed( unsigned char*& outTemplateVar )
-{
-    return DeserializeCompressed( (char*)outTemplateVar );
-}
+inline bool BitStream::ReadCompressed( char*& outTemplateVar );
+template<>
+inline bool BitStream::ReadCompressed( unsigned char*& outTemplateVar );
 
 /// \brief Read any integral type from a bitstream.
 /// \details If the written value differed from the value compared against in the write function,

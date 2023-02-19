@@ -17,7 +17,6 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 #include "BitStream.h"
-#include "Plugins/RakString.h"
 
 // #define NTDS_VERBOSE
 
@@ -44,7 +43,7 @@ void NatTypeDetectionServer::Startup( const char* nonRakNetIP2, const char* nonR
     s3p4 = CreateNonblockingBoundSocket( nonRakNetIP3, this );
     s4p5 = CreateNonblockingBoundSocket( nonRakNetIP4, this );
 
-    strcpy( s3p4Address, nonRakNetIP3 );
+    s3p4Address = nonRakNetIP3;
 
     if( s3p4->IsBerkleySocket() )
     {
@@ -220,7 +219,7 @@ void NatTypeDetectionServer::Update( void )
                 printf( "Testing NAT_TYPE_PORT_RESTRICTED\n" );
 #endif
                 bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_REQUEST );
-                bs.Write( RakString::NonVariadic( s3p4Address ) );
+                bs.Write( s3p4Address );
                 bs.Write( s3p4->GetBoundAddress().GetPort() );
                 rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
                 break;

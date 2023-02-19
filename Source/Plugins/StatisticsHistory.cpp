@@ -106,7 +106,7 @@ void StatisticsHistory::Clear( void )
 }
 unsigned int StatisticsHistory::GetObjectCount( void ) const { return objects.Size(); }
 StatisticsHistory::TrackedObjectData* StatisticsHistory::GetObjectAtIndex( unsigned int index ) const { return &objects[index]->trackedObjectData; }
-bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, RakString key, SHValueType val, Time curTime, bool combineEqualTimes )
+bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes )
 {
     unsigned int idx = GetObjectIndex( objectId );
     if( idx == (unsigned int)-1 )
@@ -114,7 +114,7 @@ bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, RakString key, SH
     AddValueByIndex( idx, key, val, curTime, combineEqualTimes );
     return true;
 }
-void StatisticsHistory::AddValueByIndex( unsigned int index, RakString key, SHValueType val, Time curTime, bool combineEqualTimes )
+void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes )
 {
     TimeAndValueQueue* queue;
     TrackedObject* to = objects[index];
@@ -159,7 +159,7 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, RakString key, SHVa
     if( queue->longTermHighest < tav.val )
         queue->longTermHighest = tav.val;
 }
-StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t objectId, RakString key, StatisticsHistory::TimeAndValueQueue** values, Time curTime ) const
+StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t objectId, const std::string& key, StatisticsHistory::TimeAndValueQueue** values, Time curTime ) const
 {
     if( values == 0 )
         return SH_INVALID_PARAMETER;
@@ -182,7 +182,7 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
         return false;
     TrackedObject* to = objects[idx];
     DataStructures::List<TimeAndValueQueue*> itemList;
-    DataStructures::List<RakString> keyList;
+    DataStructures::List<std::string> keyList;
     to->dataQueues.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
     Time curTime = GetTime();
 
@@ -230,7 +230,7 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
         values.Push( sortedQueues[i], _FILE_AND_LINE_ );
     return true;
 }
-void StatisticsHistory::MergeAllObjectsOnKey( RakString key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const
+void StatisticsHistory::MergeAllObjectsOnKey( const std::string& key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const
 {
     tavqOutput->Clear();
 
@@ -249,7 +249,7 @@ void StatisticsHistory::MergeAllObjectsOnKey( RakString key, TimeAndValueQueue* 
         }
     }
 }
-void StatisticsHistory::GetUniqueKeyList( DataStructures::List<RakString>& keys )
+void StatisticsHistory::GetUniqueKeyList( DataStructures::List<std::string>& keys )
 {
     keys.Clear( true, _FILE_AND_LINE_ );
 
@@ -257,7 +257,7 @@ void StatisticsHistory::GetUniqueKeyList( DataStructures::List<RakString>& keys 
     {
         TrackedObject* to = objects[idx];
         DataStructures::List<TimeAndValueQueue*> itemList;
-        DataStructures::List<RakString> keyList;
+        DataStructures::List<std::string> keyList;
         to->dataQueues.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
         for( unsigned int k = 0; k < keyList.Size(); k++ )
         {
@@ -695,7 +695,6 @@ StatisticsHistory::TrackedObject::TrackedObject() {}
 StatisticsHistory::TrackedObject::~TrackedObject()
 {
     DataStructures::List<StatisticsHistory::TimeAndValueQueue*> itemList;
-    DataStructures::List<RakString> keyList;
     for( unsigned int idx = 0; idx < itemList.Size(); idx++ )
         RakNet::OP_DELETE( itemList[idx], _FILE_AND_LINE_ );
 }
@@ -787,7 +786,7 @@ void StatisticsHistoryPlugin::Update( void )
         rakPeerInterface->GetStatistics(remoteSystems[idx], &rns);
         statistics.AddValue();
 
-        bool AddValue(uint64_t objectId, RakString key, SHValueType val, Time curTime);
+        bool AddValue(uint64_t objectId, const std::string& key, SHValueType val, Time curTime);
 
     }
     */

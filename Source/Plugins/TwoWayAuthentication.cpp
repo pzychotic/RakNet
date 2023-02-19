@@ -119,26 +119,26 @@ TwoWayAuthentication::~TwoWayAuthentication()
 {
     Clear();
 }
-bool TwoWayAuthentication::AddPassword( RakString identifier, RakString password )
+bool TwoWayAuthentication::AddPassword( const std::string& identifier, const std::string& password )
 {
-    if( password.IsEmpty() )
+    if( password.empty() )
         return false;
 
-    if( identifier.IsEmpty() )
+    if( identifier.empty() )
         return false;
 
     if( password == identifier )
         return false; // Insecure
 
-    if( passwords.GetIndexOf( identifier.C_String() ).IsInvalid() == false )
+    if( passwords.GetIndexOf( identifier ).IsInvalid() == false )
         return false; // This identifier already in use
 
     passwords.Push( identifier, password, _FILE_AND_LINE_ );
     return true;
 }
-bool TwoWayAuthentication::Challenge( RakString identifier, AddressOrGUID remoteSystem )
+bool TwoWayAuthentication::Challenge( const std::string& identifier, AddressOrGUID remoteSystem )
 {
-    DataStructures::HashIndex skhi = passwords.GetIndexOf( identifier.C_String() );
+    DataStructures::HashIndex skhi = passwords.GetIndexOf( identifier );
     if( skhi.IsInvalid() )
         return false;
 
@@ -254,11 +254,11 @@ void TwoWayAuthentication::Clear( void )
     passwords.Clear( _FILE_AND_LINE_ );
     nonceGenerator.Clear();
 }
-void TwoWayAuthentication::PushToUser( MessageID messageId, RakString password, AddressOrGUID remoteSystem )
+void TwoWayAuthentication::PushToUser( MessageID messageId, const std::string& password, AddressOrGUID remoteSystem )
 {
     BitStream output;
     output.Write( messageId );
-    if( password.IsEmpty() == false )
+    if( password.empty() == false )
         output.Write( password );
     Packet* p = AllocatePacketUnified( output.GetNumberOfBytesUsed() );
     p->systemAddress = remoteSystem.systemAddress;
@@ -304,10 +304,10 @@ void TwoWayAuthentication::OnNonceReply( Packet* packet )
             outgoingChallenges[i].sentHash = true;
 
             // Get the password for this identifier
-            DataStructures::HashIndex skhi = passwords.GetIndexOf( outgoingChallenges[i].identifier.C_String() );
+            DataStructures::HashIndex skhi = passwords.GetIndexOf( outgoingChallenges[i].identifier );
             if( skhi.IsInvalid() == false )
             {
-                RakString password = passwords.ItemAtIndex( skhi );
+                const std::string& password = passwords.ItemAtIndex( skhi );
 
                 // Hash their nonce with password and reply
                 char hashedNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
@@ -335,7 +335,7 @@ PluginReceiveResult TwoWayAuthentication::OnHashedNonceAndPassword( Packet* pack
     char remoteHashedNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
     unsigned short requestId;
     bsIn.Read( requestId );
-    RakString passwordIdentifier;
+    std::string passwordIdentifier;
     bsIn.Read( passwordIdentifier );
     bsIn.ReadAlignedBytes( (unsigned char*)remoteHashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH );
 
@@ -344,7 +344,7 @@ PluginReceiveResult TwoWayAuthentication::OnHashedNonceAndPassword( Packet* pack
     if( nonceGenerator.GetNonceById( usedNonce, requestId, packet, true ) == false )
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
 
-    DataStructures::HashIndex skhi = passwords.GetIndexOf( passwordIdentifier.C_String() );
+    DataStructures::HashIndex skhi = passwords.GetIndexOf( passwordIdentifier );
     if( skhi.IsInvalid() == false )
     {
         char hashedThisNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
@@ -386,13 +386,13 @@ void TwoWayAuthentication::OnPasswordResult( Packet* packet )
     bsIn.ReadAlignedBytes( (unsigned char*)usedNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
     char hashedNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
     bsIn.ReadAlignedBytes( (unsigned char*)hashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH );
-    RakString passwordIdentifier;
+    std::string passwordIdentifier;
     bsIn.Read( passwordIdentifier );
 
-    DataStructures::HashIndex skhi = passwords.GetIndexOf( passwordIdentifier.C_String() );
+    DataStructures::HashIndex skhi = passwords.GetIndexOf( passwordIdentifier );
     if( skhi.IsInvalid() == false )
     {
-        RakString password = passwords.ItemAtIndex( skhi );
+        const std::string& password = passwords.ItemAtIndex( skhi );
         char testHash[HASHED_NONCE_AND_PW_LENGTH];
         Hash( usedNonce, password, testHash );
         if( memcmp( testHash, hashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH ) == 0 )
@@ -415,20 +415,20 @@ void TwoWayAuthentication::OnPasswordResult( Packet* packet )
         }
     }
 }
-void TwoWayAuthentication::Hash( char thierNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], RakString password, char out[HASHED_NONCE_AND_PW_LENGTH] )
+void TwoWayAuthentication::Hash( char thierNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], const std::string& password, char out[HASHED_NONCE_AND_PW_LENGTH] )
 {
 #if LIBCAT_SECURITY == 1
     cat::Skein hash;
     if( !hash.BeginKey( HASH_BITS ) )
         return;
     hash.Crunch( thierNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
-    hash.Crunch( password.C_String(), (int)password.GetLength() );
+    hash.Crunch( password.c_str(), (int)password.size() );
     hash.End();
     hash.Generate( out, HASH_BYTES, STRENGTHENING_FACTOR );
 #else
     CSHA1 sha1;
     sha1.Update( (unsigned char*)thierNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
-    sha1.Update( (unsigned char*)password.C_String(), (unsigned int)password.GetLength() );
+    sha1.Update( (unsigned char*)password.c_str(), (uint32_t)password.size() );
     sha1.Final();
     sha1.GetHash( (unsigned char*)out );
 #endif

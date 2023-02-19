@@ -13,7 +13,7 @@
 
 #include "Plugins/NatPunchthroughServer.h"
 #include "Plugins/PacketLogger.h"
-#include "Plugins/RakString.h"
+#include "StringUtils.h"
 #include "BitStream.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
@@ -64,42 +64,29 @@ bool NatPunchthroughServer::User::HasConnectionAttemptToUser( User* user )
     }
     return false;
 }
-void NatPunchthroughServer::User::LogConnectionAttempts( RakString& rs )
+
+void NatPunchthroughServer::User::LogConnectionAttempts( std::string& rs )
 {
-    rs.Clear();
-    unsigned int index;
+    rs.clear();
     char guidStr[128], ipStr[128];
     guid.ToString( guidStr );
     systemAddress.ToString( true, ipStr );
-    rs = RakString( "User systemAddress=%s guid=%s\n", ipStr, guidStr );
-    rs += RakString( "%i attempts in list:\n", connectionAttempts.Size() );
-    for( index = 0; index < connectionAttempts.Size(); index++ )
+    rs = RakNet::format( "User systemAddress=%s guid=%s\n", ipStr, guidStr );
+    rs += RakNet::format( "%u attempts in list:\n", connectionAttempts.Size() );
+    for( uint32_t index = 0; index < connectionAttempts.Size(); index++ )
     {
-        rs += RakString( "%i. SessionID=%i ", index + 1, connectionAttempts[index]->sessionId );
-        if( connectionAttempts[index]->sender == this )
-            rs += "(We are sender) ";
-        else
-            rs += "(We are recipient) ";
-        if( isReady )
-            rs += "(READY TO START) ";
-        else
-            rs += "(NOT READY TO START) ";
-        if( connectionAttempts[index]->attemptPhase == NatPunchthroughServer::ConnectionAttempt::NAT_ATTEMPT_PHASE_NOT_STARTED )
-            rs += "(NOT_STARTED). ";
-        else
-            rs += "(GETTING_RECENT_PORTS). ";
-        if( connectionAttempts[index]->sender == this )
-        {
-            connectionAttempts[index]->recipient->guid.ToString( guidStr );
-            connectionAttempts[index]->recipient->systemAddress.ToString( true, ipStr );
-        }
-        else
-        {
-            connectionAttempts[index]->sender->guid.ToString( guidStr );
-            connectionAttempts[index]->sender->systemAddress.ToString( true, ipStr );
-        }
+        const ConnectionAttempt* pAttempt = connectionAttempts[index];
 
-        rs += RakString( "Target systemAddress=%s, guid=%s.\n", ipStr, guidStr );
+        rs += RakNet::format( "%u. SessionID=%i ", index + 1, pAttempt->sessionId );
+        rs += pAttempt->sender == this ? "(We are sender) " : "(We are recipient) ";
+        rs += isReady ? "(READY TO START) " : "(NOT READY TO START) ";
+        rs += pAttempt->attemptPhase == NatPunchthroughServer::ConnectionAttempt::NAT_ATTEMPT_PHASE_NOT_STARTED ? "(NOT_STARTED). " : "(GETTING_RECENT_PORTS). ";
+
+        const NatPunchthroughServer::User* pUser = pAttempt->sender == this ? pAttempt->recipient : pAttempt->sender;
+        pUser->guid.ToString( guidStr );
+        pUser->systemAddress.ToString( true, ipStr );
+
+        rs += RakNet::format( "Target systemAddress=%s, guid=%s.\n", ipStr, guidStr );
     }
 }
 
@@ -195,14 +182,13 @@ void NatPunchthroughServer::Update( void )
 
                         if( natPunchthroughServerDebugInterface )
                         {
-                            char str[1024];
                             char addr1[128], addr2[128];
                             // 8/01/09 Fixed bug where this was after DeleteConnectionAttempt()
                             connectionAttempt->sender->systemAddress.ToString( true, addr1 );
                             connectionAttempt->recipient->systemAddress.ToString( true, addr2 );
-                            sprintf( str, "Sending ID_NAT_TARGET_UNRESPONSIVE to sender %s and recipient %s.", addr1, addr2 );
-                            natPunchthroughServerDebugInterface->OnServerMessage( str );
-                            RakString log;
+                            std::string str = RakNet::format( "Sending ID_NAT_TARGET_UNRESPONSIVE to sender %s and recipient %s.", addr1, addr2 );
+                            natPunchthroughServerDebugInterface->OnServerMessage( str.c_str() );
+                            std::string log;
                             connectionAttempt->sender->LogConnectionAttempts( log );
                             connectionAttempt->recipient->LogConnectionAttempts( log );
                         }
@@ -425,12 +411,11 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
 
     if( natPunchthroughServerDebugInterface )
     {
-        RakString log;
         char addr1[128], addr2[128];
         packet->systemAddress.ToString( true, addr1 );
         packet->guid.ToString( addr2 );
-        log = RakString( "Got ID_NAT_GET_MOST_RECENT_PORT from systemAddress %s guid %s. port=%i. sessionId=%i. userFound=%i.", addr1, addr2, mostRecentPort, sessionId, objectExists );
-        natPunchthroughServerDebugInterface->OnServerMessage( log.C_String() );
+        std::string log = RakNet::format( "Got ID_NAT_GET_MOST_RECENT_PORT from systemAddress %s guid %s. port=%i. sessionId=%i. userFound=%i.", addr1, addr2, mostRecentPort, sessionId, objectExists );
+        natPunchthroughServerDebugInterface->OnServerMessage( log.c_str() );
     }
 
     if( objectExists )
@@ -472,12 +457,11 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
 
                 if( natPunchthroughServerDebugInterface )
                 {
-                    RakString log;
                     char addr1[128], addr2[128];
                     recipientSystemAddress.ToString( true, addr1 );
                     connectionAttempt->recipient->guid.ToString( addr2 );
-                    log = RakString( "Sending ID_NAT_CONNECT_AT_TIME to recipient systemAddress %s guid %s", addr1, addr2 );
-                    natPunchthroughServerDebugInterface->OnServerMessage( log.C_String() );
+                    std::string log = RakNet::format( "Sending ID_NAT_CONNECT_AT_TIME to recipient systemAddress %s guid %s", addr1, addr2 );
+                    natPunchthroughServerDebugInterface->OnServerMessage( log.c_str() );
                 }
 
                 // Send to recipient timestamped message to connect at time
@@ -496,12 +480,11 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
 
                 if( natPunchthroughServerDebugInterface )
                 {
-                    RakString log;
                     char addr1[128], addr2[128];
                     senderSystemAddress.ToString( true, addr1 );
                     connectionAttempt->sender->guid.ToString( addr2 );
-                    log = RakString( "Sending ID_NAT_CONNECT_AT_TIME to sender systemAddress %s guid %s", addr1, addr2 );
-                    natPunchthroughServerDebugInterface->OnServerMessage( log.C_String() );
+                    std::string log = RakNet::format( "Sending ID_NAT_CONNECT_AT_TIME to sender systemAddress %s guid %s", addr1, addr2 );
+                    natPunchthroughServerDebugInterface->OnServerMessage( log.c_str() );
                 }
 
 
@@ -531,12 +514,11 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
 
         if( natPunchthroughServerDebugInterface )
         {
-            RakString log;
             char addr1[128], addr2[128];
             packet->systemAddress.ToString( true, addr1 );
             packet->guid.ToString( addr2 );
-            log = RakString( "Ignoring ID_NAT_GET_MOST_RECENT_PORT from systemAddress %s guid %s", addr1, addr2 );
-            natPunchthroughServerDebugInterface->OnServerMessage( log.C_String() );
+            std::string log = RakNet::format( "Ignoring ID_NAT_GET_MOST_RECENT_PORT from systemAddress %s guid %s", addr1, addr2 );
+            natPunchthroughServerDebugInterface->OnServerMessage( log.c_str() );
         }
     }
 }

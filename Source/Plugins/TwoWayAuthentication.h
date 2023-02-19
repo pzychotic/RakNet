@@ -39,11 +39,12 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "Plugins/RakString.h"
+#include "StringUtils.h"
 #include "DS_Hash.h"
 #include "DS_Queue.h"
 
 #include <stdint.h>
+#include <string>
 
 namespace RakNet {
 
@@ -69,14 +70,14 @@ public:
     /// \param[in] identifier A unique identifier representing this password. This is transmitted in plaintext and should be considered insecure
     /// \param[in] password The password to add
     /// \return True on success, false on identifier==password, either identifier or password is blank, or identifier is already in use
-    bool AddPassword( RakString identifier, RakString password );
+    bool AddPassword( const std::string& identifier, const std::string& password );
 
     /// \brief Challenge another system for the specified identifier
     /// \details After calling Challenge, you will get back ID_TWO_WAY_AUTHENTICATION_SUCCESS, ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, or ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_FAILED
     /// ID_TWO_WAY_AUTHENTICATION_SUCCESS will be returned if and only if the other system has called AddPassword() with the same identifier\password pair as this system.
     /// \param[in] identifier A unique identifier representing this password. This is transmitted in plaintext and should be considered insecure
     /// \return True on success, false on remote system not connected, or identifier not previously added with AddPassword()
-    bool Challenge( RakString identifier, AddressOrGUID remoteSystem );
+    bool Challenge( const std::string& identifier, AddressOrGUID remoteSystem );
 
     /// \brief Free all memory
     void Clear( void );
@@ -93,7 +94,7 @@ public:
     /// \internal
     struct PendingChallenge
     {
-        RakString identifier;
+        std::string identifier;
         AddressOrGUID remoteSystem;
         RakNet::Time time;
         bool sentHash;
@@ -126,9 +127,10 @@ public:
     };
 
 protected:
-    void PushToUser( MessageID messageId, RakString password, AddressOrGUID remoteSystem );
+    void PushToUser( MessageID messageId, const std::string& password, AddressOrGUID remoteSystem );
+
     // Key is identifier, data is password
-    DataStructures::Hash<RakString, RakString, 16, RakString::ToInteger> passwords;
+    DataStructures::Hash<std::string, std::string, 16, RakNet::hash> passwords;
 
     RakNet::Time whenLastTimeoutCheck;
 
@@ -138,7 +140,7 @@ protected:
     void OnNonceReply( Packet* packet );
     PluginReceiveResult OnHashedNonceAndPassword( Packet* packet );
     void OnPasswordResult( Packet* packet );
-    void Hash( char thierNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], RakString password, char out[HASHED_NONCE_AND_PW_LENGTH] );
+    void Hash( char thierNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], const std::string& password, char out[HASHED_NONCE_AND_PW_LENGTH] );
 };
 
 } // namespace RakNet

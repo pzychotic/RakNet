@@ -17,6 +17,7 @@
 #include "RakAssert.h"
 #include "Export.h"
 #include "RakMemoryOverride.h"
+#include "DS_List.h"
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.

@@ -16,9 +16,7 @@
 
 #include "Export.h"
 
-#ifdef _STD_STRING_COMPRESSOR
 #include <string>
-#endif
 
 namespace RakNet {
 
@@ -54,10 +52,8 @@ public:
     /// \param[in] languageID Which language to use
     bool DecodeString( char* output, int maxCharsToWrite, BitStream* input );
 
-#ifdef _STD_STRING_COMPRESSOR
     void EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output );
-    bool DecodeString( std::string* output, int maxCharsToWrite, BitStream* input );
-#endif
+    bool DecodeString( std::string& output, int maxCharsToWrite, BitStream* input );
 
     /// Used so I can allocate and deallocate this singleton at runtime
     static void AddReference( void );

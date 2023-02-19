@@ -138,7 +138,7 @@ RPC4::~RPC4()
         RakNet::OP_DELETE( localCallbacks[i], _FILE_AND_LINE_ );
     }
 
-    DataStructures::List<RakString> keyList;
+    DataStructures::List<std::string> keyList;
     DataStructures::List<LocalSlot*> outputList;
     localSlots.GetAsList( outputList, keyList, _FILE_AND_LINE_ );
     unsigned int j;
@@ -187,8 +187,7 @@ void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )
     bool objectExists;
     unsigned int index;
     LocalCallback* lc;
-    RakString str;
-    str = uniqueID;
+    std::string str( uniqueID );
     index = localCallbacks.GetIndexFromKey( messageId, &objectExists );
     if( objectExists )
     {
@@ -220,8 +219,7 @@ bool RPC4::UnregisterLocalCallback( const char* uniqueID, MessageID messageId )
     bool objectExists;
     unsigned int index, index2;
     LocalCallback* lc;
-    RakString str;
-    str = uniqueID;
+    std::string str( uniqueID );
     index = localCallbacks.GetIndexFromKey( messageId, &objectExists );
     if( objectExists )
     {
@@ -380,7 +378,7 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
             }
             else if( packet->data[0] == ID_RPC_REMOTE_ERROR && packet->data[1] == RPC_ERROR_FUNCTION_NOT_REGISTERED )
             {
-                RakString functionName;
+                std::string functionName;
                 BitStream bsIn( packet->data, packet->length, false );
                 bsIn.IgnoreBytes( 2 );
                 bsIn.Read( functionName );
@@ -526,19 +524,19 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
 
         if( packet->data[1] == ID_RPC4_CALL )
         {
-            RakString functionName;
+            std::string functionName;
             bsIn.ReadCompressed( functionName );
             bool isBlocking = false;
             bsIn.Read( isBlocking );
             if( isBlocking == false )
             {
-                DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( functionName.C_String() );
+                DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( functionName );
                 if( skhi.IsInvalid() )
                 {
                     BitStream bsOut;
                     bsOut.Write( (unsigned char)ID_RPC_REMOTE_ERROR );
                     bsOut.Write( (unsigned char)RPC_ERROR_FUNCTION_NOT_REGISTERED );
-                    bsOut.Write( functionName.C_String(), (unsigned int)functionName.GetLength() + 1 );
+                    bsOut.Write( functionName );
                     SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
                     return RR_STOP_PROCESSING_AND_DEALLOCATE;
                 }
@@ -550,13 +548,13 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
             }
             else
             {
-                DataStructures::HashIndex skhi = registeredBlockingFunctions.GetIndexOf( functionName.C_String() );
+                DataStructures::HashIndex skhi = registeredBlockingFunctions.GetIndexOf( functionName );
                 if( skhi.IsInvalid() )
                 {
                     BitStream bsOut;
                     bsOut.Write( (unsigned char)ID_RPC_REMOTE_ERROR );
                     bsOut.Write( (unsigned char)RPC_ERROR_FUNCTION_NOT_REGISTERED );
-                    bsOut.Write( functionName.C_String(), (unsigned int)functionName.GetLength() + 1 );
+                    bsOut.Write( functionName );
                     SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
                     return RR_STOP_PROCESSING_AND_DEALLOCATE;
                 }
@@ -578,7 +576,7 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
         }
         else if( packet->data[1] == ID_RPC4_SIGNAL )
         {
-            RakString sharedIdentifier;
+            std::string sharedIdentifier;
             bsIn.ReadCompressed( sharedIdentifier );
             DataStructures::HashIndex functionIndex;
             functionIndex = localSlots.GetIndexOf( sharedIdentifier );
@@ -603,13 +601,12 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
     index = localCallbacks.GetIndexFromKey( packet->data[0], &objectExists );
     if( objectExists )
     {
-        LocalCallback* lc;
-        lc = localCallbacks[index];
+        LocalCallback* lc = localCallbacks[index];
         for( index2 = 0; index2 < lc->functions.Size(); index2++ )
         {
             BitStream bsIn( packet->data, packet->length, false );
 
-            DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( lc->functions[index2].C_String() );
+            DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( lc->functions[index2] );
             if( skhi.IsInvalid() == false )
             {
                 void ( *fp )( BitStream*, Packet* );

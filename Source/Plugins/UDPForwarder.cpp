@@ -385,11 +385,11 @@ void UDPForwarder::UpdateUDPForwarder( void )
 #if RAKNET_SUPPORT_IPV6 != 1
                 fe->socket = socket__( AF_INET, SOCK_DGRAM, 0 );
                 listenerSocketAddress.sin_family = AF_INET;
-                if( sfis->forceHostAddress.IsEmpty() == false )
+                if( sfis->forceHostAddress.empty() == false )
                 {
 
 
-                    listenerSocketAddress.sin_addr.s_addr = inet_addr__( sfis->forceHostAddress.C_String() );
+                    listenerSocketAddress.sin_addr.s_addr = inet_addr__( sfis->forceHostAddress.c_str() );
                 }
                 else
                 {
@@ -414,10 +414,10 @@ void UDPForwarder::UpdateUDPForwarder( void )
                 hints.ai_flags = AI_PASSIVE;         // fill in my IP for me
                 struct addrinfo *servinfo = 0, *aip; // will point to the results
 
-                if( sfis->forceHostAddress.IsEmpty() || sfis->forceHostAddress == "UNASSIGNED_SYSTEM_ADDRESS" )
+                if( sfis->forceHostAddress.empty() || sfis->forceHostAddress == "UNASSIGNED_SYSTEM_ADDRESS" )
                     getaddrinfo( 0, "0", &hints, &servinfo );
                 else
-                    getaddrinfo( sfis->forceHostAddress.C_String(), "0", &hints, &servinfo );
+                    getaddrinfo( sfis->forceHostAddress.c_str(), "0", &hints, &servinfo );
 
                 for( aip = servinfo; aip != NULL; aip = aip->ai_next )
                 {

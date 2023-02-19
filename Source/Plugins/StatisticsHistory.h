@@ -21,12 +21,13 @@
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_OrderedList.h"
-#include "Plugins/RakString.h"
+#include "StringUtils.h"
 #include "DS_Queue.h"
 #include "DS_Hash.h"
 
 #include <float.h>
 #include <stdint.h>
+#include <string>
 
 namespace RakNet {
 
@@ -110,12 +111,12 @@ public:
     unsigned int GetObjectCount( void ) const;
     StatisticsHistory::TrackedObjectData* GetObjectAtIndex( unsigned int index ) const;
     unsigned int GetObjectIndex( uint64_t objectId ) const;
-    bool AddValueByObjectID( uint64_t objectId, RakString key, SHValueType val, Time curTime, bool combineEqualTimes );
-    void AddValueByIndex( unsigned int index, RakString key, SHValueType val, Time curTime, bool combineEqualTimes );
-    SHErrorCode GetHistoryForKey( uint64_t objectId, RakString key, TimeAndValueQueue** values, Time curTime ) const;
+    bool AddValueByObjectID( uint64_t objectId, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
+    void AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
+    SHErrorCode GetHistoryForKey( uint64_t objectId, const std::string& key, TimeAndValueQueue** values, Time curTime ) const;
     bool GetHistorySorted( uint64_t objectId, SHSortOperation sortType, DataStructures::List<TimeAndValueQueue*>& values ) const;
-    void MergeAllObjectsOnKey( RakString key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const;
-    void GetUniqueKeyList( DataStructures::List<RakString>& keys );
+    void MergeAllObjectsOnKey( const std::string& key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const;
+    void GetUniqueKeyList( DataStructures::List<std::string>& keys );
 
     struct TimeAndValue
     {
@@ -131,7 +132,7 @@ public:
         DataStructures::Queue<TimeAndValue> values;
 
         Time timeToTrackValues;
-        RakString key;
+        std::string key;
 
         SHValueType recentSum;
         SHValueType recentSumOfSquares;
@@ -187,7 +188,7 @@ protected:
         TrackedObject();
         ~TrackedObject();
         TrackedObjectData trackedObjectData;
-        DataStructures::Hash<RakString, TimeAndValueQueue*, 32, RakString::ToInteger> dataQueues;
+        DataStructures::Hash<std::string, TimeAndValueQueue*, 32, RakNet::hash> dataQueues;
     };
 
     DataStructures::OrderedList<uint64_t, TrackedObject*, TrackedObjectComp> objects;

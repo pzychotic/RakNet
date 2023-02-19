@@ -57,7 +57,7 @@ UDPProxyCoordinator::~UDPProxyCoordinator()
 {
     Clear();
 }
-void UDPProxyCoordinator::SetRemoteLoginPassword( RakString password )
+void UDPProxyCoordinator::SetRemoteLoginPassword( const std::string& password )
 {
     remoteLoginPassword = password;
 }
@@ -206,7 +206,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         outgoingBs.Write( targetGuid );
         // Request in progress, not completed
         unsigned short forwardingPort = 0;
-        RakString serverPublicIp;
+        std::string serverPublicIp;
         outgoingBs.Write( serverPublicIp );
         outgoingBs.Write( forwardingPort );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
@@ -285,11 +285,11 @@ void UDPProxyCoordinator::OnLoginRequestFromServerToCoordinator( Packet* packet 
 {
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( 2 );
-    RakString password;
+    std::string password;
     incomingBs.Read( password );
     BitStream outgoingBs;
 
-    if( remoteLoginPassword.IsEmpty() )
+    if( remoteLoginPassword.empty() )
     {
         outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
         outgoingBs.Write( (MessageID)ID_UDP_PROXY_NO_PASSWORD_SET_FROM_COORDINATOR_TO_SERVER );
@@ -341,10 +341,10 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
     sata.senderClientGuid = fw->sata.senderClientGuid;
     sata.targetClientGuid = fw->sata.targetClientGuid;
 
-    RakString serverPublicIp;
+    std::string serverPublicIp;
     incomingBs.Read( serverPublicIp );
 
-    if( serverPublicIp.IsEmpty() )
+    if( serverPublicIp.empty() )
     {
         char serverIP[64];
         packet->systemAddress.ToString( false, serverIP );

@@ -21,9 +21,11 @@
 #include "PacketPriority.h"
 #include "RakNetTypes.h"
 #include "BitStream.h"
-#include "Plugins/RakString.h"
+#include "StringUtils.h"
 #include "DS_Hash.h"
 #include "DS_OrderedList.h"
+
+#include <string>
 
 /// \defgroup RPC_PLUGIN_GROUP RPC
 /// \brief Remote procedure calls, without external dependencies.
@@ -169,7 +171,7 @@ public:
     struct LocalCallback
     {
         MessageID messageId;
-        DataStructures::OrderedList<RakString, RakString> functions;
+        DataStructures::OrderedList<std::string, std::string> functions;
     };
     static int LocalCallbackComp( const MessageID& key, LocalCallback* const& data );
 
@@ -199,7 +201,7 @@ public:
     {
         DataStructures::OrderedList<LocalSlotObject, LocalSlotObject, LocalSlotObjectComp> slotObjects;
     };
-    DataStructures::Hash<RakString, LocalSlot*, 256, RakString::ToInteger> localSlots;
+    DataStructures::Hash<std::string, LocalSlot*, 256, RakNet::hash> localSlots;
 
 protected:
     // --------------------------------------------------------------------------------------------
@@ -208,8 +210,8 @@ protected:
     virtual void OnAttach( void );
     virtual PluginReceiveResult OnReceive( Packet* packet );
 
-    DataStructures::Hash<RakString, void ( * )( BitStream*, Packet* ), 64, RakString::ToInteger> registeredNonblockingFunctions;
-    DataStructures::Hash<RakString, void ( * )( BitStream*, BitStream*, Packet* ), 64, RakString::ToInteger> registeredBlockingFunctions;
+    DataStructures::Hash<std::string, void ( * )( BitStream*, Packet* ), 64, RakNet::hash> registeredNonblockingFunctions;
+    DataStructures::Hash<std::string, void ( * )( BitStream*, BitStream*, Packet* ), 64, RakNet::hash> registeredBlockingFunctions;
     DataStructures::OrderedList<MessageID, LocalCallback*, RPC4::LocalCallbackComp> localCallbacks;
 
     BitStream blockingReturnValue;

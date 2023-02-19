@@ -22,7 +22,8 @@
 #include "DS_OrderedList.h"
 #include "DS_Hash.h"
 #include "Export.h"
-#include "Plugins/RakString.h"
+
+#include <string>
 
 /// MessageIdentifier (ID_*) values shoudln't go higher than this.  Change it if you do.
 #define MESSAGE_FILTER_MAX_MESSAGE_ID 256
@@ -50,7 +51,7 @@ struct FilterSet
     void* timeoutUserData;
     int filterSetID;
     bool allowedIDs[MESSAGE_FILTER_MAX_MESSAGE_ID];
-    DataStructures::OrderedList<RakString, RakString> allowedRPC4;
+    DataStructures::OrderedList<std::string, std::string> allowedRPC4;
 };
 
 /// \internal Has to be public so some of the shittier compilers can use it.

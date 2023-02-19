@@ -1170,33 +1170,32 @@ void BitStream::WriteFloat16( float inOutFloat, float floatMin, float floatMax )
     Write( (unsigned short)percentile );
 }
 
-void BitStream::Serialize( const char* str )
+void BitStream::Serialize( const std::string& str )
 {
-    unsigned short l = (unsigned short)strlen( str );
-    Write( l );
-    WriteAlignedBytes( (const unsigned char*)str, (const unsigned int)l );
+    const uint16_t size = static_cast<uint16_t>( str.size() );
+    Write( size );
+    WriteAlignedBytes( reinterpret_cast<const unsigned char*>( str.c_str() ), size );
 }
 
-bool BitStream::Deserialize( char* str )
+bool BitStream::Deserialize( std::string& str )
 {
-    unsigned short l;
-    bool b = Read( l );
-    if( b && l > 0 )
-        b = ReadAlignedBytes( (unsigned char*)str, l );
+    uint16_t size = 0;
+    bool b = Read( size );
+    if( b && size > 0 )
+    {
+        str.resize( size );
+        b = ReadAlignedBytes( reinterpret_cast<unsigned char*>( str.data() ), size );
+    }
 
-    if( b == false )
-        str[0] = 0;
-
-    str[l] = 0;
     return b;
 }
 
-void BitStream::SerializeCompressed( const char* str )
+void BitStream::SerializeCompressed( const std::string& str )
 {
     StringCompressor::Instance()->EncodeString( str, 0xFFFF, this );
 }
 
-bool BitStream::DeserializeCompressed( char* str )
+bool BitStream::DeserializeCompressed( std::string& str )
 {
     return StringCompressor::Instance()->DecodeString( str, 0xFFFF, this );
 }

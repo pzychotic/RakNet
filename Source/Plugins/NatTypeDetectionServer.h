@@ -25,6 +25,7 @@
 #include "DS_List.h"
 
 #include <mutex>
+#include <string>
 
 namespace RakNet {
 
@@ -116,7 +117,7 @@ protected:
 
     // s1p1 is rakpeer itself
     RakNetSocket2 *s1p2, *s2p3, *s3p4, *s4p5;
-    char s3p4Address[64];
+    std::string s3p4Address;
 };
 
 } // namespace RakNet

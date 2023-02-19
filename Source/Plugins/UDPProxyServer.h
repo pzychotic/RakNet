@@ -22,7 +22,8 @@
 #include "PluginInterface2.h"
 #include "DS_OrderedList.h"
 #include "UDPForwarder.h"
-#include "Plugins/RakString.h"
+
+#include <string>
 
 namespace RakNet {
 
@@ -38,23 +39,23 @@ struct UDPProxyServerResultHandler
     /// Called when our login succeeds
     /// \param[out] usedPassword The password we passed to UDPProxyServer::LoginToCoordinator()
     /// \param[out] proxyServer The plugin calling this callback
-    virtual void OnLoginSuccess( RakString usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
+    virtual void OnLoginSuccess( const std::string& usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
 
     /// We are already logged in.
     /// This login failed, but the system is operational as if it succeeded
     /// \param[out] usedPassword The password we passed to UDPProxyServer::LoginToCoordinator()
     /// \param[out] proxyServer The plugin calling this callback
-    virtual void OnAlreadyLoggedIn( RakString usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
+    virtual void OnAlreadyLoggedIn( const std::string& usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
 
     /// The coordinator operator forgot to call UDPProxyCoordinator::SetRemoteLoginPassword()
     /// \param[out] usedPassword The password we passed to UDPProxyServer::LoginToCoordinator()
     /// \param[out] proxyServer The plugin calling this callback
-    virtual void OnNoPasswordSet( RakString usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
+    virtual void OnNoPasswordSet( const std::string& usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
 
     /// The coordinator operator set a different password in UDPProxyCoordinator::SetRemoteLoginPassword() than what we passed
     /// \param[out] usedPassword The password we passed to UDPProxyServer::LoginToCoordinator()
     /// \param[out] proxyServer The plugin calling this callback
-    virtual void OnWrongPassword( RakString usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
+    virtual void OnWrongPassword( const std::string& usedPassword, UDPProxyServer* proxyServerPlugin ) = 0;
 };
 
 /// \brief UDPProxyServer to control our instance of UDPForwarder
@@ -84,12 +85,12 @@ public:
     /// \pre Must be connected to the coordinator
     /// \pre Coordinator must have set a password with UDPProxyCoordinator::SetRemoteLoginPassword()
     /// \returns false if already logged in, or logging in. Returns true otherwise
-    bool LoginToCoordinator( RakString password, SystemAddress coordinatorAddress );
+    bool LoginToCoordinator( const std::string& password, SystemAddress coordinatorAddress );
 
     /// \brief The server IP reported to the client is the IP address from the server to the coordinator.
     /// If the server and coordinator are on the same LAN, you need to call SetServerPublicIP() to tell the client what address to connect to
     /// \param[in] ip IP address to report in UDPProxyClientResultHandler::OnForwardingSuccess() and UDPProxyClientResultHandler::OnForwardingNotification() as proxyIPAddress
-    void SetServerPublicIP( RakString ip );
+    void SetServerPublicIP( const std::string& ip );
 
     /// Operative class that performs the forwarding
     /// Exposed so you can call UDPForwarder::SetMaxForwardEntries() if you want to change away from the default
@@ -114,7 +115,7 @@ protected:
 
     UDPProxyServerResultHandler* resultHandler;
     unsigned short socketFamily;
-    RakString serverPublicIp;
+    std::string serverPublicIp;
 };
 
 } // namespace RakNet

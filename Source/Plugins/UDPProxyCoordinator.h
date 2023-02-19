@@ -20,10 +20,11 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "Plugins/RakString.h"
 #include "BitStream.h"
 #include "DS_Queue.h"
 #include "DS_OrderedList.h"
+
+#include <string>
 
 namespace RakNet {
 
@@ -44,7 +45,7 @@ public:
     /// For UDPProxyServers logging in remotely, they must pass a password to UDPProxyServer::LoginToCoordinator(). It must match the password set here.
     /// If no password is set, they cannot login remotely.
     /// By default, no password is set
-    void SetRemoteLoginPassword( RakString password );
+    void SetRemoteLoginPassword( const std::string& password );
 
     /// \internal
     virtual void Update( void );
@@ -101,7 +102,7 @@ protected:
     // Forwarding requests in progress
     DataStructures::OrderedList<SenderAndTargetAddress, ForwardingRequest*, ForwardingRequestComp> forwardingRequestList;
 
-    RakString remoteLoginPassword;
+    std::string remoteLoginPassword;
 };
 
 } // namespace RakNet

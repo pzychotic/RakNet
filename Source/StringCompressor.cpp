@@ -130,16 +130,15 @@ bool StringCompressor::DecodeString( char* output, int maxCharsToWrite, BitStrea
     return true;
 }
 
-#ifdef _STD_STRING_COMPRESSOR
 void StringCompressor::EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output )
 {
     EncodeString( input.c_str(), maxCharsToWrite, output );
 }
-bool StringCompressor::DecodeString( std::string* output, int maxCharsToWrite, BitStream* input )
+bool StringCompressor::DecodeString( std::string& output, int maxCharsToWrite, BitStream* input )
 {
     if( maxCharsToWrite <= 0 )
     {
-        output->clear();
+        output.clear();
         return true;
     }
 
@@ -150,19 +149,18 @@ bool StringCompressor::DecodeString( std::string* output, int maxCharsToWrite, B
     {
         char* destinationBlock = (char*)alloca( maxCharsToWrite );
         out = DecodeString( destinationBlock, maxCharsToWrite, input );
-        *output = destinationBlock;
+        output = destinationBlock;
     }
     else
 #endif
     {
         char* destinationBlock = (char*)rakMalloc_Ex( maxCharsToWrite, _FILE_AND_LINE_ );
         out = DecodeString( destinationBlock, maxCharsToWrite, input );
-        *output = destinationBlock;
+        output = destinationBlock;
         rakFree_Ex( destinationBlock, _FILE_AND_LINE_ );
     }
 
     return out;
 }
-#endif
 
 } // namespace RakNet

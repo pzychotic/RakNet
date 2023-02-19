@@ -37,7 +37,7 @@ void UDPProxyServer::SetResultHandler( UDPProxyServerResultHandler* rh )
 {
     resultHandler = rh;
 }
-bool UDPProxyServer::LoginToCoordinator( RakString password, SystemAddress coordinatorAddress )
+bool UDPProxyServer::LoginToCoordinator( const std::string& password, SystemAddress coordinatorAddress )
 {
     unsigned int insertionIndex;
     bool objectExists;
@@ -55,7 +55,7 @@ bool UDPProxyServer::LoginToCoordinator( RakString password, SystemAddress coord
     loggingInCoordinators.InsertAtIndex( coordinatorAddress, insertionIndex, _FILE_AND_LINE_ );
     return true;
 }
-void UDPProxyServer::SetServerPublicIP( RakString ip )
+void UDPProxyServer::SetServerPublicIP( const std::string& ip )
 {
     serverPublicIp = ip;
 }
@@ -90,7 +90,7 @@ PluginReceiveResult UDPProxyServer::OnReceive( Packet* packet )
 
                 BitStream incomingBs( packet->data, packet->length, false );
                 incomingBs.IgnoreBytes( 2 );
-                RakString password;
+                std::string password;
                 incomingBs.Read( password );
                 switch( packet->data[1] )
                 {

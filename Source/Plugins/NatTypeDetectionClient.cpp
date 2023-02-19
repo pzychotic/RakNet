@@ -14,7 +14,6 @@
 #include "Plugins/NatTypeDetectionClient.h"
 #include "BitStream.h"
 #include "SocketIncludes.h"
-#include "Plugins/RakString.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 
@@ -159,7 +158,7 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
 {
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( sizeof( MessageID ) );
-    RakString s3p4StrAddress;
+    std::string s3p4StrAddress;
     bsIn.Read( s3p4StrAddress );
     unsigned short s3p4Port;
     bsIn.Read( s3p4Port );
@@ -167,7 +166,7 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
     DataStructures::List<RakNetSocket2*> sockets;
     rakPeerInterface->GetSockets( sockets );
     SystemAddress s3p4Addr = sockets[0]->GetBoundAddress();
-    s3p4Addr.FromStringExplicitPort( s3p4StrAddress.C_String(), s3p4Port );
+    s3p4Addr.FromStringExplicitPort( s3p4StrAddress.c_str(), s3p4Port );
 
     // Send off the RakNet socket to the specified address, message is unformatted
     // Server does this twice, so don't have to unduly worry about packetloss

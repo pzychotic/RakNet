@@ -20,7 +20,6 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
-#include "Plugins/RakString.h"
 #include "DS_Queue.h"
 #include "DS_List.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
@@ -28,6 +27,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <string>
 
 namespace RakNet {
 
@@ -115,7 +115,7 @@ protected:
         SystemAddress source;
         SystemAddress destination;
         RakNet::TimeMS timeoutOnNoDataMS;
-        RakString forceHostAddress;
+        std::string forceHostAddress;
         unsigned short socketFamily;
         unsigned int inputId;
     };

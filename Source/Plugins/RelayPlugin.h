@@ -18,8 +18,10 @@
 #if _RAKNET_SUPPORT_RelayPlugin == 1
 
 #include "PluginInterface2.h"
-#include "Plugins/RakString.h"
+#include "StringUtils.h"
 #include "DS_Hash.h"
+
+#include <string>
 
 /// \defgroup RELAY_PLUGIN_GROUP RelayPlugin
 /// \brief A simple class to relay messages from one system to another through an intermediary
@@ -69,7 +71,7 @@ public:
     /// \param[in] key A string to identify the target's RakNetGUID. This is so the sending system does not need to know the RakNetGUID of the target system. The key should be unique among all guids added. If the key is not unique, only one system will be sent to (at random).
     /// \param[in] guid The RakNetGuid of the system to send to. If this system disconnects, it is removed from the internal hash
     /// \return RPE_ADD_CLIENT_TARGET_NOT_CONNECTED, RPE_ADD_CLIENT_NAME_ALREADY_IN_USE, or RPE_ADD_CLIENT_OK
-    RelayPluginEnums AddParticipantOnServer( const RakString& key, const RakNetGUID& guid );
+    RelayPluginEnums AddParticipantOnServer( const std::string& key, const RakNetGUID& guid );
 
     /// \brief Remove a chat participant
     void RemoveParticipantOnServer( const RakNetGUID& guid );
@@ -83,7 +85,7 @@ public:
     /// \pre The server must have called SetAcceptAddParticipantRequests(true) or the request will be ignored
     /// \param[in] key A string to identify out system. Passed to \a key on AddParticipantOnServer()
     /// \param[in] relayPluginServerGuid the RakNetGUID of the system running RelayPlugin
-    void AddParticipantRequestFromClient( const RakString& key, const RakNetGUID& relayPluginServerGuid );
+    void AddParticipantRequestFromClient( const std::string& key, const RakNetGUID& relayPluginServerGuid );
 
     /// \brief Remove yourself as a participant
     void RemoveParticipantRequestFromClient( const RakNetGUID& relayPluginServerGuid );
@@ -95,10 +97,10 @@ public:
     /// \param[in] priority See the parameter of the same name in RakPeerInterface::Send()
     /// \param[in] reliability See the parameter of the same name in RakPeerInterface::Send()
     /// \param[in] orderingChannel See the parameter of the same name in RakPeerInterface::Send()
-    void SendToParticipant( const RakNetGUID& relayPluginServerGuid, const RakString& destinationGuid, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel );
+    void SendToParticipant( const RakNetGUID& relayPluginServerGuid, const std::string& destinationGuid, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel );
 
     void SendGroupMessage( const RakNetGUID& relayPluginServerGuid, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel );
-    void JoinGroupRequest( const RakNetGUID& relayPluginServerGuid, RakString groupName );
+    void JoinGroupRequest( const RakNetGUID& relayPluginServerGuid, const std::string& groupName );
     void LeaveGroup( const RakNetGUID& relayPluginServerGuid );
     void GetGroupList( const RakNetGUID& relayPluginServerGuid );
 
@@ -109,35 +111,35 @@ public:
 
     struct StrAndGuidAndRoom
     {
-        RakString str;
+        std::string str;
         RakNetGUID guid;
-        RakString currentRoom;
+        std::string currentRoom;
     };
 
     struct StrAndGuid
     {
-        RakString str;
+        std::string str;
         RakNetGUID guid;
     };
 
     struct RP_Group
     {
-        RakString roomName;
+        std::string roomName;
         DataStructures::List<StrAndGuid> usersInRoom;
     };
 
 protected:
-    RelayPlugin::RP_Group* JoinGroup( RakNetGUID userGuid, RakString roomName );
+    RelayPlugin::RP_Group* JoinGroup( RakNetGUID userGuid, const std::string& roomName );
     RelayPlugin::RP_Group* JoinGroup( RP_Group* room, StrAndGuidAndRoom** strAndGuidSender );
     void LeaveGroup( StrAndGuidAndRoom** strAndGuidSender );
-    void NotifyUsersInRoom( RP_Group* room, int msg, const RakString& message );
+    void NotifyUsersInRoom( RP_Group* room, int msg, const std::string& message );
     void SendMessageToRoom( StrAndGuidAndRoom** strAndGuidSender, BitStream* message );
     void SendChatRoomsList( RakNetGUID target );
     void OnGroupMessageFromClient( Packet* packet );
     void OnJoinGroupRequestFromClient( Packet* packet );
     void OnLeaveGroupRequestFromClient( Packet* packet );
 
-    DataStructures::Hash<RakString, StrAndGuidAndRoom*, 8096, RakString::ToInteger> strToGuidHash;
+    DataStructures::Hash<std::string, StrAndGuidAndRoom*, 8096, RakNet::hash> strToGuidHash;
     DataStructures::Hash<RakNetGUID, StrAndGuidAndRoom*, 8096, RakNetGUID::ToUint32> guidToStrHash;
     DataStructures::List<RP_Group*> chatRooms;
     bool acceptAddParticipantRequests;

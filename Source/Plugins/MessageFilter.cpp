@@ -391,8 +391,8 @@ PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
         {
             BitStream bsIn( packet->data, packet->length, false );
             bsIn.IgnoreBytes( 2 );
-            RakString functionName;
-            bsIn.ReadCompressed( functionName );
+            std::string functionName;
+            bsIn.ReadCompressed( *functionName.data() );
             if( systemList.ItemAtIndex( index ).filter->allowedRPC4.HasData( functionName ) == false )
             {
                 OnInvalidMessage( systemList.ItemAtIndex( index ).filter, packet, packet->data[0] );
