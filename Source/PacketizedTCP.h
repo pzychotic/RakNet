@@ -19,7 +19,8 @@
 
 #include "TCPInterface.h"
 #include "DS_ByteQueue.h"
-#include "DS_Map.h"
+
+#include <map>
 
 namespace RakNet {
 
@@ -70,7 +71,7 @@ protected:
 
     // A single TCP recieve may generate multiple split packets. They are stored in the waitingPackets list until Receive is called
     DataStructures::Queue<Packet*> waitingPackets;
-    DataStructures::Map<SystemAddress, DataStructures::ByteQueue*> connections;
+    std::map<SystemAddress, DataStructures::ByteQueue*> connections;
 
     // Mirrors single producer / consumer, but processes them in Receive() before returning to user
     DataStructures::Queue<SystemAddress> _newIncomingConnections, _lostConnections, _failedConnectionAttempts, _completedConnectionAttempts;
