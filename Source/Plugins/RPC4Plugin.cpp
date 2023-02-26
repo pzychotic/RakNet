@@ -287,7 +287,7 @@ void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
     BitStream out;
     out.Write( (MessageID)ID_RPC_PLUGIN );
     out.Write( (MessageID)ID_RPC4_CALL );
-    out.WriteCompressed( uniqueID );
+    out.WriteCompressed( std::string( uniqueID ) );
     out.Write( false ); // nonblocking
     if( bitStream )
     {
@@ -319,7 +319,7 @@ void RPC4::Call( const char* uniqueID, BitStream* bitStream, PacketPriority prio
     BitStream out;
     out.Write( (MessageID)ID_RPC_PLUGIN );
     out.Write( (MessageID)ID_RPC4_CALL );
-    out.WriteCompressed( uniqueID );
+    out.WriteCompressed( std::string( uniqueID ) );
     out.Write( false ); // Nonblocking
     if( bitStream )
     {
@@ -334,7 +334,7 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
     BitStream out;
     out.Write( (MessageID)ID_RPC_PLUGIN );
     out.Write( (MessageID)ID_RPC4_CALL );
-    out.WriteCompressed( uniqueID );
+    out.WriteCompressed( std::string( uniqueID ) );
     out.Write( true ); // Blocking
     if( bitStream )
     {
@@ -411,7 +411,7 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
     BitStream out;
     out.Write( (MessageID)ID_RPC_PLUGIN );
     out.Write( (MessageID)ID_RPC4_SIGNAL );
-    out.WriteCompressed( sharedIdentifier );
+    out.WriteCompressed( std::string( sharedIdentifier ) );
     if( bitStream )
     {
         bitStream->ResetReadPointer();

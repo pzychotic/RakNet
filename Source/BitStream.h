@@ -1089,9 +1089,8 @@ inline void BitStream::WriteCompressed( const std::string& inTemplateVar )
     SerializeCompressed( inTemplateVar );
 }
 
-// ??? uncomment to find and fix usage in RPC4Plugin
-//template<>
-//inline void BitStream::WriteCompressed( const char* const& inTemplateVar );
+template<>
+inline void BitStream::WriteCompressed( const char* const& inTemplateVar );
 template<>
 inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar );
 
