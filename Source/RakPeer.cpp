@@ -35,7 +35,6 @@
 #include "Rand.h"
 #include "PluginInterface2.h"
 #include "StringCompressor.h"
-#include "StringTable.h"
 #include "RakNetTypes.h"
 #include "RakThread.h"
 #include "RakAssert.h"
@@ -192,7 +191,6 @@ RakPeer::RakPeer()
     // Dummy call to PacketLogger to ensure it's included in exported symbols.
     //
     StringCompressor::AddReference();
-    StringTable::AddReference();
     WSAStartupSingleton::AddRef();
 
     defaultMTUSize = mtuSizes[NUM_MTU_SIZES - 1];
@@ -265,7 +263,6 @@ RakPeer::~RakPeer()
     ClearBanList();
 
     StringCompressor::RemoveReference();
-    StringTable::RemoveReference();
     WSAStartupSingleton::Deref();
 
     quitAndDataEvents.CloseEvent();

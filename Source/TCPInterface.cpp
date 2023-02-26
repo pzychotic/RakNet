@@ -28,7 +28,6 @@ typedef int socklen_t;
 #include <stdio.h>
 #include "RakThread.h"
 #include "StringCompressor.h"
-#include "StringTable.h"
 #include "SocketLayer.h"
 #include "SocketDefines.h"
 #if( defined( __GNUC__ ) || defined( __GCCXML__ ) ) && !defined( __WIN32__ )
@@ -60,7 +59,6 @@ TCPInterface::TCPInterface()
     remoteClientsLength = 0;
 
     StringCompressor::AddReference();
-    StringTable::AddReference();
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     ctx = 0;
@@ -81,7 +79,6 @@ TCPInterface::~TCPInterface()
     RakNet::OP_DELETE_ARRAY( remoteClients, _FILE_AND_LINE_ );
 
     StringCompressor::RemoveReference();
-    StringTable::RemoveReference();
 }
 
 bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIncomingConnections, unsigned short socketFamily, const char* bindAddress )
