@@ -21,6 +21,7 @@
 #include "SocketIncludes.h"
 
 #include <stdint.h>
+#include <functional>
 
 namespace RakNet {
 
