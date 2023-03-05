@@ -18,10 +18,10 @@
 #if _RAKNET_SUPPORT_RelayPlugin == 1
 
 #include "PluginInterface2.h"
-#include "StringUtils.h"
-#include "DS_Hash.h"
+#include "DS_List.h"
 
 #include <string>
+#include <unordered_map>
 
 /// \defgroup RELAY_PLUGIN_GROUP RelayPlugin
 /// \brief A simple class to relay messages from one system to another through an intermediary
@@ -130,17 +130,17 @@ public:
 
 protected:
     RelayPlugin::RP_Group* JoinGroup( RakNetGUID userGuid, const std::string& roomName );
-    RelayPlugin::RP_Group* JoinGroup( RP_Group* room, StrAndGuidAndRoom** strAndGuidSender );
-    void LeaveGroup( StrAndGuidAndRoom** strAndGuidSender );
+    RelayPlugin::RP_Group* JoinGroup( RP_Group* room, StrAndGuidAndRoom* strAndGuidSender );
+    void LeaveGroup( StrAndGuidAndRoom* strAndGuidSender );
     void NotifyUsersInRoom( RP_Group* room, int msg, const std::string& message );
-    void SendMessageToRoom( StrAndGuidAndRoom** strAndGuidSender, BitStream* message );
+    void SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStream* message );
     void SendChatRoomsList( RakNetGUID target );
     void OnGroupMessageFromClient( Packet* packet );
     void OnJoinGroupRequestFromClient( Packet* packet );
     void OnLeaveGroupRequestFromClient( Packet* packet );
 
-    DataStructures::Hash<std::string, StrAndGuidAndRoom*, 8096, RakNet::hash> strToGuidHash;
-    DataStructures::Hash<RakNetGUID, StrAndGuidAndRoom*, 8096, RakNetGUID::ToUint32> guidToStrHash;
+    std::unordered_map<std::string, StrAndGuidAndRoom*> strToGuidHash;
+    std::unordered_map<RakNetGUID, StrAndGuidAndRoom*> guidToStrHash;
     DataStructures::List<RP_Group*> chatRooms;
     bool acceptAddParticipantRequests;
 };

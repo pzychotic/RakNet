@@ -13,6 +13,4 @@ std::string format( const char* pszFormat, Args ... args )
     return str;
 }
 
-unsigned long hash( const std::string& key );
-
 } // namespace RakNet

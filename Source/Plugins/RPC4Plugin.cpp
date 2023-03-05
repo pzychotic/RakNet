@@ -130,58 +130,57 @@ RPC4::RPC4()
     nextSlotRegistrationCount = 0;
     interruptSignal = false;
 }
+
 RPC4::~RPC4()
 {
-    unsigned int i;
-    for( i = 0; i < localCallbacks.Size(); i++ )
+    for( unsigned int i = 0; i < localCallbacks.Size(); i++ )
     {
         RakNet::OP_DELETE( localCallbacks[i], _FILE_AND_LINE_ );
     }
 
-    DataStructures::List<std::string> keyList;
-    DataStructures::List<LocalSlot*> outputList;
-    localSlots.GetAsList( outputList, keyList, _FILE_AND_LINE_ );
-    unsigned int j;
-    for( j = 0; j < outputList.Size(); j++ )
+    for( const auto& entry : localSlots )
     {
-        RakNet::OP_DELETE( outputList[j], _FILE_AND_LINE_ );
+        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
     }
-    localSlots.Clear( _FILE_AND_LINE_ );
+    localSlots.clear();
 }
+
 bool RPC4::RegisterFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ) )
 {
-    DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( uniqueID );
-    if( skhi.IsInvalid() == false )
+    if( registeredNonblockingFunctions.find( uniqueID ) != registeredNonblockingFunctions.end() )
         return false;
 
-    registeredNonblockingFunctions.Push( uniqueID, functionPointer, _FILE_AND_LINE_ );
+    registeredNonblockingFunctions.insert( std::make_pair( uniqueID, functionPointer ) );
     return true;
 }
+
 void RPC4::RegisterSlot( const char* sharedIdentifier, void ( *functionPointer )( BitStream* userData, Packet* packet ), int callPriority )
 {
-    LocalSlotObject lso( nextSlotRegistrationCount++, callPriority, functionPointer );
-    DataStructures::HashIndex idx = GetLocalSlotIndex( sharedIdentifier );
-    LocalSlot* localSlot;
-    if( idx.IsInvalid() )
+    LocalSlot* localSlot = nullptr;
+    auto it = localSlots.find( sharedIdentifier );
+    if( it == localSlots.end() )
     {
         localSlot = RakNet::OP_NEW<LocalSlot>( _FILE_AND_LINE_ );
-        localSlots.Push( sharedIdentifier, localSlot, _FILE_AND_LINE_ );
+        localSlots.insert( std::make_pair( sharedIdentifier, localSlot ) );
     }
     else
     {
-        localSlot = localSlots.ItemAtIndex( idx );
+        localSlot = it->second;
     }
+
+    LocalSlotObject lso( nextSlotRegistrationCount++, callPriority, functionPointer );
     localSlot->slotObjects.Insert( lso, lso, true, _FILE_AND_LINE_ );
 }
+
 bool RPC4::RegisterBlockingFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, BitStream* returnData, Packet* packet ) )
 {
-    DataStructures::HashIndex skhi = registeredBlockingFunctions.GetIndexOf( uniqueID );
-    if( skhi.IsInvalid() == false )
+    if( registeredBlockingFunctions.find( uniqueID ) != registeredBlockingFunctions.end() )
         return false;
 
-    registeredBlockingFunctions.Push( uniqueID, functionPointer, _FILE_AND_LINE_ );
+    registeredBlockingFunctions.insert( std::make_pair( uniqueID, functionPointer ) );
     return true;
 }
+
 void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )
 {
     bool objectExists;
@@ -204,16 +203,17 @@ void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )
         localCallbacks.InsertAtIndex( lc, index, _FILE_AND_LINE_ );
     }
 }
+
 bool RPC4::UnregisterFunction( const char* uniqueID )
 {
-    void ( *f )( BitStream*, Packet* );
-    return registeredNonblockingFunctions.Pop( f, uniqueID, _FILE_AND_LINE_ );
+    return registeredNonblockingFunctions.erase( uniqueID ) > 0u;
 }
+
 bool RPC4::UnregisterBlockingFunction( const char* uniqueID )
 {
-    void ( *f )( BitStream*, BitStream*, Packet* );
-    return registeredBlockingFunctions.Pop( f, uniqueID, _FILE_AND_LINE_ );
+    return registeredBlockingFunctions.erase( uniqueID ) > 0u;
 }
+
 bool RPC4::UnregisterLocalCallback( const char* uniqueID, MessageID messageId )
 {
     bool objectExists;
@@ -238,26 +238,25 @@ bool RPC4::UnregisterLocalCallback( const char* uniqueID, MessageID messageId )
     }
     return false;
 }
+
 bool RPC4::UnregisterSlot( const char* sharedIdentifier )
 {
-    DataStructures::HashIndex hi = localSlots.GetIndexOf( sharedIdentifier );
-    if( hi.IsInvalid() == false )
+    if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
     {
-        LocalSlot* ls = localSlots.ItemAtIndex( hi );
+        LocalSlot* ls = it->second;
         RakNet::OP_DELETE( ls, _FILE_AND_LINE_ );
-        localSlots.RemoveAtIndex( hi, _FILE_AND_LINE_ );
+        localSlots.erase( it );
         return true;
     }
 
     return false;
 }
+
 void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
 {
     Packet* p = 0;
 
-    DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( uniqueID );
-
-    if( skhi.IsInvalid() == true )
+    if( registeredNonblockingFunctions.find( uniqueID ) == registeredNonblockingFunctions.end() )
     {
         if( rakPeerInterface )
             p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) + (unsigned int)strlen( uniqueID ) + 1 );
@@ -314,6 +313,7 @@ void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
     PushBackPacketUnified( p, false );
     return;
 }
+
 void RPC4::Call( const char* uniqueID, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast )
 {
     BitStream out;
@@ -329,6 +329,7 @@ void RPC4::Call( const char* uniqueID, BitStream* bitStream, PacketPriority prio
     }
     SendUnified( &out, priority, reliability, orderingChannel, systemIdentifier, broadcast );
 }
+
 bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, BitStream* returnData )
 {
     BitStream out;
@@ -406,6 +407,7 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
     returnData->ResetReadPointer();
     return true;
 }
+
 void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool invokeLocal )
 {
     BitStream out;
@@ -423,11 +425,10 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
     if( invokeLocal )
     {
         //TimeUS t1 = GetTimeUS();
-
-        DataStructures::HashIndex functionIndex;
-        functionIndex = localSlots.GetIndexOf( sharedIdentifier );
+        auto it = localSlots.find( sharedIdentifier );
         //TimeUS t2 = GetTimeUS();
-        if( functionIndex.IsInvalid() )
+
+        if( it == localSlots.end() )
             return;
 
         Packet p;
@@ -450,26 +451,23 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
         }
 
         //TimeUS t3 = GetTimeUS();
-        InvokeSignal( functionIndex, bsptr, &p );
+        InvokeSignal( it->second, bsptr, &p );
         //TimeUS t4 = GetTimeUS();
         //printf("b1: %I64d\n", t2-t1);
         //printf("b2: %I64d\n", t3-t2);
         //printf("b3: %I64d\n", t4-t3);
     }
 }
-void RPC4::InvokeSignal( DataStructures::HashIndex functionIndex, BitStream* serializedParameters, Packet* packet )
-{
-    if( functionIndex.IsInvalid() )
-        return;
 
+void RPC4::InvokeSignal( LocalSlot* localSlot, BitStream* serializedParameters, Packet* packet )
+{
     //TimeUS t1 = GetTimeUS();
     //TimeUS t2=0;
     //TimeUS t3=0;
 
     interruptSignal = false;
-    LocalSlot* localSlot = localSlots.ItemAtIndex( functionIndex );
-    unsigned int i;
-    i = 0;
+    //LocalSlot* localSlot = localSlots.ItemAtIndex( functionIndex );
+    unsigned int i = 0u;
     while( i < localSlot->slotObjects.Size() )
     {
         //t2 = GetTimeUS();
@@ -493,10 +491,12 @@ void RPC4::InvokeSignal( DataStructures::HashIndex functionIndex, BitStream* ser
     //printf("b2: %I64d\n", t3-t2);
     //printf("b3: %I64d\n", t4-t3);
 }
+
 void RPC4::InterruptSignal( void )
 {
     interruptSignal = true;
 }
+
 void RPC4::OnAttach( void )
 {
     unsigned int i;
@@ -515,6 +515,7 @@ void RPC4::OnAttach( void )
             RegisterLocalCallback( globalRegistrationBuffer[i].functionName, globalRegistrationBuffer[i].messageId );
     }
 }
+
 PluginReceiveResult RPC4::OnReceive( Packet* packet )
 {
     if( packet->data[0] == ID_RPC_PLUGIN )
@@ -530,8 +531,8 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
             bsIn.Read( isBlocking );
             if( isBlocking == false )
             {
-                DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( functionName );
-                if( skhi.IsInvalid() )
+                auto it = registeredNonblockingFunctions.find( functionName );
+                if( it == registeredNonblockingFunctions.end() )
                 {
                     BitStream bsOut;
                     bsOut.Write( (unsigned char)ID_RPC_REMOTE_ERROR );
@@ -541,15 +542,14 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
                     return RR_STOP_PROCESSING_AND_DEALLOCATE;
                 }
 
-                void ( *fp )( BitStream*, Packet* );
-                fp = registeredNonblockingFunctions.ItemAtIndex( skhi );
+                void ( *fp )( BitStream*, Packet* ) = it->second;
                 bsIn.AlignReadToByteBoundary();
                 fp( &bsIn, packet );
             }
             else
             {
-                DataStructures::HashIndex skhi = registeredBlockingFunctions.GetIndexOf( functionName );
-                if( skhi.IsInvalid() )
+                auto it = registeredBlockingFunctions.find( functionName );
+                if( it == registeredBlockingFunctions.end() )
                 {
                     BitStream bsOut;
                     bsOut.Write( (unsigned char)ID_RPC_REMOTE_ERROR );
@@ -559,8 +559,7 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
                     return RR_STOP_PROCESSING_AND_DEALLOCATE;
                 }
 
-                void ( *fp )( BitStream*, BitStream*, Packet* );
-                fp = registeredBlockingFunctions.ItemAtIndex( skhi );
+                void ( *fp )( BitStream*, BitStream*, Packet* ) = it->second;
                 BitStream returnData;
                 bsIn.AlignReadToByteBoundary();
                 fp( &bsIn, &returnData, packet );
@@ -578,12 +577,13 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
         {
             std::string sharedIdentifier;
             bsIn.ReadCompressed( sharedIdentifier );
-            DataStructures::HashIndex functionIndex;
-            functionIndex = localSlots.GetIndexOf( sharedIdentifier );
             BitStream serializedParameters;
             bsIn.AlignReadToByteBoundary();
             bsIn.Read( &serializedParameters );
-            InvokeSignal( functionIndex, &serializedParameters, packet );
+            if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
+            {
+                InvokeSignal( it->second, &serializedParameters, packet );
+            }
         }
         else
         {
@@ -596,21 +596,18 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
     }
 
-    bool objectExists;
-    unsigned int index, index2;
-    index = localCallbacks.GetIndexFromKey( packet->data[0], &objectExists );
+    bool objectExists = false;
+    unsigned int index = localCallbacks.GetIndexFromKey( packet->data[0], &objectExists );
     if( objectExists )
     {
         LocalCallback* lc = localCallbacks[index];
-        for( index2 = 0; index2 < lc->functions.Size(); index2++ )
+        for( unsigned int index2 = 0; index2 < lc->functions.Size(); index2++ )
         {
             BitStream bsIn( packet->data, packet->length, false );
 
-            DataStructures::HashIndex skhi = registeredNonblockingFunctions.GetIndexOf( lc->functions[index2] );
-            if( skhi.IsInvalid() == false )
+            if( auto it = registeredNonblockingFunctions.find( lc->functions[index2] ); it != registeredNonblockingFunctions.end() )
             {
-                void ( *fp )( BitStream*, Packet* );
-                fp = registeredNonblockingFunctions.ItemAtIndex( skhi );
+                void ( *fp )( BitStream*, Packet* ) = it->second;
                 bsIn.AlignReadToByteBoundary();
                 fp( &bsIn, packet );
             }
@@ -618,10 +615,6 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
     }
 
     return RR_CONTINUE_PROCESSING;
-}
-DataStructures::HashIndex RPC4::GetLocalSlotIndex( const char* sharedIdentifier )
-{
-    return localSlots.GetIndexOf( sharedIdentifier );
 }
 
 } // namespace RakNet

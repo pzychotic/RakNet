@@ -114,21 +114,22 @@ bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, const std::string
     AddValueByIndex( idx, key, val, curTime, combineEqualTimes );
     return true;
 }
+
 void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes )
 {
-    TimeAndValueQueue* queue;
+    TimeAndValueQueue* queue = nullptr;
     TrackedObject* to = objects[index];
-    DataStructures::HashIndex hi = to->dataQueues.GetIndexOf( key );
-    if( hi.IsInvalid() )
+    auto it = to->dataQueues.find( key );
+    if( it == to->dataQueues.end() )
     {
         queue = RakNet::OP_NEW<TimeAndValueQueue>( _FILE_AND_LINE_ );
         queue->key = key;
         queue->timeToTrackValues = timeToTrack;
-        to->dataQueues.Push( key, queue, _FILE_AND_LINE_ );
+        to->dataQueues.insert( std::make_pair( key, queue ) );
     }
     else
     {
-        queue = to->dataQueues.ItemAtIndex( hi );
+        queue = it->second;
     }
 
     TimeAndValue tav;
@@ -159,6 +160,7 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& 
     if( queue->longTermHighest < tav.val )
         queue->longTermHighest = tav.val;
 }
+
 StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t objectId, const std::string& key, StatisticsHistory::TimeAndValueQueue** values, Time curTime ) const
 {
     if( values == 0 )
@@ -168,28 +170,27 @@ StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t obj
     if( idx == (unsigned int)-1 )
         return SH_UKNOWN_OBJECT;
     TrackedObject* to = objects[idx];
-    DataStructures::HashIndex hi = to->dataQueues.GetIndexOf( key );
-    if( hi.IsInvalid() )
+    auto it = to->dataQueues.find( key );
+    if( it == to->dataQueues.end() )
         return SH_UKNOWN_KEY;
-    *values = to->dataQueues.ItemAtIndex( hi );
+    *values = it->second;
     ( *values )->CullExpiredValues( curTime );
     return SH_OK;
 }
+
 bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sortType, DataStructures::List<StatisticsHistory::TimeAndValueQueue*>& values ) const
 {
     unsigned int idx = GetObjectIndex( objectId );
     if( idx == (unsigned int)-1 )
         return false;
     TrackedObject* to = objects[idx];
-    DataStructures::List<TimeAndValueQueue*> itemList;
-    DataStructures::List<std::string> keyList;
-    to->dataQueues.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
     Time curTime = GetTime();
 
     DataStructures::OrderedList<TimeAndValueQueue*, TimeAndValueQueue*, TimeAndValueQueueCompAsc> sortedQueues;
-    for( unsigned int i = 0; i < itemList.Size(); i++ )
+    //for( unsigned int i = 0; i < itemList.Size(); i++ )
+    for( const auto& entry : to->dataQueues )
     {
-        TimeAndValueQueue* tavq = itemList[i];
+        TimeAndValueQueue* tavq = entry.second;
         tavq->CullExpiredValues( curTime );
 
         if( sortType == SH_SORT_BY_RECENT_SUM_ASCENDING || sortType == SH_SORT_BY_RECENT_SUM_DESCENDING )
@@ -230,6 +231,7 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
         values.Push( sortedQueues[i], _FILE_AND_LINE_ );
     return true;
 }
+
 void StatisticsHistory::MergeAllObjectsOnKey( const std::string& key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const
 {
     tavqOutput->Clear();
@@ -240,15 +242,15 @@ void StatisticsHistory::MergeAllObjectsOnKey( const std::string& key, TimeAndVal
     for( unsigned int idx = 0; idx < objects.Size(); idx++ )
     {
         TrackedObject* to = objects[idx];
-        DataStructures::HashIndex hi = to->dataQueues.GetIndexOf( key );
-        if( hi.IsInvalid() == false )
+        if( auto it = to->dataQueues.find( key ); it != to->dataQueues.end() )
         {
-            TimeAndValueQueue* tavqInput = to->dataQueues.ItemAtIndex( hi );
+            TimeAndValueQueue* tavqInput = it->second;
             tavqInput->CullExpiredValues( curTime );
             TimeAndValueQueue::MergeSets( tavqOutput, dataCategory, tavqInput, dataCategory, tavqOutput );
         }
     }
 }
+
 void StatisticsHistory::GetUniqueKeyList( DataStructures::List<std::string>& keys )
 {
     keys.Clear( true, _FILE_AND_LINE_ );
@@ -256,15 +258,12 @@ void StatisticsHistory::GetUniqueKeyList( DataStructures::List<std::string>& key
     for( unsigned int idx = 0; idx < objects.Size(); idx++ )
     {
         TrackedObject* to = objects[idx];
-        DataStructures::List<TimeAndValueQueue*> itemList;
-        DataStructures::List<std::string> keyList;
-        to->dataQueues.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
-        for( unsigned int k = 0; k < keyList.Size(); k++ )
+        for( auto&& [key, value] : to->dataQueues )
         {
             bool hasKey = false;
             for( unsigned int j = 0; j < keys.Size(); j++ )
             {
-                if( keys[j] == keyList[k] )
+                if( keys[j] == key )
                 {
                     hasKey = true;
                     break;
@@ -272,10 +271,13 @@ void StatisticsHistory::GetUniqueKeyList( DataStructures::List<std::string>& key
             }
 
             if( hasKey == false )
-                keys.Push( keyList[k], _FILE_AND_LINE_ );
+            {
+                keys.Push( key, _FILE_AND_LINE_ );
+            }
         }
     }
 }
+
 StatisticsHistory::TimeAndValueQueue::TimeAndValueQueue()
 {
     Clear();

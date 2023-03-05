@@ -526,3 +526,21 @@ struct RAK_DLL_EXPORT uint24_t
 };
 
 } // namespace RakNet
+
+template<>
+struct std::hash<RakNet::AddressOrGUID>
+{
+    std::size_t operator()( RakNet::AddressOrGUID const& aog ) const noexcept
+    {
+        return RakNet::AddressOrGUID::ToInteger( aog );
+    }
+};
+
+template<>
+struct std::hash<RakNet::RakNetGUID>
+{
+    std::size_t operator()( RakNet::RakNetGUID const& guid ) const noexcept
+    {
+        return RakNet::RakNetGUID::ToUint32( guid );
+    }
+};

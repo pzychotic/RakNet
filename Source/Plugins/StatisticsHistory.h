@@ -21,13 +21,12 @@
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_OrderedList.h"
-#include "StringUtils.h"
 #include "DS_Queue.h"
-#include "DS_Hash.h"
 
 #include <float.h>
 #include <stdint.h>
 #include <string>
+#include <unordered_map>
 
 namespace RakNet {
 
@@ -188,7 +187,7 @@ protected:
         TrackedObject();
         ~TrackedObject();
         TrackedObjectData trackedObjectData;
-        DataStructures::Hash<std::string, TimeAndValueQueue*, 32, RakNet::hash> dataQueues;
+        std::unordered_map<std::string, TimeAndValueQueue*> dataQueues;
     };
 
     DataStructures::OrderedList<uint64_t, TrackedObject*, TrackedObjectComp> objects;

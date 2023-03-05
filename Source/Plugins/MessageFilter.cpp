@@ -108,74 +108,63 @@ void MessageFilter::SetFilterMaxTime( int allowedTimeMS, bool banOnExceed, RakNe
     filterSet->banOnFilterTimeExceed = banOnExceed;
     filterSet->timeExceedBanTimeMS = banTimeMS;
 }
+
 int MessageFilter::GetSystemFilterSet( AddressOrGUID systemAddress )
 {
-    //  bool objectExists;
-    //  unsigned index = systemList.GetIndexFromKey(systemAddress, &objectExists);
-    //  if (objectExists==false)
-    //      return -1;
-    //  else
-    //      return systemList[index].filter->filterSetID;
-
-    DataStructures::HashIndex index = systemList.GetIndexOf( systemAddress );
-    if( index.IsInvalid() )
-        return -1;
-    else
-        return systemList.ItemAtIndex( index ).filter->filterSetID;
+    if( auto it = systemList.find( systemAddress ); it != systemList.end() )
+    {
+        return it->second.filter->filterSetID;
+    }
+    return -1;
 }
+
 void MessageFilter::SetSystemFilterSet( AddressOrGUID addressOrGUID, int filterSetID )
 {
     // Allocate this filter set if it doesn't exist.
     RakAssert( addressOrGUID.IsUndefined() == false );
-    //  bool objectExists;
-    //  unsigned index = systemList.GetIndexFromKey(addressOrGUID, &objectExists);
-    //  if (objectExists==false)
-    DataStructures::HashIndex index = systemList.GetIndexOf( addressOrGUID );
-    if( index.IsInvalid() )
+
+    auto it = systemList.find( addressOrGUID );
+    if( it == systemList.end() )
     {
         if( filterSetID < 0 )
             return;
 
-        FilteredSystem filteredSystem;
-        filteredSystem.filter = GetFilterSetByID( filterSetID );
-        //  filteredSystem.addressOrGUID=addressOrGUID;
-        filteredSystem.timeEnteredThisSet = RakNet::GetTimeMS();
-        //  systemList.Insert(addressOrGUID, filteredSystem, true, _FILE_AND_LINE_);
-        systemList.Push( addressOrGUID, filteredSystem, _FILE_AND_LINE_ );
+        systemList.insert( std::make_pair( addressOrGUID, FilteredSystem{ GetFilterSetByID( filterSetID ), RakNet::GetTimeMS() } ) );
     }
     else
     {
         if( filterSetID >= 0 )
         {
-            FilterSet* filterSet = GetFilterSetByID( filterSetID );
-            systemList.ItemAtIndex( index ).timeEnteredThisSet = RakNet::GetTimeMS();
-            systemList.ItemAtIndex( index ).filter = filterSet;
+            it->second.filter = GetFilterSetByID( filterSetID );
+            it->second.timeEnteredThisSet = RakNet::GetTimeMS();
         }
         else
         {
-            systemList.RemoveAtIndex( index, _FILE_AND_LINE_ );
+            systemList.erase( it );
         }
     }
 }
+
 unsigned MessageFilter::GetSystemCount( int filterSetID ) const
 {
     if( filterSetID == -1 )
     {
-        return systemList.Size();
+        return static_cast<unsigned>( systemList.size() );
     }
     else
     {
-        unsigned i;
-        unsigned count = 0;
-        DataStructures::List<FilteredSystem> itemList;
-        DataStructures::List<AddressOrGUID> keyList;
-        systemList.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
-        for( i = 0; i < itemList.Size(); i++ )
-            if( itemList[i].filter->filterSetID == filterSetID )
+        unsigned int count = 0u;
+        for( auto&& [key, value] : systemList )
+        {
+            if( value.filter->filterSetID == filterSetID )
+            {
                 ++count;
+            }
+        }
         return count;
     }
 }
+
 unsigned MessageFilter::GetFilterSetCount( void ) const
 {
     return filterList.Size();
@@ -184,60 +173,49 @@ int MessageFilter::GetFilterSetIDByIndex( unsigned index )
 {
     return filterList[index]->filterSetID;
 }
+
 void MessageFilter::DeleteFilterSet( int filterSetID )
 {
-    FilterSet* filterSet;
-    bool objectExists;
-    unsigned i, index;
-    index = filterList.GetIndexFromKey( filterSetID, &objectExists );
+    bool objectExists = false;
+    unsigned int index = filterList.GetIndexFromKey( filterSetID, &objectExists );
     if( objectExists )
     {
-        filterSet = filterList[index];
+        FilterSet* filterSet = filterList[index];
         DeallocateFilterSet( filterSet );
         filterList.RemoveAtIndex( index );
 
-        DataStructures::List<FilteredSystem> itemList;
-        DataStructures::List<AddressOrGUID> keyList;
-        systemList.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
-        for( i = 0; i < itemList.Size(); i++ )
+        for( auto it = systemList.begin(); it != systemList.end(); )
         {
-            if( itemList[i].filter == filterSet )
+            if( it->second.filter == filterSet )
             {
-                systemList.Remove( keyList[i], _FILE_AND_LINE_ );
+                it = systemList.erase( it );
+            }
+            else
+            {
+                ++it;
             }
         }
-
-        /*
-        // Don't reference this pointer any longer
-        i=0;
-        while (i < systemList.Size())
-        {
-            if (systemList[i].filter==filterSet)
-                systemList.RemoveAtIndex(i);
-            else
-                ++i;
-        }
-        */
     }
 }
+
 void MessageFilter::Clear( void )
 {
-    unsigned i;
-    systemList.Clear( _FILE_AND_LINE_ );
-    for( i = 0; i < filterList.Size(); i++ )
+    systemList.clear();
+    for( unsigned int i = 0; i < filterList.Size(); i++ )
         DeallocateFilterSet( filterList[i] );
     filterList.Clear( false, _FILE_AND_LINE_ );
 }
+
 void MessageFilter::DeallocateFilterSet( FilterSet* filterSet )
 {
     RakNet::OP_DELETE( filterSet, _FILE_AND_LINE_ );
 }
+
 FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
 {
     RakAssert( filterSetID >= 0 );
-    bool objectExists;
-    unsigned index;
-    index = filterList.GetIndexFromKey( filterSetID, &objectExists );
+    bool objectExists = false;
+    unsigned int index = filterList.GetIndexFromKey( filterSetID, &objectExists );
     if( objectExists )
         return filterList[index];
     else
@@ -258,6 +236,7 @@ FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
         return newFilterSet;
     }
 }
+
 void MessageFilter::OnInvalidMessage( FilterSet* filterSet, AddressOrGUID systemAddress, unsigned char messageID )
 {
     if( filterSet->invalidMessageCallback )
@@ -278,50 +257,50 @@ void MessageFilter::OnInvalidMessage( FilterSet* filterSet, AddressOrGUID system
 #endif
     }
 }
+
 void MessageFilter::Update( void )
 {
     // Update all timers for all systems.  If those systems' filter sets are expired, take the appropriate action.
     RakNet::Time curTime = RakNet::GetTime();
     if( GreaterThan( curTime - 1000, whenLastTimeoutCheck ) )
     {
-        DataStructures::List<FilteredSystem> itemList;
-        DataStructures::List<AddressOrGUID> keyList;
-        systemList.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
-
-        unsigned int index;
-        for( index = 0; index < itemList.Size(); index++ )
+        for( auto it = systemList.begin(); it != systemList.end(); )
         {
-            if( itemList[index].filter &&
-                itemList[index].filter->maxMemberTimeMS > 0 &&
-                curTime - itemList[index].timeEnteredThisSet >= itemList[index].filter->maxMemberTimeMS )
-            {
-                if( itemList[index].filter->timeoutCallback )
-                    itemList[index].filter->timeoutCallback( rakPeerInterface, keyList[index], itemList[index].filter->filterSetID, itemList[index].filter->timeoutUserData );
+            const AddressOrGUID& key = it->first;
+            const FilteredSystem& value = it->second;
+            const FilterSet* filter = value.filter;
 
-                if( itemList[index].filter->banOnFilterTimeExceed && rakPeerInterface )
+            if( filter && filter->maxMemberTimeMS > 0 &&
+                curTime - value.timeEnteredThisSet >= filter->maxMemberTimeMS )
+            {
+                if( filter->timeoutCallback )
+                {
+                    filter->timeoutCallback( rakPeerInterface, key, filter->filterSetID, filter->timeoutUserData );
+                }
+
+                if( filter->banOnFilterTimeExceed && rakPeerInterface )
                 {
                     char str1[64];
-                    keyList[index].ToString( false, str1 );
-                    rakPeerInterface->AddToBanList( str1, itemList[index].filter->timeExceedBanTimeMS );
+                    key.ToString( false, str1 );
+                    rakPeerInterface->AddToBanList( str1, filter->timeExceedBanTimeMS );
                 }
                 if( rakPeerInterface )
-                    rakPeerInterface->CloseConnection( keyList[index], true, 0 );
+                    rakPeerInterface->CloseConnection( key, true, 0 );
 #if _RAKNET_SUPPORT_PacketizedTCP == 1 && _RAKNET_SUPPORT_TCPInterface == 1
                 else
-                    tcpInterface->CloseConnection( keyList[index].systemAddress );
+                    tcpInterface->CloseConnection( key.systemAddress );
 #endif
 
-                systemList.Remove( keyList[index], _FILE_AND_LINE_ );
+                it = systemList.erase( it );
             }
         }
 
         whenLastTimeoutCheck = curTime + 1000;
     }
 }
+
 void MessageFilter::OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming )
 {
-    (void)systemAddress;
-    (void)rakNetGUID;
     (void)isIncoming;
 
     AddressOrGUID aog;
@@ -329,12 +308,14 @@ void MessageFilter::OnNewConnection( const SystemAddress& systemAddress, RakNetG
     aog.systemAddress = systemAddress;
 
     // New system, automatically assign to filter set if appropriate
-    if( autoAddNewConnectionsToFilter >= 0 && systemList.HasData( aog ) == false )
+    if( autoAddNewConnectionsToFilter >= 0 && systemList.find( aog ) == systemList.end() )
+    {
         SetSystemFilterSet( aog, autoAddNewConnectionsToFilter );
+    }
 }
+
 void MessageFilter::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
 {
-    (void)rakNetGUID;
     (void)lostConnectionReason;
 
     AddressOrGUID aog;
@@ -342,14 +323,14 @@ void MessageFilter::OnClosedConnection( const SystemAddress& systemAddress, RakN
     aog.systemAddress = systemAddress;
 
     // Lost system, remove from the list
-    systemList.Remove( aog, _FILE_AND_LINE_ );
+    systemList.erase( aog );
 }
+
 PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
 {
-    DataStructures::HashIndex index;
-    unsigned char messageId;
+    unsigned char messageId = packet->data[0];
 
-    switch( packet->data[0] )
+    switch( messageId )
     {
     case ID_NEW_INCOMING_CONNECTION:
     case ID_CONNECTION_REQUEST_ACCEPTED:
@@ -375,27 +356,28 @@ PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
                 return RR_STOP_PROCESSING_AND_DEALLOCATE; // Invalid message
             messageId = packet->data[sizeof( MessageID ) + sizeof( RakNet::TimeMS )];
         }
-        else
-            messageId = packet->data[0];
         // If this system is filtered, check if this message is allowed.  If not allowed, return RR_STOP_PROCESSING_AND_DEALLOCATE
-        // index = systemList.GetIndexFromKey(packet->addressOrGUID, &objectExists);
-        index = systemList.GetIndexOf( packet );
-        if( index.IsInvalid() )
+        auto it = systemList.find( packet );
+        if( it == systemList.end() )
             break;
-        if( systemList.ItemAtIndex( index ).filter->allowedIDs[messageId] == false )
+
+        const FilteredSystem& value = it->second;
+
+        if( value.filter->allowedIDs[messageId] == false )
         {
-            OnInvalidMessage( systemList.ItemAtIndex( index ).filter, packet, packet->data[0] );
+            OnInvalidMessage( value.filter, packet, packet->data[0] );
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
         }
+
         if( packet->data[0] == ID_RPC_PLUGIN )
         {
             BitStream bsIn( packet->data, packet->length, false );
             bsIn.IgnoreBytes( 2 );
             std::string functionName;
             bsIn.ReadCompressed( *functionName.data() );
-            if( systemList.ItemAtIndex( index ).filter->allowedRPC4.HasData( functionName ) == false )
+            if( value.filter->allowedRPC4.HasData( functionName ) == false )
             {
-                OnInvalidMessage( systemList.ItemAtIndex( index ).filter, packet, packet->data[0] );
+                OnInvalidMessage( value.filter, packet, packet->data[0] );
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
             }
         }

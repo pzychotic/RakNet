@@ -20,10 +20,10 @@
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
 #include "DS_OrderedList.h"
-#include "DS_Hash.h"
 #include "Export.h"
 
 #include <string>
+#include <unordered_map>
 
 /// MessageIdentifier (ID_*) values shoudln't go higher than this.  Change it if you do.
 #define MESSAGE_FILTER_MAX_MESSAGE_ID 256
@@ -184,7 +184,7 @@ protected:
 
     DataStructures::OrderedList<int, FilterSet*, FilterSetComp> filterList;
     // Change to guid
-    DataStructures::Hash<AddressOrGUID, FilteredSystem, 2048, AddressOrGUID::ToInteger> systemList;
+    std::unordered_map<AddressOrGUID, FilteredSystem> systemList;
 
     int autoAddNewConnectionsToFilter;
     RakNet::Time whenLastTimeoutCheck;

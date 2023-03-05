@@ -21,11 +21,10 @@
 #include "PacketPriority.h"
 #include "RakNetTypes.h"
 #include "BitStream.h"
-#include "StringUtils.h"
-#include "DS_Hash.h"
 #include "DS_OrderedList.h"
 
 #include <string>
+#include <unordered_map>
 
 /// \defgroup RPC_PLUGIN_GROUP RPC
 /// \brief Remote procedure calls, without external dependencies.
@@ -201,7 +200,7 @@ public:
     {
         DataStructures::OrderedList<LocalSlotObject, LocalSlotObject, LocalSlotObjectComp> slotObjects;
     };
-    DataStructures::Hash<std::string, LocalSlot*, 256, RakNet::hash> localSlots;
+    std::unordered_map<std::string, LocalSlot*> localSlots;
 
 protected:
     // --------------------------------------------------------------------------------------------
@@ -210,21 +209,19 @@ protected:
     virtual void OnAttach( void );
     virtual PluginReceiveResult OnReceive( Packet* packet );
 
-    DataStructures::Hash<std::string, void ( * )( BitStream*, Packet* ), 64, RakNet::hash> registeredNonblockingFunctions;
-    DataStructures::Hash<std::string, void ( * )( BitStream*, BitStream*, Packet* ), 64, RakNet::hash> registeredBlockingFunctions;
+    std::unordered_map<std::string, void ( * )( BitStream*, Packet* )> registeredNonblockingFunctions;
+    std::unordered_map<std::string, void ( * )( BitStream*, BitStream*, Packet* )> registeredBlockingFunctions;
     DataStructures::OrderedList<MessageID, LocalCallback*, RPC4::LocalCallbackComp> localCallbacks;
 
     BitStream blockingReturnValue;
     bool gotBlockingReturnValue;
-
-    DataStructures::HashIndex GetLocalSlotIndex( const char* sharedIdentifier );
 
     /// Used so slots are called in the order they are registered
     unsigned int nextSlotRegistrationCount;
 
     bool interruptSignal;
 
-    void InvokeSignal( DataStructures::HashIndex functionIndex, BitStream* serializedParameters, Packet* packet );
+    void InvokeSignal( LocalSlot* localSlot, BitStream* serializedParameters, Packet* packet );
 };
 
 } // namespace RakNet

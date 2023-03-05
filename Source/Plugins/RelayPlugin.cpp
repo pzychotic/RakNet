@@ -27,14 +27,15 @@ RelayPlugin::RelayPlugin()
 
 RelayPlugin::~RelayPlugin()
 {
-    DataStructures::List<StrAndGuidAndRoom*> itemList;
-    DataStructures::List<std::string> keyList;
-    strToGuidHash.GetAsList( itemList, keyList, _FILE_AND_LINE_ );
-    guidToStrHash.Clear( _FILE_AND_LINE_ );
-    for( unsigned int i = 0; i < itemList.Size(); i++ )
-        RakNet::OP_DELETE( itemList[i], _FILE_AND_LINE_ );
+    guidToStrHash.clear();
+    for( const auto& entry : strToGuidHash )
+    {
+        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
+    }
     for( unsigned int i = 0; i < chatRooms.Size(); i++ )
+    {
         RakNet::OP_DELETE( chatRooms[i], _FILE_AND_LINE_ );
+    }
 }
 
 RelayPluginEnums RelayPlugin::AddParticipantOnServer( const std::string& key, const RakNetGUID& guid )
@@ -43,33 +44,36 @@ RelayPluginEnums RelayPlugin::AddParticipantOnServer( const std::string& key, co
     if( cs != IS_CONNECTED )
         return RPE_ADD_CLIENT_TARGET_NOT_CONNECTED;
 
-    if( strToGuidHash.HasData( key ) == true )
+    if( strToGuidHash.find( key ) != strToGuidHash.end() )
         return RPE_ADD_CLIENT_NAME_ALREADY_IN_USE; // Name already in use
 
     // If GUID is already in use, remove existing
-    StrAndGuidAndRoom* strAndGuidExisting;
-    if( guidToStrHash.Pop( strAndGuidExisting, guid, _FILE_AND_LINE_ ) )
+    if( auto it = guidToStrHash.find( guid ); it != guidToStrHash.end() )
     {
-        strToGuidHash.Remove( strAndGuidExisting->str, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( strAndGuidExisting, _FILE_AND_LINE_ );
+        StrAndGuidAndRoom* strAndGuid = it->second;
+        strToGuidHash.erase( strAndGuid->str );
+        guidToStrHash.erase( it );
+        RakNet::OP_DELETE( strAndGuid, _FILE_AND_LINE_ );
     }
 
     StrAndGuidAndRoom* strAndGuid = RakNet::OP_NEW<StrAndGuidAndRoom>( _FILE_AND_LINE_ );
     strAndGuid->guid = guid;
     strAndGuid->str = key;
 
-    strToGuidHash.Push( key, strAndGuid, _FILE_AND_LINE_ );
-    guidToStrHash.Push( guid, strAndGuid, _FILE_AND_LINE_ );
+    strToGuidHash.insert( std::make_pair( key, strAndGuid ) );
+    guidToStrHash.insert( std::make_pair( guid, strAndGuid ) );
 
     return RPE_ADD_CLIENT_SUCCESS;
 }
+
 void RelayPlugin::RemoveParticipantOnServer( const RakNetGUID& guid )
 {
-    StrAndGuidAndRoom* strAndGuid;
-    if( guidToStrHash.Pop( strAndGuid, guid, _FILE_AND_LINE_ ) )
+    if( auto it = guidToStrHash.find( guid ); it != guidToStrHash.end() )
     {
-        LeaveGroup( &strAndGuid );
-        strToGuidHash.Remove( strAndGuid->str, _FILE_AND_LINE_ );
+        StrAndGuidAndRoom* strAndGuid = it->second;
+        LeaveGroup( strAndGuid );
+        strToGuidHash.erase( strAndGuid->str );
+        guidToStrHash.erase( it );
         RakNet::OP_DELETE( strAndGuid, _FILE_AND_LINE_ );
     }
 }
@@ -153,17 +157,17 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             bsIn.ReadCompressed( key );
             BitStream bsData;
             bsIn.Read( &bsData );
-            StrAndGuidAndRoom** strAndGuid = strToGuidHash.Peek( key );
-            StrAndGuidAndRoom** strAndGuidSender = guidToStrHash.Peek( packet->guid );
-            if( strAndGuid && strAndGuidSender )
+            auto itStrAndGuid = strToGuidHash.find( key );
+            auto itStrAndGuidSender = guidToStrHash.find( packet->guid );
+            if( itStrAndGuid != strToGuidHash.end() && itStrAndGuidSender != guidToStrHash.end() )
             {
                 BitStream bsOut;
                 bsOut.WriteCasted<MessageID>( ID_RELAY_PLUGIN );
                 bsOut.WriteCasted<MessageID>( RPE_MESSAGE_TO_CLIENT_FROM_SERVER );
-                bsOut.WriteCompressed( ( *strAndGuidSender )->str );
+                bsOut.WriteCompressed( itStrAndGuidSender->second->str );
                 bsOut.AlignWriteToByteBoundary();
                 bsOut.Write( bsData );
-                SendUnified( &bsOut, priority, reliability, orderingChannel, ( *strAndGuid )->guid, false );
+                SendUnified( &bsOut, priority, reliability, orderingChannel, itStrAndGuid->second->guid, false );
             }
 
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
@@ -219,21 +223,22 @@ void RelayPlugin::OnClosedConnection( const SystemAddress& systemAddress, RakNet
     RemoveParticipantOnServer( rakNetGUID );
 }
 
-RelayPlugin::RP_Group* RelayPlugin::JoinGroup( RP_Group* room, StrAndGuidAndRoom** strAndGuidSender )
+RelayPlugin::RP_Group* RelayPlugin::JoinGroup( RP_Group* room, StrAndGuidAndRoom* strAndGuidSender )
 {
     if( strAndGuidSender == 0 )
         return 0;
 
-    NotifyUsersInRoom( room, RPE_USER_ENTERED_ROOM, ( *strAndGuidSender )->str );
+    NotifyUsersInRoom( room, RPE_USER_ENTERED_ROOM, strAndGuidSender->str );
     StrAndGuid sag;
-    sag.guid = ( *strAndGuidSender )->guid;
-    sag.str = ( *strAndGuidSender )->str;
+    sag.guid = strAndGuidSender->guid;
+    sag.str = strAndGuidSender->str;
 
     room->usersInRoom.Push( sag, _FILE_AND_LINE_ );
-    ( *strAndGuidSender )->currentRoom = room->roomName;
+    strAndGuidSender->currentRoom = room->roomName;
 
     return room;
 }
+
 void RelayPlugin::JoinGroupRequest( const RakNetGUID& relayPluginServerGuid, const std::string& groupName )
 {
     BitStream bsOut;
@@ -242,18 +247,19 @@ void RelayPlugin::JoinGroupRequest( const RakNetGUID& relayPluginServerGuid, con
     bsOut.WriteCompressed( groupName );
     SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, relayPluginServerGuid, false );
 }
+
 RelayPlugin::RP_Group* RelayPlugin::JoinGroup( RakNetGUID userGuid, const std::string& roomName )
 {
-    StrAndGuidAndRoom** strAndGuidSender = guidToStrHash.Peek( userGuid );
-    if( strAndGuidSender )
+    if( auto it = guidToStrHash.find( userGuid ); it != guidToStrHash.end() )
     {
+        StrAndGuidAndRoom* strAndGuidSender = it->second;
         if( roomName.empty() )
             return 0;
 
-        if( ( *strAndGuidSender )->currentRoom == roomName )
+        if( strAndGuidSender->currentRoom == roomName )
             return 0;
 
-        if( ( *strAndGuidSender )->currentRoom.empty() == false )
+        if( !strAndGuidSender->currentRoom.empty() )
             LeaveGroup( strAndGuidSender );
 
         for( unsigned int i = 0; i < chatRooms.Size(); i++ )
@@ -274,22 +280,23 @@ RelayPlugin::RP_Group* RelayPlugin::JoinGroup( RakNetGUID userGuid, const std::s
 
     return 0;
 }
-void RelayPlugin::LeaveGroup( StrAndGuidAndRoom** strAndGuidSender )
+
+void RelayPlugin::LeaveGroup( StrAndGuidAndRoom* strAndGuidSender )
 {
     if( strAndGuidSender == 0 )
         return;
 
-    const std::string& userName = ( *strAndGuidSender )->str;
+    const std::string& userName = strAndGuidSender->str;
     for( unsigned int i = 0; i < chatRooms.Size(); i++ )
     {
-        if( chatRooms[i]->roomName == ( *strAndGuidSender )->currentRoom )
+        if( chatRooms[i]->roomName == strAndGuidSender->currentRoom )
         {
-            ( *strAndGuidSender )->currentRoom.clear();
+            strAndGuidSender->currentRoom.clear();
 
             RP_Group* room = chatRooms[i];
             for( unsigned int j = 0; j < room->usersInRoom.Size(); j++ )
             {
-                if( room->usersInRoom[j].guid == ( *strAndGuidSender )->guid )
+                if( room->usersInRoom[j].guid == strAndGuidSender->guid )
                 {
                     room->usersInRoom.RemoveAtIndexFast( j );
 
@@ -308,6 +315,7 @@ void RelayPlugin::LeaveGroup( StrAndGuidAndRoom** strAndGuidSender )
         }
     }
 }
+
 void RelayPlugin::NotifyUsersInRoom( RP_Group* room, int msg, const std::string& message )
 {
     for( unsigned int i = 0; i < room->usersInRoom.Size(); i++ )
@@ -320,27 +328,28 @@ void RelayPlugin::NotifyUsersInRoom( RP_Group* room, int msg, const std::string&
         SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, room->usersInRoom[i].guid, false );
     }
 }
-void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom** strAndGuidSender, BitStream* message )
+
+void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStream* message )
 {
-    if( ( *strAndGuidSender )->currentRoom.empty() )
+    if( strAndGuidSender->currentRoom.empty() )
         return;
 
     for( unsigned int i = 0; i < chatRooms.Size(); i++ )
     {
-        if( chatRooms[i]->roomName == ( *strAndGuidSender )->currentRoom )
+        if( chatRooms[i]->roomName == strAndGuidSender->currentRoom )
         {
             BitStream bsOut;
             bsOut.WriteCasted<MessageID>( ID_RELAY_PLUGIN );
             bsOut.WriteCasted<MessageID>( RPE_GROUP_MSG_FROM_SERVER );
             message->ResetReadPointer();
-            bsOut.WriteCompressed( ( *strAndGuidSender )->str );
+            bsOut.WriteCompressed( strAndGuidSender->str );
             bsOut.AlignWriteToByteBoundary();
             bsOut.Write( message );
 
             RP_Group* room = chatRooms[i];
             for( unsigned int i = 0; i < room->usersInRoom.Size(); i++ )
             {
-                if( room->usersInRoom[i].guid != ( *strAndGuidSender )->guid )
+                if( room->usersInRoom[i].guid != strAndGuidSender->guid )
                     SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, room->usersInRoom[i].guid, false );
             }
 
@@ -348,6 +357,7 @@ void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom** strAndGuidSender, BitSt
         }
     }
 }
+
 void RelayPlugin::SendChatRoomsList( RakNetGUID target )
 {
     BitStream bsOut;
@@ -361,6 +371,7 @@ void RelayPlugin::SendChatRoomsList( RakNetGUID target )
     }
     SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, target, false );
 }
+
 void RelayPlugin::OnGroupMessageFromClient( Packet* packet )
 {
     BitStream bsIn( packet->data, packet->length, false );
@@ -378,12 +389,12 @@ void RelayPlugin::OnGroupMessageFromClient( Packet* packet )
     BitStream bsData;
     bsIn.Read( &bsData );
 
-    StrAndGuidAndRoom** strAndGuidSender = guidToStrHash.Peek( packet->guid );
-    if( strAndGuidSender )
+    if( auto it = guidToStrHash.find( packet->guid ); it != guidToStrHash.end() )
     {
-        SendMessageToRoom( strAndGuidSender, &bsData );
+        SendMessageToRoom( it->second, &bsData );
     }
 }
+
 void RelayPlugin::OnJoinGroupRequestFromClient( Packet* packet )
 {
     BitStream bsIn( packet->data, packet->length, false );
@@ -410,13 +421,15 @@ void RelayPlugin::OnJoinGroupRequestFromClient( Packet* packet )
 
     SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->guid, false );
 }
+
 void RelayPlugin::OnLeaveGroupRequestFromClient( Packet* packet )
 {
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( sizeof( MessageID ) * 2 );
-    StrAndGuidAndRoom** strAndGuidSender = guidToStrHash.Peek( packet->guid );
-    if( strAndGuidSender )
-        LeaveGroup( strAndGuidSender );
+    if( auto it = guidToStrHash.find( packet->guid ); it != guidToStrHash.end() )
+    {
+        LeaveGroup( it->second );
+    }
 }
 
 } // namespace RakNet

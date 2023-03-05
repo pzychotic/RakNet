@@ -39,12 +39,12 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "StringUtils.h"
-#include "DS_Hash.h"
 #include "DS_Queue.h"
+#include "DS_List.h"
 
 #include <stdint.h>
 #include <string>
+#include <unordered_map>
 
 namespace RakNet {
 
@@ -130,7 +130,7 @@ protected:
     void PushToUser( MessageID messageId, const std::string& password, AddressOrGUID remoteSystem );
 
     // Key is identifier, data is password
-    DataStructures::Hash<std::string, std::string, 16, RakNet::hash> passwords;
+    std::unordered_map<std::string, std::string> passwords;
 
     RakNet::Time whenLastTimeoutCheck;
 
