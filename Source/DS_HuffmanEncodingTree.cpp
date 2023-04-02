@@ -9,9 +9,10 @@
  */
 
 #include "DS_HuffmanEncodingTree.h"
-#include "DS_Queue.h"
 #include "BitStream.h"
 #include "RakAssert.h"
+
+#include <deque>
 
 namespace RakNet {
 
@@ -31,21 +32,19 @@ void HuffmanEncodingTree::FreeMemory( void )
         return;
 
     // Use an in-order traversal to delete the tree
-    DataStructures::Queue<HuffmanEncodingTreeNode*> nodeQueue;
+    std::deque<HuffmanEncodingTreeNode*> nodeQueue;
+    nodeQueue.push_back( root );
 
-    HuffmanEncodingTreeNode* node;
-
-    nodeQueue.Push( root, _FILE_AND_LINE_ );
-
-    while( nodeQueue.Size() > 0 )
+    while( !nodeQueue.empty() )
     {
-        node = nodeQueue.Pop();
+        HuffmanEncodingTreeNode* node = nodeQueue.front();
+        nodeQueue.pop_front();
 
         if( node->left )
-            nodeQueue.Push( node->left, _FILE_AND_LINE_ );
+            nodeQueue.push_back( node->left );
 
         if( node->right )
-            nodeQueue.Push( node->right, _FILE_AND_LINE_ );
+            nodeQueue.push_back( node->right );
 
         RakNet::OP_DELETE( node, _FILE_AND_LINE_ );
     }

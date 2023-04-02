@@ -147,7 +147,7 @@ bool TwoWayAuthentication::Challenge( const std::string& identifier, AddressOrGU
     pc.remoteSystem = remoteSystem;
     pc.time = RakNet::GetTime();
     pc.sentHash = false;
-    outgoingChallenges.Push( pc, _FILE_AND_LINE_ );
+    outgoingChallenges.push_back( pc );
 
     return true;
 }
@@ -158,9 +158,10 @@ void TwoWayAuthentication::Update( void )
     nonceGenerator.Update( curTime );
     if( GreaterThan( curTime - CHALLENGE_MINIMUM_TIMEOUT, whenLastTimeoutCheck ) )
     {
-        while( outgoingChallenges.Size() && GreaterThan( curTime - CHALLENGE_MINIMUM_TIMEOUT, outgoingChallenges.Peek().time ) )
+        while( !outgoingChallenges.empty() && GreaterThan( curTime - CHALLENGE_MINIMUM_TIMEOUT, outgoingChallenges.front().time ) )
         {
-            PendingChallenge pc = outgoingChallenges.Pop();
+            PendingChallenge pc = outgoingChallenges.front();
+            outgoingChallenges.pop_front();
 
             // Tell the user about the timeout
             PushToUser( ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, pc.identifier, pc.remoteSystem );
@@ -225,17 +226,17 @@ void TwoWayAuthentication::OnClosedConnection( const SystemAddress& systemAddres
     (void)lostConnectionReason;
 
     // Remove from pending challenges
-    unsigned int i = 0;
-    while( i < outgoingChallenges.Size() )
+    outgoingChallenges.erase( outgoingChallenges .end());
+    for( auto it = outgoingChallenges.begin(); it != outgoingChallenges.end(); )
     {
-        if( ( rakNetGUID != UNASSIGNED_RAKNET_GUID && outgoingChallenges[i].remoteSystem.rakNetGuid == rakNetGUID ) ||
-            ( systemAddress != UNASSIGNED_SYSTEM_ADDRESS && outgoingChallenges[i].remoteSystem.systemAddress == systemAddress ) )
+        if( ( rakNetGUID != UNASSIGNED_RAKNET_GUID && (*it).remoteSystem.rakNetGuid == rakNetGUID ) ||
+            ( systemAddress != UNASSIGNED_SYSTEM_ADDRESS && (*it).remoteSystem.systemAddress == systemAddress ) )
         {
-            outgoingChallenges.RemoveAtIndex( i );
+            it = outgoingChallenges.erase( it );
         }
         else
         {
-            i++;
+            ++it;
         }
     }
 
@@ -247,7 +248,7 @@ void TwoWayAuthentication::OnClosedConnection( const SystemAddress& systemAddres
 
 void TwoWayAuthentication::Clear( void )
 {
-    outgoingChallenges.Clear( _FILE_AND_LINE_ );
+    outgoingChallenges.clear();
     passwords.clear();
     nonceGenerator.Clear();
 }
@@ -295,15 +296,14 @@ void TwoWayAuthentication::OnNonceReply( Packet* packet )
 
     // Lookup one of the negotiations for this guid/system address
     AddressOrGUID aog( packet );
-    unsigned int i;
-    for( i = 0; i < outgoingChallenges.Size(); i++ )
+    for( PendingChallenge& rChallenge : outgoingChallenges )
     {
-        if( outgoingChallenges[i].remoteSystem == aog && outgoingChallenges[i].sentHash == false )
+        if( rChallenge.remoteSystem == aog && rChallenge.sentHash == false )
         {
-            outgoingChallenges[i].sentHash = true;
+            rChallenge.sentHash = true;
 
             // Get the password for this identifier
-            if( const auto it = passwords.find( outgoingChallenges[i].identifier ); it != passwords.end() )
+            if( const auto it = passwords.find( rChallenge.identifier ); it != passwords.end() )
             {
                 // Hash their nonce with password and reply
                 char hashedNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
@@ -314,7 +314,7 @@ void TwoWayAuthentication::OnNonceReply( Packet* packet )
                 bsOut.Write( (MessageID)ID_TWO_WAY_AUTHENTICATION_NEGOTIATION );
                 bsOut.Write( (MessageID)ID_HASHED_NONCE_AND_PASSWORD );
                 bsOut.Write( requestId );
-                bsOut.Write( outgoingChallenges[i].identifier ); // Identifier helps the other system lookup the password quickly.
+                bsOut.Write( rChallenge.identifier ); // Identifier helps the other system lookup the password quickly.
                 bsOut.WriteAlignedBytes( (const unsigned char*)hashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH );
                 SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet, false );
             }
@@ -393,15 +393,14 @@ void TwoWayAuthentication::OnPasswordResult( Packet* packet )
         if( memcmp( testHash, hashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH ) == 0 )
         {
             // Lookup the outgoing challenge and remove it from the list
-            unsigned int i;
             AddressOrGUID aog( packet );
-            for( i = 0; i < outgoingChallenges.Size(); i++ )
+            for( auto it = outgoingChallenges.begin(); it != outgoingChallenges.end(); ++it )
             {
-                if( outgoingChallenges[i].identifier == passwordIdentifier &&
-                    outgoingChallenges[i].remoteSystem == aog &&
-                    outgoingChallenges[i].sentHash == true )
+                if( (*it).identifier == passwordIdentifier &&
+                    (*it).remoteSystem == aog &&
+                    (*it).sentHash == true )
                 {
-                    outgoingChallenges.RemoveAtIndex( i );
+                    outgoingChallenges.erase( it );
 
                     PushToUser( packet->data[0], passwordIdentifier, packet );
                     return;

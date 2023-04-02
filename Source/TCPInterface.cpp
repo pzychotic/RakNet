@@ -261,15 +261,15 @@ void TCPInterface::Stop( void )
     newRemoteClients.Clear( _FILE_AND_LINE_ );
     lostConnections.Clear( _FILE_AND_LINE_ );
     requestedCloseConnections.Clear( _FILE_AND_LINE_ );
-    failedConnectionAttempts.Clear( _FILE_AND_LINE_ );
-    completedConnectionAttempts.Clear( _FILE_AND_LINE_ );
-    failedConnectionAttempts.Clear( _FILE_AND_LINE_ );
-    for( i = 0; i < headPush.Size(); i++ )
-        DeallocatePacket( headPush[i] );
-    headPush.Clear( _FILE_AND_LINE_ );
-    for( i = 0; i < tailPush.Size(); i++ )
-        DeallocatePacket( tailPush[i] );
-    tailPush.Clear( _FILE_AND_LINE_ );
+    failedConnectionAttempts.clear();
+    completedConnectionAttempts.clear();
+    failedConnectionAttempts.clear();
+    for( Packet* pPacket : headPush )
+        DeallocatePacket( pPacket );
+    headPush.clear();
+    for( Packet* pPacket : tailPush )
+        DeallocatePacket( pPacket );
+    tailPush.clear();
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     SSL_CTX_free( ctx );
@@ -312,7 +312,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
 
             failedConnectionAttemptMutex.lock();
-            failedConnectionAttempts.Push( systemAddress, _FILE_AND_LINE_ );
+            failedConnectionAttempts.push_back( systemAddress );
             failedConnectionAttemptMutex.unlock();
 
             return UNASSIGNED_SYSTEM_ADDRESS;
@@ -322,7 +322,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         remoteClients[newRemoteClientIndex].systemAddress = systemAddress;
 
         completedConnectionAttemptMutex.lock();
-        completedConnectionAttempts.Push( remoteClients[newRemoteClientIndex].systemAddress, _FILE_AND_LINE_ );
+        completedConnectionAttempts.push_back( remoteClients[newRemoteClientIndex].systemAddress );
         completedConnectionAttemptMutex.unlock();
 
         return remoteClients[newRemoteClientIndex].systemAddress;
@@ -348,7 +348,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         if( errorCode != 0 )
         {
             RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
-            failedConnectionAttempts.Push( s->systemAddress, _FILE_AND_LINE_ );
+            failedConnectionAttempts.push_back( s->systemAddress );
         }
         return UNASSIGNED_SYSTEM_ADDRESS;
     }
@@ -436,7 +436,7 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
 }
 bool TCPInterface::ReceiveHasPackets( void )
 {
-    return headPush.IsEmpty() == false || incomingMessages.IsEmpty() == false || tailPush.IsEmpty() == false;
+    return !headPush.empty() || incomingMessages.IsEmpty() == false || !tailPush.empty();
 }
 Packet* TCPInterface::Receive( void )
 {
@@ -473,13 +473,21 @@ Packet* TCPInterface::ReceiveInt( void )
 {
     if( isStarted == 0 )
         return 0;
-    if( headPush.IsEmpty() == false )
-        return headPush.Pop();
+    if( !headPush.empty() )
+    {
+        Packet* p = headPush.front();
+        headPush.pop_front();
+        return p;
+    }
     Packet* p = incomingMessages.PopInaccurate();
     if( p )
         return p;
-    if( tailPush.IsEmpty() == false )
-        return tailPush.Pop();
+    if( !tailPush.empty() )
+    {
+        Packet* p = tailPush.front();
+        tailPush.pop_front();
+        return p;
+    }
     return 0;
 }
 
@@ -576,9 +584,9 @@ Packet* TCPInterface::AllocatePacket( unsigned dataSize )
 void TCPInterface::PushBackPacket( Packet* packet, bool pushAtHead )
 {
     if( pushAtHead )
-        headPush.Push( packet, _FILE_AND_LINE_ );
+        headPush.push_back( packet );
     else
-        tailPush.Push( packet, _FILE_AND_LINE_ );
+        tailPush.push_back( packet );
 }
 bool TCPInterface::WasStarted( void ) const
 {
@@ -588,8 +596,11 @@ SystemAddress TCPInterface::HasCompletedConnectionAttempt( void )
 {
     SystemAddress sysAddr = UNASSIGNED_SYSTEM_ADDRESS;
     completedConnectionAttemptMutex.lock();
-    if( completedConnectionAttempts.IsEmpty() == false )
-        sysAddr = completedConnectionAttempts.Pop();
+    if( !completedConnectionAttempts.empty() )
+    {
+        sysAddr = completedConnectionAttempts.front();
+        completedConnectionAttempts.pop_front();
+    }
     completedConnectionAttemptMutex.unlock();
 
     if( sysAddr != UNASSIGNED_SYSTEM_ADDRESS )
@@ -605,8 +616,11 @@ SystemAddress TCPInterface::HasFailedConnectionAttempt( void )
 {
     SystemAddress sysAddr = UNASSIGNED_SYSTEM_ADDRESS;
     failedConnectionAttemptMutex.lock();
-    if( failedConnectionAttempts.IsEmpty() == false )
-        sysAddr = failedConnectionAttempts.Pop();
+    if( !failedConnectionAttempts.empty() )
+    {
+        sysAddr = failedConnectionAttempts.front();
+        failedConnectionAttempts.pop_front();
+    }
     failedConnectionAttemptMutex.unlock();
 
     if( sysAddr != UNASSIGNED_SYSTEM_ADDRESS )
@@ -812,7 +826,7 @@ void ConnectionAttemptLoop( void* arg )
         tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
 
         tcpInterface->failedConnectionAttemptMutex.lock();
-        tcpInterface->failedConnectionAttempts.Push( systemAddress, _FILE_AND_LINE_ );
+        tcpInterface->failedConnectionAttempts.push_back( systemAddress );
         tcpInterface->failedConnectionAttemptMutex.unlock();
         return;
     }
@@ -824,7 +838,7 @@ void ConnectionAttemptLoop( void* arg )
     if( tcpInterface->threadRunning > 0 )
     {
         std::lock_guard<std::mutex> guard( tcpInterface->completedConnectionAttemptMutex );
-        tcpInterface->completedConnectionAttempts.Push( systemAddress, _FILE_AND_LINE_ );
+        tcpInterface->completedConnectionAttempts.push_back( systemAddress );
     }
 }
 

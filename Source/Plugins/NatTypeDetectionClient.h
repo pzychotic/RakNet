@@ -23,6 +23,7 @@
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
 
+#include <deque>
 #include <mutex>
 
 namespace RakNet {
@@ -71,7 +72,7 @@ public:
     virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line );
 
 protected:
-    DataStructures::Queue<RNS2RecvStruct*> bufferedPackets;
+    std::deque<RNS2RecvStruct*> bufferedPackets;
     std::mutex bufferedPacketsMutex;
 
     RakNetSocket2* c2;

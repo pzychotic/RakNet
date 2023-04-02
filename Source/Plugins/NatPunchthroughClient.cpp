@@ -848,13 +848,14 @@ void NatPunchthroughClient::QueueOpenNAT( RakNetGUID destination, const SystemAd
     DSTAndFac daf;
     daf.destination = destination;
     daf.facilitator = facilitator;
-    queuedOpenNat.Push( daf, _FILE_AND_LINE_ );
+    queuedOpenNat.push_back( daf );
 }
 void NatPunchthroughClient::SendQueuedOpenNAT( void )
 {
-    while( queuedOpenNat.IsEmpty() == false )
+    while( !queuedOpenNat.empty() )
     {
-        DSTAndFac daf = queuedOpenNat.Pop();
+        DSTAndFac daf = queuedOpenNat.front();
+        queuedOpenNat.pop_back(),
         SendPunchthrough( daf.destination, daf.facilitator );
     }
 }
@@ -892,7 +893,7 @@ void NatPunchthroughClient::Clear( void )
 
     failedAttemptList.Clear( false, _FILE_AND_LINE_ );
 
-    queuedOpenNat.Clear( _FILE_AND_LINE_ );
+    queuedOpenNat.clear();
 }
 PunchthroughConfiguration* NatPunchthroughClient::GetPunchthroughConfiguration( void )
 {

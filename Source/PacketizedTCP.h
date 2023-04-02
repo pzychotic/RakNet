@@ -20,6 +20,7 @@
 #include "TCPInterface.h"
 #include "DS_ByteQueue.h"
 
+#include <deque>
 #include <map>
 
 namespace RakNet {
@@ -70,11 +71,11 @@ protected:
     Packet* ReturnOutgoingPacket( void );
 
     // A single TCP recieve may generate multiple split packets. They are stored in the waitingPackets list until Receive is called
-    DataStructures::Queue<Packet*> waitingPackets;
+    std::deque<Packet*> waitingPackets;
     std::map<SystemAddress, DataStructures::ByteQueue*> connections;
 
     // Mirrors single producer / consumer, but processes them in Receive() before returning to user
-    DataStructures::Queue<SystemAddress> _newIncomingConnections, _lostConnections, _failedConnectionAttempts, _completedConnectionAttempts;
+    std::deque<SystemAddress> _newIncomingConnections, _lostConnections, _failedConnectionAttempts, _completedConnectionAttempts;
 };
 
 } // namespace RakNet

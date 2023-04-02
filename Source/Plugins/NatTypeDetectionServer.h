@@ -24,6 +24,7 @@
 #include "SocketIncludes.h"
 #include "DS_List.h"
 
+#include <deque>
 #include <mutex>
 #include <string>
 
@@ -107,7 +108,7 @@ public:
     virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line );
 
 protected:
-    DataStructures::Queue<RNS2RecvStruct*> bufferedPackets;
+    std::deque<RNS2RecvStruct*> bufferedPackets;
     std::mutex bufferedPacketsMutex;
 
     void OnDetectionRequest( Packet* packet );

@@ -12,7 +12,6 @@
 
 #include "RakNetTypes.h"
 #include "MTUSize.h"
-#include "DS_Queue.h"
 #include "Export.h"
 
 #include <atomic>

@@ -16,10 +16,10 @@
 #include "RakPeerInterface.h"
 #include "TCPInterface.h"
 #include "RakNetDefines.h"
-#include "DS_Queue.h"
 //#include "GetTime.h"
 
 #include <chrono>
+#include <deque>
 #include <thread>
 
 namespace RakNet {
@@ -355,14 +355,13 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
     returnData->Reset();
     blockingReturnValue.Reset();
     gotBlockingReturnValue = false;
-    Packet* packet;
-    DataStructures::Queue<Packet*> packetQueue;
+    std::deque<Packet*> packetQueue;
     while( gotBlockingReturnValue == false )
     {
         // TODO - block, filter until gotBlockingReturnValue==true or ID_CONNECTION_LOST or ID_DISCONNECTION_NOTIFICXATION or ID_RPC_REMOTE_ERROR/RPC_ERROR_FUNCTION_NOT_REGISTERED
         std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
 
-        packet = rakPeerInterface->Receive();
+        Packet* packet = rakPeerInterface->Receive();
 
         if( packet )
         {
@@ -373,8 +372,11 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
             {
                 // Push back to head in reverse order
                 rakPeerInterface->PushBackPacket( packet, true );
-                while( packetQueue.Size() )
-                    rakPeerInterface->PushBackPacket( packetQueue.Pop(), true );
+                for( Packet* pPacket : packetQueue )
+                {
+                    rakPeerInterface->PushBackPacket( pPacket, true );
+                }
+                packetQueue.clear();
                 return false;
             }
             else if( packet->data[0] == ID_RPC_REMOTE_ERROR && packet->data[1] == RPC_ERROR_FUNCTION_NOT_REGISTERED )
@@ -387,18 +389,21 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
                 {
                     // Push back to head in reverse order
                     rakPeerInterface->PushBackPacket( packet, true );
-                    while( packetQueue.Size() )
-                        rakPeerInterface->PushBackPacket( packetQueue.Pop(), true );
+                    for( Packet* pPacket : packetQueue )
+                    {
+                        rakPeerInterface->PushBackPacket( pPacket, true );
+                    }
+                    packetQueue.clear();
                     return false;
                 }
                 else
                 {
-                    packetQueue.PushAtHead( packet, 0, _FILE_AND_LINE_ );
+                    packetQueue.push_front( packet );
                 }
             }
             else
             {
-                packetQueue.PushAtHead( packet, 0, _FILE_AND_LINE_ );
+                packetQueue.push_front( packet );
             }
         }
     }

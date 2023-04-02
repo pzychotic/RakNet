@@ -21,10 +21,10 @@
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_OrderedList.h"
-#include "DS_Queue.h"
 
 #include <float.h>
 #include <stdint.h>
+#include <deque>
 #include <string>
 #include <unordered_map>
 
@@ -128,7 +128,8 @@ public:
         TimeAndValueQueue();
         ~TimeAndValueQueue();
 
-        DataStructures::Queue<TimeAndValue> values;
+        using TimeAndValueDeque = std::deque<TimeAndValue>;
+        TimeAndValueDeque values;
 
         Time timeToTrackValues;
         std::string key;
@@ -160,7 +161,7 @@ public:
 
         // Shrink or expand a sample set to the approximate number given
         // DC_DISCRETE will produce a histogram (sum) while DC_CONTINUOUS will produce an average
-        void ResizeSampleSet( int approximateSamples, DataStructures::Queue<StatisticsHistory::TimeAndValue>& blendedSamples, SHDataCategory dataCategory, Time timeClipStart = 0, Time timeClipEnd = 0 );
+        void ResizeSampleSet( int approximateSamples, TimeAndValueDeque& blendedSamples, SHDataCategory dataCategory, Time timeClipStart = 0, Time timeClipEnd = 0 );
 
         // Clear out all values
         void Clear( void );

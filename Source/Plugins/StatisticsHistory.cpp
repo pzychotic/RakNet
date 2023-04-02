@@ -133,9 +133,10 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& 
     }
 
     TimeAndValue tav;
-    if( combineEqualTimes == true && queue->values.Size() > 0 && queue->values.PeekTail().time == curTime )
+    if( combineEqualTimes == true && !queue->values.empty() && queue->values.back().time == curTime )
     {
-        tav = queue->values.PopTail();
+        tav = queue->values.back();
+        queue->values.pop_back();
 
         queue->recentSum -= tav.val;
         queue->recentSumOfSquares -= tav.val * tav.val;
@@ -149,7 +150,7 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& 
     }
 
     tav.val += val;
-    queue->values.Push( tav, _FILE_AND_LINE_ );
+    queue->values.push_back( tav );
 
     queue->recentSum += tav.val;
     queue->recentSumOfSquares += tav.val * tav.val;
@@ -293,39 +294,40 @@ SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentSumOfSquares( void ) 
 SHValueType StatisticsHistory::TimeAndValueQueue::GetLongTermSum( void ) const { return longTermSum; }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentAverage( void ) const
 {
-    if( values.Size() > 0 )
-        return recentSum / (SHValueType)values.Size();
-    else
-        return 0;
+    return !values.empty() ? recentSum / (SHValueType)values.size() : 0;
 }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentLowest( void ) const
 {
     SHValueType out = SH_TYPE_MAX;
-    for( unsigned int idx = 0; idx < values.Size(); idx++ )
+    for( const TimeAndValue& rVal : values )
     {
-        if( values[idx].val < out )
-            out = values[idx].val;
+        if( rVal.val < out )
+        {
+            out = rVal.val;
+        }
     }
     return out;
 }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentHighest( void ) const
 {
     SHValueType out = -SH_TYPE_MAX;
-    for( unsigned int idx = 0; idx < values.Size(); idx++ )
+    for( const TimeAndValue& rVal : values )
     {
-        if( values[idx].val > out )
-            out = values[idx].val;
+        if( rVal.val > out )
+        {
+            out = rVal.val;
+        }
     }
     return out;
 }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentStandardDeviation( void ) const
 {
-    if( values.Size() == 0 )
+    if( values.empty() )
         return 0;
 
     SHValueType recentMean = GetRecentAverage();
     SHValueType squareOfMean = recentMean * recentMean;
-    SHValueType meanOfSquares = GetRecentSumOfSquares() / (SHValueType)values.Size();
+    SHValueType meanOfSquares = GetRecentSumOfSquares() / (SHValueType)values.size();
     return meanOfSquares - squareOfMean;
 }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetLongTermAverage( void ) const
@@ -338,14 +340,14 @@ SHValueType StatisticsHistory::TimeAndValueQueue::GetLongTermLowest( void ) cons
 SHValueType StatisticsHistory::TimeAndValueQueue::GetLongTermHighest( void ) const { return longTermHighest; }
 Time StatisticsHistory::TimeAndValueQueue::GetTimeRange( void ) const
 {
-    if( values.Size() < 2 )
+    if( values.size() < 2 )
         return 0;
-    return values[values.Size() - 1].time - values[0].time;
+    return values[values.size() - 1].time - values[0].time;
 }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetSumSinceTime( Time t ) const
 {
     SHValueType sum = 0;
-    for( int i = values.Size(); i > 0; --i )
+    for( int i = values.size(); i > 0; --i )
     {
         if( values[i - 1].time >= t )
             sum += values[i - 1].val;
@@ -379,39 +381,39 @@ void StatisticsHistory::TimeAndValueQueue::MergeSets( const TimeAndValueQueue* l
     rhsIndex = 0;
 
     // I use local valuesOutput in case lhs==output || rhs==output
-    DataStructures::Queue<TimeAndValue> valuesOutput;
+    std::deque<TimeAndValue> valuesOutput;
 
     if( lhsDataCategory == StatisticsHistory::DC_DISCRETE && rhsDataCategory == StatisticsHistory::DC_DISCRETE )
     {
-        while( rhsIndex < rhs->values.Size() && lhsIndex < lhs->values.Size() )
+        while( rhsIndex < rhs->values.size() && lhsIndex < lhs->values.size() )
         {
             if( rhs->values[rhsIndex].time < lhs->values[lhsIndex].time )
             {
-                valuesOutput.Push( rhs->values[rhsIndex], _FILE_AND_LINE_ );
+                valuesOutput.push_back( rhs->values[rhsIndex] );
                 rhsIndex++;
             }
             else if( rhs->values[rhsIndex].time > lhs->values[lhsIndex].time )
             {
-                valuesOutput.Push( lhs->values[rhsIndex], _FILE_AND_LINE_ );
+                valuesOutput.push_back( lhs->values[rhsIndex] );
                 lhsIndex++;
             }
             else
             {
-                valuesOutput.Push( rhs->values[rhsIndex], _FILE_AND_LINE_ );
+                valuesOutput.push_back( rhs->values[rhsIndex] );
                 rhsIndex++;
-                valuesOutput.Push( lhs->values[rhsIndex], _FILE_AND_LINE_ );
+                valuesOutput.push_back( lhs->values[rhsIndex] );
                 lhsIndex++;
             }
         }
 
-        while( rhsIndex < rhs->values.Size() )
+        while( rhsIndex < rhs->values.size() )
         {
-            valuesOutput.Push( rhs->values[rhsIndex], _FILE_AND_LINE_ );
+            valuesOutput.push_back( rhs->values[rhsIndex] );
             rhsIndex++;
         }
-        while( lhsIndex < lhs->values.Size() )
+        while( lhsIndex < lhs->values.size() )
         {
-            valuesOutput.Push( lhs->values[lhsIndex], _FILE_AND_LINE_ );
+            valuesOutput.push_back( lhs->values[lhsIndex] );
             lhsIndex++;
         }
 
@@ -441,7 +443,7 @@ void StatisticsHistory::TimeAndValueQueue::MergeSets( const TimeAndValueQueue* l
 
         TimeAndValue newTimeAndValue;
 
-        while( rhsIndex < rhs->values.Size() && lhsIndex < lhs->values.Size() )
+        while( rhsIndex < rhs->values.size() && lhsIndex < lhs->values.size() )
         {
             if( rhs->values[rhsIndex].time < lhs->values[lhsIndex].time )
             {
@@ -477,40 +479,40 @@ void StatisticsHistory::TimeAndValueQueue::MergeSets( const TimeAndValueQueue* l
                 rhsIndex++;
             }
 
-            valuesOutput.Push( newTimeAndValue, _FILE_AND_LINE_ );
+            valuesOutput.push_back( newTimeAndValue );
         }
 
-        while( rhsIndex < rhs->values.Size() )
+        while( rhsIndex < rhs->values.size() )
         {
             timeSinceOppositeValue = rhs->values[rhsIndex].time - lastTimeAndValueLhs.time;
             newTimeAndValue.val = rhs->values[rhsIndex].val + lastTimeAndValueLhs.val + lastSlopeLhs * timeSinceOppositeValue;
             newTimeAndValue.time = rhs->values[rhsIndex].time;
-            valuesOutput.Push( newTimeAndValue, _FILE_AND_LINE_ );
+            valuesOutput.push_back( newTimeAndValue );
             rhsIndex++;
         }
-        while( lhsIndex < lhs->values.Size() )
+        while( lhsIndex < lhs->values.size() )
         {
             timeSinceOppositeValue = lhs->values[lhsIndex].time - lastTimeAndValueRhs.time;
             newTimeAndValue.val = lhs->values[lhsIndex].val + lastTimeAndValueRhs.val + lastSlopeRhs * timeSinceOppositeValue;
             newTimeAndValue.time = lhs->values[lhsIndex].time;
-            valuesOutput.Push( newTimeAndValue, _FILE_AND_LINE_ );
+            valuesOutput.push_back( newTimeAndValue );
             lhsIndex++;
         }
 
         output->recentSum = 0;
         output->recentSumOfSquares = 0;
-        for( unsigned int i = 0; i < valuesOutput.Size(); i++ )
+        for( const TimeAndValue& rVal : valuesOutput )
         {
-            output->recentSum += valuesOutput[i].val;
-            output->recentSumOfSquares += valuesOutput[i].val * valuesOutput[i].val;
+            output->recentSum += rVal.val;
+            output->recentSumOfSquares += rVal.val * rVal.val;
         }
     }
 
     output->values = valuesOutput;
 }
-void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, DataStructures::Queue<StatisticsHistory::TimeAndValue>& histogram, SHDataCategory dataCategory, Time timeClipStart, Time timeClipEnd )
+void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, TimeAndValueDeque& histogram, SHDataCategory dataCategory, Time timeClipStart, Time timeClipEnd )
 {
-    histogram.Clear( _FILE_AND_LINE_ );
+    histogram.clear();
     if( maxSamples == 0 )
         return;
     Time timeRange = GetTimeRange();
@@ -521,7 +523,7 @@ void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, Data
         StatisticsHistory::TimeAndValue tav;
         tav.time = timeRange;
         tav.val = GetRecentSum();
-        histogram.Push( tav, _FILE_AND_LINE_ );
+        histogram.push_back( tav );
         return;
     }
     Time interval = timeRange / maxSamples;
@@ -535,15 +537,15 @@ void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, Data
     Time endTime;
 
     numSamples = 0;
-    endTime = values[values.Size() - 1].time;
+    endTime = values.back().time;
     dataIndex = 0;
-    currentTime = values[0].time;
+    currentTime = values.front().time;
     currentSum.val = 0;
-    currentSum.time = values[0].time + interval / 2;
-    timeBoundary = values[0].time + interval;
+    currentSum.time = values.front().time + interval / 2;
+    timeBoundary = values.front().time + interval;
     while( timeBoundary <= endTime )
     {
-        while( dataIndex < values.Size() && values[dataIndex].time <= timeBoundary )
+        while( dataIndex < values.size() && values[dataIndex].time <= timeBoundary )
         {
             currentSum.val += values[dataIndex].val;
             dataIndex++;
@@ -553,7 +555,7 @@ void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, Data
         if( dataCategory == DC_CONTINUOUS )
         {
             if( dataIndex > 0 &&
-                dataIndex < values.Size() &&
+                dataIndex < values.size() &&
                 values[dataIndex - 1].time < timeBoundary &&
                 values[dataIndex].time > timeBoundary )
             {
@@ -568,7 +570,7 @@ void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, Data
             }
         }
 
-        histogram.Push( currentSum, _FILE_AND_LINE_ );
+        histogram.push_back( currentSum );
         currentSum.time = timeBoundary + interval / 2;
         timeBoundary += interval;
         currentSum.val = 0;
@@ -576,78 +578,80 @@ void StatisticsHistory::TimeAndValueQueue::ResizeSampleSet( int maxSamples, Data
     }
 
 
-    if( timeClipStart != 0 && histogram.Size() >= 1 )
+    if( timeClipStart != 0 && !histogram.empty() )
     {
-        timeClipStart = histogram.Peek().time + timeClipStart;
-        if( histogram.PeekTail().time < timeClipStart )
+        timeClipStart = histogram.front().time + timeClipStart;
+        if( histogram.back().time < timeClipStart )
         {
-            histogram.Clear( _FILE_AND_LINE_ );
+            histogram.clear();
         }
-        else if( histogram.Size() >= 2 && histogram.Peek().time < timeClipStart )
+        else if( histogram.size() >= 2 && histogram.front().time < timeClipStart )
         {
             StatisticsHistory::TimeAndValue tav;
 
             do
             {
-                tav = histogram.Pop();
+                tav = histogram.front();
+                histogram.pop_front();
 
-                if( histogram.Peek().time == timeClipStart )
+                if( histogram.front().time == timeClipStart )
                 {
                     break;
                 }
-                else if( histogram.Peek().time > timeClipStart )
+                else if( histogram.front().time > timeClipStart )
                 {
                     StatisticsHistory::TimeAndValue tav2;
-                    tav2.val = StatisticsHistory::TimeAndValueQueue::Interpolate( tav, histogram.Peek(), timeClipStart );
+                    tav2.val = StatisticsHistory::TimeAndValueQueue::Interpolate( tav, histogram.front(), timeClipStart );
                     tav2.time = timeClipStart;
-                    histogram.PushAtHead( tav2, 0, _FILE_AND_LINE_ );
+                    histogram.push_front( tav2 );
                     break;
                 }
-            } while( histogram.Size() >= 2 );
+            } while( histogram.size() >= 2 );
         }
     }
 
-    if( timeClipEnd != 0 && histogram.Size() >= 1 )
+    if( timeClipEnd != 0 && !histogram.empty() )
     {
-        timeClipEnd = histogram.PeekTail().time - timeClipEnd;
-        if( histogram.Peek().time > timeClipEnd )
+        timeClipEnd = histogram.back().time - timeClipEnd;
+        if( histogram.front().time > timeClipEnd )
         {
-            histogram.Clear( _FILE_AND_LINE_ );
+            histogram.clear();
         }
-        else if( histogram.Size() >= 2 && histogram.PeekTail().time > timeClipEnd )
+        else if( histogram.size() >= 2 && histogram.back().time > timeClipEnd )
         {
             StatisticsHistory::TimeAndValue tav;
 
             do
             {
-                tav = histogram.PopTail();
+                tav = histogram.back();
+                histogram.pop_back();
 
-                if( histogram.PeekTail().time == timeClipEnd )
+                if( histogram.back().time == timeClipEnd )
                 {
                     break;
                 }
-                else if( histogram.PeekTail().time < timeClipEnd )
+                else if( histogram.back().time < timeClipEnd )
                 {
                     StatisticsHistory::TimeAndValue tav2;
-                    tav2.val = StatisticsHistory::TimeAndValueQueue::Interpolate( tav, histogram.PeekTail(), timeClipEnd );
+                    tav2.val = StatisticsHistory::TimeAndValueQueue::Interpolate( tav, histogram.back(), timeClipEnd );
                     tav2.time = timeClipEnd;
-                    histogram.Push( tav2, _FILE_AND_LINE_ );
+                    histogram.push_back( tav2 );
                     break;
                 }
-            } while( histogram.Size() >= 2 );
+            } while( histogram.size() >= 2 );
         }
     }
 }
 void StatisticsHistory::TimeAndValueQueue::CullExpiredValues( Time curTime )
 {
-    while( values.Size() )
+    while( !values.empty() )
     {
-        StatisticsHistory::TimeAndValue tav = values.Peek();
+        StatisticsHistory::TimeAndValue tav = values.front();
         if( curTime - tav.time > timeToTrackValues )
         {
             recentSum -= tav.val;
             recentSumOfSquares -= tav.val * tav.val;
-            values.Pop();
+            values.pop_front();
         }
         else
         {
@@ -678,7 +682,7 @@ void StatisticsHistory::TimeAndValueQueue::Clear( void )
     longTermCount = 0;
     longTermLowest = SH_TYPE_MAX;
     longTermHighest = -SH_TYPE_MAX;
-    values.Clear( _FILE_AND_LINE_ );
+    values.clear();
 }
 StatisticsHistory::TimeAndValueQueue& StatisticsHistory::TimeAndValueQueue::operator=( const TimeAndValueQueue& input )
 {

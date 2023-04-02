@@ -39,10 +39,10 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "DS_Queue.h"
 #include "DS_List.h"
 
 #include <stdint.h>
+#include <deque>
 #include <string>
 #include <unordered_map>
 
@@ -100,7 +100,7 @@ public:
         bool sentHash;
     };
 
-    DataStructures::Queue<PendingChallenge> outgoingChallenges;
+    std::deque<PendingChallenge> outgoingChallenges;
 
     /// \internal
     struct NonceAndRemoteSystemRequest

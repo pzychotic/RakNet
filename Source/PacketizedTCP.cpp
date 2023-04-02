@@ -34,10 +34,9 @@ PacketizedTCP::~PacketizedTCP()
 
 void PacketizedTCP::Stop( void )
 {
-    unsigned int i;
     TCPInterface::Stop();
-    for( i = 0; i < waitingPackets.Size(); i++ )
-        DeallocatePacket( waitingPackets[i] );
+    for( Packet* pPacket : waitingPackets )
+        DeallocatePacket( pPacket );
     ClearAllConnections();
 }
 
@@ -104,27 +103,27 @@ void PacketizedTCP::PushNotificationsToQueues( void )
     sa = TCPInterface::HasNewIncomingConnection();
     if( sa != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        _newIncomingConnections.Push( sa, _FILE_AND_LINE_ );
+        _newIncomingConnections.push_back( sa );
         AddToConnectionList( sa );
     }
 
     sa = TCPInterface::HasFailedConnectionAttempt();
     if( sa != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        _failedConnectionAttempts.Push( sa, _FILE_AND_LINE_ );
+        _failedConnectionAttempts.push_back( sa );
     }
 
     sa = TCPInterface::HasLostConnection();
     if( sa != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        _lostConnections.Push( sa, _FILE_AND_LINE_ );
+        _lostConnections.push_back( sa );
         RemoveFromConnectionList( sa );
     }
 
     sa = TCPInterface::HasCompletedConnectionAttempt();
     if( sa != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        _completedConnectionAttempts.Push( sa, _FILE_AND_LINE_ );
+        _completedConnectionAttempts.push_back( sa );
         AddToConnectionList( sa );
     }
 }
@@ -185,7 +184,7 @@ Packet* PacketizedTCP::Receive( void )
                     }
                     bq->ReadBytes( (char*)outgoingPacket->data, dataLength, false );
 
-                    waitingPackets.Push( outgoingPacket, _FILE_AND_LINE_ );
+                    waitingPackets.push_back( outgoingPacket );
 
                     // Peek the header to see if a full message is waiting
                     if( bq->ReadBytes( (char*)&dataLength, sizeof( PTCPHeader ), true ) )
@@ -233,7 +232,7 @@ Packet* PacketizedTCP::Receive( void )
                     bq->ReadBytes( (char*)outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, oneChunkSize, true );
                     bq->DecrementReadOffset( sizeof( PTCPHeader ) );
 
-                    waitingPackets.Push( outgoingPacket, _FILE_AND_LINE_ );
+                    waitingPackets.push_back( outgoingPacket );
                 }
             }
 
@@ -242,7 +241,7 @@ Packet* PacketizedTCP::Receive( void )
         }
         else
         {
-            waitingPackets.Push( incomingPacket, _FILE_AND_LINE_ );
+            waitingPackets.push_back( incomingPacket );
         }
 
         incomingPacket = TCPInterface::ReceiveInt();
@@ -253,12 +252,13 @@ Packet* PacketizedTCP::Receive( void )
 Packet* PacketizedTCP::ReturnOutgoingPacket( void )
 {
     Packet* outgoingPacket = 0;
-    unsigned int i;
-    while( outgoingPacket == 0 && waitingPackets.IsEmpty() == false )
+    while( outgoingPacket == 0 && !waitingPackets.empty() )
     {
-        outgoingPacket = waitingPackets.Pop();
+        outgoingPacket = waitingPackets.front();
+        waitingPackets.pop_front();
+
         PluginReceiveResult pluginResult;
-        for( i = 0; i < messageHandlerList.Size(); i++ )
+        for( uint32_t i = 0; i < messageHandlerList.Size(); i++ )
         {
             pluginResult = messageHandlerList[i]->OnReceive( outgoingPacket );
             if( pluginResult == RR_STOP_PROCESSING_AND_DEALLOCATE )
@@ -318,32 +318,48 @@ SystemAddress PacketizedTCP::HasCompletedConnectionAttempt( void )
 {
     PushNotificationsToQueues();
 
-    if( _completedConnectionAttempts.IsEmpty() == false )
-        return _completedConnectionAttempts.Pop();
+    if( !_completedConnectionAttempts.empty() )
+    {
+        SystemAddress sa = _completedConnectionAttempts.front();
+        _completedConnectionAttempts.pop_front();
+        return sa;
+    }
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
 SystemAddress PacketizedTCP::HasFailedConnectionAttempt( void )
 {
     PushNotificationsToQueues();
 
-    if( _failedConnectionAttempts.IsEmpty() == false )
-        return _failedConnectionAttempts.Pop();
+    if( !_failedConnectionAttempts.empty() )
+    {
+        SystemAddress sa = _failedConnectionAttempts.front();
+        _failedConnectionAttempts.pop_front();
+        return sa;
+    }
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
 SystemAddress PacketizedTCP::HasNewIncomingConnection( void )
 {
     PushNotificationsToQueues();
 
-    if( _newIncomingConnections.IsEmpty() == false )
-        return _newIncomingConnections.Pop();
+    if( !_newIncomingConnections.empty() )
+    {
+        SystemAddress sa = _newIncomingConnections.front();
+        _newIncomingConnections.pop_front();
+        return sa;
+    }
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
 SystemAddress PacketizedTCP::HasLostConnection( void )
 {
     PushNotificationsToQueues();
 
-    if( _lostConnections.IsEmpty() == false )
-        return _lostConnections.Pop();
+    if( !_lostConnections.empty() )
+    {
+        SystemAddress sa = _lostConnections.front();
+        _lostConnections.pop_front();
+        return sa;
+    }
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
 

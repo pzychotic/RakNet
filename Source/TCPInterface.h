@@ -21,7 +21,6 @@
 #include "DS_List.h"
 #include "RakNetTypes.h"
 #include "Export.h"
-#include "DS_Queue.h"
 #include "RakNetDefines.h"
 #include "SocketIncludes.h"
 #include "DS_ByteQueue.h"
@@ -37,6 +36,7 @@
 #endif
 
 #include <atomic>
+#include <deque>
 #include <mutex>
 
 namespace RakNet {
@@ -145,7 +145,7 @@ protected:
     std::atomic<uint32_t> isStarted, threadRunning;
     __TCPSOCKET__ listenSocket;
 
-    DataStructures::Queue<Packet*> headPush, tailPush;
+    std::deque<Packet*> headPush, tailPush;
     RemoteClient* remoteClients;
     int remoteClientsLength;
 
@@ -153,7 +153,7 @@ protected:
     DataStructures::ThreadsafeAllocatingQueue<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
     DataStructures::ThreadsafeAllocatingQueue<RemoteClient*> newRemoteClients;
     std::mutex completedConnectionAttemptMutex, failedConnectionAttemptMutex;
-    DataStructures::Queue<SystemAddress> completedConnectionAttempts, failedConnectionAttempts;
+    std::deque<SystemAddress> completedConnectionAttempts, failedConnectionAttempts;
 
     int threadPriority;
 

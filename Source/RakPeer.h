@@ -26,8 +26,8 @@
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
-#include "DS_Queue.h"
 
+#include <deque>
 #include <mutex>
 
 namespace RakNet {
@@ -819,8 +819,8 @@ protected:
     // Threadsafe, and not thread safe
     DataStructures::List<PluginInterface2*> pluginListTS, pluginListNTS;
 
-    DataStructures::Queue<RequestedConnectionStruct*> requestedConnectionQueue;
-    DataStructures::Queue<SystemAddress> requestedConnectionCancelQueue;
+    std::deque<RequestedConnectionStruct*> requestedConnectionQueue;
+    std::deque<SystemAddress> requestedConnectionCancelQueue;
     std::mutex requestedConnectionQueueMutex;
     std::mutex requestedConnectionCancelQueueMutex;
 
@@ -854,9 +854,9 @@ protected:
 
     DataStructures::ThreadsafeAllocatingQueue<BufferedCommandStruct> bufferedCommands;
 
-    DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsFreePool;
+    std::deque<RNS2RecvStruct*> bufferedPacketsFreePool;
     std::mutex bufferedPacketsFreePoolMutex;
-    DataStructures::Queue<RNS2RecvStruct*> bufferedPacketsQueue;
+    std::deque<RNS2RecvStruct*> bufferedPacketsQueue;
     std::mutex bufferedPacketsQueueMutex;
 
     virtual void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line );
@@ -941,7 +941,7 @@ protected:
     DataStructures::MemoryPool<Packet> packetAllocationPool;
 
     std::mutex packetReturnMutex;
-    DataStructures::Queue<Packet*> packetReturnQueue;
+    std::deque<Packet*> packetReturnQueue;
     Packet* AllocPacket( unsigned dataSize, const char* file, unsigned int line );
     Packet* AllocPacket( unsigned dataSize, unsigned char* data, const char* file, unsigned int line );
 

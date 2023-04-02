@@ -15,9 +15,9 @@
 
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
-#include "DS_Queue.h"
 
 #include <stdint.h>
+#include <deque>
 
 namespace RakNet {
 
@@ -370,7 +370,7 @@ protected:
 
     DatagramSequenceNumberType nextCongestionControlBlock;
     bool hadPacketlossThisBlock;
-    DataStructures::Queue<CCTimeType> pingsLastInterval;
+    std::deque<CCTimeType> pingsLastInterval;
 };
 
 } // namespace RakNet

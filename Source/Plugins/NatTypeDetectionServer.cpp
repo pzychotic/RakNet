@@ -78,8 +78,11 @@ void NatTypeDetectionServer::Shutdown()
         s4p5 = 0;
     }
     std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
-    while( bufferedPackets.Size() )
-        RakNet::OP_DELETE( bufferedPackets.Pop(), _FILE_AND_LINE_ );
+    for( RNS2RecvStruct* pPacket : bufferedPackets )
+    {
+        RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
+    }
+    bufferedPackets.clear();
 }
 void NatTypeDetectionServer::Update( void )
 {
@@ -89,7 +92,12 @@ void NatTypeDetectionServer::Update( void )
     SystemAddress boundAddress;
 
     bufferedPacketsMutex.lock();
-    RNS2RecvStruct* recvStruct = bufferedPackets.Size() > 0 ? bufferedPackets.Pop() : 0;
+    RNS2RecvStruct* recvStruct = nullptr;
+    if( !bufferedPackets.empty() )
+    {
+        recvStruct = bufferedPackets.front();
+        bufferedPackets.pop_front();
+    }
     bufferedPacketsMutex.unlock();
     while( recvStruct )
     {
@@ -147,7 +155,11 @@ void NatTypeDetectionServer::Update( void )
         DeallocRNS2RecvStruct( recvStruct, _FILE_AND_LINE_ );
 
         std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
-        recvStruct = bufferedPackets.Size() > 0 ? bufferedPackets.Pop() : 0;
+        if( !bufferedPackets.empty() )
+        {
+            recvStruct = bufferedPackets.front();
+            bufferedPackets.pop_front();
+        }
     }
 
     while( i < (int)natDetectionAttempts.Size() )
@@ -322,7 +334,7 @@ RNS2RecvStruct* NatTypeDetectionServer::AllocRNS2RecvStruct( const char* file, u
 void NatTypeDetectionServer::OnRNS2Recv( RNS2RecvStruct* recvStruct )
 {
     std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
-    bufferedPackets.Push( recvStruct, _FILE_AND_LINE_ );
+    bufferedPackets.push_back( recvStruct );
 }
 
 } // namespace RakNet

@@ -40,14 +40,14 @@ bool RakNetTransport2::Start( unsigned short port, bool serverMode )
 }
 void RakNetTransport2::Stop( void )
 {
-    newConnections.Clear( _FILE_AND_LINE_ );
-    lostConnections.Clear( _FILE_AND_LINE_ );
-    for( unsigned int i = 0; i < packetQueue.Size(); i++ )
+    newConnections.clear();
+    lostConnections.clear();
+    for( Packet* pPacket : packetQueue )
     {
-        rakFree_Ex( packetQueue[i]->data, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( packetQueue[i], _FILE_AND_LINE_ );
+        rakFree_Ex( pPacket->data, _FILE_AND_LINE_ );
+        RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
     }
-    packetQueue.Clear( _FILE_AND_LINE_ );
+    packetQueue.clear();
 }
 void RakNetTransport2::Send( SystemAddress systemAddress, const char* data, ... )
 {
@@ -73,20 +73,32 @@ void RakNetTransport2::CloseConnection( SystemAddress systemAddress )
 }
 Packet* RakNetTransport2::Receive( void )
 {
-    if( packetQueue.Size() == 0 )
-        return 0;
-    return packetQueue.Pop();
+    Packet* pPacket = nullptr;
+    if( !packetQueue.empty() )
+    {
+        pPacket = packetQueue.front();
+        packetQueue.pop_front();
+    }
+    return pPacket;
 }
 SystemAddress RakNetTransport2::HasNewIncomingConnection( void )
 {
-    if( newConnections.Size() )
-        return newConnections.Pop();
+    if( !newConnections.empty() )
+    {
+        SystemAddress sa = newConnections.front();
+        newConnections.pop_front();
+        return sa;
+    }
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
 SystemAddress RakNetTransport2::HasLostConnection( void )
 {
-    if( lostConnections.Size() )
-        return lostConnections.Pop();
+    if( !lostConnections.empty() )
+    {
+        SystemAddress sa = lostConnections.front();
+        lostConnections.pop_front();
+        return sa;
+    }
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
 void RakNetTransport2::DeallocatePacket( Packet* packet )
@@ -108,7 +120,7 @@ PluginReceiveResult RakNetTransport2::OnReceive( Packet* packet )
         p->length--;
         p->data = (unsigned char*)rakMalloc_Ex( p->length, _FILE_AND_LINE_ );
         memcpy( p->data, packet->data + 1, p->length );
-        packetQueue.Push( p, _FILE_AND_LINE_ );
+        packetQueue.push_back( p );
     }
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
     }
@@ -118,13 +130,13 @@ void RakNetTransport2::OnClosedConnection( const SystemAddress& systemAddress, R
 {
     (void)rakNetGUID;
     (void)lostConnectionReason;
-    lostConnections.Push( systemAddress, _FILE_AND_LINE_ );
+    lostConnections.push_back( systemAddress );
 }
 void RakNetTransport2::OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming )
 {
     (void)rakNetGUID;
     (void)isIncoming;
-    newConnections.Push( systemAddress, _FILE_AND_LINE_ );
+    newConnections.push_back( systemAddress );
 }
 
 } // namespace RakNet

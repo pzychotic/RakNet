@@ -20,12 +20,12 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
-#include "DS_Queue.h"
 #include "DS_List.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "Plugins/UDPProxyCommon.h"
 
 #include <atomic>
+#include <deque>
 #include <mutex>
 #include <string>
 
@@ -129,7 +129,7 @@ protected:
         UDPForwarderResult result;
         unsigned int inputId;
     };
-    DataStructures::Queue<StartForwardingOutputStruct> startForwardingOutput;
+    std::deque<StartForwardingOutputStruct> startForwardingOutput;
     std::mutex startForwardingOutputMutex;
 
     struct StopForwardingStruct

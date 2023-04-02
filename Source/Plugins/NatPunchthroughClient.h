@@ -22,7 +22,8 @@
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
 #include "DS_List.h"
-#include "DS_Queue.h"
+
+#include <deque>
 
 // Trendnet TEW-632BRP sometimes starts at port 1024 and increments sequentially.
 // Zonnet zsr1134we. Replies go out on the net, but are always absorbed by the remote router??
@@ -243,7 +244,7 @@ protected:
         RakNetGUID destination;
         SystemAddress facilitator;
     };
-    DataStructures::Queue<DSTAndFac> queuedOpenNat;
+    std::deque<DSTAndFac> queuedOpenNat;
 
     void IncrementExternalAttemptCount( RakNet::Time time, RakNet::Time delta );
     unsigned short portStride;

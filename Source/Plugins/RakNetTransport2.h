@@ -18,10 +18,11 @@
 #if _RAKNET_SUPPORT_TelnetTransport == 1
 
 #include "TransportInterface.h"
-#include "DS_Queue.h"
 #include "CommandParserInterface.h"
 #include "PluginInterface2.h"
 #include "Export.h"
+
+#include <deque>
 
 namespace RakNet {
 
@@ -93,8 +94,9 @@ public:
     virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
 
 protected:
-    DataStructures::Queue<SystemAddress> newConnections, lostConnections;
-    DataStructures::Queue<Packet*> packetQueue;
+
+    std::deque<SystemAddress> newConnections, lostConnections;
+    std::deque<Packet*> packetQueue;
 };
 
 } // namespace RakNet

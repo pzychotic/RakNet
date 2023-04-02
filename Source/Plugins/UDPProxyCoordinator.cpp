@@ -258,7 +258,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         fw->timeRequestedPings = RakNet::GetTimeMS();
         unsigned int copyIndex;
         for( copyIndex = 0; copyIndex < serverList.Size(); copyIndex++ )
-            fw->remainingServersToTry.Push( serverList[copyIndex], _FILE_AND_LINE_ );
+            fw->remainingServersToTry.push_back( serverList[copyIndex] );
         forwardingRequestList.InsertAtIndex( fw, insertionIndex, _FILE_AND_LINE_ );
     }
     else
@@ -474,10 +474,11 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
 void UDPProxyCoordinator::TryNextServer( SenderAndTargetAddress sata, ForwardingRequest* fw )
 {
     bool pickedGoodServer = false;
-    while( fw->remainingServersToTry.Size() > 0 )
+    while( !fw->remainingServersToTry.empty() )
     {
-        fw->currentlyAttemptedServerAddress = fw->remainingServersToTry.Pop();
-        if( serverList.GetIndexOf( fw->currentlyAttemptedServerAddress ) != (unsigned int)-1 )
+        fw->currentlyAttemptedServerAddress = fw->remainingServersToTry.front();
+        fw->remainingServersToTry.pop_front();
+        if( serverList.GetIndexOf( fw->currentlyAttemptedServerAddress ) != ~0u )
         {
             pickedGoodServer = true;
             break;
@@ -520,9 +521,8 @@ void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )
     if( sourceServerPings.Size() == 0 && targetServerPings.Size() == 0 )
         return;
 
-    unsigned int idx;
     UDPProxyCoordinator::ServerWithPing swp;
-    for( idx = 0; idx < remainingServersToTry.Size(); idx++ )
+    for( uint32_t idx = 0; idx < remainingServersToTry.size(); idx++ )
     {
         swp.serverAddress = remainingServersToTry[idx];
         swp.ping = 0;
@@ -536,10 +536,10 @@ void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )
             swp.ping += (unsigned short)( DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME );
         swpList.Insert( swp.ping, swp, false, _FILE_AND_LINE_ );
     }
-    remainingServersToTry.Clear( _FILE_AND_LINE_ );
-    for( idx = 0; idx < swpList.Size(); idx++ )
+    remainingServersToTry.clear();
+    for( uint32_t idx = 0; idx < swpList.Size(); idx++ )
     {
-        remainingServersToTry.Push( swpList[idx].serverAddress, _FILE_AND_LINE_ );
+        remainingServersToTry.push_back( swpList[idx].serverAddress );
     }
 }
 

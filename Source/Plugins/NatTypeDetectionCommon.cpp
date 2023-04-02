@@ -13,6 +13,7 @@
 #if _RAKNET_SUPPORT_NatTypeDetectionServer == 1 || _RAKNET_SUPPORT_NatTypeDetectionClient == 1
 
 #include "SocketIncludes.h"
+#include "RakAssert.h"
 
 namespace RakNet {
 

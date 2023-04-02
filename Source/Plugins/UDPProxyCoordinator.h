@@ -21,9 +21,9 @@
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
 #include "BitStream.h"
-#include "DS_Queue.h"
 #include "DS_OrderedList.h"
 
+#include <deque>
 #include <string>
 
 namespace RakNet {
@@ -73,7 +73,7 @@ public:
         SenderAndTargetAddress sata;
         SystemAddress requestingAddress; // Which system originally sent the network message to start forwarding
         SystemAddress currentlyAttemptedServerAddress;
-        DataStructures::Queue<SystemAddress> remainingServersToTry;
+        std::deque<SystemAddress> remainingServersToTry;
         BitStream serverSelectionBitstream;
 
         DataStructures::List<ServerWithPing> sourceServerPings, targetServerPings;

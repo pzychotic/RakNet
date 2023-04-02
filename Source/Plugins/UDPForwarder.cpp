@@ -140,19 +140,19 @@ UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAd
     {
         std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
         std::lock_guard<std::mutex> guard( startForwardingOutputMutex );
-        for( unsigned int i = 0; i < startForwardingOutput.Size(); i++ )
+        for( auto it = startForwardingOutput.begin(); it != startForwardingOutput.end(); ++it )
         {
-            if( startForwardingOutput[i].inputId == inputId )
+            if( (*it).inputId == inputId )
             {
-                if( startForwardingOutput[i].result == UDPFORWARDER_SUCCESS )
+                if( (*it).result == UDPFORWARDER_SUCCESS )
                 {
                     if( forwardingPort )
-                        *forwardingPort = startForwardingOutput[i].forwardingPort;
+                        *forwardingPort = (*it).forwardingPort;
                     if( forwardingSocket )
-                        *forwardingSocket = startForwardingOutput[i].forwardingSocket;
+                        *forwardingSocket = (*it).forwardingSocket;
                 }
-                UDPForwarderResult res = startForwardingOutput[i].result;
-                startForwardingOutput.RemoveAtIndex( i );
+                UDPForwarderResult res = (*it).result;
+                startForwardingOutput.erase( it );
                 return res;
             }
         }
@@ -471,7 +471,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
         // Push result
         sfos.inputId = sfis->inputId;
         startForwardingOutputMutex.lock();
-        startForwardingOutput.Push( sfos, _FILE_AND_LINE_ );
+        startForwardingOutput.push_back( sfos );
         startForwardingOutputMutex.unlock();
 
         startForwardingInput.Deallocate( sfis, _FILE_AND_LINE_ );

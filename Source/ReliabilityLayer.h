@@ -19,7 +19,6 @@
 #include "DS_LinkedList.h"
 #include "DS_List.h"
 #include "PacketPriority.h"
-#include "DS_Queue.h"
 #include "BitStream.h"
 #include "InternalPacket.h"
 #include "RakNetStatistics.h"
@@ -41,6 +40,8 @@
 #include "CCRakNetSlidingWindow.h"
 #define INCLUDE_TIMESTAMP_WITH_DATAGRAMS 0
 #endif
+
+#include <deque>
 
 /// Number of ordered streams available. You can use up to 32 ordered streams
 #define NUMBER_OF_ORDERED_STREAMS 32 // 2^5
@@ -153,7 +154,7 @@ struct BPSTracker
     void Reset( const char* file, unsigned int line );
     inline void Push1( CCTimeType time, uint64_t value1 )
     {
-        dataQueue.Push( TimeAndValue2( time, value1 ), _FILE_AND_LINE_ );
+        dataQueue.push_back( TimeAndValue2( time, value1 ) );
         total1 += value1;
         lastSec1 += value1;
     }
@@ -179,7 +180,7 @@ struct BPSTracker
     };
 
     uint64_t total1, lastSec1;
-    DataStructures::Queue<TimeAndValue2> dataQueue;
+    std::deque<TimeAndValue2> dataQueue;
     void ClearExpired1( CCTimeType time );
 };
 
@@ -353,7 +354,7 @@ private:
     /// How many elements are waiting to be resent?
     unsigned int GetResendListDataSize( void ) const;
 
-    DataStructures::Queue<InternalPacket*> outputQueue;
+    std::deque<InternalPacket*> outputQueue;
     int splitMessageProgressInterval;
     CCTimeType unreliableTimeout;
 
@@ -376,7 +377,7 @@ private:
     // Queue length is programmatically restricted to DATAGRAM_MESSAGE_ID_ARRAY_LENGTH
     // This is essentially an O(1) lookup to get a DatagramHistoryNode given an index
     // datagramHistory holds a linked list of MessageNumberNode.
-    DataStructures::Queue<DatagramHistoryNode> datagramHistory;
+    std::deque<DatagramHistoryNode> datagramHistory;
     DataStructures::MemoryPool<MessageNumberNode> datagramHistoryMessagePool;
 
     struct UnreliableWithAckReceiptNode
@@ -461,7 +462,7 @@ private:
     /// If 0, we got got that packet.  Otherwise, the time to give up waiting for that packet.
     /// If we get a packet number where (receivedPacketsBaseIndex-packetNumber) is less than half the range of receivedPacketsBaseIndex then it is a duplicate
     /// Otherwise, it is a duplicate packet (and ignore it).
-    DataStructures::Queue<bool> hasReceivedPacketQueue;
+    std::deque<bool> hasReceivedPacketQueue;
     DatagramSequenceNumberType receivedPacketsBaseIndex;
     bool resetReceivedPackets;
 
@@ -493,7 +494,7 @@ private:
         RakNet::TimeMS sendTime;
         unsigned int extraSocketOptions;
     };
-    DataStructures::Queue<DataAndTime*> delayList;
+    std::deque<DataAndTime*> delayList;
 
     // Internet simulator
     double packetloss;
