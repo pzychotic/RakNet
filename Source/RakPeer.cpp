@@ -5028,11 +5028,10 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
             timeMS = ( RakNet::TimeMS )( timeNS / (RakNet::TimeUS)1000 );
         }
 
-        requestedConnectionQueueMutex.lock();
+        std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
         for( auto it = requestedConnectionQueue.begin(); it != requestedConnectionQueue.end(); )
         {
             RequestedConnectionStruct* rcs = *it;
-            requestedConnectionQueueMutex.unlock();
             if( rcs->nextRequestTime < timeMS )
             {
                 bool condition1 = rcs->requestsMade == rcs->sendConnectionAttemptCount + 1;
@@ -5062,9 +5061,7 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
 #endif
                     RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
 
-                    requestedConnectionQueueMutex.lock();
                     it = requestedConnectionQueue.erase( it );
-                    requestedConnectionQueueMutex.unlock();
                 }
                 else
                 {
@@ -5146,10 +5143,7 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
             {
                 ++it;
             }
-
-            requestedConnectionQueueMutex.lock();
         }
-        requestedConnectionQueueMutex.unlock();
     }
 
     // remoteSystemList in network thread
