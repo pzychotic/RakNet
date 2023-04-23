@@ -52,10 +52,9 @@ void TelnetTransport::Stop( void )
     if( tcpInterface == 0 )
         return;
     tcpInterface->Stop();
-    unsigned i;
-    for( i = 0; i < remoteClients.Size(); i++ )
-        RakNet::OP_DELETE( remoteClients[i], _FILE_AND_LINE_ );
-    remoteClients.Clear( false, _FILE_AND_LINE_ );
+    for( TelnetClient* pClient : remoteClients )
+        RakNet::OP_DELETE( pClient, _FILE_AND_LINE_ );
+    remoteClients.clear();
     RakNet::OP_DELETE( tcpInterface, _FILE_AND_LINE_ );
     tcpInterface = 0;
 }
@@ -121,12 +120,13 @@ Packet* TelnetTransport::Receive( void )
     */
 
     // Get this guy's cursor buffer.  This is real bullcrap that I have to do this.
-    unsigned i;
     TelnetClient* remoteClient = 0;
-    for( i = 0; i < remoteClients.Size(); i++ )
+    for( TelnetClient* pClient : remoteClients )
     {
-        if( remoteClients[i]->systemAddress == p->systemAddress )
-            remoteClient = remoteClients[i];
+        if( pClient->systemAddress == p->systemAddress )
+        {
+            remoteClient = pClient;
+        }
     }
     //RakAssert(remoteClient);
     if( remoteClient == 0 )
@@ -134,7 +134,6 @@ Packet* TelnetTransport::Receive( void )
         tcpInterface->DeallocatePacket( p );
         return 0;
     }
-
 
     if( p->length == 3 && p->data[0] == 27 && p->data[1] == 91 && p->data[2] == 65 )
     {
@@ -151,7 +150,6 @@ Packet* TelnetTransport::Receive( void )
 
         return 0;
     }
-
 
     // 127 is delete - ignore that
     // 9 is tab
@@ -173,15 +171,13 @@ Packet* TelnetTransport::Receive( void )
         return 0;
     }
 
-
     // Echo
 #ifdef ECHO_INPUT
     tcpInterface->Send( (const char*)p->data, p->length, p->systemAddress, false );
 #endif
 
-    bool gotLine;
     // Process each character in turn
-    for( i = 0; i < p->length; i++ )
+    for( unsigned int i = 0; i < p->length; i++ )
     {
 
 #ifdef ECHO_INPUT
@@ -194,7 +190,7 @@ Packet* TelnetTransport::Receive( void )
         }
 #endif
 
-        gotLine = ReassembleLine( remoteClient, p->data[i] );
+        bool gotLine = ReassembleLine( remoteClient, p->data[i] );
         if( gotLine && remoteClient->textInput[0] )
         {
 
@@ -226,9 +222,7 @@ void TelnetTransport::DeallocatePacket( Packet* packet )
 }
 SystemAddress TelnetTransport::HasNewIncomingConnection( void )
 {
-    unsigned i;
-    SystemAddress newConnection;
-    newConnection = tcpInterface->HasNewIncomingConnection();
+    SystemAddress newConnection = tcpInterface->HasNewIncomingConnection();
     // 03/16/06 Can't force the stupid windows telnet to use line mode or local echo so now I have to track all the remote players and their
     // input buffer
     if( newConnection != UNASSIGNED_SYSTEM_ADDRESS )
@@ -254,11 +248,11 @@ SystemAddress TelnetTransport::HasNewIncomingConnection( void )
     */
 
         TelnetClient* remoteClient = 0;
-        for( i = 0; i < remoteClients.Size(); i++ )
+        for( TelnetClient* pClient : remoteClients )
         {
-            if( remoteClients[i]->systemAddress == newConnection )
+            if( pClient->systemAddress == newConnection )
             {
-                remoteClient = remoteClients[i];
+                remoteClient = pClient;
                 remoteClient->cursorPosition = 0;
             }
         }
@@ -274,24 +268,26 @@ SystemAddress TelnetTransport::HasNewIncomingConnection( void )
 #endif
         }
 
-        remoteClients.Insert( remoteClient, _FILE_AND_LINE_ );
+        remoteClients.push_back( remoteClient );
     }
     return newConnection;
 }
 SystemAddress TelnetTransport::HasLostConnection( void )
 {
-    SystemAddress systemAddress;
-    unsigned i;
-    systemAddress = tcpInterface->HasLostConnection();
+    SystemAddress systemAddress = tcpInterface->HasLostConnection();
     if( systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        for( i = 0; i < remoteClients.Size(); i++ )
+        for( auto it = remoteClients.begin(); it != remoteClients.end(); /**/ )
         {
-            if( remoteClients[i]->systemAddress == systemAddress )
+            TelnetClient* pClient = *it;
+            if( pClient->systemAddress == systemAddress )
             {
-                RakNet::OP_DELETE( remoteClients[i], _FILE_AND_LINE_ );
-                remoteClients[i] = remoteClients[remoteClients.Size() - 1];
-                remoteClients.RemoveFromEnd();
+                RakNet::OP_DELETE( pClient, _FILE_AND_LINE_ );
+                it = remoteClients.erase( it );
+            }
+            else
+            {
+                ++it;
             }
         }
     }

@@ -34,11 +34,12 @@ int CrossConnectionConvertTest::RunTest( bool isVerbose, bool noPauses )
     RakPeerInterface *server, *client;
     unsigned short clientPort;
     bool gotNotification;
+
+    destroyList.clear();
     server = RakPeerInterface::GetInstance();
-    destroyList.Clear( false, _FILE_AND_LINE_ );
-    destroyList.Push( server, _FILE_AND_LINE_ );
+    destroyList.push_back( server );
     client = RakPeerInterface::GetInstance();
-    destroyList.Push( client, _FILE_AND_LINE_ );
+    destroyList.push_back( client );
 
 
     server->Startup( 1, &SocketDescriptor( SERVER_PORT, 0 ), 1 );
@@ -227,11 +228,10 @@ std::string CrossConnectionConvertTest::ErrorCodeToString( int errorCode ) const
 
 void CrossConnectionConvertTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }
 
 CrossConnectionConvertTest::CrossConnectionConvertTest( void )

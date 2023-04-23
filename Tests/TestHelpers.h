@@ -18,6 +18,8 @@
 #include "CommonFunctions.h"
 #include "RakTimer.h"
 
+#include <vector>
+
 using namespace RakNet;
 class TestHelpers
 {
@@ -27,8 +29,8 @@ public:
 
     static void StandardServerPrep( RakPeerInterface*& server );
     static void StandardClientPrep( RakPeerInterface*& client );
-    static void StandardServerPrep( RakPeerInterface*& server, DataStructures::List<RakPeerInterface*>& destroyList );
-    static void StandardClientPrep( RakPeerInterface*& client, DataStructures::List<RakPeerInterface*>& destroyList );
+    static void StandardServerPrep( RakPeerInterface*& server, std::vector<RakPeerInterface*>& destroyList );
+    static void StandardClientPrep( RakPeerInterface*& client, std::vector<RakPeerInterface*>& destroyList );
 
     static bool WaitAndConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee, int millisecondsToWait );
     static bool ConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee );

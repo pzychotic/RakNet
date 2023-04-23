@@ -19,7 +19,8 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "DS_List.h"
+
+#include <vector>
 
 /// \defgroup UDP_PROXY_GROUP UDPProxy
 /// \brief Forwards UDP datagrams from one system to another. Protocol independent
@@ -157,11 +158,11 @@ public:
         SenderAndTargetAddress sata;
         RakNet::TimeMS startPingTime;
         SystemAddress coordinatorAddressForPings;
-        DataStructures::List<ServerWithPing> serversToPing;
+        std::vector<ServerWithPing> serversToPing;
         bool AreAllServersPinged( void ) const;
         void SendPingedServersToCoordinator( RakPeerInterface* rakPeerInterface );
     };
-    DataStructures::List<PingServerGroup*> pingServerGroups;
+    std::vector<PingServerGroup*> pingServerGroups;
 
 protected:
     void OnPingServers( Packet* packet );

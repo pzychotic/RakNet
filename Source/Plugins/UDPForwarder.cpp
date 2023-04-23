@@ -90,12 +90,15 @@ void UDPForwarder::Shutdown( void )
     isRunning--;
 
     while( threadRunning > 0 )
+    {
         std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
+    }
 
-    unsigned int j;
-    for( j = 0; j < forwardListNotUpdated.Size(); j++ )
-        RakNet::OP_DELETE( forwardListNotUpdated[j], _FILE_AND_LINE_ );
-    forwardListNotUpdated.Clear( false, _FILE_AND_LINE_ );
+    for( ForwardEntry* pEntry : forwardListNotUpdated )
+    {
+        RakNet::OP_DELETE( pEntry, _FILE_AND_LINE_ );
+    }
+    forwardListNotUpdated.clear();
 }
 void UDPForwarder::SetMaxForwardEntries( unsigned short maxEntries )
 {
@@ -108,7 +111,7 @@ int UDPForwarder::GetMaxForwardEntries( void ) const
 }
 int UDPForwarder::GetUsedForwardEntries( void ) const
 {
-    return (int)forwardListNotUpdated.Size();
+    return (int)forwardListNotUpdated.size();
 }
 UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAddress destination, RakNet::TimeMS timeoutOnNoDataMS, const char* forceHostAddress, unsigned short socketFamily,
                                                   unsigned short* forwardingPort, __UDPSOCKET__* forwardingSocket )
@@ -356,17 +359,15 @@ void UDPForwarder::UpdateUDPForwarder( void )
         {
             sfos.result = UDPFORWARDER_RESULT_COUNT;
 
-            for( unsigned int i = 0; i < forwardListNotUpdated.Size(); i++ )
+            for( ForwardEntry* pEntry : forwardListNotUpdated )
             {
-                if(
-                    ( forwardListNotUpdated[i]->addr1Unconfirmed == sfis->source &&
-                      forwardListNotUpdated[i]->addr2Unconfirmed == sfis->destination ) ||
-                    ( forwardListNotUpdated[i]->addr1Unconfirmed == sfis->destination &&
-                      forwardListNotUpdated[i]->addr2Unconfirmed == sfis->source ) )
+                if( ( pEntry->addr1Unconfirmed == sfis->source &&
+                      pEntry->addr2Unconfirmed == sfis->destination ) ||
+                    ( pEntry->addr1Unconfirmed == sfis->destination &&
+                      pEntry->addr2Unconfirmed == sfis->source ) )
                 {
-                    ForwardEntry* fe = forwardListNotUpdated[i];
-                    sfos.forwardingPort = SocketLayer::GetLocalPort( fe->socket );
-                    sfos.forwardingSocket = fe->socket;
+                    sfos.forwardingPort = SocketLayer::GetLocalPort( pEntry->socket );
+                    sfos.forwardingSocket = pEntry->socket;
                     sfos.result = UDPFORWARDER_FORWARDING_ALREADY_EXISTS;
                     break;
                 }
@@ -463,7 +464,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
                     fcntl( fe->socket, F_SETFL, O_NONBLOCK );
 #endif
 
-                    forwardListNotUpdated.Insert( fe, _FILE_AND_LINE_ );
+                    forwardListNotUpdated.push_back( fe );
                 }
             }
         }
@@ -477,26 +478,22 @@ void UDPForwarder::UpdateUDPForwarder( void )
         startForwardingInput.Deallocate( sfis, _FILE_AND_LINE_ );
     }
 
-    StopForwardingStruct* sfs;
-
     while( 1 )
     {
-        sfs = stopForwardingCommands.Pop();
+        StopForwardingStruct* sfs = stopForwardingCommands.Pop();
         if( sfs == 0 )
             break;
 
-        ForwardEntry* fe;
-        for( unsigned int i = 0; i < forwardListNotUpdated.Size(); i++ )
+        for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); ++it )
         {
-            if(
-                ( forwardListNotUpdated[i]->addr1Unconfirmed == sfs->source &&
-                  forwardListNotUpdated[i]->addr2Unconfirmed == sfs->destination ) ||
-                ( forwardListNotUpdated[i]->addr1Unconfirmed == sfs->destination &&
-                  forwardListNotUpdated[i]->addr2Unconfirmed == sfs->source ) )
+            ForwardEntry* pEntry = *it;
+            if( ( pEntry->addr1Unconfirmed == sfs->source &&
+                  pEntry->addr2Unconfirmed == sfs->destination ) ||
+                ( pEntry->addr1Unconfirmed == sfs->destination &&
+                  pEntry->addr2Unconfirmed == sfs->source ) )
             {
-                fe = forwardListNotUpdated[i];
-                forwardListNotUpdated.RemoveAtIndexFast( i );
-                RakNet::OP_DELETE( fe, _FILE_AND_LINE_ );
+                forwardListNotUpdated.erase( it );
+                RakNet::OP_DELETE( pEntry, _FILE_AND_LINE_ );
                 break;
             }
         }
@@ -504,26 +501,24 @@ void UDPForwarder::UpdateUDPForwarder( void )
         stopForwardingCommands.Deallocate( sfs, _FILE_AND_LINE_ );
     }
 
-    unsigned int i;
-
-    i = 0;
-    while( i < forwardListNotUpdated.Size() )
+    for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); /**/ )
     {
-        if( curTime > forwardListNotUpdated[i]->timeLastDatagramForwarded && // Account for timestamp wrap
-            curTime > forwardListNotUpdated[i]->timeLastDatagramForwarded + forwardListNotUpdated[i]->timeoutOnNoDataMS )
+        ForwardEntry* pEntry = *it;
+        if( curTime > pEntry->timeLastDatagramForwarded && // Account for timestamp wrap
+            curTime > pEntry->timeLastDatagramForwarded + pEntry->timeoutOnNoDataMS )
         {
-            RakNet::OP_DELETE( forwardListNotUpdated[i], _FILE_AND_LINE_ );
-            forwardListNotUpdated.RemoveAtIndex( i );
+            RakNet::OP_DELETE( pEntry, _FILE_AND_LINE_ );
+            it = forwardListNotUpdated.erase( it );
         }
         else
-            i++;
+        {
+            ++it;
+        }
     }
 
-    ForwardEntry* forwardEntry;
-    for( i = 0; i < forwardListNotUpdated.Size(); i++ )
+    for( ForwardEntry* pEntry : forwardListNotUpdated )
     {
-        forwardEntry = forwardListNotUpdated[i];
-        RecvFrom( curTime, forwardEntry );
+        RecvFrom( curTime, pEntry );
     }
 }
 
@@ -539,14 +534,8 @@ void UpdateUDPForwarderGlobal( void* arg )
         // 12/1/2010 Do not change from 0
         // See http://www.jenkinssoftware.com/forum/index.php?topic=4033.0
         // Avoid 100% reported CPU usage
-        if( udpForwarder->forwardListNotUpdated.Size() == 0 )
-        {
-            std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
-        }
-        else
-        {
-            std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
-        }
+        const bool bListEmpty = udpForwarder->forwardListNotUpdated.empty();
+        std::this_thread::sleep_for( std::chrono::milliseconds( bListEmpty ? 30 : 0 ) );
     }
     udpForwarder->threadRunning--;
 }

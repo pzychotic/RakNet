@@ -18,6 +18,8 @@
 #include "GetTime.h"
 #include "BitStream.h"
 
+#include <algorithm>
+
 // #define NTDS_VERBOSE
 
 namespace RakNet {
@@ -28,16 +30,19 @@ NatTypeDetectionServer::NatTypeDetectionServer()
 {
     s1p2 = s2p3 = s3p4 = s4p5 = 0;
 }
+
 NatTypeDetectionServer::~NatTypeDetectionServer()
 {
     Shutdown();
 }
+
 void NatTypeDetectionServer::Startup( const char* nonRakNetIP2, const char* nonRakNetIP3, const char* nonRakNetIP4 )
 {
-    DataStructures::List<RakNetSocket2*> sockets;
+    std::vector<RakNetSocket2*> sockets;
     rakPeerInterface->GetSockets( sockets );
+    RakAssert( !sockets.empty() );
     char str[64];
-    sockets[0]->GetBoundAddress().ToString( false, str );
+    sockets.front()->GetBoundAddress().ToString( false, str );
     s1p2 = CreateNonblockingBoundSocket( str, this );
     s2p3 = CreateNonblockingBoundSocket( nonRakNetIP2, this );
     s3p4 = CreateNonblockingBoundSocket( nonRakNetIP3, this );
@@ -50,6 +55,7 @@ void NatTypeDetectionServer::Startup( const char* nonRakNetIP2, const char* nonR
         ( (RNS2_Berkley*)s3p4 )->CreateRecvPollingThread( 0 );
     }
 }
+
 void NatTypeDetectionServer::Shutdown()
 {
     if( s1p2 != 0 )
@@ -84,12 +90,11 @@ void NatTypeDetectionServer::Shutdown()
     }
     bufferedPackets.clear();
 }
+
 void NatTypeDetectionServer::Update( void )
 {
-    int i = 0;
     RakNet::TimeMS time = RakNet::GetTimeMS();
     BitStream bs;
-    SystemAddress boundAddress;
 
     bufferedPacketsMutex.lock();
     RNS2RecvStruct* recvStruct = nullptr;
@@ -112,13 +117,14 @@ void NatTypeDetectionServer::Update( void )
             RakAssert( readSuccess );
             if( readSuccess )
             {
-                unsigned int i = GetDetectionAttemptIndex( senderGuid );
-                if( i != (unsigned int)-1 )
+                auto it = std::find_if( natDetectionAttempts.begin(), natDetectionAttempts.end(),
+                                        [&senderGuid]( const NATDetectionAttempt& rAttempt ) { return rAttempt.guid == senderGuid; } );
+                if( it != natDetectionAttempts.end() )
                 {
                     bs.Reset();
                     bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_RESULT );
                     // If different, then symmetric
-                    if( senderAddr != natDetectionAttempts[i].systemAddress )
+                    if( senderAddr != it->systemAddress )
                     {
 
 #ifdef NTDS_VERBOSE
@@ -136,19 +142,19 @@ void NatTypeDetectionServer::Update( void )
                         bs.Write( (unsigned char)NAT_TYPE_PORT_RESTRICTED );
                     }
 
-                    rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
+                    rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, it->systemAddress, false );
 
                     // Done
-                    natDetectionAttempts.RemoveAtIndexFast( i );
+                    natDetectionAttempts.erase( it );
                 }
                 else
                 {
-                    //      RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
+                    //RakAssert("i==0 in Update when looking up GUID in NatTypeDetectionServer.cpp. Either a bug or a late resend" && 0);
                 }
             }
             else
             {
-                //  RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
+                //RakAssert("Didn't read GUID in Update in NatTypeDetectionServer.cpp. Message format error" && 0);
             }
         }
 
@@ -162,7 +168,8 @@ void NatTypeDetectionServer::Update( void )
         }
     }
 
-    while( i < (int)natDetectionAttempts.Size() )
+    int i = 0;
+    while( i < (int)natDetectionAttempts.size() )
     {
         if( time > natDetectionAttempts[i].nextStateTime )
         {
@@ -243,7 +250,7 @@ void NatTypeDetectionServer::Update( void )
                 bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_RESULT );
                 bs.Write( (unsigned char)NAT_TYPE_SYMMETRIC );
                 rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
-                natDetectionAttempts.RemoveAtIndexFast( i );
+                natDetectionAttempts.erase( natDetectionAttempts.begin() + i );
                 i--;
                 break;
             }
@@ -251,6 +258,7 @@ void NatTypeDetectionServer::Update( void )
         i++;
     }
 }
+
 PluginReceiveResult NatTypeDetectionServer::OnReceive( Packet* packet )
 {
     switch( packet->data[0] )
@@ -261,19 +269,23 @@ PluginReceiveResult NatTypeDetectionServer::OnReceive( Packet* packet )
     }
     return RR_CONTINUE_PROCESSING;
 }
+
 void NatTypeDetectionServer::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
 {
     (void)lostConnectionReason;
     (void)rakNetGUID;
 
-    unsigned int i = GetDetectionAttemptIndex( systemAddress );
-    if( i == (unsigned int)-1 )
+    auto it = std::find_if( natDetectionAttempts.begin(), natDetectionAttempts.end(),
+                            [&systemAddress]( const NATDetectionAttempt& rAttempt ) { return rAttempt.systemAddress == systemAddress; } );
+    if( it == natDetectionAttempts.end() )
         return;
-    natDetectionAttempts.RemoveAtIndexFast( i );
+    natDetectionAttempts.erase( it );
 }
+
 void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
 {
-    unsigned int i = GetDetectionAttemptIndex( packet->systemAddress );
+    auto it = std::find_if( natDetectionAttempts.begin(), natDetectionAttempts.end(),
+                            [packet]( const NATDetectionAttempt& rAttempt ) { return rAttempt.systemAddress == packet->systemAddress; } );
 
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( 1 );
@@ -281,7 +293,7 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
     bsIn.Read( isRequest );
     if( isRequest )
     {
-        if( i != (unsigned int)-1 )
+        if( it != natDetectionAttempts.end() )
             return; // Already in progress
 
         NATDetectionAttempt nda;
@@ -291,33 +303,15 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
         bsIn.Read( nda.c2Port );
         nda.nextStateTime = 0;
         nda.timeBetweenAttempts = rakPeerInterface->GetLastPing( nda.systemAddress ) * 3 + 50;
-        natDetectionAttempts.Push( nda, _FILE_AND_LINE_ );
+        natDetectionAttempts.emplace_back( nda );
     }
     else
     {
-        if( i == (unsigned int)-1 )
+        if( it == natDetectionAttempts.end() )
             return; // Unknown
         // They are done
-        natDetectionAttempts.RemoveAtIndexFast( i );
+        natDetectionAttempts.erase( it );
     }
-}
-unsigned int NatTypeDetectionServer::GetDetectionAttemptIndex( const SystemAddress& sa )
-{
-    for( unsigned int i = 0; i < natDetectionAttempts.Size(); i++ )
-    {
-        if( natDetectionAttempts[i].systemAddress == sa )
-            return i;
-    }
-    return (unsigned int)-1;
-}
-unsigned int NatTypeDetectionServer::GetDetectionAttemptIndex( RakNetGUID guid )
-{
-    for( unsigned int i = 0; i < natDetectionAttempts.Size(); i++ )
-    {
-        if( natDetectionAttempts[i].guid == guid )
-            return i;
-    }
-    return (unsigned int)-1;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

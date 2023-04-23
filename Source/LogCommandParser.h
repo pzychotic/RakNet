@@ -20,6 +20,8 @@
 #include "CommandParserInterface.h"
 #include "Export.h"
 
+#include <vector>
+
 namespace RakNet {
 
 /// \brief Adds the ability to send logging output to a remote console
@@ -108,7 +110,7 @@ protected:
     };
 
     /// The list of remote users.  Added to when users subscribe, removed when they disconnect or unsubscribe
-    DataStructures::List<SystemAddressAndChannel> remoteUsers;
+    std::vector<SystemAddressAndChannel> remoteUsers;
 
     /// Names of the channels at each bit, or 0 for an unused channel
     const char* channelNames[32];

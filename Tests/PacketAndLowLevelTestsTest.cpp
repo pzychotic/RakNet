@@ -47,7 +47,7 @@ DetachPlugin
 int PacketAndLowLevelTestsTest::RunTest( bool isVerbose, bool noPauses )
 {
     RakPeerInterface *server, *client;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     TestHelpers::StandardClientPrep( client, destroyList );
     TestHelpers::StandardServerPrep( server, destroyList );
@@ -291,7 +291,7 @@ std::string PacketAndLowLevelTestsTest::GetTestName() const
 
 std::string PacketAndLowLevelTestsTest::ErrorCodeToString( int errorCode ) const
 {
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
+    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
     {
         return errorList[errorCode - 1];
     }
@@ -303,30 +303,29 @@ std::string PacketAndLowLevelTestsTest::ErrorCodeToString( int errorCode ) const
 
 void PacketAndLowLevelTestsTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }
 
 PacketAndLowLevelTestsTest::PacketAndLowLevelTestsTest( void )
 {
 
-    errorList.Push( "Client failed to connect to server", _FILE_AND_LINE_ );
-    errorList.Push( "Attached plugin failed to modify packet", _FILE_AND_LINE_ );
-    errorList.Push( "Plugin is still modifying packets after detach", _FILE_AND_LINE_ );
-    errorList.Push( "GetSplitMessageProgressInterval returned wrong value", _FILE_AND_LINE_ );
-    errorList.Push( "Send to server failed", _FILE_AND_LINE_ );
-    errorList.Push( "Large packet did not split or did not properly get ID_DOWNLOAD_PROGRESS after SetSplitMessageProgressInterval is set to 1 millisecond", _FILE_AND_LINE_ );
-    errorList.Push( "Did not recieve and put on packet made with AllocatePacket and put on recieve stack with PushBackPacket", _FILE_AND_LINE_ );
-    errorList.Push( "Client failed to connect to server", _FILE_AND_LINE_ );
-    errorList.Push( "Did not recieve all packets from SendList", _FILE_AND_LINE_ );
-    errorList.Push( "Did not recieve and put on packet made with AllocatePacket and put on recieve stack with PushBackPacket", _FILE_AND_LINE_ );
-    errorList.Push( "Client failed to connect to server", _FILE_AND_LINE_ );
-    errorList.Push( "PushBackPacket messed up future communication", _FILE_AND_LINE_ );
-    errorList.Push( "Send/Recieve failed", _FILE_AND_LINE_ );
-    errorList.Push( "Recieved size incorrect", _FILE_AND_LINE_ );
+    errorList.emplace_back( "Client failed to connect to server" );
+    errorList.emplace_back( "Attached plugin failed to modify packet" );
+    errorList.emplace_back( "Plugin is still modifying packets after detach" );
+    errorList.emplace_back( "GetSplitMessageProgressInterval returned wrong value" );
+    errorList.emplace_back( "Send to server failed" );
+    errorList.emplace_back( "Large packet did not split or did not properly get ID_DOWNLOAD_PROGRESS after SetSplitMessageProgressInterval is set to 1 millisecond" );
+    errorList.emplace_back( "Did not recieve and put on packet made with AllocatePacket and put on recieve stack with PushBackPacket" );
+    errorList.emplace_back( "Client failed to connect to server" );
+    errorList.emplace_back( "Did not recieve all packets from SendList" );
+    errorList.emplace_back( "Did not recieve and put on packet made with AllocatePacket and put on recieve stack with PushBackPacket" );
+    errorList.emplace_back( "Client failed to connect to server" );
+    errorList.emplace_back( "PushBackPacket messed up future communication" );
+    errorList.emplace_back( "Send/Recieve failed" );
+    errorList.emplace_back( "Recieved size incorrect" );
 }
 
 PacketAndLowLevelTestsTest::~PacketAndLowLevelTestsTest( void )

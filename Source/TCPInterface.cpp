@@ -41,6 +41,7 @@ typedef int socklen_t;
 #include "WSAStartupSingleton.h"
 #endif
 
+#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <thread>
@@ -193,23 +194,25 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
         std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
     }
 
-    unsigned int i;
-    for( i = 0; i < messageHandlerList.Size(); i++ )
-        messageHandlerList[i]->OnRakPeerStartup();
+    for( PluginInterface2* pPlugin : messageHandlerList )
+    {
+        pPlugin->OnRakPeerStartup();
+    }
 
     return true;
 }
 void TCPInterface::Stop( void )
 {
-    unsigned int i;
-    for( i = 0; i < messageHandlerList.Size(); i++ )
-        messageHandlerList[i]->OnRakPeerShutdown();
+    for( PluginInterface2* pPlugin : messageHandlerList )
+    {
+        pPlugin->OnRakPeerShutdown();
+    }
 
     if( isStarted == 0 )
         return;
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
-    for( i = 0; i < remoteClientsLength; i++ )
+    for( unsigned int i = 0; i < remoteClientsLength; i++ )
         remoteClients[i].DisconnectSSL();
 #endif
 
@@ -228,9 +231,9 @@ void TCPInterface::Stop( void )
 
     // Abort waiting connect calls
     blockingSocketListMutex.lock();
-    for( i = 0; i < blockingSocketList.Size(); i++ )
+    for( __TCPSOCKET__ socket : blockingSocketList )
     {
-        closesocket__( blockingSocketList[i] );
+        closesocket__( socket );
     }
     blockingSocketListMutex.unlock();
 
@@ -245,7 +248,7 @@ void TCPInterface::Stop( void )
     listenSocket = 0;
 
     // Stuff from here on to the end of the function is not threadsafe
-    for( i = 0; i < (unsigned int)remoteClientsLength; i++ )
+    for( int i = 0; i < remoteClientsLength; i++ )
     {
         closesocket__( remoteClients[i].socket );
 #if OPEN_SSL_CLIENT_SUPPORT == 1
@@ -274,7 +277,7 @@ void TCPInterface::Stop( void )
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     SSL_CTX_free( ctx );
     startSSL.Clear( _FILE_AND_LINE_ );
-    activeSSLConnections.Clear( false, _FILE_AND_LINE_ );
+    activeSSLConnections.clear();
 #endif
 }
 SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort, bool block, unsigned short socketFamily, const char* bindAddress )
@@ -369,13 +372,16 @@ void TCPInterface::StartSSLClient( SystemAddress systemAddress )
     SystemAddress* id = startSSL.Allocate( _FILE_AND_LINE_ );
     *id = systemAddress;
     startSSL.Push( id );
-    unsigned index = activeSSLConnections.GetIndexOf( systemAddress );
-    if( index == (unsigned)-1 )
-        activeSSLConnections.Insert( systemAddress, _FILE_AND_LINE_ );
+
+    auto it = std::find( activeSSLConnections.begin(), activeSSLConnections.end(), systemAddress );
+    if( it == activeSSLConnections.end() )
+    {
+        activeSSLConnections.emplace_back( systemAddress );
+    }
 }
 bool TCPInterface::IsSSLActive( SystemAddress systemAddress )
 {
-    return activeSSLConnections.GetIndexOf( systemAddress ) != -1;
+    return std::find( activeSSLConnections.begin(), activeSSLConnections.end(), systemAddress ) != activeSSLConnections.end();
 }
 #endif
 void TCPInterface::Send( const char* data, unsigned int length, const SystemAddress& systemAddress, bool broadcast )
@@ -440,18 +446,18 @@ bool TCPInterface::ReceiveHasPackets( void )
 }
 Packet* TCPInterface::Receive( void )
 {
-    unsigned int i;
-    for( i = 0; i < messageHandlerList.Size(); i++ )
-        messageHandlerList[i]->Update();
+    for( PluginInterface2* pPlugin : messageHandlerList )
+    {
+        pPlugin->Update();
+    }
 
     Packet* outgoingPacket = ReceiveInt();
 
     if( outgoingPacket )
     {
-        PluginReceiveResult pluginResult;
-        for( i = 0; i < messageHandlerList.Size(); i++ )
+        for( PluginInterface2* pPlugin : messageHandlerList )
         {
-            pluginResult = messageHandlerList[i]->OnReceive( outgoingPacket );
+            PluginReceiveResult pluginResult = pPlugin->OnReceive( outgoingPacket );
             if( pluginResult == RR_STOP_PROCESSING_AND_DEALLOCATE )
             {
                 DeallocatePacket( outgoingPacket );
@@ -465,7 +471,6 @@ Packet* TCPInterface::Receive( void )
             }
         }
     }
-
 
     return outgoingPacket;
 }
@@ -494,9 +499,9 @@ Packet* TCPInterface::ReceiveInt( void )
 
 void TCPInterface::AttachPlugin( PluginInterface2* plugin )
 {
-    if( messageHandlerList.GetIndexOf( plugin ) == MAX_UNSIGNED_LONG )
+    if( std::find( messageHandlerList.begin(), messageHandlerList.end(), plugin ) == messageHandlerList.end() )
     {
-        messageHandlerList.Insert( plugin, _FILE_AND_LINE_ );
+        messageHandlerList.push_back( plugin );
         plugin->SetTCPInterface( this );
         plugin->OnAttach();
     }
@@ -506,14 +511,12 @@ void TCPInterface::DetachPlugin( PluginInterface2* plugin )
     if( plugin == 0 )
         return;
 
-    unsigned int index;
-    index = messageHandlerList.GetIndexOf( plugin );
-    if( index != MAX_UNSIGNED_LONG )
+    auto it = std::find( messageHandlerList.begin(), messageHandlerList.end(), plugin );
+    if( it != messageHandlerList.end() )
     {
-        messageHandlerList[index]->OnDetach();
+        (*it)->OnDetach();
         // Unordered list so delete from end for speed
-        messageHandlerList[index] = messageHandlerList[messageHandlerList.Size() - 1];
-        messageHandlerList.RemoveFromEnd();
+        messageHandlerList.erase( it );
         plugin->SetTCPInterface( 0 );
     }
 }
@@ -524,9 +527,10 @@ void TCPInterface::CloseConnection( SystemAddress systemAddress )
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         return;
 
-    unsigned int i;
-    for( i = 0; i < messageHandlerList.Size(); i++ )
-        messageHandlerList[i]->OnClosedConnection( systemAddress, UNASSIGNED_RAKNET_GUID, LCR_CLOSED_BY_USER );
+    for( PluginInterface2* pPlugin : messageHandlerList )
+    {
+        pPlugin->OnClosedConnection( systemAddress, UNASSIGNED_RAKNET_GUID, LCR_CLOSED_BY_USER );
+    }
 
     if( systemAddress.systemIndex < remoteClientsLength && remoteClients[systemAddress.systemIndex].systemAddress == systemAddress )
     {
@@ -548,9 +552,11 @@ void TCPInterface::CloseConnection( SystemAddress systemAddress )
 
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
-    unsigned index = activeSSLConnections.GetIndexOf( systemAddress );
-    if( index != (unsigned)-1 )
-        activeSSLConnections.RemoveAtIndex( index );
+    auto it = std::find( activeSSLConnections.begin(), activeSSLConnections.end(), systemAddress );
+    if( it != activeSSLConnections.end() )
+    {
+        activeSSLConnections.erase( it );
+    }
 #endif
 }
 void TCPInterface::DeallocatePacket( Packet* packet )
@@ -605,9 +611,10 @@ SystemAddress TCPInterface::HasCompletedConnectionAttempt( void )
 
     if( sysAddr != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        unsigned int i;
-        for( i = 0; i < messageHandlerList.Size(); i++ )
-            messageHandlerList[i]->OnNewConnection( sysAddr, UNASSIGNED_RAKNET_GUID, true );
+        for( PluginInterface2* pPlugin : messageHandlerList )
+        {
+            pPlugin->OnNewConnection( sysAddr, UNASSIGNED_RAKNET_GUID, true );
+        }
     }
 
     return sysAddr;
@@ -625,15 +632,14 @@ SystemAddress TCPInterface::HasFailedConnectionAttempt( void )
 
     if( sysAddr != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        unsigned int i;
-        for( i = 0; i < messageHandlerList.Size(); i++ )
+        for( PluginInterface2* pPlugin : messageHandlerList )
         {
             Packet p;
             p.systemAddress = sysAddr;
             p.data = 0;
             p.length = 0;
             p.bitSize = 0;
-            messageHandlerList[i]->OnFailedConnectionAttempt( &p, FCAR_CONNECTION_ATTEMPT_FAILED );
+            pPlugin->OnFailedConnectionAttempt( &p, FCAR_CONNECTION_ATTEMPT_FAILED );
         }
     }
 
@@ -641,16 +647,16 @@ SystemAddress TCPInterface::HasFailedConnectionAttempt( void )
 }
 SystemAddress TCPInterface::HasNewIncomingConnection( void )
 {
-    SystemAddress *out, out2;
-    out = newIncomingConnections.PopInaccurate();
+    SystemAddress* out = newIncomingConnections.PopInaccurate();
     if( out )
     {
-        out2 = *out;
+        SystemAddress out2 = *out;
         newIncomingConnections.Deallocate( out, _FILE_AND_LINE_ );
 
-        unsigned int i;
-        for( i = 0; i < messageHandlerList.Size(); i++ )
-            messageHandlerList[i]->OnNewConnection( out2, UNASSIGNED_RAKNET_GUID, true );
+        for( PluginInterface2* pPlugin : messageHandlerList )
+        {
+            pPlugin->OnNewConnection( out2, UNASSIGNED_RAKNET_GUID, true );
+        }
 
         return *out;
     }
@@ -661,16 +667,16 @@ SystemAddress TCPInterface::HasNewIncomingConnection( void )
 }
 SystemAddress TCPInterface::HasLostConnection( void )
 {
-    SystemAddress *out, out2;
-    out = lostConnections.PopInaccurate();
+    SystemAddress* out = lostConnections.PopInaccurate();
     if( out )
     {
-        out2 = *out;
+        SystemAddress out2 = *out;
         lostConnections.Deallocate( out, _FILE_AND_LINE_ );
 
-        unsigned int i;
-        for( i = 0; i < messageHandlerList.Size(); i++ )
-            messageHandlerList[i]->OnClosedConnection( out2, UNASSIGNED_RAKNET_GUID, LCR_DISCONNECTION_NOTIFICATION );
+        for( PluginInterface2* pPlugin : messageHandlerList )
+        {
+            pPlugin->OnClosedConnection( out2, UNASSIGNED_RAKNET_GUID, LCR_DISCONNECTION_NOTIFICATION );
+        }
 
         return *out;
     }
@@ -762,7 +768,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     memcpy( (char*)&serverAddress.sin_addr.s_addr, (char*)server->h_addr, server->h_length );
 
     blockingSocketListMutex.lock();
-    blockingSocketList.Insert( sockfd, _FILE_AND_LINE_ );
+    blockingSocketList.push_back( sockfd );
     blockingSocketListMutex.unlock();
 
     // This is blocking
@@ -792,11 +798,12 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
     if( connectResult == -1 )
     {
-        unsigned sockfdIndex;
         blockingSocketListMutex.lock();
-        sockfdIndex = blockingSocketList.GetIndexOf( sockfd );
-        if( sockfdIndex != (unsigned)-1 )
-            blockingSocketList.RemoveAtIndexFast( sockfdIndex );
+        auto it = std::find( blockingSocketList.begin(), blockingSocketList.end(), sockfd );
+        if( it != blockingSocketList.end() )
+        {
+            blockingSocketList.erase( it );
+        }
         blockingSocketListMutex.unlock();
 
         closesocket__( sockfd );

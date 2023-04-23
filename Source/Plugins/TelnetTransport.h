@@ -18,8 +18,9 @@
 #if _RAKNET_SUPPORT_TelnetTransport == 1 && _RAKNET_SUPPORT_TCPInterface == 1
 
 #include "TransportInterface.h"
-#include "DS_List.h"
 #include "Export.h"
+
+#include <vector>
 
 namespace RakNet {
 
@@ -65,7 +66,7 @@ protected:
     bool ReassembleLine( TelnetTransport::TelnetClient* telnetClient, unsigned char c );
 
     // Crap this sucks but because windows telnet won't send line at a time, I have to reconstruct the lines at the server per player
-    DataStructures::List<TelnetClient*> remoteClients;
+    std::vector<TelnetClient*> remoteClients;
 
     char *sendSuffix, *sendPrefix;
 };

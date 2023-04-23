@@ -22,11 +22,11 @@
 #include "Export.h"
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
-#include "DS_List.h"
 
 #include <deque>
 #include <mutex>
 #include <string>
+#include <vector>
 
 namespace RakNet {
 
@@ -112,9 +112,7 @@ protected:
     std::mutex bufferedPacketsMutex;
 
     void OnDetectionRequest( Packet* packet );
-    DataStructures::List<NATDetectionAttempt> natDetectionAttempts;
-    unsigned int GetDetectionAttemptIndex( const SystemAddress& sa );
-    unsigned int GetDetectionAttemptIndex( RakNetGUID guid );
+    std::vector<NATDetectionAttempt> natDetectionAttempts;
 
     // s1p1 is rakpeer itself
     RakNetSocket2 *s1p2, *s2p3, *s3p4, *s4p5;

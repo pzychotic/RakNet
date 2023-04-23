@@ -43,12 +43,12 @@ int OfflineMessagesConvertTest::RunTest( bool isVerbose, bool noPauses )
     bool recievedProperPingData = false;
 
     int nextTest;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     RakPeerInterface* peer1 = RakPeerInterface::GetInstance();
-    destroyList.Push( peer1, _FILE_AND_LINE_ );
+    destroyList.push_back( peer1 );
     RakPeerInterface* peer2 = RakPeerInterface::GetInstance();
-    destroyList.Push( peer2, _FILE_AND_LINE_ );
+    destroyList.push_back( peer2 );
 
     bool sentPacket = false;
     nextTest = 0;
@@ -224,9 +224,8 @@ OfflineMessagesConvertTest::~OfflineMessagesConvertTest( void )
 
 void OfflineMessagesConvertTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

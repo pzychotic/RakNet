@@ -179,7 +179,7 @@ StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t obj
     return SH_OK;
 }
 
-bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sortType, DataStructures::List<StatisticsHistory::TimeAndValueQueue*>& values ) const
+bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sortType, std::vector<StatisticsHistory::TimeAndValueQueue*>& values ) const
 {
     unsigned int idx = GetObjectIndex( objectId );
     if( idx == (unsigned int)-1 )
@@ -228,8 +228,12 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
             sortedQueues.Insert( tavq, tavq, false, _FILE_AND_LINE_, TimeAndValueQueueCompDesc );
     }
 
+    values.reserve( values.size() + sortedQueues.Size() );
     for( unsigned int i = 0; i < sortedQueues.Size(); i++ )
-        values.Push( sortedQueues[i], _FILE_AND_LINE_ );
+    {
+        values.emplace_back( sortedQueues[i] );
+    }
+
     return true;
 }
 
@@ -252,42 +256,17 @@ void StatisticsHistory::MergeAllObjectsOnKey( const std::string& key, TimeAndVal
     }
 }
 
-void StatisticsHistory::GetUniqueKeyList( DataStructures::List<std::string>& keys )
-{
-    keys.Clear( true, _FILE_AND_LINE_ );
-
-    for( unsigned int idx = 0; idx < objects.Size(); idx++ )
-    {
-        TrackedObject* to = objects[idx];
-        for( auto&& [key, value] : to->dataQueues )
-        {
-            bool hasKey = false;
-            for( unsigned int j = 0; j < keys.Size(); j++ )
-            {
-                if( keys[j] == key )
-                {
-                    hasKey = true;
-                    break;
-                }
-            }
-
-            if( hasKey == false )
-            {
-                keys.Push( key, _FILE_AND_LINE_ );
-            }
-        }
-    }
-}
-
 StatisticsHistory::TimeAndValueQueue::TimeAndValueQueue()
 {
     Clear();
 }
+
 StatisticsHistory::TimeAndValueQueue::~TimeAndValueQueue() {}
 void StatisticsHistory::TimeAndValueQueue::SetTimeToTrackValues( Time t )
 {
     timeToTrackValues = t;
 }
+
 Time StatisticsHistory::TimeAndValueQueue::GetTimeToTrackValues( void ) const { return timeToTrackValues; }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentSum( void ) const { return recentSum; }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetRecentSumOfSquares( void ) const { return recentSumOfSquares; }
@@ -347,7 +326,7 @@ Time StatisticsHistory::TimeAndValueQueue::GetTimeRange( void ) const
 SHValueType StatisticsHistory::TimeAndValueQueue::GetSumSinceTime( Time t ) const
 {
     SHValueType sum = 0;
-    for( int i = values.size(); i > 0; --i )
+    for( int i = (int)values.size(); i > 0; --i )
     {
         if( values[i - 1].time >= t )
             sum += values[i - 1].val;
@@ -700,10 +679,12 @@ StatisticsHistory::TimeAndValueQueue& StatisticsHistory::TimeAndValueQueue::oper
 StatisticsHistory::TrackedObject::TrackedObject() {}
 StatisticsHistory::TrackedObject::~TrackedObject()
 {
-    DataStructures::List<StatisticsHistory::TimeAndValueQueue*> itemList;
-    for( unsigned int idx = 0; idx < itemList.Size(); idx++ )
-        RakNet::OP_DELETE( itemList[idx], _FILE_AND_LINE_ );
+    // ??? WTF
+    //std::vector<StatisticsHistory::TimeAndValueQueue*> itemList;
+    //for( unsigned int idx = 0; idx < itemList.size(); idx++ )
+    //    RakNet::OP_DELETE( itemList[idx], _FILE_AND_LINE_ );
 }
+
 unsigned int StatisticsHistory::GetObjectIndex( uint64_t objectId ) const
 {
     bool objectExists;
@@ -727,15 +708,16 @@ void StatisticsHistoryPlugin::SetTrackConnections( bool _addNewConnections, int 
     removeLostConnections = _removeLostConnections;
     newConnectionsObjectType = _newConnectionsObjectType;
 }
+
 void StatisticsHistoryPlugin::Update( void )
 {
-    DataStructures::List<SystemAddress> addresses;
-    DataStructures::List<RakNetGUID> guids;
-    DataStructures::List<RakNetStatistics> stats;
+    std::vector<SystemAddress> addresses;
+    std::vector<RakNetGUID> guids;
+    std::vector<RakNetStatistics> stats;
     rakPeerInterface->GetStatisticsList( addresses, guids, stats );
 
     Time curTime = GetTime();
-    for( unsigned int idx = 0; idx < guids.Size(); idx++ )
+    for( unsigned int idx = 0; idx < guids.size(); idx++ )
     {
         unsigned int objectIndex = statistics.GetObjectIndex( guids[idx].g );
         if( objectIndex != (unsigned int)-1 )
@@ -784,16 +766,15 @@ void StatisticsHistoryPlugin::Update( void )
 
     /*
     RakNetStatistics rns;
-    DataStructures::List<SystemAddress> addresses;
-    DataStructures::List<RakNetGUID> guids;
+    std::vector<SystemAddress> addresses;
+    std::vector<RakNetGUID> guids;
     rakPeerInterface->GetSystemList(addresses, guids);
-    for (unsigned int idx = 0; idx < guids.Size(); idx++)
+    for (unsigned int idx = 0; idx < guids.size(); idx++)
     {
-        rakPeerInterface->GetStatistics(remoteSystems[idx], &rns);
+        rakPeerInterface->GetStatistics(guids[idx], &rns);
         statistics.AddValue();
 
         bool AddValue(uint64_t objectId, const std::string& key, SHValueType val, Time curTime);
-
     }
     */
 }
@@ -808,6 +789,7 @@ void StatisticsHistoryPlugin::OnClosedConnection( const SystemAddress& systemAdd
         statistics.RemoveObject( rakNetGUID.g, 0 );
     }
 }
+
 void StatisticsHistoryPlugin::OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming )
 {
     (void)systemAddress;

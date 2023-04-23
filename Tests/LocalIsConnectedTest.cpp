@@ -46,12 +46,12 @@ GetInternalID
 int LocalIsConnectedTest::RunTest( bool isVerbose, bool noPauses )
 {
     RakPeerInterface *server, *client;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     server = RakPeerInterface::GetInstance();
-    destroyList.Push( server, _FILE_AND_LINE_ );
+    destroyList.push_back( server );
     client = RakPeerInterface::GetInstance();
-    destroyList.Push( client, _FILE_AND_LINE_ );
+    destroyList.push_back( client );
 
     client->Startup( 1, &SocketDescriptor(), 1 );
     server->Startup( 1, &SocketDescriptor( 60000, 0 ), 1 );
@@ -238,9 +238,8 @@ LocalIsConnectedTest::~LocalIsConnectedTest( void )
 
 void LocalIsConnectedTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

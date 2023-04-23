@@ -294,52 +294,64 @@ bool MemoryPool<MemoryBlockType>::InitPage( Page* page, Page* prev, const char* 
 
 /*
 #include "DS_MemoryPool.h"
-#include "DS_List.h"
+
+#include <vector>
 
 struct TestMemoryPool
 {
     int allocationId;
 };
 
-int main(void)
+int main( void )
 {
     DataStructures::MemoryPool<TestMemoryPool> memoryPool;
-    DataStructures::List<TestMemoryPool*> returnList;
+    std::vector<TestMemoryPool*> returnList;
+    returnList.reserve( 100000 );
 
-    for (int i=0; i < 100000; i++)
-        returnList.Push(memoryPool.Allocate(_FILE_AND_LINE_), _FILE_AND_LINE_);
-    for (int i=0; i < returnList.Size(); i+=2)
+    for( int i = 0; i < 100000; i++ )
     {
-        memoryPool.Release(returnList[i], _FILE_AND_LINE_);
-        returnList.RemoveAtIndexFast(i);
+        returnList.push_back( memoryPool.Allocate( _FILE_AND_LINE_ ) );
     }
-    for (int i=0; i < 100000; i++)
-        returnList.Push(memoryPool.Allocate(_FILE_AND_LINE_), _FILE_AND_LINE_);
-    while (returnList.Size())
+    for( int i = 0; i < returnList.size(); i += 2 )
     {
-        memoryPool.Release(returnList[returnList.Size()-1], _FILE_AND_LINE_);
-        returnList.RemoveAtIndex(returnList.Size()-1);
+        memoryPool.Release( returnList[i], _FILE_AND_LINE_ );
+        returnList.erase( returnList.begin() + i );
     }
-    for (int i=0; i < 100000; i++)
-        returnList.Push(memoryPool.Allocate(_FILE_AND_LINE_), _FILE_AND_LINE_);
-    while (returnList.Size())
+    for( int i = 0; i < 100000; i++ )
     {
-        memoryPool.Release(returnList[returnList.Size()-1], _FILE_AND_LINE_);
-        returnList.RemoveAtIndex(returnList.Size()-1);
+        returnList.push_back( memoryPool.Allocate( _FILE_AND_LINE_ ) );
     }
-    for (int i=0; i < 100000; i++)
-        returnList.Push(memoryPool.Allocate(_FILE_AND_LINE_), _FILE_AND_LINE_);
-    for (int i=100000-1; i <= 0; i-=2)
+    while( returnList.size() )
     {
-        memoryPool.Release(returnList[i], _FILE_AND_LINE_);
-        returnList.RemoveAtIndexFast(i);
+        memoryPool.Release( returnList.back(), _FILE_AND_LINE_ );
+        returnList.pop_back();
     }
-    for (int i=0; i < 100000; i++)
-        returnList.Push(memoryPool.Allocate(_FILE_AND_LINE_), _FILE_AND_LINE_);
-    while (returnList.Size())
+    for( int i = 0; i < 100000; i++ )
     {
-        memoryPool.Release(returnList[returnList.Size()-1], _FILE_AND_LINE_);
-        returnList.RemoveAtIndex(returnList.Size()-1);
+        returnList.push_back( memoryPool.Allocate( _FILE_AND_LINE_ ) );
+    }
+    while( returnList.size() )
+    {
+        memoryPool.Release( returnList.back(), _FILE_AND_LINE_ );
+        returnList.pop_back();
+    }
+    for( int i = 0; i < 100000; i++ )
+    {
+        returnList.push_back( memoryPool.Allocate( _FILE_AND_LINE_ ) );
+    }
+    for( int i = 100000 - 1; i <= 0; i -= 2 )
+    {
+        memoryPool.Release( returnList[i], _FILE_AND_LINE_ );
+        returnList.erase( returnList.begin() + i );
+    }
+    for( int i = 0; i < 100000; i++ )
+    {
+        returnList.push_back( memoryPool.Allocate( _FILE_AND_LINE_ ) );
+    }
+    while( returnList.size() )
+    {
+        memoryPool.Release( returnList.back(), _FILE_AND_LINE_ );
+        returnList.pop_back();
     }
 
     return 0;

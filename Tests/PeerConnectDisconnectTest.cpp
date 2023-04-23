@@ -142,13 +142,13 @@ int PeerConnectDisconnectTest::RunTest( bool isVerbose, bool noPauses )
     const int maxConnections = peerNum * 3; //Max allowed connections for test set to times 3 to eliminate problem variables
     RakPeerInterface* peerList[peerNum];    //A list of 8 peers
 
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     //Initializations of the arrays
     for( int i = 0; i < peerNum; i++ )
     {
         peerList[i] = RakPeerInterface::GetInstance();
-        destroyList.Push( peerList[i], _FILE_AND_LINE_ );
+        destroyList.push_back( peerList[i] );
 
         peerList[i]->Startup( maxConnections, &SocketDescriptor( 60000 + i, 0 ), 1 );
         peerList[i]->SetMaximumIncomingConnections( maxConnections );
@@ -175,25 +175,21 @@ int PeerConnectDisconnectTest::RunTest( bool isVerbose, bool noPauses )
 
     TimeMS entryTime = GetTimeMS(); //Loop entry time
 
-    DataStructures::List<SystemAddress> systemList;
-    DataStructures::List<RakNetGUID> guidList;
+    std::vector<SystemAddress> systemList;
+    std::vector<RakNetGUID> guidList;
 
     printf( "Entering disconnect loop \n" );
 
     while( GetTimeMS() - entryTime < 10000 ) //Run for 10 Secoonds
     {
-
         //Disconnect all peers IF connected to any
         for( int i = 0; i < peerNum; i++ )
         {
-
             peerList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-            int len = systemList.Size();
 
-            for( int j = 0; j < len; j++ ) //Disconnect them all
+            for( const SystemAddress& rSystem : systemList ) //Disconnect them all
             {
-
-                peerList[i]->CloseConnection( systemList[j], true, 0, LOW_PRIORITY );
+                peerList[i]->CloseConnection( rSystem, true, 0, LOW_PRIORITY );
             }
         }
 
@@ -246,7 +242,6 @@ int PeerConnectDisconnectTest::RunTest( bool isVerbose, bool noPauses )
                 if( peerList[i]->Connect( "127.0.0.1", 60000 + j, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
                 {
                     peerList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-                    int len = systemList.Size();
 
                     if( isVerbose )
                         DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
@@ -270,12 +265,10 @@ int PeerConnectDisconnectTest::RunTest( bool isVerbose, bool noPauses )
 
     for( int i = 0; i < peerNum; i++ )
     {
-
         peerList[i]->GetSystemList( systemList, guidList );
-        int connNum = guidList.Size(); //Get the number of connections for the current peer
+        int connNum = static_cast<int>( guidList.size() ); //Get the number of connections for the current peer
         if( connNum != peerNum - 1 )   //Did we connect to all?
         {
-
             if( isVerbose )
             {
                 printf( "Not all peers reconnected normally.\nFailed on peer number %i with %i peers\n", i, connNum );
@@ -320,9 +313,8 @@ PeerConnectDisconnectTest::~PeerConnectDisconnectTest( void )
 }
 void PeerConnectDisconnectTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

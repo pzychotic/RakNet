@@ -39,12 +39,12 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "DS_List.h"
 
 #include <stdint.h>
 #include <deque>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace RakNet {
 
@@ -122,7 +122,7 @@ public:
         void ClearByAddress( AddressOrGUID remoteSystem );
         void Update( RakNet::Time curTime );
 
-        DataStructures::List<TwoWayAuthentication::NonceAndRemoteSystemRequest*> generatedNonces;
+        std::vector<TwoWayAuthentication::NonceAndRemoteSystemRequest*> generatedNonces;
         unsigned short nextRequestId;
     };
 

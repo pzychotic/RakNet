@@ -14,6 +14,8 @@
 #include "ConsoleServer.h"
 #include "TransportInterface.h"
 #include "CommandParserInterface.h"
+#include "RakAssert.h"
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -50,9 +52,10 @@ void ConsoleServer::SetTransportProvider( TransportInterface* transportInterface
         transport = transportInterface;
         transport->Start( port, true );
 
-        unsigned i;
-        for( i = 0; i < commandParserList.Size(); i++ )
-            commandParserList[i]->OnTransportChange( transport );
+        for( CommandParserInterface* pCommandParser : commandParserList )
+        {
+            pCommandParser->OnTransportChange( transport );
+        }
 
         //  The transport itself might have a command parser - for example password for the RakNet transport
         AddCommandParser( transport->GetCommandParser() );
@@ -64,13 +67,12 @@ void ConsoleServer::AddCommandParser( CommandParserInterface* commandParserInter
         return;
 
     // Non-duplicate insertion
-    unsigned i;
-    for( i = 0; i < commandParserList.Size(); i++ )
+    for( CommandParserInterface* pCommandParser : commandParserList )
     {
-        if( commandParserList[i] == commandParserInterface )
+        if( pCommandParser == commandParserInterface )
             return;
 
-        if( _stricmp( commandParserList[i]->GetName(), commandParserInterface->GetName() ) == 0 )
+        if( _stricmp( pCommandParser->GetName(), commandParserInterface->GetName() ) == 0 )
         {
             // Naming conflict between two command parsers
             RakAssert( 0 );
@@ -78,9 +80,12 @@ void ConsoleServer::AddCommandParser( CommandParserInterface* commandParserInter
         }
     }
 
-    commandParserList.Insert( commandParserInterface, _FILE_AND_LINE_ );
+    commandParserList.push_back( commandParserInterface );
+
     if( transport )
+    {
         commandParserInterface->OnTransportChange( transport );
+    }
 }
 void ConsoleServer::RemoveCommandParser( CommandParserInterface* commandParserInterface )
 {
@@ -88,34 +93,30 @@ void ConsoleServer::RemoveCommandParser( CommandParserInterface* commandParserIn
         return;
 
     // Overwrite the element we are removing from the back of the list and delete the back of the list
-    unsigned i;
-    for( i = 0; i < commandParserList.Size(); i++ )
+    for( size_t i = 0; i < commandParserList.size(); ++i )
     {
         if( commandParserList[i] == commandParserInterface )
         {
-            commandParserList[i] = commandParserList[commandParserList.Size() - 1];
-            commandParserList.RemoveFromEnd();
+            commandParserList[i] = commandParserList.back();
+            commandParserList.pop_back();
             return;
         }
     }
 }
 void ConsoleServer::Update( void )
 {
-    unsigned i;
     char* parameterList[20]; // Up to 20 parameters
     unsigned numParameters;
-    SystemAddress newOrLostConnectionId;
-    Packet* p;
     RegisteredCommand rc;
 
-    p = transport->Receive();
-    newOrLostConnectionId = transport->HasNewIncomingConnection();
+    Packet* p = transport->Receive();
+    SystemAddress newOrLostConnectionId = transport->HasNewIncomingConnection();
 
     if( newOrLostConnectionId != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        for( i = 0; i < commandParserList.Size(); i++ )
+        for( CommandParserInterface* pCommandParser : commandParserList )
         {
-            commandParserList[i]->OnNewIncomingConnection( newOrLostConnectionId, transport );
+            pCommandParser->OnNewIncomingConnection( newOrLostConnectionId, transport );
         }
 
         transport->Send( newOrLostConnectionId, "Connected to remote command console.\r\nType 'help' for help.\r\n" );
@@ -126,8 +127,10 @@ void ConsoleServer::Update( void )
     newOrLostConnectionId = transport->HasLostConnection();
     if( newOrLostConnectionId != UNASSIGNED_SYSTEM_ADDRESS )
     {
-        for( i = 0; i < commandParserList.Size(); i++ )
-            commandParserList[i]->OnConnectionLost( newOrLostConnectionId, transport );
+        for( CommandParserInterface* pCommandParser : commandParserList )
+        {
+            pCommandParser->OnConnectionLost( newOrLostConnectionId, transport );
+        }
     }
 
     while( p )
@@ -165,14 +168,14 @@ void ConsoleServer::Update( void )
             }
             else // numParameters == 2, including the help tag
             {
-                for( i = 0; i < commandParserList.Size(); i++ )
+                for( CommandParserInterface* pCommandParser : commandParserList )
                 {
-                    if( _stricmp( parameterList[1], commandParserList[i]->GetName() ) == 0 )
+                    if( _stricmp( parameterList[1], pCommandParser->GetName() ) == 0 )
                     {
                         commandParsed = true;
-                        commandParserList[i]->SendHelp( transport, p->systemAddress );
+                        pCommandParser->SendHelp( transport, p->systemAddress );
                         transport->Send( p->systemAddress, "COMMAND LIST:\r\n" );
-                        commandParserList[i]->SendCommandList( transport, p->systemAddress );
+                        pCommandParser->SendCommandList( transport, p->systemAddress );
                         transport->Send( p->systemAddress, "\r\n" );
                         break;
                     }
@@ -182,9 +185,9 @@ void ConsoleServer::Update( void )
                 {
                     // Try again, for all commands for all parsers.
                     RegisteredCommand rc;
-                    for( i = 0; i < commandParserList.Size(); i++ )
+                    for( CommandParserInterface* pCommandParser : commandParserList )
                     {
-                        if( commandParserList[i]->GetRegisteredCommand( parameterList[1], &rc ) )
+                        if( pCommandParser->GetRegisteredCommand( parameterList[1], &rc ) )
                         {
                             if( rc.parameterCount == CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS )
                                 transport->Send( p->systemAddress, "(Variable parms): %s %s\r\n", rc.command, rc.commandHelp );
@@ -216,13 +219,13 @@ void ConsoleServer::Update( void )
 
             if( numParameters >= 2 ) // At minimum <CommandParserName> <Command>
             {
-                unsigned commandParserIndex = (unsigned)-1;
+                uint32_t commandParserIndex = ~0u;
                 // Prefixing with numbers directs to a particular parser
                 if( **parameterList >= '0' && **parameterList <= '9' )
                 {
                     commandParserIndex = atoi( *parameterList ); // Use specified parser unless it's an invalid number
                     commandParserIndex--;                        // Subtract 1 since we displayed numbers starting at index+1
-                    if( commandParserIndex >= commandParserList.Size() )
+                    if( commandParserIndex >= commandParserList.size() )
                     {
                         transport->Send( p->systemAddress, "Invalid index.\r\n" );
                         failed = true;
@@ -230,21 +233,23 @@ void ConsoleServer::Update( void )
                 }
                 else
                 {
-                    // // Prefixing with the name of a command parser directs to that parser.  See if the first word matches a parser
-                    for( i = 0; i < commandParserList.Size(); i++ )
+                    // Prefixing with the name of a command parser directs to that parser.  See if the first word matches a parser
+                    uint32_t uParserIndex = 0u;
+                    for( CommandParserInterface* pCommandParser : commandParserList )
                     {
-                        if( _stricmp( parameterList[0], commandParserList[i]->GetName() ) == 0 )
+                        if( _stricmp( parameterList[0], pCommandParser->GetName() ) == 0 )
                         {
-                            commandParserIndex = i; // Matches parser at index i
+                            commandParserIndex = uParserIndex; // Matches parser at index uParserIndex
                             break;
                         }
+                        uParserIndex++;
                     }
                 }
 
                 if( failed == false )
                 {
                     // -1 means undirected, so otherwise this is directed to a target
-                    if( commandParserIndex != (unsigned)-1 )
+                    if( commandParserIndex != ~0u )
                     {
                         // Only this parser should use this command
                         tryAllParsers = false;
@@ -262,22 +267,22 @@ void ConsoleServer::Update( void )
 
             if( failed == false && tryAllParsers )
             {
-                for( i = 0; i < commandParserList.Size(); i++ )
+                for( CommandParserInterface* pCommandParser : commandParserList )
                 {
                     // Undirected command.  Try all the parsers to see if they understand the command
                     // Pass the 1nd element as the command, and the remainder as the parameter list
-                    if( commandParserList[i]->GetRegisteredCommand( parameterList[0], &rc ) )
+                    if( pCommandParser->GetRegisteredCommand( parameterList[0], &rc ) )
                     {
                         commandParsed = true;
 
                         if( rc.parameterCount == CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS || rc.parameterCount == numParameters - 1 )
-                            commandParserList[i]->OnCommand( rc.command, numParameters - 1, parameterList + 1, transport, p->systemAddress, copy );
+                            pCommandParser->OnCommand( rc.command, numParameters - 1, parameterList + 1, transport, p->systemAddress, copy );
                         else
                             transport->Send( p->systemAddress, "Invalid parameter count.\r\n(%i parms): %s %s\r\n", rc.parameterCount, rc.command, rc.commandHelp );
                     }
                 }
             }
-            if( commandParsed == false && commandParserList.Size() > 0 )
+            if( !commandParsed && !commandParserList.empty() )
             {
                 transport->Send( p->systemAddress, "Unknown command:  Type 'help' for help.\r\n" );
             }
@@ -293,10 +298,11 @@ void ConsoleServer::Update( void )
 void ConsoleServer::ListParsers( SystemAddress systemAddress )
 {
     transport->Send( systemAddress, "INSTALLED PARSERS:\r\n" );
-    unsigned i;
-    for( i = 0; i < commandParserList.Size(); i++ )
+    int i = 0;
+    for( CommandParserInterface* pCommandParser : commandParserList )
     {
-        transport->Send( systemAddress, "%i. %s\r\n", i + 1, commandParserList[i]->GetName() );
+        transport->Send( systemAddress, "%i. %s\r\n", i + 1, pCommandParser->GetName() );
+        i++;
     }
 }
 void ConsoleServer::ShowPrompt( SystemAddress systemAddress )

@@ -14,7 +14,7 @@
 Description:
 Tests:
 virtual unsigned short RakPeerInterface::NumberOfConnections    (   void         )       const
-virtual void RakPeerInterface::GetSystemList    (   DataStructures::List< SystemAddress > &      addresses,         DataStructures::List< RakNetGUID > &    guids       )
+virtual void RakPeerInterface::GetSystemList    (   std::vector< SystemAddress > &      addresses,         std::vector< RakNetGUID > &    guids       )
 virtual bool RakPeerInterface::IsActive     (   void         )       const
 virtual SystemAddress RakPeerInterface::GetSystemAddressFromIndex   (   int      index       )
 virtual SystemAddress RakPeerInterface::GetSystemAddressFromGuid    (   const RakNetGUID     input       )       const
@@ -68,11 +68,11 @@ GetExternalID
 int SystemAddressAndGuidTest::RunTest( bool isVerbose, bool noPauses )
 {
     RakPeerInterface *server, *client;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     printf( "Testing IsActive\n" );
     client = RakPeerInterface::GetInstance();
-    destroyList.Push( client, _FILE_AND_LINE_ );
+    destroyList.push_back( client );
     if( client->IsActive() )
     {
 
@@ -105,14 +105,14 @@ int SystemAddressAndGuidTest::RunTest( bool isVerbose, bool noPauses )
         return 3;
     }
 
-    DataStructures::List<SystemAddress> systemList;
-    DataStructures::List<RakNetGUID> guidList;
+    std::vector<SystemAddress> systemList;
+    std::vector<RakNetGUID> guidList;
 
     printf( "Test GetSystemList and NumberOfConnections\n" );
 
     client->GetSystemList( systemList, guidList ); //Get connectionlist
-    int len = systemList.Size();
-    int len2 = guidList.Size();
+    int len  = static_cast<int>( systemList.size() );
+    int len2 = static_cast<int>( guidList.size() );
 
     int conNum = client->NumberOfConnections();
 
@@ -268,7 +268,7 @@ std::string SystemAddressAndGuidTest::GetTestName() const
 
 std::string SystemAddressAndGuidTest::ErrorCodeToString( int errorCode ) const
 {
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
+    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
     {
         return errorList[errorCode - 1];
     }
@@ -291,22 +291,22 @@ bool SystemAddressAndGuidTest::compareSystemAddresses( SystemAddress ad1, System
 SystemAddressAndGuidTest::SystemAddressAndGuidTest( void )
 {
 
-    errorList.Push( "Client was active but shouldn't be yet", _FILE_AND_LINE_ );
-    errorList.Push( "Client was not active but should be", _FILE_AND_LINE_ );
-    errorList.Push( "Could not connect the client", _FILE_AND_LINE_ );
-    errorList.Push( "Mismatch between guidList size and systemList size ", _FILE_AND_LINE_ );
-    errorList.Push( "NumberOfConnections problem", _FILE_AND_LINE_ );
-    errorList.Push( "SystemList problem with GetSystemList", _FILE_AND_LINE_ );
-    errorList.Push( "Both SystemList and Number of connections have problems and report different results", _FILE_AND_LINE_ );
-    errorList.Push( "Both SystemList and Number of connections have problems and report same results", _FILE_AND_LINE_ );
-    errorList.Push( "Undefined Error", _FILE_AND_LINE_ );
-    errorList.Push( "System address from list is wrong.", _FILE_AND_LINE_ );
-    errorList.Push( "Guid from list is wrong", _FILE_AND_LINE_ );
-    errorList.Push( "GetSystemAddressFromIndex failed to return correct values", _FILE_AND_LINE_ );
-    errorList.Push( "GetSystemAddressFromGuid failed to return correct values", _FILE_AND_LINE_ );
-    errorList.Push( "GetGuidFromSystemAddress failed to return correct values", _FILE_AND_LINE_ );
-    errorList.Push( "GetGUIDFromIndex failed to return correct values", _FILE_AND_LINE_ );
-    errorList.Push( "GetExternalID failed to return correct values", _FILE_AND_LINE_ );
+    errorList.emplace_back( "Client was active but shouldn't be yet" );
+    errorList.emplace_back( "Client was not active but should be" );
+    errorList.emplace_back( "Could not connect the client" );
+    errorList.emplace_back( "Mismatch between guidList size and systemList size " );
+    errorList.emplace_back( "NumberOfConnections problem" );
+    errorList.emplace_back( "SystemList problem with GetSystemList" );
+    errorList.emplace_back( "Both SystemList and Number of connections have problems and report different results" );
+    errorList.emplace_back( "Both SystemList and Number of connections have problems and report same results" );
+    errorList.emplace_back( "Undefined Error" );
+    errorList.emplace_back( "System address from list is wrong." );
+    errorList.emplace_back( "Guid from list is wrong" );
+    errorList.emplace_back( "GetSystemAddressFromIndex failed to return correct values" );
+    errorList.emplace_back( "GetSystemAddressFromGuid failed to return correct values" );
+    errorList.emplace_back( "GetGuidFromSystemAddress failed to return correct values" );
+    errorList.emplace_back( "GetGUIDFromIndex failed to return correct values" );
+    errorList.emplace_back( "GetExternalID failed to return correct values" );
 }
 
 SystemAddressAndGuidTest::~SystemAddressAndGuidTest( void )
@@ -315,9 +315,8 @@ SystemAddressAndGuidTest::~SystemAddressAndGuidTest( void )
 
 void SystemAddressAndGuidTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

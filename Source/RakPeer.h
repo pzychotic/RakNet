@@ -20,7 +20,6 @@
 #include "ReliabilityLayer.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
-#include "DS_List.h"
 #include "Export.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "SignaledEvent.h"
@@ -29,6 +28,7 @@
 
 #include <deque>
 #include <mutex>
+#include <vector>
 
 namespace RakNet {
 
@@ -311,7 +311,7 @@ public:
     /// Indices match each other, so \a addresses[0] and \a guids[0] refer to the same system
     /// \param[out] addresses All system addresses. Size of the list is the number of connections. Size of the \a addresses list will match the size of the \a guids list.
     /// \param[out] guids All guids. Size of the list is the number of connections. Size of the list will match the size of the \a addresses list.
-    void GetSystemList( DataStructures::List<SystemAddress>& addresses, DataStructures::List<RakNetGUID>& guids ) const;
+    void GetSystemList( std::vector<SystemAddress>& addresses, std::vector<RakNetGUID>& guids ) const;
 
     /// \brief Bans an IP from connecting.
     /// \details Banned IPs persist between connections but are not saved on shutdown nor loaded on startup.
@@ -552,8 +552,8 @@ public:
     /// \brief Gets all sockets in use.
     /// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
     /// \param[out] sockets List of RakNetSocket2 structures in use.
-    virtual void GetSockets( DataStructures::List<RakNetSocket2*>& sockets );
-    virtual void ReleaseSockets( DataStructures::List<RakNetSocket2*>& sockets );
+    virtual void GetSockets( std::vector<RakNetSocket2*>& sockets );
+    virtual void ReleaseSockets( std::vector<RakNetSocket2*>& sockets );
 
     /// \internal
     virtual void WriteOutOfBandHeader( BitStream* bitStream );
@@ -607,7 +607,7 @@ public:
     /// \param[out] addresses SystemAddress for each connected system
     /// \param[out] guids RakNetGUID for each connected system
     /// \param[out] statistics Calculated RakNetStatistics for each connected system
-    virtual void GetStatisticsList( DataStructures::List<SystemAddress>& addresses, DataStructures::List<RakNetGUID>& guids, DataStructures::List<RakNetStatistics>& statistics );
+    virtual void GetStatisticsList( std::vector<SystemAddress>& addresses, std::vector<RakNetGUID>& guids, std::vector<RakNetStatistics>& statistics );
 
     /// \Returns how many messages are waiting when you call Receive()
     virtual unsigned int GetReceiveBufferSize( void );
@@ -815,9 +815,9 @@ protected:
     bool GenerateConnectionRequestChallenge( RequestedConnectionStruct* rcs, PublicKey* publicKey );
 #endif
 
-    DataStructures::List<BanStruct*> banList;
+    std::vector<BanStruct*> banList;
     // Threadsafe, and not thread safe
-    DataStructures::List<PluginInterface2*> pluginListTS, pluginListNTS;
+    std::vector<PluginInterface2*> pluginListTS, pluginListNTS;
 
     std::deque<RequestedConnectionStruct*> requestedConnectionQueue;
     std::deque<SystemAddress> requestedConnectionCancelQueue;
@@ -869,7 +869,7 @@ protected:
     {
         SocketQueryOutput() {}
         ~SocketQueryOutput() {}
-        DataStructures::List<RakNetSocket2*> sockets;
+        std::vector<RakNetSocket2*> sockets;
     };
 
     DataStructures::ThreadsafeAllocatingQueue<SocketQueryOutput> socketQueryOutput;
@@ -895,7 +895,7 @@ protected:
     int defaultMTUSize;
 
     // Smart pointer so I can return the object to the user
-    DataStructures::List<RakNetSocket2*> socketList;
+    std::vector<RakNetSocket2*> socketList;
     void DerefAllSockets( void );
     unsigned int GetRakNetSocketFromUserConnectionSocketIndex( unsigned int userIndex ) const;
 
@@ -926,7 +926,7 @@ protected:
     bool ( *incomingDatagramEventHandler )( RNS2RecvStruct* );
 
     // Systems in this list will not go through the secure connection process, even when secure connections are turned on. Wildcards are accepted.
-    DataStructures::List<std::string> securityExceptionList;
+    std::vector<std::string> securityExceptionList;
 
     SystemAddress ipList[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
 
@@ -952,7 +952,7 @@ protected:
     uint32_t sendReceiptSerial;
     void ResetSendReceipt( void );
     void OnConnectedPong( RakNet::Time sendPingTime, RakNet::Time sendPongTime, RemoteSystemStruct* remoteSystem );
-    void CallPluginCallbacks( DataStructures::List<PluginInterface2*>& pluginList, Packet* packet );
+    void CallPluginCallbacks( std::vector<PluginInterface2*>& pluginList, Packet* packet );
 
 #if LIBCAT_SECURITY == 1
     // Encryption and security

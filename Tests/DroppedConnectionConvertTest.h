@@ -24,6 +24,8 @@
 #include <cstdio>
 #include "CommonFunctions.h"
 
+#include <vector>
+
 using namespace RakNet;
 class DroppedConnectionConvertTest : public TestInterface
 {
@@ -36,5 +38,5 @@ public:
     void DestroyPeers();
 
 private:
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<RakPeerInterface*> destroyList;
 };

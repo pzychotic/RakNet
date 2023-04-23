@@ -44,14 +44,14 @@ SetOccasionalPing
 int PingTestsTest::RunTest( bool isVerbose, bool noPauses )
 {
     RakPeerInterface *sender, *sender2, *receiver;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     TestHelpers::StandardClientPrep( sender, destroyList );
 
     TestHelpers::StandardClientPrep( sender2, destroyList );
 
     receiver = RakPeerInterface::GetInstance();
-    destroyList.Push( receiver, _FILE_AND_LINE_ );
+    destroyList.push_back( receiver );
     receiver->Startup( 2, &SocketDescriptor( 60000, 0 ), 1 );
     receiver->SetMaximumIncomingConnections( 2 );
     Packet* packet;
@@ -253,9 +253,8 @@ PingTestsTest::~PingTestsTest( void )
 
 void PingTestsTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

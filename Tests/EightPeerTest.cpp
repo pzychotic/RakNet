@@ -44,13 +44,13 @@ int EightPeerTest::RunTest( bool isVerbose, bool noPauses )
     const int numPackets = 100;
     Packet* packet;
     BitStream bitStream;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     //Initializations of the arrays
     for( int i = 0; i < peerNum; i++ )
     {
         peerList[i] = RakPeerInterface::GetInstance();
-        destroyList.Push( peerList[i], _FILE_AND_LINE_ );
+        destroyList.push_back( peerList[i] );
         connectionAmount[i] = 0;
 
         for( int j = 0; j < peerNum; j++ )
@@ -341,9 +341,8 @@ EightPeerTest::~EightPeerTest( void )
 
 void EightPeerTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

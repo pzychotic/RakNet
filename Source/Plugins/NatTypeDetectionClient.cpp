@@ -17,6 +17,8 @@
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 
+#include <vector>
+
 namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS( NatTypeDetectionClient, NatTypeDetectionClient );
@@ -32,6 +34,7 @@ NatTypeDetectionClient::~NatTypeDetectionClient()
         RakNet::OP_DELETE( c2, _FILE_AND_LINE_ );
     }
 }
+
 void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
 {
     if( IsInProgress() )
@@ -39,10 +42,11 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
 
     if( c2 == 0 )
     {
-        DataStructures::List<RakNetSocket2*> sockets;
+        std::vector<RakNetSocket2*> sockets;
         rakPeerInterface->GetSockets( sockets );
+        RakAssert( !sockets.empty() );
         char str[64];
-        sockets[0]->GetBoundAddress().ToString( false, str );
+        sockets.front()->GetBoundAddress().ToString( false, str );
         c2 = CreateNonblockingBoundSocket( str, this );
     }
 
@@ -59,6 +63,7 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
     bs.Write( c2->GetBoundAddress().GetPort() );
     rakPeerInterface->Send( &bs, MEDIUM_PRIORITY, RELIABLE, 0, serverAddress, false );
 }
+
 void NatTypeDetectionClient::OnCompletion( NATTypeDetectionResult result )
 {
     Packet* p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) * 2 );
@@ -172,9 +177,10 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
     unsigned short s3p4Port;
     bsIn.Read( s3p4Port );
 
-    DataStructures::List<RakNetSocket2*> sockets;
+    std::vector<RakNetSocket2*> sockets;
     rakPeerInterface->GetSockets( sockets );
-    SystemAddress s3p4Addr = sockets[0]->GetBoundAddress();
+    RakAssert( !sockets.empty() );
+    SystemAddress s3p4Addr = sockets.front()->GetBoundAddress();
     s3p4Addr.FromStringExplicitPort( s3p4StrAddress.c_str(), s3p4Port );
 
     // Send off the RakNet socket to the specified address, message is unformatted
@@ -187,7 +193,7 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
     bsp.data = (char*)bsOut.GetData();
     bsp.length = bsOut.GetNumberOfBytesUsed();
     bsp.systemAddress = s3p4Addr;
-    sockets[0]->Send( &bsp, _FILE_AND_LINE_ );
+    sockets.front()->Send( &bsp, _FILE_AND_LINE_ );
 }
 void NatTypeDetectionClient::Shutdown( void )
 {

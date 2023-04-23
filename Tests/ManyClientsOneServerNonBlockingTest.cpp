@@ -51,19 +51,19 @@ int ManyClientsOneServerNonBlockingTest::RunTest( bool isVerbose, bool noPauses 
     //SystemAddress currentSystem;
 
     Packet* packet;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     //Initializations of the arrays
     for( int i = 0; i < clientNum; i++ )
     {
         clientList[i] = RakPeerInterface::GetInstance();
-        destroyList.Push( clientList[i], _FILE_AND_LINE_ );
+        destroyList.push_back( clientList[i] );
 
         clientList[i]->Startup( 1, &SocketDescriptor(), 1 );
     }
 
     server = RakPeerInterface::GetInstance();
-    destroyList.Push( server, _FILE_AND_LINE_ );
+    destroyList.push_back( server );
     server->Startup( clientNum, &SocketDescriptor( 60000, 0 ), 1 );
     server->SetMaximumIncomingConnections( clientNum );
 
@@ -84,26 +84,23 @@ int ManyClientsOneServerNonBlockingTest::RunTest( bool isVerbose, bool noPauses 
 
     TimeMS entryTime = GetTimeMS(); //Loop entry time
 
-    DataStructures::List<SystemAddress> systemList;
-    DataStructures::List<RakNetGUID> guidList;
+    std::vector<SystemAddress> systemList;
+    std::vector<RakNetGUID> guidList;
 
     if( isVerbose )
         printf( "Entering disconnect loop \n" );
 
     while( GetTimeMS() - entryTime < 10000 ) //Run for 10 Secoonds
     {
-
         //Disconnect all clients IF connected to any from client side
         for( int i = 0; i < clientNum; i++ )
         {
-
             clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-            int len = systemList.Size();
 
-            for( int j = 0; j < len; j++ ) //Disconnect them all
+            for( const SystemAddress& rSystem : systemList ) //Disconnect them all
             {
 
-                clientList[i]->CloseConnection( systemList[j], true, 0, LOW_PRIORITY );
+                clientList[i]->CloseConnection( rSystem, true, 0, LOW_PRIORITY );
             }
         }
 
@@ -445,12 +442,9 @@ int ManyClientsOneServerNonBlockingTest::RunTest( bool isVerbose, bool noPauses 
 
         if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
         {
-
             if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
             {
-
                 clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-                int len = systemList.Size();
 
                 if( isVerbose )
                     DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
@@ -617,18 +611,15 @@ int ManyClientsOneServerNonBlockingTest::RunTest( bool isVerbose, bool noPauses 
 
     for( int i = 0; i < clientNum; i++ )
     {
-
         clientList[i]->GetSystemList( systemList, guidList );
-        int connNum = guidList.Size(); //Get the number of connections for the current peer
-        if( connNum != 1 )             //Did we connect to all?
+        //Get the number of connections for the current peer
+        if( guidList.size() != 1 )     //Did we connect to all?
         {
-
             if( isVerbose )
                 printf( "Not all clients reconnected normally.\nFailed on clients number %i\n", i );
 
             if( isVerbose )
                 DebugTools::ShowError( "", !noPauses && isVerbose, __LINE__, __FILE__ );
-
 
             return 2;
         }
@@ -668,9 +659,8 @@ ManyClientsOneServerNonBlockingTest::~ManyClientsOneServerNonBlockingTest( void 
 
 void ManyClientsOneServerNonBlockingTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

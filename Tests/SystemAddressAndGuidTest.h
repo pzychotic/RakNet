@@ -22,6 +22,8 @@
 #include "CommonFunctions.h"
 #include "TestHelpers.h"
 
+#include <vector>
+
 using namespace RakNet;
 class SystemAddressAndGuidTest : public TestInterface
 {
@@ -36,6 +38,6 @@ public:
 protected:
     bool compareSystemAddresses( SystemAddress ad1, SystemAddress ad2 ); //true if same;
 private:
-    DataStructures::List<std::string> errorList;
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<std::string> errorList;
+    std::vector<RakPeerInterface*> destroyList;
 };

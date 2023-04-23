@@ -23,6 +23,8 @@
 #include "CommonFunctions.h"
 #include "RakTimer.h"
 
+#include <vector>
+
 using namespace RakNet;
 class PingTestsTest : public TestInterface
 {
@@ -36,5 +38,5 @@ public:
     int TestAverageValue( int averagePing, int line, bool noPauses, bool isVerbose );
 
 private:
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<RakPeerInterface*> destroyList;
 };

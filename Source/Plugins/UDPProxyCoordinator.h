@@ -25,6 +25,7 @@
 
 #include <deque>
 #include <string>
+#include <vector>
 
 namespace RakNet {
 
@@ -76,7 +77,7 @@ public:
         std::deque<SystemAddress> remainingServersToTry;
         BitStream serverSelectionBitstream;
 
-        DataStructures::List<ServerWithPing> sourceServerPings, targetServerPings;
+        std::vector<ServerWithPing> sourceServerPings, targetServerPings;
         RakNet::TimeMS timeRequestedPings;
         // Order based on sourceServerPings and targetServerPings
         void OrderRemainingServersToTry( void );
@@ -97,7 +98,7 @@ protected:
     void SendForwardingRequest( SystemAddress sourceAddress, SystemAddress targetAddress, SystemAddress serverAddress, RakNet::TimeMS timeoutOnNoDataMS );
 
     // Logged in servers
-    DataStructures::List<SystemAddress> serverList;
+    std::vector<SystemAddress> serverList;
 
     // Forwarding requests in progress
     DataStructures::OrderedList<SenderAndTargetAddress, ForwardingRequest*, ForwardingRequestComp> forwardingRequestList;

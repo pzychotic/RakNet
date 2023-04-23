@@ -22,6 +22,8 @@
 #include "TestHelpers.h"
 #include "PacketChangerPlugin.h"
 
+#include <vector>
+
 using namespace RakNet;
 class PacketAndLowLevelTestsTest : public TestInterface
 {
@@ -37,6 +39,6 @@ protected:
     void FloodWithHighPriority( RakPeerInterface* client );
 
 private:
-    DataStructures::List<std::string> errorList;
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<std::string> errorList;
+    std::vector<RakPeerInterface*> destroyList;
 };

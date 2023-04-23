@@ -536,7 +536,6 @@ SecurityFunctionsTest::~SecurityFunctionsTest( void )
 
 void SecurityFunctionsTest::DestroyPeers()
 {
-
     RakPeerInterface::DestroyInstance( client );
     RakPeerInterface::DestroyInstance( server );
 }

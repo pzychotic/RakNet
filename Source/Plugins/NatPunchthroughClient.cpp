@@ -19,6 +19,8 @@
 #include "GetTime.h"
 #include "StringUtils.h"
 
+#include <algorithm>
+
 namespace RakNet {
 
 void NatPunchthroughDebugInterface_Printf::OnClientMessage( const char* msg )
@@ -310,28 +312,26 @@ void NatPunchthroughClient::OnPunchthroughFailure( void )
         return;
     }
 
-    unsigned int i;
-    for( i = 0; i < failedAttemptList.Size(); i++ )
+    auto it = std::find_if( failedAttemptList.begin(), failedAttemptList.end(),
+                            [&]( const AddrAndGuid& rAddr ) { return rAddr.guid == sp.targetGuid; } );
+    if( it != failedAttemptList.end() )
     {
-        if( failedAttemptList[i].guid == sp.targetGuid )
+        if( natPunchthroughDebugInterface )
         {
-            if( natPunchthroughDebugInterface )
-            {
-                char ipAddressString[32];
-                sp.targetAddress.ToString( true, ipAddressString );
-                char guidString[128];
-                sp.targetGuid.ToString( guidString );
-                natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "Failed punchthrough twice. Returning failure to guid %s, system address %s to user.", guidString, ipAddressString ).c_str() );
-            }
-
-            // Failed a second time, so return failed to user
-            PushFailure();
-
-            OnReadyForNextPunchthrough();
-
-            failedAttemptList.RemoveAtIndexFast( i );
-            return;
+            char ipAddressString[32];
+            sp.targetAddress.ToString( true, ipAddressString );
+            char guidString[128];
+            sp.targetGuid.ToString( guidString );
+            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "Failed punchthrough twice. Returning failure to guid %s, system address %s to user.", guidString, ipAddressString ).c_str() );
         }
+
+        // Failed a second time, so return failed to user
+        PushFailure();
+
+        OnReadyForNextPunchthrough();
+
+        failedAttemptList.erase( it );
+        return;
     }
 
     if( rakPeerInterface->GetConnectionState( sp.facilitator ) != IS_CONNECTED )
@@ -360,10 +360,7 @@ void NatPunchthroughClient::OnPunchthroughFailure( void )
     }
 
     // Failed the first time. Add to the failure queue and try again
-    AddrAndGuid aag;
-    aag.addr = sp.targetAddress;
-    aag.guid = sp.targetGuid;
-    failedAttemptList.Push( aag, _FILE_AND_LINE_ );
+    failedAttemptList.emplace_back( AddrAndGuid{ sp.targetAddress, sp.targetGuid } );
 
     // Tell the server we are ready
     OnReadyForNextPunchthrough();
@@ -582,33 +579,31 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
                 break;
         }
 
-        unsigned int i;
-        for( i = 0; i < failedAttemptList.Size(); i++ )
+        auto it = std::find_if( failedAttemptList.begin(), failedAttemptList.end(),
+                                [&targetGuid]( const AddrAndGuid& rAddr ) { return rAddr.guid == targetGuid; } );
+        if( it != failedAttemptList.end() )
         {
-            if( failedAttemptList[i].guid == targetGuid )
+            if( natPunchthroughDebugInterface )
             {
-                if( natPunchthroughDebugInterface )
-                {
-                    char guidString[128];
-                    targetGuid.ToString( guidString );
-                    natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "Punchthrough retry to guid %s failed due to %s.", guidString, reason ).c_str() );
-                }
-
-                // If the retry target is not connected, or loses connection, or is not responsive, then previous failures cannot be retried.
-
-                // Don't need to return failed, the other messages indicate failure anyway
-                /*
-                Packet *p = AllocatePacketUnified(sizeof(MessageID));
-                p->data[0]=ID_NAT_PUNCHTHROUGH_FAILED;
-                p->systemAddress=failedAttemptList[i].addr;
-                p->systemAddress.systemIndex=(SystemIndex)-1;
-                p->guid=failedAttemptList[i].guid;
-                rakPeerInterface->PushBackPacket(p, false);
-                */
-
-                failedAttemptList.RemoveAtIndexFast( i );
-                break;
+                char guidString[128];
+                targetGuid.ToString( guidString );
+                natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "Punchthrough retry to guid %s failed due to %s.", guidString, reason ).c_str() );
             }
+
+            // If the retry target is not connected, or loses connection, or is not responsive, then previous failures cannot be retried.
+
+            // Don't need to return failed, the other messages indicate failure anyway
+            /*
+            Packet *p = AllocatePacketUnified(sizeof(MessageID));
+            p->data[0]=ID_NAT_PUNCHTHROUGH_FAILED;
+            p->systemAddress=failedAttemptList[i].addr;
+            p->systemAddress.systemIndex=(SystemIndex)-1;
+            p->guid=failedAttemptList[i].guid;
+            rakPeerInterface->PushBackPacket(p, false);
+            */
+
+            failedAttemptList.erase( it );
+            break;
         }
 
         if( natPunchthroughDebugInterface )
@@ -782,25 +777,23 @@ void NatPunchthroughClient::OnNewConnection( const SystemAddress& systemAddress,
 
 void NatPunchthroughClient::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
 {
-    (void)systemAddress;
     (void)rakNetGUID;
     (void)lostConnectionReason;
 
     if( sp.facilitator == systemAddress )
     {
         // If we lose the connection to the facilitator, all previous failures not currently in progress are returned as such
-        unsigned int i = 0;
-        while( i < failedAttemptList.Size() )
+        for( auto it = failedAttemptList.begin(); it != failedAttemptList.end(); /**/ )
         {
-            if( sp.nextActionTime != 0 && sp.targetGuid == failedAttemptList[i].guid )
+            if( sp.nextActionTime != 0 && sp.targetGuid == it->guid )
             {
-                i++;
+                ++it;
                 continue;
             }
 
             PushFailure();
 
-            failedAttemptList.RemoveAtIndexFast( i );
+            it = failedAttemptList.erase( it );
         }
     }
 }
@@ -891,8 +884,7 @@ void NatPunchthroughClient::Clear( void )
 {
     OnReadyForNextPunchthrough();
 
-    failedAttemptList.Clear( false, _FILE_AND_LINE_ );
-
+    failedAttemptList.clear();
     queuedOpenNat.clear();
 }
 PunchthroughConfiguration* NatPunchthroughClient::GetPunchthroughConfiguration( void )
@@ -927,15 +919,13 @@ void NatPunchthroughClient::PushSuccess( void )
 }
 bool NatPunchthroughClient::RemoveFromFailureQueue( void )
 {
-    unsigned int i;
-    for( i = 0; i < failedAttemptList.Size(); i++ )
+    auto it = std::find_if( failedAttemptList.begin(), failedAttemptList.end(),
+                            [&]( const AddrAndGuid& rAddr ) { return rAddr.guid == sp.targetGuid; } );
+    if( it != failedAttemptList.end() )
     {
-        if( failedAttemptList[i].guid == sp.targetGuid )
-        {
-            // Remove from failure queue
-            failedAttemptList.RemoveAtIndexFast( i );
-            return true;
-        }
+        // Remove from failure queue
+        failedAttemptList.erase( it );
+        return true;
     }
     return false;
 }

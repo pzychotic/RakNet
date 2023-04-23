@@ -20,7 +20,6 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
-#include "DS_List.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "Plugins/UDPProxyCommon.h"
 
@@ -28,6 +27,7 @@
 #include <deque>
 #include <mutex>
 #include <string>
+#include <vector>
 
 namespace RakNet {
 
@@ -141,7 +141,7 @@ protected:
     unsigned int nextInputId;
 
     // New entries are added to forwardListNotUpdated
-    DataStructures::List<ForwardEntry*> forwardListNotUpdated;
+    std::vector<ForwardEntry*> forwardListNotUpdated;
 
     unsigned short maxForwardEntries;
     std::atomic<uint32_t> isRunning, threadRunning;

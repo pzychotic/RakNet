@@ -18,10 +18,10 @@
 #if _RAKNET_SUPPORT_RelayPlugin == 1
 
 #include "PluginInterface2.h"
-#include "DS_List.h"
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 /// \defgroup RELAY_PLUGIN_GROUP RelayPlugin
 /// \brief A simple class to relay messages from one system to another through an intermediary
@@ -125,7 +125,7 @@ public:
     struct RP_Group
     {
         std::string roomName;
-        DataStructures::List<StrAndGuid> usersInRoom;
+        std::vector<StrAndGuid> usersInRoom;
     };
 
 protected:
@@ -141,7 +141,7 @@ protected:
 
     std::unordered_map<std::string, StrAndGuidAndRoom*> strToGuidHash;
     std::unordered_map<RakNetGUID, StrAndGuidAndRoom*> guidToStrHash;
-    DataStructures::List<RP_Group*> chatRooms;
+    std::vector<RP_Group*> chatRooms;
     bool acceptAddParticipantRequests;
 };
 

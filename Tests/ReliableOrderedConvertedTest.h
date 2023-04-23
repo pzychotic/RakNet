@@ -23,8 +23,9 @@
 #include "Rand.h"
 #include "RakNetStatistics.h"
 #include "RakMemoryOverride.h"
-
 #include "DebugTools.h"
+
+#include <vector>
 
 using namespace RakNet;
 class ReliableOrderedConvertedTest : public TestInterface
@@ -43,5 +44,5 @@ protected:
     void* LoggedRealloc( void* p, size_t size, const char* file, unsigned int line );
 
 private:
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<RakPeerInterface*> destroyList;
 };

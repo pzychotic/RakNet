@@ -131,8 +131,10 @@ Packet* PacketizedTCP::Receive( void )
 {
     PushNotificationsToQueues();
 
-    for( unsigned int i = 0; i < messageHandlerList.Size(); i++ )
-        messageHandlerList[i]->Update();
+    for( PluginInterface2* pPlugin : messageHandlerList )
+    {
+        pPlugin->Update();
+    }
 
     Packet* outgoingPacket = ReturnOutgoingPacket();
     if( outgoingPacket )
@@ -257,10 +259,9 @@ Packet* PacketizedTCP::ReturnOutgoingPacket( void )
         outgoingPacket = waitingPackets.front();
         waitingPackets.pop_front();
 
-        PluginReceiveResult pluginResult;
-        for( uint32_t i = 0; i < messageHandlerList.Size(); i++ )
+        for( PluginInterface2* pPlugin : messageHandlerList )
         {
-            pluginResult = messageHandlerList[i]->OnReceive( outgoingPacket );
+            PluginReceiveResult pluginResult = pPlugin->OnReceive( outgoingPacket );
             if( pluginResult == RR_STOP_PROCESSING_AND_DEALLOCATE )
             {
                 DeallocatePacket( outgoingPacket );

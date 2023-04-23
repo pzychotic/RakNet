@@ -22,6 +22,8 @@
 #include "TestHelpers.h"
 #include "CommonFunctions.h"
 
+#include <vector>
+
 using namespace RakNet;
 class ConnectWithSocketTest : public TestInterface
 {
@@ -34,6 +36,6 @@ public:
     void DestroyPeers();
 
 private:
-    DataStructures::List<std::string> errorList;
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<std::string> errorList;
+    std::vector<RakPeerInterface*> destroyList;
 };

@@ -18,7 +18,6 @@
 #if _RAKNET_SUPPORT_TCPInterface == 1
 
 #include "RakMemoryOverride.h"
-#include "DS_List.h"
 #include "RakNetTypes.h"
 #include "Export.h"
 #include "RakNetDefines.h"
@@ -38,6 +37,7 @@
 #include <atomic>
 #include <deque>
 #include <mutex>
+#include <vector>
 
 namespace RakNet {
 
@@ -140,7 +140,7 @@ protected:
     bool CreateListenSocket( unsigned short port, unsigned short maxIncomingConnections, unsigned short socketFamily, const char* hostAddress );
 
     // Plugins
-    DataStructures::List<PluginInterface2*> messageHandlerList;
+    std::vector<PluginInterface2*> messageHandlerList;
 
     std::atomic<uint32_t> isStarted, threadRunning;
     __TCPSOCKET__ listenSocket;
@@ -157,7 +157,7 @@ protected:
 
     int threadPriority;
 
-    DataStructures::List<__TCPSOCKET__> blockingSocketList;
+    std::vector<__TCPSOCKET__> blockingSocketList;
     std::mutex blockingSocketListMutex;
 
 
@@ -179,7 +179,7 @@ protected:
     SSL_CTX* ctx;
     SSL_METHOD* meth;
     DataStructures::ThreadsafeAllocatingQueue<SystemAddress> startSSL;
-    DataStructures::List<SystemAddress> activeSSLConnections;
+    std::vector<SystemAddress> activeSSLConnections;
     std::mutex sharedSslMutex;
 #endif
 };

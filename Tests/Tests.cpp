@@ -10,7 +10,7 @@
 
 #include "IncludeAllTests.h"
 
-#include "DS_List.h"
+#include <vector>
 
 using namespace RakNet;
 /*
@@ -22,58 +22,57 @@ when adding new test cases. While I do not use the paramslist, it is available.
 
 int main( int argc, char* argv[] )
 {
-    int returnVal;
-    int numTests = 0;
-    int testListSize = 0;
-    int passedTests = 0;
-    DataStructures::List<TestInterface*> testList; //Pointer list
-    DataStructures::List<int> testResultList;      //A list of pass and/or fail and the error codes
-    DataStructures::List<std::string> testsToRun;  //A list of tests to run
-    DataStructures::List<int> testsToRunIndexes;   //A list of tests to run by index
+    std::vector<TestInterface*> testList; //Pointer list
+    std::vector<int> testResultList;      //A list of pass and/or fail and the error codes
+    std::vector<std::string> testsToRun;  //A list of tests to run
+    std::vector<int> testsToRunIndexes;   //A list of tests to run by index
 
     //Add all the tests to the test list
-    testList.Push( new EightPeerTest(), _FILE_AND_LINE_ );
-    testList.Push( new MaximumConnectTest(), _FILE_AND_LINE_ );
-    testList.Push( new PeerConnectDisconnectWithCancelPendingTest(), _FILE_AND_LINE_ );
-    testList.Push( new PeerConnectDisconnectTest(), _FILE_AND_LINE_ );
-    testList.Push( new ManyClientsOneServerBlockingTest(), _FILE_AND_LINE_ );
-    testList.Push( new ManyClientsOneServerNonBlockingTest(), _FILE_AND_LINE_ );
-    testList.Push( new ManyClientsOneServerDeallocateBlockingTest(), _FILE_AND_LINE_ );
-    testList.Push( new ReliableOrderedConvertedTest(), _FILE_AND_LINE_ );
-    testList.Push( new DroppedConnectionConvertTest(), _FILE_AND_LINE_ );
-    testList.Push( new ComprehensiveConvertTest(), _FILE_AND_LINE_ );
-    testList.Push( new CrossConnectionConvertTest(), _FILE_AND_LINE_ );
-    testList.Push( new PingTestsTest(), _FILE_AND_LINE_ );
-    testList.Push( new OfflineMessagesConvertTest(), _FILE_AND_LINE_ );
-    testList.Push( new LocalIsConnectedTest(), _FILE_AND_LINE_ );
-    testList.Push( new SecurityFunctionsTest(), _FILE_AND_LINE_ );
-    testList.Push( new ConnectWithSocketTest(), _FILE_AND_LINE_ );
-    testList.Push( new SystemAddressAndGuidTest(), _FILE_AND_LINE_ );
-    testList.Push( new PacketAndLowLevelTestsTest(), _FILE_AND_LINE_ );
-    testList.Push( new MiscellaneousTestsTest(), _FILE_AND_LINE_ );
+    testList.push_back( new EightPeerTest() );
+    testList.push_back( new MaximumConnectTest() );
+    testList.push_back( new PeerConnectDisconnectWithCancelPendingTest() );
+    testList.push_back( new PeerConnectDisconnectTest() );
+    testList.push_back( new ManyClientsOneServerBlockingTest() );
+    testList.push_back( new ManyClientsOneServerNonBlockingTest() );
+    testList.push_back( new ManyClientsOneServerDeallocateBlockingTest() );
+    testList.push_back( new ReliableOrderedConvertedTest() );
+    testList.push_back( new DroppedConnectionConvertTest() );
+    testList.push_back( new ComprehensiveConvertTest() );
+    testList.push_back( new CrossConnectionConvertTest() );
+    testList.push_back( new PingTestsTest() );
+    testList.push_back( new OfflineMessagesConvertTest() );
+    testList.push_back( new LocalIsConnectedTest() );
+    testList.push_back( new SecurityFunctionsTest() );
+    testList.push_back( new ConnectWithSocketTest() );
+    testList.push_back( new SystemAddressAndGuidTest() );
+    testList.push_back( new PacketAndLowLevelTestsTest() );
+    testList.push_back( new MiscellaneousTestsTest() );
 
-    testListSize = testList.Size();
+    int testListSize = static_cast<int>( testList.size() );
 
     bool isVerbose = true;
     bool disallowTestToPause = false;
 
     if( argc > 1 ) //we have command line arguments
     {
-
         for( int p = 1; p < argc; p++ )
         {
-            testsToRun.Push( argv[p], _FILE_AND_LINE_ );
+            testsToRun.push_back( argv[p] );
         }
     }
 
-    if( testsToRun.Size() == 0 && testsToRunIndexes.Size() == 0 )
+    int numTests = 0;
+    int passedTests = 0;
+
+    if( testsToRun.empty() && testsToRunIndexes.empty() )
     {
         numTests = testListSize;
-        for( int i = 0; i < testListSize; i++ )
+
+        for( TestInterface* pTest : testList )
         {
-            printf( "\n\nRunning test %s.\n\n", testList[i]->GetTestName().c_str() );
-            returnVal = testList[i]->RunTest( isVerbose, disallowTestToPause );
-            testList[i]->DestroyPeers();
+            printf( "\n\nRunning test %s.\n\n", pTest->GetTestName().c_str() );
+            int returnVal = pTest->RunTest( isVerbose, disallowTestToPause );
+            pTest->DestroyPeers();
 
             if( returnVal == 0 )
             {
@@ -81,42 +80,36 @@ int main( int argc, char* argv[] )
             }
             else
             {
-                printf( "Test %s returned with error %s", testList[i]->GetTestName().c_str(), testList[i]->ErrorCodeToString( returnVal ).c_str() );
+                printf( "Test %s returned with error %s", pTest->GetTestName().c_str(), pTest->ErrorCodeToString( returnVal ).c_str() );
             }
         }
     }
 
-    if( testsToRun.Size() != 0 ) //If string arguments convert to indexes.Suggestion: if speed becoms an issue keep a sorted list and binary search it
+    if( !testsToRun.empty() ) //If string arguments convert to indexes.Suggestion: if speed becoms an issue keep a sorted list and binary search it
     {
-        int TestsToRunSize = testsToRun.Size();
-
-        for( int i = 0; i < TestsToRunSize; i++ )
+        for( const std::string& testName : testsToRun )
         {
-            const std::string& testName = testsToRun[i];
-
             for( int j = 0; j < testListSize; j++ )
             {
                 if( testList[j]->GetTestName() == testName )
                 {
-                    testsToRunIndexes.Push( j, _FILE_AND_LINE_ );
+                    testsToRunIndexes.push_back( j );
                 }
             }
         }
     }
 
-    if( testsToRunIndexes.Size() != 0 ) //Run selected indexes
+    if( !testsToRunIndexes.empty() ) //Run selected indexes
     {
-        numTests = testsToRunIndexes.Size();
+        numTests = static_cast<int>( testsToRunIndexes.size() );
 
-        for( int i = 0; i < numTests; i++ )
+        for( int iTestIndex : testsToRunIndexes )
         {
-
-            if( testsToRunIndexes[i] < testListSize )
+            if( iTestIndex < testListSize )
             {
-
-                printf( "\n\nRunning test %s.\n\n", testList[testsToRunIndexes[i]]->GetTestName().c_str() );
-                returnVal = testList[testsToRunIndexes[i]]->RunTest( isVerbose, disallowTestToPause );
-                testList[i]->DestroyPeers();
+                printf( "\n\nRunning test %s.\n\n", testList[iTestIndex]->GetTestName().c_str() );
+                int returnVal = testList[iTestIndex]->RunTest( isVerbose, disallowTestToPause );
+                testList[iTestIndex]->DestroyPeers();
 
                 if( returnVal == 0 )
                 {
@@ -124,7 +117,7 @@ int main( int argc, char* argv[] )
                 }
                 else
                 {
-                    printf( "Test %s returned with error %s", testList[testsToRunIndexes[i]]->GetTestName().c_str(), testList[testsToRunIndexes[i]]->ErrorCodeToString( returnVal ).c_str() );
+                    printf( "Test %s returned with error %s", testList[iTestIndex]->GetTestName().c_str(), testList[iTestIndex]->ErrorCodeToString( returnVal ).c_str() );
                 }
             }
         }
@@ -136,13 +129,11 @@ int main( int argc, char* argv[] )
     }
 
     //Cleanup
-    int len = testList.Size();
-
-    for( int i = 0; i < len; i++ )
+    for( TestInterface* pTest : testList )
     {
-        delete testList[i];
+        delete pTest;
     }
-    testList.Clear( false, _FILE_AND_LINE_ );
+    testList.clear();
 
     return 0;
 }

@@ -462,16 +462,16 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
     delayList.clear();
 #endif
 
-    unreliableWithAckReceiptHistory.Clear( false, _FILE_AND_LINE_ );
+    unreliableWithAckReceiptHistory.clear();
 
-    packetsToSendThisUpdate.Clear( false, _FILE_AND_LINE_ );
-    packetsToSendThisUpdate.Preallocate( 512, _FILE_AND_LINE_ );
-    packetsToDeallocThisUpdate.Clear( false, _FILE_AND_LINE_ );
-    packetsToDeallocThisUpdate.Preallocate( 512, _FILE_AND_LINE_ );
-    packetsToSendThisUpdateDatagramBoundaries.Clear( false, _FILE_AND_LINE_ );
-    packetsToSendThisUpdateDatagramBoundaries.Preallocate( 128, _FILE_AND_LINE_ );
-    datagramSizesInBytes.Clear( false, _FILE_AND_LINE_ );
-    datagramSizesInBytes.Preallocate( 128, _FILE_AND_LINE_ );
+    packetsToSendThisUpdate.clear();
+    packetsToSendThisUpdate.reserve( 512 );
+    packetsToDeallocThisUpdate.clear();
+    packetsToDeallocThisUpdate.reserve( 512 );
+    packetsToSendThisUpdateDatagramBoundaries.clear();
+    packetsToSendThisUpdateDatagramBoundaries.reserve( 128 );
+    datagramSizesInBytes.clear();
+    datagramSizesInBytes.reserve( 128 );
 
     internalPacketPool.Clear( _FILE_AND_LINE_ );
 
@@ -501,7 +501,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
 //split packets
 //-------------------------------------------------------------------------------------------------------
 bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
-    const char* buffer, unsigned int length, SystemAddress& systemAddress, DataStructures::List<PluginInterface2*>& messageHandlerList, int MTUSize,
+    const char* buffer, unsigned int length, SystemAddress& systemAddress, std::vector<PluginInterface2*>& messageHandlerList, int MTUSize,
     RakNetSocket2* s, RakNetRandom* rnr, CCTimeType timeRead,
     BitStream& updateBitStream )
 {
@@ -520,15 +520,14 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
     if( length <= 2 || buffer == 0 ) // Length of 1 is a connection request resend that we just ignore
     {
-        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "length <= 2 || buffer == 0", BYTES_TO_BITS( length ), systemAddress, true );
+        for( PluginInterface2* pPlugin : messageHandlerList )
+        {
+            pPlugin->OnReliabilityLayerNotification( "length <= 2 || buffer == 0", BYTES_TO_BITS( length ), systemAddress, true );
+        }
         return true;
     }
 
     timeLastDatagramArrived = RakNet::GetTimeMS();
-
-    DatagramSequenceNumberType holeCount;
-    unsigned i;
 
 #if LIBCAT_SECURITY == 1
     if( useSecurity )
@@ -548,8 +547,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     dhf.Deserialize( &socketData );
     if( dhf.isValid == false )
     {
-        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "dhf.isValid==false", BYTES_TO_BITS( length ), systemAddress, true );
+        for( PluginInterface2* pPlugin : messageHandlerList )
+        {
+            pPlugin->OnReliabilityLayerNotification( "dhf.isValid==false", BYTES_TO_BITS( length ), systemAddress, true );
+        }
 
         return true;
     }
@@ -588,47 +589,47 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         incomingAcks.Clear();
         if( incomingAcks.Deserialize( &socketData ) == false )
         {
-            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "incomingAcks.Deserialize failed", BYTES_TO_BITS( length ), systemAddress, true );
+            for( PluginInterface2* pPlugin : messageHandlerList )
+            {
+                pPlugin->OnReliabilityLayerNotification( "incomingAcks.Deserialize failed", BYTES_TO_BITS( length ), systemAddress, true );
+            }
 
             return false;
         }
-        for( i = 0; i < incomingAcks.ranges.Size(); i++ )
+        for( unsigned int i = 0; i < incomingAcks.ranges.Size(); i++ )
         {
             if( incomingAcks.ranges[i].minIndex > incomingAcks.ranges[i].maxIndex || ( incomingAcks.ranges[i].maxIndex == (uint24_t)( 0xFFFFFFFF ) ) )
             {
                 RakAssert( incomingAcks.ranges[i].minIndex <= incomingAcks.ranges[i].maxIndex );
 
-                for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                    messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "incomingAcks minIndex > maxIndex or maxIndex is max value", BYTES_TO_BITS( length ), systemAddress, true );
+                for( PluginInterface2* pPlugin : messageHandlerList )
+                {
+                    pPlugin->OnReliabilityLayerNotification( "incomingAcks minIndex > maxIndex or maxIndex is max value", BYTES_TO_BITS( length ), systemAddress, true );
+                }
                 return false;
             }
             for( datagramNumber = incomingAcks.ranges[i].minIndex; datagramNumber >= incomingAcks.ranges[i].minIndex && datagramNumber <= incomingAcks.ranges[i].maxIndex; datagramNumber++ )
             {
-                CCTimeType whenSent;
-
-                if( unreliableWithAckReceiptHistory.Size() > 0 )
+                for( auto it = unreliableWithAckReceiptHistory.begin();  it != unreliableWithAckReceiptHistory.end(); /**/ )
                 {
-                    unsigned int k = 0;
-                    while( k < unreliableWithAckReceiptHistory.Size() )
+                    if( it->datagramNumber == datagramNumber )
                     {
-                        if( unreliableWithAckReceiptHistory[k].datagramNumber == datagramNumber )
-                        {
-                            InternalPacket* ackReceipt = AllocateFromInternalPacketPool();
-                            AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
-                            ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
-                            ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_ACKED;
-                            memcpy( ackReceipt->data + sizeof( MessageID ), &unreliableWithAckReceiptHistory[k].sendReceiptSerial, sizeof( uint32_t ) );
-                            outputQueue.push_back( ackReceipt );
+                        InternalPacket* ackReceipt = AllocateFromInternalPacketPool();
+                        AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
+                        ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
+                        ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_ACKED;
+                        memcpy( ackReceipt->data + sizeof( MessageID ), &it->sendReceiptSerial, sizeof( uint32_t ) );
+                        outputQueue.push_back( ackReceipt );
 
-                            // Remove, swap with last
-                            unreliableWithAckReceiptHistory.RemoveAtIndex( k );
-                        }
-                        else
-                            k++;
+                        it = unreliableWithAckReceiptHistory.erase( it );
+                    }
+                    else
+                    {
+                        ++it;
                     }
                 }
 
+                CCTimeType whenSent;
                 MessageNumberNode* messageNumberNode = GetMessageNumberNodeByDatagramIndex( datagramNumber, &whenSent );
                 if( messageNumberNode )
                 {
@@ -636,11 +637,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
                     congestionManager.OnAck( timeRead, rtt, dhf.hasBAndAS, 0, dhf.AS, totalUserDataBytesAcked, bandwidthExceededStatistic, datagramNumber );
 #else
-                    CCTimeType ping;
-                    if( timeRead > whenSent )
-                        ping = timeRead - whenSent;
-                    else
-                        ping = 0;
+                    CCTimeType ping = timeRead > whenSent ? timeRead - whenSent : 0;
                     congestionManager.OnAck( timeRead, ping, dhf.hasBAndAS, 0, dhf.AS, totalUserDataBytesAcked, bandwidthExceededStatistic, datagramNumber );
 #endif
                     while( messageNumberNode )
@@ -663,19 +660,23 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         DataStructures::RangeList<DatagramSequenceNumberType> incomingNAKs;
         if( incomingNAKs.Deserialize( &socketData ) == false )
         {
-            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "incomingNAKs.Deserialize failed", BYTES_TO_BITS( length ), systemAddress, true );
+            for( PluginInterface2* pPlugin : messageHandlerList )
+            {
+                pPlugin->OnReliabilityLayerNotification( "incomingNAKs.Deserialize failed", BYTES_TO_BITS( length ), systemAddress, true );
+            }
 
             return false;
         }
-        for( i = 0; i < incomingNAKs.ranges.Size(); i++ )
+        for( unsigned int i = 0; i < incomingNAKs.ranges.Size(); i++ )
         {
             if( incomingNAKs.ranges[i].minIndex > incomingNAKs.ranges[i].maxIndex )
             {
                 RakAssert( incomingNAKs.ranges[i].minIndex <= incomingNAKs.ranges[i].maxIndex );
 
-                for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                    messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "incomingNAKs minIndex>maxIndex", BYTES_TO_BITS( length ), systemAddress, true );
+                for( PluginInterface2* pPlugin : messageHandlerList )
+                {
+                    pPlugin->OnReliabilityLayerNotification( "incomingNAKs minIndex>maxIndex", BYTES_TO_BITS( length ), systemAddress, true );
+                }
 
                 return false;
             }
@@ -713,8 +714,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         uint32_t skippedMessageCount;
         if( !congestionManager.OnGotPacket( dhf.datagramNumber, dhf.isContinuousSend, timeRead, length, &skippedMessageCount ) )
         {
-            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "congestionManager.OnGotPacket failed", BYTES_TO_BITS( length ), systemAddress, true );
+            for( PluginInterface2* pPlugin : messageHandlerList )
+            {
+                pPlugin->OnReliabilityLayerNotification( "congestionManager.OnGotPacket failed", BYTES_TO_BITS( length ), systemAddress, true );
+            }
 
             return true;
         }
@@ -741,20 +744,22 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         InternalPacket* internalPacket = CreateInternalPacketFromBitStream( &socketData, timeRead );
         if( internalPacket == 0 )
         {
-            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "CreateInternalPacketFromBitStream failed", BYTES_TO_BITS( length ), systemAddress, true );
+            for( PluginInterface2* pPlugin : messageHandlerList )
+            {
+                pPlugin->OnReliabilityLayerNotification( "CreateInternalPacketFromBitStream failed", BYTES_TO_BITS( length ), systemAddress, true );
+            }
 
             return true;
         }
 
         while( internalPacket )
         {
-            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
+            for( PluginInterface2* pPlugin : messageHandlerList )
             {
 #if CC_TIME_TYPE_BYTES == 4
-                messageHandlerList[messageHandlerIndex]->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, timeRead, false );
+                pPlugin->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, timeRead, false );
 #else
-                messageHandlerList[messageHandlerIndex]->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, ( RakNet::TimeMS )( timeRead / (CCTimeType)1000 ), false );
+                pPlugin->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, ( RakNet::TimeMS )( timeRead / (CCTimeType)1000 ), false );
 #endif
             }
 
@@ -776,8 +781,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                 {
                     if( internalPacket->orderingChannel >= NUMBER_OF_ORDERED_STREAMS )
                     {
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "internalPacket->orderingChannel >= NUMBER_OF_ORDERED_STREAMS", BYTES_TO_BITS( length ), systemAddress, true );
+                        for( PluginInterface2* pPlugin : messageHandlerList )
+                        {
+                            pPlugin->OnReliabilityLayerNotification( "internalPacket->orderingChannel >= NUMBER_OF_ORDERED_STREAMS", BYTES_TO_BITS( length ), systemAddress, true );
+                        }
 
                         bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
 
@@ -794,7 +801,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     // If the following conditional is true then this either a duplicate packet
                     // or an older out of order packet
                     // The subtraction unsigned overflow is intentional
-                    holeCount = (DatagramSequenceNumberType)( internalPacket->reliableMessageNumber - receivedPacketsBaseIndex );
+                    DatagramSequenceNumberType holeCount = (DatagramSequenceNumberType)( internalPacket->reliableMessageNumber - receivedPacketsBaseIndex );
                     const DatagramSequenceNumberType typeRange = (DatagramSequenceNumberType)(const uint32_t)-1;
 
                     // TESTING1
@@ -811,8 +818,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     {
                         bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
 
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "holeCount > typeRange/(DatagramSequenceNumberType) 2", BYTES_TO_BITS( length ), systemAddress, false );
+                        for( PluginInterface2* pPlugin : messageHandlerList )
+                        {
+                            pPlugin->OnReliabilityLayerNotification( "holeCount > typeRange/(DatagramSequenceNumberType) 2", BYTES_TO_BITS( length ), systemAddress, false );
+                        }
 
                         // Duplicate packet
                         FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
@@ -826,8 +835,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         if( hasReceivedPacketQueue[holeCount] != false ) // non-zero means this is a hole
                         {
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "Higher count pushed to hasReceivedPacketQueue", BYTES_TO_BITS( length ), systemAddress, false );
+                            for( PluginInterface2* pPlugin : messageHandlerList )
+                            {
+                                pPlugin->OnReliabilityLayerNotification( "Higher count pushed to hasReceivedPacketQueue", BYTES_TO_BITS( length ), systemAddress, false );
+                            }
 #endif
 
                             // Fill in the hole
@@ -838,8 +849,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                             bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "Duplicate packet ignored", BYTES_TO_BITS( length ), systemAddress, false );
+                            for( PluginInterface2* pPlugin : messageHandlerList )
+                            {
+                                pPlugin->OnReliabilityLayerNotification( "Duplicate packet ignored", BYTES_TO_BITS( length ), systemAddress, false );
+                            }
 #endif
 
                             // Duplicate packet
@@ -855,8 +868,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         {
                             RakAssert( "Hole count too high. See ReliabilityLayer.h" && 0 );
 
-                            for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                                messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "holeCount > 1000000", BYTES_TO_BITS( length ), systemAddress, true );
+                            for( PluginInterface2* pPlugin : messageHandlerList )
+                            {
+                                pPlugin->OnReliabilityLayerNotification( "holeCount > 1000000", BYTES_TO_BITS( length ), systemAddress, true );
+                            }
 
                             bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
 
@@ -868,8 +883,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         }
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "Adding to hasReceivedPacketQueue later ordered message", BYTES_TO_BITS( length ), systemAddress, false );
+                        for( PluginInterface2* pPlugin : messageHandlerList )
+                        {
+                            pPlugin->OnReliabilityLayerNotification( "Adding to hasReceivedPacketQueue later ordered message", BYTES_TO_BITS( length ), systemAddress, false );
+                        }
 #endif
 
                         // Fix - sending on a higher priority gives us a very very high received packets base index if we formerly had pre-split a lot of messages and
@@ -913,8 +930,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     if( internalPacket == 0 )
                     {
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "BuildPacketFromSplitPacketList did not return anything.", BYTES_TO_BITS( length ), systemAddress, false );
+                        for( PluginInterface2* pPlugin : messageHandlerList )
+                        {
+                            pPlugin->OnReliabilityLayerNotification( "BuildPacketFromSplitPacketList did not return anything.", BYTES_TO_BITS( length ), systemAddress, false );
+                        }
 #endif
 
                         // Don't have all the parts yet
@@ -1010,8 +1029,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #endif
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                                for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                                    messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "Sequenced rejected: lower than highest known value", BYTES_TO_BITS( length ), systemAddress, false );
+                                for( PluginInterface2* pPlugin : messageHandlerList )
+                                {
+                                    pPlugin->OnReliabilityLayerNotification( "Sequenced rejected: lower than highest known value", BYTES_TO_BITS( length ), systemAddress, false );
+                                }
 #endif
 
                                 // Lower than highest known value
@@ -1135,8 +1156,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #endif
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "Larger number ordered packet leaving holes", BYTES_TO_BITS( length ), systemAddress, false );
+                        for( PluginInterface2* pPlugin : messageHandlerList )
+                        {
+                            pPlugin->OnReliabilityLayerNotification( "Larger number ordered packet leaving holes", BYTES_TO_BITS( length ), systemAddress, false );
+                        }
 #endif
 
                         // Buffered, nothing to do
@@ -1149,8 +1172,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         ReleaseToInternalPacketPool( internalPacket );
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
-                            messageHandlerList[messageHandlerIndex]->OnReliabilityLayerNotification( "Rejected older resend", BYTES_TO_BITS( length ), systemAddress, false );
+                        for( PluginInterface2* pPlugin : messageHandlerList )
+                        {
+                            pPlugin->OnReliabilityLayerNotification( "Rejected older resend", BYTES_TO_BITS( length ), systemAddress, false );
+                        }
 #endif
 
                         // Ignored, nothing to do
@@ -1338,7 +1363,7 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, int MTUSize, CCTimeType time,
                                unsigned bitsPerSecondLimit,
-                               DataStructures::List<PluginInterface2*>& messageHandlerList,
+                               std::vector<PluginInterface2*>& messageHandlerList,
                                RakNetRandom* rnr,
                                BitStream& updateBitStream )
 
@@ -1485,7 +1510,6 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     statistics.BPSLimitByOutgoingBandwidthLimit = BITS_TO_BYTES( bitsPerSecondLimit );
     statistics.BPSLimitByCongestionControl = congestionManager.GetBytesPerSecondLimitByCongestionControl();
 
-    unsigned int i;
     if( time > lastBpsClear +
 #if CC_TIME_TYPE_BYTES == 4
                    100
@@ -1494,7 +1518,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 #endif
     )
     {
-        for( i = 0; i < RNS_PER_SECOND_METRICS_COUNT; i++ )
+        for( int i = 0; i < RNS_PER_SECOND_METRICS_COUNT; i++ )
         {
             bpsMetrics[i].ClearExpired1( time );
         }
@@ -1502,26 +1526,23 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
         lastBpsClear = time;
     }
 
-    if( unreliableWithAckReceiptHistory.Size() > 0 )
+    for( auto it = unreliableWithAckReceiptHistory.begin(); it != unreliableWithAckReceiptHistory.end(); /**/ )
     {
-        i = 0;
-        while( i < unreliableWithAckReceiptHistory.Size() )
+        //if( it->nextActionTime < time )
+        if( time - it->nextActionTime < ( ( (CCTimeType)-1 ) / 2 ) )
         {
-            //if (unreliableWithAckReceiptHistory[i].nextActionTime < time)
-            if( time - unreliableWithAckReceiptHistory[i].nextActionTime < ( ( (CCTimeType)-1 ) / 2 ) )
-            {
-                InternalPacket* ackReceipt = AllocateFromInternalPacketPool();
-                AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
-                ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
-                ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_LOSS;
-                memcpy( ackReceipt->data + sizeof( MessageID ), &unreliableWithAckReceiptHistory[i].sendReceiptSerial, sizeof( uint32_t ) );
-                outputQueue.push_back( ackReceipt );
+            InternalPacket* ackReceipt = AllocateFromInternalPacketPool();
+            AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
+            ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
+            ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_LOSS;
+            memcpy( ackReceipt->data + sizeof( MessageID ), &it->sendReceiptSerial, sizeof( uint32_t ) );
+            outputQueue.push_back( ackReceipt );
 
-                // Remove, swap with last
-                unreliableWithAckReceiptHistory.RemoveAtIndex( i );
-            }
-            else
-                i++;
+            it = unreliableWithAckReceiptHistory.erase( it );
+        }
+        else
+        {
+            ++it;
         }
     }
 
@@ -1584,12 +1605,12 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
                         pushedAnything = true;
 
-                        for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
+                        for( PluginInterface2* pPlugin : messageHandlerList )
                         {
 #if CC_TIME_TYPE_BYTES == 4
-                            messageHandlerList[messageHandlerIndex]->OnInternalPacket( internalPacket, packetsToSendThisUpdateDatagramBoundaries.Size() + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)time, true );
+                            pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)time, true );
 #else
-                            messageHandlerList[messageHandlerIndex]->OnInternalPacket( internalPacket, packetsToSendThisUpdateDatagramBoundaries.Size() + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ), true );
+                            pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ), true );
 #endif
                         }
 
@@ -1624,12 +1645,10 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
             allDatagramSizesSoFar = 0;
 
             // Keep filling datagrams until we exceed transmission bandwidth
-            while(
-                ResendBufferOverflow() == false &&
+            while( ResendBufferOverflow() == false &&
                 ( (int)BITS_TO_BYTES( allDatagramSizesSoFar ) < transmissionBandwidth ||
                   // This condition means if we want to send a datagram pair, and only have one datagram buffered, exceed bandwidth to add another
-                  ( countdownToNextPacketPair == 0 &&
-                    datagramsToSendThisUpdateIsPair.Size() == 1 ) ) )
+                  ( countdownToNextPacketPair == 0 && datagramsToSendThisUpdateIsPair.size() == 1 ) ) )
             {
                 // Fill with packets until MTU is reached
                 pushedAnything = false;
@@ -1727,11 +1746,10 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                     }
                     else if( internalPacket->reliability == UNRELIABLE_WITH_ACK_RECEIPT )
                     {
-                        unreliableWithAckReceiptHistory.Push( UnreliableWithAckReceiptNode(
-                                                                  congestionManager.GetNextDatagramSequenceNumber() + packetsToSendThisUpdateDatagramBoundaries.Size(),
+                        unreliableWithAckReceiptHistory.emplace_back( UnreliableWithAckReceiptNode(
+                                                                  congestionManager.GetNextDatagramSequenceNumber() + static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ),
                                                                   internalPacket->sendReceiptSerial,
-                                                                  congestionManager.GetRTOForRetransmission( internalPacket->timesSent + 1 ) + time ),
-                                                              _FILE_AND_LINE_ );
+                                                                  congestionManager.GetRTOForRetransmission( internalPacket->timesSent + 1 ) + time ) );
                     }
 
                     // If isReliable is false, the packet and its contents will be added to a list to be freed in ClearPacketsAndDatagrams
@@ -1745,12 +1763,12 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                     PushPacket( time, internalPacket, isReliable );
                     internalPacket->timesSent++;
 
-                    for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
+                    for( PluginInterface2* pPlugin : messageHandlerList )
                     {
 #if CC_TIME_TYPE_BYTES == 4
-                        messageHandlerList[messageHandlerIndex]->OnInternalPacket( internalPacket, packetsToSendThisUpdateDatagramBoundaries.Size() + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)time, true );
+                        pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)time, true );
 #else
-                        messageHandlerList[messageHandlerIndex]->OnInternalPacket( internalPacket, packetsToSendThisUpdateDatagramBoundaries.Size() + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ), true );
+                        pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ), true );
 #endif
                     }
                     pushedAnything = true;
@@ -1770,7 +1788,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
         }
 
 
-        for( unsigned int datagramIndex = 0; datagramIndex < packetsToSendThisUpdateDatagramBoundaries.Size(); datagramIndex++ )
+        for( unsigned int datagramIndex = 0; datagramIndex < packetsToSendThisUpdateDatagramBoundaries.size(); datagramIndex++ )
         {
             if( datagramIndex > 0 )
                 dhf.isContinuousSend = true;
@@ -2019,18 +2037,18 @@ void ReliabilityLayer::UpdateWindowFromAck( CCTimeType time )
 //-------------------------------------------------------------------------------------------------------
 // Does what the function name says
 //-------------------------------------------------------------------------------------------------------
-unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSequenced( const MessageNumberType messageNumber, CCTimeType time, DataStructures::List<PluginInterface2*>& messageHandlerList, const SystemAddress& systemAddress )
+unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSequenced( const MessageNumberType messageNumber, CCTimeType time, std::vector<PluginInterface2*>& messageHandlerList, const SystemAddress& systemAddress )
 {
     (void)time;
     (void)messageNumber;
     InternalPacket* internalPacket;
 
-    for( unsigned int messageHandlerIndex = 0; messageHandlerIndex < messageHandlerList.Size(); messageHandlerIndex++ )
+    for( PluginInterface2* pPlugin : messageHandlerList )
     {
 #if CC_TIME_TYPE_BYTES == 4
-        messageHandlerList[messageHandlerIndex]->OnAck( messageNumber, systemAddress, time );
+        pPlugin->OnAck( messageNumber, systemAddress, time );
 #else
-        messageHandlerList[messageHandlerIndex]->OnAck( messageNumber, systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ) );
+        pPlugin->OnAck( messageNumber, systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ) );
 #endif
     }
 
@@ -2907,11 +2925,11 @@ CCTimeType ReliabilityLayer::GetAckPing( void ) const
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::ResetPacketsAndDatagrams( void )
 {
-    packetsToSendThisUpdate.Clear( true, _FILE_AND_LINE_ );
-    packetsToDeallocThisUpdate.Clear( true, _FILE_AND_LINE_ );
-    packetsToSendThisUpdateDatagramBoundaries.Clear( true, _FILE_AND_LINE_ );
-    datagramsToSendThisUpdateIsPair.Clear( true, _FILE_AND_LINE_ );
-    datagramSizesInBytes.Clear( true, _FILE_AND_LINE_ );
+    packetsToSendThisUpdate.clear();
+    packetsToDeallocThisUpdate.clear();
+    packetsToSendThisUpdateDatagramBoundaries.clear();
+    datagramsToSendThisUpdateIsPair.clear();
+    datagramSizesInBytes.clear();
     datagramSizeSoFar = 0;
 }
 //-------------------------------------------------------------------------------------------------------
@@ -2921,8 +2939,8 @@ void ReliabilityLayer::PushPacket( CCTimeType time, InternalPacket* internalPack
     datagramSizeSoFar += bitsForThisPacket;
     RakAssert( BITS_TO_BYTES( datagramSizeSoFar ) < MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
     allDatagramSizesSoFar += bitsForThisPacket;
-    packetsToSendThisUpdate.Push( internalPacket, _FILE_AND_LINE_ );
-    packetsToDeallocThisUpdate.Push( isReliable == false, _FILE_AND_LINE_ );
+    packetsToSendThisUpdate.push_back( internalPacket );
+    packetsToDeallocThisUpdate.push_back( isReliable == false );
     RakAssert( internalPacket->headerLength == GetMessageHeaderLengthBits( internalPacket ) );
 
     // This code tells me how much time elapses between when you send, and when the message actually goes out
@@ -2942,10 +2960,10 @@ void ReliabilityLayer::PushDatagram( void )
 {
     if( datagramSizeSoFar > 0 )
     {
-        packetsToSendThisUpdateDatagramBoundaries.Push( packetsToSendThisUpdate.Size(), _FILE_AND_LINE_ );
-        datagramsToSendThisUpdateIsPair.Push( false, _FILE_AND_LINE_ );
+        packetsToSendThisUpdateDatagramBoundaries.push_back( static_cast<uint32_t>( packetsToSendThisUpdate.size() ) );
+        datagramsToSendThisUpdateIsPair.push_back( false );
         RakAssert( BITS_TO_BYTES( datagramSizeSoFar ) < MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
-        datagramSizesInBytes.Push( BITS_TO_BYTES( datagramSizeSoFar ), _FILE_AND_LINE_ );
+        datagramSizesInBytes.push_back( BITS_TO_BYTES( datagramSizeSoFar ) );
         datagramSizeSoFar = 0;
 
         // Disable packet pairs
@@ -2963,10 +2981,10 @@ void ReliabilityLayer::PushDatagram( void )
 //-------------------------------------------------------------------------------------------------------
 bool ReliabilityLayer::TagMostRecentPushAsSecondOfPacketPair( void )
 {
-    if( datagramsToSendThisUpdateIsPair.Size() >= 2 )
+    if( datagramsToSendThisUpdateIsPair.size() >= 2 )
     {
-        datagramsToSendThisUpdateIsPair[datagramsToSendThisUpdateIsPair.Size() - 2] = true;
-        datagramsToSendThisUpdateIsPair[datagramsToSendThisUpdateIsPair.Size() - 1] = true;
+        datagramsToSendThisUpdateIsPair[datagramsToSendThisUpdateIsPair.size() - 2] = true;
+        datagramsToSendThisUpdateIsPair[datagramsToSendThisUpdateIsPair.size() - 1] = true;
         return true;
     }
     return false;
@@ -2974,8 +2992,7 @@ bool ReliabilityLayer::TagMostRecentPushAsSecondOfPacketPair( void )
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::ClearPacketsAndDatagrams( void )
 {
-    unsigned int i;
-    for( i = 0; i < packetsToDeallocThisUpdate.Size(); i++ )
+    for( unsigned int i = 0; i < packetsToDeallocThisUpdate.size(); i++ )
     {
         // packetsToDeallocThisUpdate holds a boolean indicating if packetsToSendThisUpdate at this index should be freed
         if( packetsToDeallocThisUpdate[i] )
@@ -2986,7 +3003,7 @@ void ReliabilityLayer::ClearPacketsAndDatagrams( void )
             ReleaseToInternalPacketPool( packetsToSendThisUpdate[i] );
         }
     }
-    packetsToDeallocThisUpdate.Clear( true, _FILE_AND_LINE_ );
+    packetsToDeallocThisUpdate.clear();
 }
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::MoveToListHead( InternalPacket* internalPacket )

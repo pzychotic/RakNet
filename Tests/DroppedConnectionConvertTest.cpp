@@ -52,8 +52,8 @@ int DroppedConnectionConvertTest::RunTest( bool isVerbose, bool noPauses )
     SystemAddress serverID( "127.0.0.1", serverPort );
 
     server = RakPeerInterface::GetInstance();
-    destroyList.Clear( false, _FILE_AND_LINE_ );
-    destroyList.Push( server, _FILE_AND_LINE_ );
+    destroyList.clear();
+    destroyList.push_back( server );
     //  server->InitializeSecurity(0,0,0,0);
     SocketDescriptor socketDescriptor( serverPort, 0 );
     server->Startup( NUMBER_OF_CLIENTS, &socketDescriptor, 1 );
@@ -63,7 +63,7 @@ int DroppedConnectionConvertTest::RunTest( bool isVerbose, bool noPauses )
     for( index = 0; index < NUMBER_OF_CLIENTS; index++ )
     {
         clients[index] = RakPeerInterface::GetInstance();
-        destroyList.Push( clients[index], _FILE_AND_LINE_ );
+        destroyList.push_back( clients[index] );
         SocketDescriptor socketDescriptor2( serverPort + 1 + index, 0 );
         clients[index]->Startup( 1, &socketDescriptor2, 1 );
         if( clients[index]->Connect( "127.0.0.1", serverPort, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
@@ -374,11 +374,10 @@ std::string DroppedConnectionConvertTest::ErrorCodeToString( int errorCode ) con
 
 void DroppedConnectionConvertTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }
 
 DroppedConnectionConvertTest::DroppedConnectionConvertTest( void )

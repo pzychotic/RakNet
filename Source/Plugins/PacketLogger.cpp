@@ -19,6 +19,7 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 #include <string.h>
+#include "RakAssert.h"
 #include "SocketIncludes.h"
 
 #include <charconv>

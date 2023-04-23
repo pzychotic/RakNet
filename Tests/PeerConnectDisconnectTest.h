@@ -21,6 +21,8 @@
 #include "DebugTools.h"
 #include "CommonFunctions.h"
 
+#include <vector>
+
 using namespace RakNet;
 class PeerConnectDisconnectTest : public TestInterface
 {
@@ -37,5 +39,5 @@ protected:
     void WaitAndPrintResults( RakPeerInterface** peerList, int peerNum, bool isVerbose );
 
 private:
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<RakPeerInterface*> destroyList;
 };

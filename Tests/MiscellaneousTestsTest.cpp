@@ -36,7 +36,7 @@ AdvertiseSystem
 */
 int MiscellaneousTestsTest::RunTest( bool isVerbose, bool noPauses )
 {
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     RakPeerInterface *client, *server;
 
@@ -66,7 +66,7 @@ std::string MiscellaneousTestsTest::GetTestName() const
 
 std::string MiscellaneousTestsTest::ErrorCodeToString( int errorCode ) const
 {
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
+    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
     {
         return errorList[errorCode - 1];
     }
@@ -78,20 +78,19 @@ std::string MiscellaneousTestsTest::ErrorCodeToString( int errorCode ) const
 
 void MiscellaneousTestsTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }
 
 MiscellaneousTestsTest::MiscellaneousTestsTest( void )
 {
 
-    errorList.Push( "Did not recieve client advertise", _FILE_AND_LINE_ );
-    errorList.Push( "The router interface should not be called because no send has happened yet", _FILE_AND_LINE_ );
-    errorList.Push( "Router failed to trigger on failed directed send", _FILE_AND_LINE_ );
-    errorList.Push( "Router was not properly removed", _FILE_AND_LINE_ );
+    errorList.emplace_back( "Did not recieve client advertise" );
+    errorList.emplace_back( "The router interface should not be called because no send has happened yet" );
+    errorList.emplace_back( "Router failed to trigger on failed directed send" );
+    errorList.emplace_back( "Router was not properly removed" );
 }
 
 MiscellaneousTestsTest::~MiscellaneousTestsTest( void )

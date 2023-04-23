@@ -21,9 +21,9 @@
 #include "Export.h"
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
-#include "DS_List.h"
 
 #include <deque>
+#include <vector>
 
 // Trendnet TEW-632BRP sometimes starts at port 1024 and increments sequentially.
 // Zonnet zsr1134we. Replies go out on the net, but are always absorbed by the remote router??
@@ -237,7 +237,7 @@ protected:
         SystemAddress addr;
         RakNetGUID guid;
     };
-    DataStructures::List<AddrAndGuid> failedAttemptList;
+    std::vector<AddrAndGuid> failedAttemptList;
 
     struct DSTAndFac
     {

@@ -16,9 +16,10 @@
 #pragma once
 
 #include "RakMemoryOverride.h"
-#include "DS_List.h"
 #include "Export.h"
 #include "RakAssert.h"
+
+#include <vector>
 
 /// The namespace DataStructures was only added to avoid compiler errors for commonly named data structures
 /// As these data structures are stand-alone, you can use them outside of RakNet for your own projects if you wish.
@@ -51,7 +52,8 @@ public:
     data_type Peek( const unsigned startingIndex = 0 ) const;
     weight_type PeekWeight( const unsigned startingIndex = 0 ) const;
     void Clear( bool doNotDeallocateSmallBlocks, const char* file, unsigned int line );
-    data_type& operator[]( const unsigned int position ) const;
+    data_type& operator[]( const unsigned int position );
+    const data_type& operator[]( const unsigned int position ) const;
     unsigned Size( void ) const;
 
 protected:
@@ -59,7 +61,8 @@ protected:
     unsigned RightChild( const unsigned i ) const;
     unsigned Parent( const unsigned i ) const;
     void Swap( const unsigned i, const unsigned j );
-    List<HeapNode> heap;
+
+    std::vector<HeapNode> heap;
     bool optimizeNextSeriesPush;
 };
 
@@ -81,11 +84,10 @@ void Heap<weight_type, data_type, isMaxHeap>::PushSeries( const weight_type& wei
     if( optimizeNextSeriesPush == false )
     {
         // If the weight of what we are inserting is greater than / less than in order of the heap of every sibling and sibling of parent, then can optimize next push
-        unsigned currentIndex = heap.Size();
-        unsigned parentIndex;
+        unsigned currentIndex = static_cast<unsigned>( heap.size() );
         if( currentIndex > 0 )
         {
-            for( parentIndex = Parent( currentIndex ); parentIndex < currentIndex; parentIndex++ )
+            for( unsigned parentIndex = Parent( currentIndex ); parentIndex < currentIndex; parentIndex++ )
             {
                 if( isMaxHeap )
                 {
@@ -111,24 +113,23 @@ void Heap<weight_type, data_type, isMaxHeap>::PushSeries( const weight_type& wei
         }
 
         // Parent's subsequent siblings and this row's siblings all are less than / greater than inserted element. Can insert all further elements straight to the end
-        heap.Insert( HeapNode( weight, data ), file, line );
+        heap.emplace_back( HeapNode( weight, data ) );
         optimizeNextSeriesPush = true;
     }
     else
     {
-        heap.Insert( HeapNode( weight, data ), file, line );
+        heap.emplace_back( HeapNode( weight, data ) );
     }
 }
 
 template<class weight_type, class data_type, bool isMaxHeap>
 void Heap<weight_type, data_type, isMaxHeap>::Push( const weight_type& weight, const data_type& data, const char* file, unsigned int line )
 {
-    unsigned currentIndex = heap.Size();
-    unsigned parentIndex;
-    heap.Insert( HeapNode( weight, data ), file, line );
+    unsigned currentIndex = static_cast<unsigned>( heap.size() );
+    heap.emplace_back( HeapNode( weight, data ) );
     while( currentIndex != 0 )
     {
-        parentIndex = Parent( currentIndex );
+        unsigned parentIndex = Parent( currentIndex );
         if( isMaxHeap )
         {
             if( heap[parentIndex].weight < weight )
@@ -137,7 +138,9 @@ void Heap<weight_type, data_type, isMaxHeap>::Push( const weight_type& weight, c
                 currentIndex = parentIndex;
             }
             else
+            {
                 break;
+            }
         }
         else
         {
@@ -147,7 +150,9 @@ void Heap<weight_type, data_type, isMaxHeap>::Push( const weight_type& weight, c
                 currentIndex = parentIndex;
             }
             else
+            {
                 break;
+            }
         }
     }
 }
@@ -156,29 +161,27 @@ template<class weight_type, class data_type, bool isMaxHeap>
 data_type Heap<weight_type, data_type, isMaxHeap>::Pop( const unsigned startingIndex )
 {
     // While we have children, swap out with the larger of the two children.
+    RakAssert( !heap.empty() );
 
-    // This line will assert on an empty heap
     data_type returnValue = heap[startingIndex].data;
 
     // Move the last element to the head, and re-heapify
-    heap[startingIndex] = heap[heap.Size() - 1];
+    heap[startingIndex] = heap[heap.size() - 1];
 
-    unsigned currentIndex, leftChild, rightChild;
-    weight_type currentWeight;
-    currentIndex = startingIndex;
-    currentWeight = heap[startingIndex].weight;
-    heap.RemoveFromEnd();
+    unsigned currentIndex = startingIndex;
+    weight_type currentWeight = heap[startingIndex].weight;
+    heap.pop_back();
 
     while( 1 )
     {
-        leftChild = LeftChild( currentIndex );
-        rightChild = RightChild( currentIndex );
-        if( leftChild >= heap.Size() )
+        unsigned leftChild  = LeftChild( currentIndex );
+        unsigned rightChild = RightChild( currentIndex );
+        if( leftChild >= heap.size() )
         {
             // Done
             return returnValue;
         }
-        if( rightChild >= heap.Size() )
+        if( rightChild >= heap.size() )
         {
             // Only left node.
             if( ( isMaxHeap == true && currentWeight < heap[leftChild].weight ) ||
@@ -241,18 +244,25 @@ inline weight_type Heap<weight_type, data_type, isMaxHeap>::PeekWeight( const un
 template<class weight_type, class data_type, bool isMaxHeap>
 void Heap<weight_type, data_type, isMaxHeap>::Clear( bool doNotDeallocateSmallBlocks, const char* file, unsigned int line )
 {
-    heap.Clear( doNotDeallocateSmallBlocks, file, line );
+    heap.clear();
 }
 
 template<class weight_type, class data_type, bool isMaxHeap>
-inline data_type& Heap<weight_type, data_type, isMaxHeap>::operator[]( const unsigned int position ) const
+inline data_type& Heap<weight_type, data_type, isMaxHeap>::operator[]( const unsigned int position )
 {
     return heap[position].data;
 }
+
+template<class weight_type, class data_type, bool isMaxHeap>
+const inline data_type& Heap<weight_type, data_type, isMaxHeap>::operator[]( const unsigned int position ) const
+{
+    return heap[position].data;
+}
+
 template<class weight_type, class data_type, bool isMaxHeap>
 unsigned Heap<weight_type, data_type, isMaxHeap>::Size( void ) const
 {
-    return heap.Size();
+    return static_cast<unsigned>( heap.size() );
 }
 
 template<class weight_type, class data_type, bool isMaxHeap>
@@ -279,10 +289,7 @@ inline unsigned Heap<weight_type, data_type, isMaxHeap>::Parent( const unsigned 
 template<class weight_type, class data_type, bool isMaxHeap>
 void Heap<weight_type, data_type, isMaxHeap>::Swap( const unsigned i, const unsigned j )
 {
-    HeapNode temp;
-    temp = heap[i];
-    heap[i] = heap[j];
-    heap[j] = temp;
+    std::swap( heap[i], heap[j] );
 }
 
 }} // namespace RakNet::DataStructures

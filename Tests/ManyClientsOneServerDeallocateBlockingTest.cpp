@@ -275,28 +275,23 @@ int ManyClientsOneServerDeallocateBlockingTest::RunTest( bool isVerbose, bool no
 
     TimeMS entryTime = GetTimeMS(); //Loop entry time
 
-    DataStructures::List<SystemAddress> systemList;
-    DataStructures::List<RakNetGUID> guidList;
+    std::vector<SystemAddress> systemList;
+    std::vector<RakNetGUID> guidList;
 
     if( isVerbose )
         printf( "Entering disconnect loop \n" );
 
     while( GetTimeMS() - entryTime < 30000 ) //Run for 30 Secoonds
     {
-
         //Deallocate client IF connected
         for( int i = 0; i < clientNum; i++ )
         {
-
             clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-            int len = systemList.Size();
 
-            if( len >= 1 )
+            if( systemList.size() >= 1 )
             {
-
                 RakPeerInterface::DestroyInstance( clientList[i] );
                 clientList[i] = RakPeerInterface::GetInstance();
-
 
                 clientList[i]->Startup( 1, &SocketDescriptor(), 1 );
             }
@@ -346,7 +341,6 @@ int ManyClientsOneServerDeallocateBlockingTest::RunTest( bool isVerbose, bool no
             if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
             {
                 clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-                int len = systemList.Size();
 
                 if( isVerbose )
                     DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
@@ -369,12 +363,10 @@ int ManyClientsOneServerDeallocateBlockingTest::RunTest( bool isVerbose, bool no
 
     for( int i = 0; i < clientNum; i++ )
     {
-
         clientList[i]->GetSystemList( systemList, guidList );
-        int connNum = guidList.Size(); //Get the number of connections for the current peer
-        if( connNum != 1 )             //Did we connect all?
+        //Get the number of connections for the current peer
+        if( guidList.size() != 1 )     //Did we connect all?
         {
-
             if( isVerbose )
             {
                 printf( "Not all clients reconnected normally.\nFailed on client number %i\n", i );

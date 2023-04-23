@@ -98,10 +98,10 @@ int ReliableOrderedConvertedTest::RunTest( bool isVerbose, bool noPauses )
     else
     */
     fp = 0;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     sender = RakPeerInterface::GetInstance();
-    destroyList.Push( sender, _FILE_AND_LINE_ );
+    destroyList.push_back( sender );
     //sender->ApplyNetworkSimulator(.02, 100, 50);
 
     /*
@@ -138,7 +138,7 @@ int ReliableOrderedConvertedTest::RunTest( bool isVerbose, bool noPauses )
     sender->Connect( ip, remotePort, 0, 0 );
 
     receiver = RakPeerInterface::GetInstance();
-    destroyList.Push( receiver, _FILE_AND_LINE_ );
+    destroyList.push_back( receiver );
 
     /*
     printf("Enter local port: ");
@@ -380,9 +380,8 @@ ReliableOrderedConvertedTest::~ReliableOrderedConvertedTest( void )
 }
 void ReliableOrderedConvertedTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

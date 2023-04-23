@@ -21,6 +21,8 @@
 #include "DebugTools.h"
 #include "CommonFunctions.h"
 
+#include <vector>
+
 using namespace RakNet;
 class ManyClientsOneServerNonBlockingTest : public TestInterface
 {
@@ -33,5 +35,5 @@ public:
     void DestroyPeers();
 
 private:
-    DataStructures::List<RakPeerInterface*> destroyList;
+    std::vector<RakPeerInterface*> destroyList;
 };

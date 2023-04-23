@@ -24,6 +24,7 @@
 #include "DS_OrderedList.h"
 
 #include <string>
+#include <vector>
 
 namespace RakNet {
 
@@ -124,7 +125,7 @@ public:
         unsigned short mostRecentPort;
         bool isReady;
 
-        DataStructures::List<ConnectionAttempt*> connectionAttempts;
+        std::vector<ConnectionAttempt*> connectionAttempts;
         bool HasConnectionAttemptToUser( User* user );
         void DerefConnectionAttempt( ConnectionAttempt* ca );
         void DeleteConnectionAttempt( ConnectionAttempt* ca );

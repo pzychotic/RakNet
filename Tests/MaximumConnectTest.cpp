@@ -46,14 +46,14 @@ int MaximumConnectTest::RunTest( bool isVerbose, bool noPauses )
     RakPeerInterface* peerList[peerNum]; //A list of 8 peers
 
     Packet* packet;
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     int connReturn;
     //Initializations of the arrays
     for( int i = 0; i < peerNum; i++ )
     {
         peerList[i] = RakPeerInterface::GetInstance();
-        destroyList.Push( peerList[i], _FILE_AND_LINE_ );
+        destroyList.push_back( peerList[i] );
 
         peerList[i]->Startup( maxConnections, &SocketDescriptor( 60000 + i, 0 ), 1 );
         peerList[i]->SetMaximumIncomingConnections( maxConnections );
@@ -171,17 +171,16 @@ int MaximumConnectTest::RunTest( bool isVerbose, bool noPauses )
         std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
     }
 
-    DataStructures::List<SystemAddress> systemList;
-    DataStructures::List<RakNetGUID> guidList;
+    std::vector<SystemAddress> systemList;
+    std::vector<RakNetGUID> guidList;
 
     for( int i = 0; i < peerNum; i++ )
     {
-
         peerList[i]->GetSystemList( systemList, guidList );
-        int connNum = guidList.Size(); //Get the number of connections for the current peer
+
+        int connNum = static_cast<int>( guidList.size() ); //Get the number of connections for the current peer
         if( connNum > maxConnections ) //Did we connect to more?
         {
-
             if( isVerbose )
             {
                 printf( "More connections were allowed to peer %i, %i total.Fail\n", i, connNum );
@@ -227,9 +226,8 @@ MaximumConnectTest::~MaximumConnectTest( void )
 
 void MaximumConnectTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

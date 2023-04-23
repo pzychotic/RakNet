@@ -16,7 +16,7 @@
 /*
 Description:
 virtual ConnectionAttemptResult RakPeerInterface::ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey=0, unsigned sendConnectionAttemptCount=12, unsigned timeBetweenSendConnectionAttemptsMS=500, RakNet::TimeMS timeoutTime=0 )
-virtual void RakPeerInterface::GetSockets( DataStructures::List<RakNetSocket2*>& sockets )
+virtual void RakPeerInterface::GetSockets( std::vector<RakNetSocket2*>& sockets )
 virtual RakNetSocket2* RakPeerInterface::GetSocket( const SystemAddress target )
 
 Success conditions:
@@ -39,11 +39,10 @@ GetSocket
 */
 int ConnectWithSocketTest::RunTest( bool isVerbose, bool noPauses )
 {
-    destroyList.Clear( false, _FILE_AND_LINE_ );
+    destroyList.clear();
 
     RakPeerInterface *server, *client;
 
-    DataStructures::List<RakNetSocket2*> sockets;
     TestHelpers::StandardClientPrep( client, destroyList );
     TestHelpers::StandardServerPrep( server, destroyList );
 
@@ -73,6 +72,7 @@ int ConnectWithSocketTest::RunTest( bool isVerbose, bool noPauses )
     printf( "Disconnecting client\n" );
     CommonFunctions::DisconnectAndWait( client, "127.0.0.1", 60000 );
 
+    std::vector<RakNetSocket2*> sockets;
     client->GetSockets( sockets );
 
     RakNetSocket2* theSocket = sockets[0];
@@ -160,7 +160,7 @@ std::string ConnectWithSocketTest::GetTestName() const
 
 std::string ConnectWithSocketTest::ErrorCodeToString( int errorCode ) const
 {
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.Size() )
+    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
     {
         return errorList[errorCode - 1];
     }
@@ -172,12 +172,12 @@ std::string ConnectWithSocketTest::ErrorCodeToString( int errorCode ) const
 
 ConnectWithSocketTest::ConnectWithSocketTest( void )
 {
-    errorList.Push( "Client did not connect after 5 seconds", _FILE_AND_LINE_ );
-    errorList.Push( "Control test send didn't work", _FILE_AND_LINE_ );
-    errorList.Push( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSockets or ConnectWithSocket problem", _FILE_AND_LINE_ );
-    errorList.Push( "Server did not recieve test packet from client", _FILE_AND_LINE_ );
-    errorList.Push( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSocket or ConnectWithSocket problem", _FILE_AND_LINE_ );
-    errorList.Push( "Server did not recieve test packet from client", _FILE_AND_LINE_ );
+    errorList.emplace_back( "Client did not connect after 5 seconds" );
+    errorList.emplace_back( "Control test send didn't work" );
+    errorList.emplace_back( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSockets or ConnectWithSocket problem" );
+    errorList.emplace_back( "Server did not recieve test packet from client" );
+    errorList.emplace_back( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSocket or ConnectWithSocket problem" );
+    errorList.emplace_back( "Server did not recieve test packet from client" );
 }
 
 ConnectWithSocketTest::~ConnectWithSocketTest( void )
@@ -186,9 +186,8 @@ ConnectWithSocketTest::~ConnectWithSocketTest( void )
 
 void ConnectWithSocketTest::DestroyPeers()
 {
-
-    int theSize = destroyList.Size();
-
-    for( int i = 0; i < theSize; i++ )
-        RakPeerInterface::DestroyInstance( destroyList[i] );
+    for( RakPeerInterface* pPeer : destroyList )
+    {
+        RakPeerInterface::DestroyInstance( pPeer );
+    }
 }

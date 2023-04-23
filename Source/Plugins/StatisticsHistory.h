@@ -18,7 +18,6 @@
 
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
-#include "DS_List.h"
 #include "RakNetTypes.h"
 #include "DS_OrderedList.h"
 
@@ -27,6 +26,7 @@
 #include <deque>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace RakNet {
 
@@ -113,9 +113,8 @@ public:
     bool AddValueByObjectID( uint64_t objectId, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
     void AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
     SHErrorCode GetHistoryForKey( uint64_t objectId, const std::string& key, TimeAndValueQueue** values, Time curTime ) const;
-    bool GetHistorySorted( uint64_t objectId, SHSortOperation sortType, DataStructures::List<TimeAndValueQueue*>& values ) const;
+    bool GetHistorySorted( uint64_t objectId, SHSortOperation sortType, std::vector<TimeAndValueQueue*>& values ) const;
     void MergeAllObjectsOnKey( const std::string& key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const;
-    void GetUniqueKeyList( DataStructures::List<std::string>& keys );
 
     struct TimeAndValue
     {
