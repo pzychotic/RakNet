@@ -16,7 +16,6 @@
 
 #include "RakMemoryOverride.h"
 #include "MTUSize.h"
-#include "DS_LinkedList.h"
 #include "PacketPriority.h"
 #include "BitStream.h"
 #include "InternalPacket.h"

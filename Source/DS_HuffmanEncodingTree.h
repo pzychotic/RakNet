@@ -18,7 +18,6 @@
 #include "DS_HuffmanEncodingTreeNode.h"
 #include "BitStream.h"
 #include "Export.h"
-#include "DS_LinkedList.h"
 
 namespace RakNet {
 
@@ -47,13 +46,11 @@ public:
     void FreeMemory( void );
 
 private:
-    /// The root node of the tree
 
+    /// The root node of the tree
     HuffmanEncodingTreeNode* root;
 
     /// Used to hold bit encoding for one character
-
-
     struct CharacterEncoding
     {
         unsigned char* encoding;
@@ -61,8 +58,6 @@ private:
     };
 
     CharacterEncoding encodingTable[256];
-
-    void InsertNodeIntoSortedList( HuffmanEncodingTreeNode* node, DataStructures::LinkedList<HuffmanEncodingTreeNode*>* huffmanEncodingTreeNodeList ) const;
 };
 
 } // namespace RakNet

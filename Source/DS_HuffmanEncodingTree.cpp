@@ -12,7 +12,9 @@
 #include "BitStream.h"
 #include "RakAssert.h"
 
+#include <array>
 #include <deque>
+#include <list>
 
 namespace RakNet {
 
@@ -56,21 +58,31 @@ void HuffmanEncodingTree::FreeMemory( void )
     root = 0;
 }
 
+void InsertNode( HuffmanEncodingTreeNode* pNode, std::list<HuffmanEncodingTreeNode*>& aList )
+{
+    auto it = aList.begin();
+    for( /**/; it != aList.end(); ++it )
+    {
+        if( ( *it )->weight >= pNode->weight )
+        {
+            break;
+        }
+    }
+    aList.insert( it, pNode );
+}
 
 // Given a frequency table of 256 elements, all with a frequency of 1 or more, generate the tree
 void HuffmanEncodingTree::GenerateFromFrequencyTable( unsigned int frequencyTable[256] )
 {
-    int counter;
-    HuffmanEncodingTreeNode* node;
-    HuffmanEncodingTreeNode* leafList[256]; // Keep a copy of the pointers to all the leaves so we can generate the encryption table bottom-up, which is easier
+    std::array<HuffmanEncodingTreeNode*, 256> aLeafs; // Keep a copy of the pointers to all the leaves so we can generate the encryption table bottom-up, which is easier
     // 1.  Make 256 trees each with a weight equal to the frequency of the corresponding character
-    DataStructures::LinkedList<HuffmanEncodingTreeNode*> huffmanEncodingTreeNodeList;
+    std::list<HuffmanEncodingTreeNode*> aHuffmanEncodingTreeNodeList;
 
     FreeMemory();
 
-    for( counter = 0; counter < 256; counter++ )
+    for( int counter = 0; counter < 256; counter++ )
     {
-        node = RakNet::OP_NEW<HuffmanEncodingTreeNode>( _FILE_AND_LINE_ );
+        HuffmanEncodingTreeNode* node = RakNet::OP_NEW<HuffmanEncodingTreeNode>( _FILE_AND_LINE_ );
         node->left = 0;
         node->right = 0;
         node->value = (unsigned char)counter;
@@ -79,28 +91,27 @@ void HuffmanEncodingTree::GenerateFromFrequencyTable( unsigned int frequencyTabl
         if( node->weight == 0 )
             node->weight = 1; // 0 weights are illegal
 
-        leafList[counter] = node; // Used later to generate the encryption table
+        aLeafs[counter] = node; // Used later to generate the encryption table
 
-        InsertNodeIntoSortedList( node, &huffmanEncodingTreeNodeList ); // Insert and maintain sort order.
+        InsertNode( node, aHuffmanEncodingTreeNodeList ); // Insert and maintain sort order.
     }
-
 
     // 2.  While there is more than one tree, take the two smallest trees and merge them so that the two trees are the left and right
     // children of a new node, where the new node has the weight the sum of the weight of the left and right child nodes.
     while( 1 )
     {
-        huffmanEncodingTreeNodeList.Beginning();
-        HuffmanEncodingTreeNode *lesser, *greater;
-        lesser = huffmanEncodingTreeNodeList.Pop();
-        greater = huffmanEncodingTreeNodeList.Pop();
-        node = RakNet::OP_NEW<HuffmanEncodingTreeNode>( _FILE_AND_LINE_ );
+        HuffmanEncodingTreeNode* lesser  = aHuffmanEncodingTreeNodeList.front();
+        aHuffmanEncodingTreeNodeList.pop_front();
+        HuffmanEncodingTreeNode* greater = aHuffmanEncodingTreeNodeList.front();
+        aHuffmanEncodingTreeNodeList.pop_front();
+        HuffmanEncodingTreeNode* node = RakNet::OP_NEW<HuffmanEncodingTreeNode>( _FILE_AND_LINE_ );
         node->left = lesser;
         node->right = greater;
         node->weight = lesser->weight + greater->weight;
         lesser->parent = node;  // This is done to make generating the encryption table easier
         greater->parent = node; // This is done to make generating the encryption table easier
 
-        if( huffmanEncodingTreeNodeList.Size() == 0 )
+        if( aHuffmanEncodingTreeNodeList.empty() )
         {
             // 3. Assign the one remaining node in the list to the root node.
             root = node;
@@ -109,24 +120,22 @@ void HuffmanEncodingTree::GenerateFromFrequencyTable( unsigned int frequencyTabl
         }
 
         // Put the new node back into the list at the correct spot to maintain the sort.  Linear search time
-        InsertNodeIntoSortedList( node, &huffmanEncodingTreeNodeList );
+        InsertNode( node, aHuffmanEncodingTreeNodeList );
     }
 
     bool tempPath[256]; // Maximum path length is 256
-    unsigned short tempPathLength;
-    HuffmanEncodingTreeNode* currentNode;
     BitStream bitStream;
 
     // Generate the encryption table. From before, we have an array of pointers to all the leaves which contain pointers to their parents.
     // This can be done more efficiently but this isn't bad and it's way easier to program and debug
 
-    for( counter = 0; counter < 256; counter++ )
+    for( int counter = 0; counter < 256; counter++ )
     {
         // Already done at the end of the loop and before it!
-        tempPathLength = 0;
+        unsigned short tempPathLength = 0;
 
         // Set the current node at the leaf
-        currentNode = leafList[counter];
+        HuffmanEncodingTreeNode* currentNode = aLeafs[counter];
 
         do
         {
@@ -244,38 +253,6 @@ void HuffmanEncodingTree::DecodeArray( unsigned char* input, BitSize_t sizeInBit
         {
             output->WriteBits( &( currentNode->value ), sizeof( char ) * 8, true ); // Use WriteBits instead of Write(char) because we want to avoid TYPE_CHECKING
             currentNode = root;
-        }
-    }
-}
-
-// Insertion sort.  Slow but easy to write in this case
-void HuffmanEncodingTree::InsertNodeIntoSortedList( HuffmanEncodingTreeNode* node, DataStructures::LinkedList<HuffmanEncodingTreeNode*>* huffmanEncodingTreeNodeList ) const
-{
-    if( huffmanEncodingTreeNodeList->Size() == 0 )
-    {
-        huffmanEncodingTreeNodeList->Insert( node );
-        return;
-    }
-
-    huffmanEncodingTreeNodeList->Beginning();
-
-    unsigned counter = 0;
-    while( 1 )
-    {
-        if( huffmanEncodingTreeNodeList->Peek()->weight < node->weight )
-            ++( *huffmanEncodingTreeNodeList );
-        else
-        {
-            huffmanEncodingTreeNodeList->Insert( node );
-            break;
-        }
-
-        // Didn't find a spot in the middle - add to the end
-        if( ++counter == huffmanEncodingTreeNodeList->Size() )
-        {
-            huffmanEncodingTreeNodeList->End();
-            huffmanEncodingTreeNodeList->Add( node ); // Add to the end
-            break;
         }
     }
 }
