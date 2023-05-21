@@ -377,17 +377,14 @@ void ReliabilityLayer::FreeMemory( bool freeAllImmediately )
 
 void ReliabilityLayer::FreeThreadSafeMemory( void )
 {
-    unsigned i, j;
-    InternalPacket* internalPacket;
-
     ClearPacketsAndDatagrams();
 
-    for( i = 0; i < splitPacketChannelList.Size(); i++ )
+    for( unsigned i = 0; i < splitPacketChannelList.Size(); i++ )
     {
-        for( j = 0; j < splitPacketChannelList[i]->splitPacketList.AllocSize(); j++ )
+        for( unsigned j = 0; j < splitPacketChannelList[i]->splitPacketList.AllocSize(); j++ )
         {
-            internalPacket = splitPacketChannelList[i]->splitPacketList.Get( j );
-            if( internalPacket != NULL )
+            const InternalPacket* pPacket = splitPacketChannelList[i]->splitPacketList.Get( j );
+            if( pPacket != nullptr )
             {
                 FreeInternalPacketData( splitPacketChannelList[i]->splitPacketList.Get( j ), _FILE_AND_LINE_ );
                 ReleaseToInternalPacketPool( splitPacketChannelList[i]->splitPacketList.Get( j ) );
@@ -411,14 +408,15 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
     }
     outputQueue.clear();
 
-    for( i = 0; i < NUMBER_OF_ORDERED_STREAMS; i++ )
+    for( unsigned i = 0; i < NUMBER_OF_ORDERED_STREAMS; i++ )
     {
-        for( j = 0; j < orderingHeaps[i].Size(); j++ )
+        while( !orderingHeaps[i].empty() )
         {
-            FreeInternalPacketData( orderingHeaps[i][j], _FILE_AND_LINE_ );
-            ReleaseToInternalPacketPool( orderingHeaps[i][j] );
+            InternalPacket* pPacket = orderingHeaps[i].top().pPacket;
+            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( pPacket );
+            orderingHeaps[i].pop();
         }
-        orderingHeaps[i].Clear( true, _FILE_AND_LINE_ );
     }
 
     memset( resendBuffer, 0, sizeof( resendBuffer ) );
@@ -447,14 +445,17 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
     }
     unacknowledgedBytes = 0;
 
-    for( j = 0; j < outgoingPacketBuffer.Size(); j++ )
+    while( !outgoingPacketBuffer.empty() )
     {
-        if( outgoingPacketBuffer[j]->data )
-            FreeInternalPacketData( outgoingPacketBuffer[j], _FILE_AND_LINE_ );
-        ReleaseToInternalPacketPool( outgoingPacketBuffer[j] );
-    }
+        InternalPacket* pPacket = outgoingPacketBuffer.top().pPacket;
+        if( pPacket->data != nullptr )
+        {
+            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
+        }
+        ReleaseToInternalPacketPool( pPacket );
 
-    outgoingPacketBuffer.Clear( true, _FILE_AND_LINE_ );
+        outgoingPacketBuffer.pop();
+    }
 
 #ifdef _DEBUG
     for( DataAndTime* pTime : delayList )
@@ -1075,10 +1076,11 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                             highestSequencedReadIndex[internalPacket->orderingChannel] = 0;
 
                             // Return off heap until order lost
-                            while( orderingHeaps[internalPacket->orderingChannel].Size() > 0 &&
-                                   orderingHeaps[internalPacket->orderingChannel].Peek()->orderingIndex == orderedReadIndex[internalPacket->orderingChannel] )
+                            while( !orderingHeaps[internalPacket->orderingChannel].empty() &&
+                                   orderingHeaps[internalPacket->orderingChannel].top().pPacket->orderingIndex == orderedReadIndex[internalPacket->orderingChannel] )
                             {
-                                internalPacket = orderingHeaps[internalPacket->orderingChannel].Pop( 0 );
+                                internalPacket = orderingHeaps[internalPacket->orderingChannel].top().pPacket;
+                                orderingHeaps[internalPacket->orderingChannel].pop();
 
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
                                 BitStream bitStream2( internalPacket->data, BITS_TO_BYTES( internalPacket->dataBitLength ), false );
@@ -1135,8 +1137,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         // Sequenced has a lower heap weight, ordered has max sequenced weight
 
                         // Keep orderedHoleCount count small
-                        if( orderingHeaps[internalPacket->orderingChannel].Size() == 0 )
+                        if( orderingHeaps[internalPacket->orderingChannel].empty() )
+                        {
                             heapIndexOffsets[internalPacket->orderingChannel] = orderedReadIndex[internalPacket->orderingChannel];
+                        }
 
                         reliabilityHeapWeightType orderedHoleCount = internalPacket->orderingIndex - heapIndexOffsets[internalPacket->orderingChannel];
                         reliabilityHeapWeightType weight = orderedHoleCount * 1048576;
@@ -1145,7 +1149,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                             weight += internalPacket->sequencingIndex;
                         else
                             weight += ( 1048576 - 1 );
-                        orderingHeaps[internalPacket->orderingChannel].Push( weight, internalPacket, _FILE_AND_LINE_ );
+                        orderingHeaps[internalPacket->orderingChannel].emplace( WeightedPacket{ weight, internalPacket } );
 
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
                         if( packetId == ID_USER_PACKET_ENUM + 1 && fp )
@@ -1351,8 +1355,8 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
 
     RakAssert( internalPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
     RakAssert( internalPacket->messageNumberAssigned == false );
-    outgoingPacketBuffer.Push( GetNextWeight( internalPacket->priority ), internalPacket, _FILE_AND_LINE_ );
-    RakAssert( outgoingPacketBuffer.Size() == 0 || outgoingPacketBuffer.Peek()->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+    outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( internalPacket->priority ), internalPacket } );
+    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
     statistics.messageInSendBuffer[(int)internalPacket->priority]++;
     statistics.bytesInSendBuffer[(int)internalPacket->priority] += (double)BITS_TO_BYTES( internalPacket->dataBitLength );
 
@@ -1501,7 +1505,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     DatagramHeaderFormat dhf;
     dhf.needsBAndAs = congestionManager.GetIsInSlowStart();
     dhf.isContinuousSend = bandwidthExceededStatistic;
-    bandwidthExceededStatistic = outgoingPacketBuffer.Size() > 0;
+    bandwidthExceededStatistic = !outgoingPacketBuffer.empty();
 
     const bool hasDataToSendOrResend = IsResendQueueEmpty() == false || bandwidthExceededStatistic;
     RakAssert( NUMBER_OF_PRIORITIES == 4 );
@@ -1655,18 +1659,17 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
                 statistics.isLimitedByOutgoingBandwidthLimit = bitsPerSecondLimit != 0 && BITS_TO_BYTES( bitsPerSecondLimit ) < bpsMetrics[USER_MESSAGE_BYTES_SENT].GetBPS1( time );
 
-
-                while( outgoingPacketBuffer.Size() &&
+                while( !outgoingPacketBuffer.empty() &&
                        statistics.isLimitedByOutgoingBandwidthLimit == false )
                 {
-                    internalPacket = outgoingPacketBuffer.Peek();
+                    internalPacket = outgoingPacketBuffer.top().pPacket;
                     RakAssert( internalPacket->messageNumberAssigned == false );
-                    RakAssert( outgoingPacketBuffer.Size() == 0 || outgoingPacketBuffer.Peek()->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
 
                     if( internalPacket->data == 0 )
                     {
-                        outgoingPacketBuffer.Pop( 0 );
-                        RakAssert( outgoingPacketBuffer.Size() == 0 || outgoingPacketBuffer.Peek()->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                        outgoingPacketBuffer.pop();
+                        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
                         statistics.messageInSendBuffer[(int)internalPacket->priority]--;
                         statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BITS_TO_BYTES( internalPacket->dataBitLength );
                         ReleaseToInternalPacketPool( internalPacket );
@@ -1683,30 +1686,23 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                         break;
                     }
 
-                    bool isReliable;
-                    if( internalPacket->reliability == RELIABLE ||
-                        internalPacket->reliability == RELIABLE_SEQUENCED ||
-                        internalPacket->reliability == RELIABLE_ORDERED ||
-                        internalPacket->reliability == RELIABLE_WITH_ACK_RECEIPT ||
-                        //                      internalPacket->reliability == RELIABLE_SEQUENCED_WITH_ACK_RECEIPT  ||
-                        internalPacket->reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT )
-                        isReliable = true;
-                    else
-                        isReliable = false;
+                    const bool isReliable = internalPacket->reliability == RELIABLE ||
+                                            internalPacket->reliability == RELIABLE_SEQUENCED ||
+                                            internalPacket->reliability == RELIABLE_ORDERED ||
+                                            internalPacket->reliability == RELIABLE_WITH_ACK_RECEIPT ||
+                                            //internalPacket->reliability == RELIABLE_SEQUENCED_WITH_ACK_RECEIPT  ||
+                                            internalPacket->reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT;
 
-                    outgoingPacketBuffer.Pop( 0 );
-                    RakAssert( outgoingPacketBuffer.Size() == 0 || outgoingPacketBuffer.Peek()->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                    outgoingPacketBuffer.pop();
+                    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
                     RakAssert( internalPacket->messageNumberAssigned == false );
                     statistics.messageInSendBuffer[(int)internalPacket->priority]--;
                     statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BITS_TO_BYTES( internalPacket->dataBitLength );
                     if( isReliable
-                        /*
-                        I thought about this and agree that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT and RELIABLE_SEQUENCED_WITH_ACK_RECEIPT is not useful unless you also know if the message was discarded.
+                        // I thought about this and agree that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT and RELIABLE_SEQUENCED_WITH_ACK_RECEIPT is not useful unless you also know if the message was discarded.
+                        // The problem is that internally, message numbers are only assigned to reliable messages, because message numbers are only used to discard duplicate message receipt and only reliable messages get sent more than once. However, without message numbers getting assigned and transmitted, there is no way to tell the sender about which messages were discarded. In fact, in looking this over I realized that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT introduced a bug, because the remote system assumes all message numbers are used (no holes). With that send type, on packetloss, a permanent hole would have been created which eventually would cause the system to discard all further packets.
+                        // So I have two options. Either do not support ack receipts when sending sequenced, or write complex and major new systems. UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT would need to send the message ID number on a special channel which allows for non-delivery. And both of them would need to have a special range list to indicate which message numbers were not delivered, so when acks are sent that can be indicated as well. A further problem is that the ack itself can be lost - it is possible that the message can arrive but be discarded, yet the ack is lost. On resend, the resent message would be ignored as duplicate, and you'd never get the discard message either (unless I made a special buffer for that case too).
 
-                        The problem is that internally, message numbers are only assigned to reliable messages, because message numbers are only used to discard duplicate message receipt and only reliable messages get sent more than once. However, without message numbers getting assigned and transmitted, there is no way to tell the sender about which messages were discarded. In fact, in looking this over I realized that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT introduced a bug, because the remote system assumes all message numbers are used (no holes). With that send type, on packetloss, a permanent hole would have been created which eventually would cause the system to discard all further packets.
-
-                        So I have two options. Either do not support ack receipts when sending sequenced, or write complex and major new systems. UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT would need to send the message ID number on a special channel which allows for non-delivery. And both of them would need to have a special range list to indicate which message numbers were not delivered, so when acks are sent that can be indicated as well. A further problem is that the ack itself can be lost - it is possible that the message can arrive but be discarded, yet the ack is lost. On resend, the resent message would be ignored as duplicate, and you'd never get the discard message either (unless I made a special buffer for that case too).
-*/
                         //                      ||
                         // If needs an ack receipt, keep the internal packet around in the list
                         //                      internalPacket->reliability == UNRELIABLE_WITH_ACK_RECEIPT ||
@@ -1859,18 +1855,15 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
             SendBitStream( s, systemAddress, &updateBitStream, rnr, time );
 
-            bandwidthExceededStatistic = outgoingPacketBuffer.Size() > 0;
+            bandwidthExceededStatistic = !outgoingPacketBuffer.empty();
 
-            if( bandwidthExceededStatistic == true )
-                timeOfLastContinualSend = time;
-            else
-                timeOfLastContinualSend = 0;
+            timeOfLastContinualSend = bandwidthExceededStatistic ? time : 0;
         }
 
         ClearPacketsAndDatagrams();
 
         // Any data waiting to send after attempting to send, then bandwidth is exceeded
-        bandwidthExceededStatistic = outgoingPacketBuffer.Size() > 0;
+        bandwidthExceededStatistic = !outgoingPacketBuffer.empty();
     }
 }
 
@@ -1975,8 +1968,10 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
 //-------------------------------------------------------------------------------------------------------
 bool ReliabilityLayer::IsOutgoingDataWaiting( void )
 {
-    if( outgoingPacketBuffer.Size() > 0 )
+    if( !outgoingPacketBuffer.empty() )
+    {
         return true;
+    }
 
     return statistics.messagesInResendBuffer != 0;
 }
@@ -2457,8 +2452,6 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
     unsigned int headerLength = (unsigned int)BITS_TO_BYTES( GetMessageHeaderLengthBits( internalPacket ) );
     unsigned int dataByteLength = (unsigned int)BITS_TO_BYTES( internalPacket->dataBitLength );
     int maximumSendBlockBytes, byteOffset, bytesToSend;
-    SplitPacketIndexType splitPacketIndex;
-    int i;
     InternalPacket** internalPacketArray;
 
     maximumSendBlockBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() );
@@ -2479,7 +2472,7 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 #endif
         internalPacketArray = (InternalPacket**)rakMalloc_Ex( sizeof( InternalPacket* ) * internalPacket->splitPacketCount, _FILE_AND_LINE_ );
 
-    for( i = 0; i < (int)internalPacket->splitPacketCount; i++ )
+    for( uint32_t i = 0; i < (int)internalPacket->splitPacketCount; ++i )
     {
         internalPacketArray[i] = AllocateFromInternalPacketPool();
 
@@ -2491,7 +2484,7 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
     }
 
     // This identifies which packet this is in the set
-    splitPacketIndex = 0;
+    SplitPacketIndexType splitPacketIndex = 0;
 
     InternalPacketRefCountedData* refCounter = 0;
 
@@ -2523,24 +2516,20 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 
     splitPacketId++; // It's ok if this wraps to 0
 
-    //  InternalPacket *workingPacket;
-
-    // Tell the heap we are going to push a list of elements where each element in the list follows the heap order
-    RakAssert( outgoingPacketBuffer.Size() == 0 || outgoingPacketBuffer.Peek()->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
-    outgoingPacketBuffer.StartSeries();
+    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
 
     // Copy all the new packets into the split packet list
-    for( i = 0; i < (int)internalPacket->splitPacketCount; i++ )
+    for( uint32_t i = 0; i < internalPacket->splitPacketCount; ++i )
     {
         internalPacketArray[i]->headerLength = headerLength;
         RakAssert( internalPacketArray[i]->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
         AddToUnreliableLinkedList( internalPacketArray[i] );
         RakAssert( internalPacketArray[i]->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
         RakAssert( internalPacketArray[i]->messageNumberAssigned == false );
-        outgoingPacketBuffer.PushSeries( GetNextWeight( internalPacketArray[i]->priority ), internalPacketArray[i], _FILE_AND_LINE_ );
-        RakAssert( outgoingPacketBuffer.Size() == 0 || outgoingPacketBuffer.Peek()->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+        outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( internalPacketArray[i]->priority ), internalPacketArray[i] } );
+        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
         statistics.messageInSendBuffer[(int)internalPacketArray[i]->priority]++;
-        statistics.bytesInSendBuffer[(int)(int)internalPacketArray[i]->priority] += (double)BITS_TO_BYTES( internalPacketArray[i]->dataBitLength );
+        statistics.bytesInSendBuffer[(int)internalPacketArray[i]->priority] += (double)BITS_TO_BYTES( internalPacketArray[i]->dataBitLength );
     }
 
     // Do not delete, original is referenced by all split packets to avoid numerous allocations. See AllocInternalPacketData above
@@ -3386,11 +3375,11 @@ void ReliabilityLayer::InitHeapWeights( void )
 //-------------------------------------------------------------------------------------------------------
 reliabilityHeapWeightType ReliabilityLayer::GetNextWeight( int priorityLevel )
 {
-    uint64_t next = outgoingPacketBufferNextWeights[priorityLevel];
-    if( outgoingPacketBuffer.Size() > 0 )
+    reliabilityHeapWeightType next = outgoingPacketBufferNextWeights[priorityLevel];
+    if( !outgoingPacketBuffer.empty() )
     {
-        int peekPL = outgoingPacketBuffer.Peek()->priority;
-        reliabilityHeapWeightType weight = outgoingPacketBuffer.PeekWeight();
+        int peekPL = outgoingPacketBuffer.top().pPacket->priority;
+        reliabilityHeapWeightType weight = outgoingPacketBuffer.top().uWeight;
         reliabilityHeapWeightType min = weight - ( 1 << peekPL ) * peekPL + peekPL;
         if( next < min )
             next = min + ( 1 << priorityLevel ) * priorityLevel + priorityLevel;

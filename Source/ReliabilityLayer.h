@@ -25,7 +25,6 @@
 #include "DS_RangeList.h"
 #include "DS_MemoryPool.h"
 #include "RakNetDefines.h"
-#include "DS_Heap.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
 #include "PluginInterface2.h"
@@ -40,6 +39,7 @@
 #endif
 
 #include <deque>
+#include <queue>
 #include <vector>
 
 /// Number of ordered streams available. You can use up to 32 ordered streams
@@ -410,7 +410,14 @@ private:
 
     RakNet::TimeMS timeLastDatagramArrived;
 
-    DataStructures::Heap<reliabilityHeapWeightType, InternalPacket*, false> outgoingPacketBuffer;
+    struct WeightedPacket
+    {
+        reliabilityHeapWeightType   uWeight;
+        InternalPacket*             pPacket;
+        bool operator()( const WeightedPacket& lhs, const WeightedPacket& rhs ) { return lhs.uWeight > rhs.uWeight; }
+    };
+    using WeightedPacketQueue = std::priority_queue<WeightedPacket, std::vector<WeightedPacket>, WeightedPacket>;
+    WeightedPacketQueue outgoingPacketBuffer;
     reliabilityHeapWeightType outgoingPacketBufferNextWeights[NUMBER_OF_PRIORITIES];
     void InitHeapWeights( void );
     reliabilityHeapWeightType GetNextWeight( int priorityLevel );
@@ -450,7 +457,7 @@ private:
     OrderingIndexType orderedReadIndex[NUMBER_OF_ORDERED_STREAMS];
     // Highest value received for sequencedWriteIndex for the current value of orderedReadIndex on the same channel.
     OrderingIndexType highestSequencedReadIndex[NUMBER_OF_ORDERED_STREAMS];
-    DataStructures::Heap<reliabilityHeapWeightType, InternalPacket*, false> orderingHeaps[NUMBER_OF_ORDERED_STREAMS];
+    WeightedPacketQueue orderingHeaps[NUMBER_OF_ORDERED_STREAMS];
     OrderingIndexType heapIndexOffsets[NUMBER_OF_ORDERED_STREAMS];
 
     /// Memory-efficient receivedPackets algorithm:
