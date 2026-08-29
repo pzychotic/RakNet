@@ -8,186 +8,113 @@
  *
  */
 
-#include "ConnectWithSocketTest.h"
+#include "PeerScope.h"
+
+#include "CommonFunctions.h"
+#include "ConnectionWaits.h"
+#include "RakNetSocket2.h"
+#include "RakPeerInterface.h"
+#include "RakTimer.h"
+#include "TestHelpers.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <thread>
+#include <vector>
 
 /*
-Description:
-virtual ConnectionAttemptResult RakPeerInterface::ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey=0, unsigned sendConnectionAttemptCount=12, unsigned timeBetweenSendConnectionAttemptsMS=500, RakNet::TimeMS timeoutTime=0 )
-virtual void RakPeerInterface::GetSockets( std::vector<RakNetSocket2*>& sockets )
-virtual RakNetSocket2* RakPeerInterface::GetSocket( const SystemAddress target )
+Connects a client to a server the ordinary way, disconnects it, then reconnects it
+twice more over a socket the test hands to RakNet itself - once with a socket taken
+from GetSockets, once with one taken from GetSocket. Each reconnection is followed
+by a send, because a connection that cannot carry a packet has not really been
+re-established.
 
-Success conditions:
+RakPeerInterface functions explicitly tested:
 
-Failure conditions:
+    ConnectWithSocket
+    GetSockets
+    GetSocket
 
-RakPeerInterface Functions used, tested indirectly by its use:
-Startup
-SetMaximumIncomingConnections
-Receive
-DeallocatePacket
-Send
-IsConnected
-
-RakPeerInterface Functions Explicitly Tested:
-ConnectWithSocket
-GetSockets
-GetSocket
-
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Receive, DeallocatePacket, Send, IsConnected.
 */
-int ConnectWithSocketTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kServerPort = 60000;
+
+/*
+ *  ConnectWithSocket is fire-and-forget, so this polls: retry whenever the client
+ *  is not already connected or on its way, until connected or the budget runs out.
+ *  Shared by both call sites so the test body reads as the three connections it is.
+ */
+bool ConnectWithSocketAndWait( RakPeerInterface* client, const SystemAddress& serverAddress, RakNetSocket2* socket, int millisecondsToWait )
 {
-    destroyList.clear();
+    RakTimer timer( millisecondsToWait );
 
-    RakPeerInterface *server, *client;
-
-    TestHelpers::StandardClientPrep( client, destroyList );
-    TestHelpers::StandardServerPrep( server, destroyList );
-
-    SystemAddress serverAddress( "127.0.0.1", 60000 );
-
-    printf( "Testing normal connect before test\n" );
-    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) )
+    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && !timer.IsExpired() )
     {
+        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
+        {
+            client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, socket );
+        }
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[1 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 1;
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
+    return CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true );
+}
+
+} // namespace
+
+TEST_CASE( "A client reconnects and sends over a socket it supplies, from both GetSockets and GetSocket", "[network]" )
+{
+    PeerScope peers;
+
+    RakPeerInterface* client = peers.Client();
+    RakPeerInterface* server = peers.Server( kServerPort );
+
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    // Everything below reconnects this same pair, so an ordinary connect that
+    // fails leaves nothing worth measuring.
+    REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) );
+
+    // The control: prove a send arrives before ConnectWithSocket is in the
+    // picture, so a later send failure is not blamed on the socket.
     TestHelpers::BroadCastTestPacket( client );
+    CHECK( TestHelpers::WaitForTestPacket( server, 5000 ) );
 
-    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[2 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 2;
-    }
-
-    printf( "Disconnecting client\n" );
-    CommonFunctions::DisconnectAndWait( client, "127.0.0.1", 60000 );
+    // Closed once and then waited for, never re-issued per poll - see
+    // ConnectionWaits::WaitForDisconnect for why that distinction matters.
+    client->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
+    ConnectionWaits::WaitForDisconnect( client, serverAddress );
 
     std::vector<RakNetSocket2*> sockets;
     client->GetSockets( sockets );
 
-    RakNetSocket2* theSocket = sockets[0];
+    // REQUIRE, not CHECK: sockets[0] on an empty list is undefined behaviour
+    // rather than a second failure message.
+    REQUIRE_FALSE( sockets.empty() );
 
-    RakTimer timer2( 5000 );
-
-    printf( "Testing ConnectWithSocket using socket from GetSockets\n" );
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && !timer2.IsExpired() )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, theSocket );
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[3 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 3;
-    }
+    REQUIRE( ConnectWithSocketAndWait( client, serverAddress, sockets[0], 5000 ) );
 
     TestHelpers::BroadCastTestPacket( client );
+    CHECK( TestHelpers::WaitForTestPacket( server, 5000 ) );
 
-    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
-    {
+    client->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
+    ConnectionWaits::WaitForDisconnect( client, serverAddress );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[4 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
+    // The same socket by the other route. UNASSIGNED_SYSTEM_ADDRESS asks for the
+    // client's own open socket rather than one bound to a peer.
+    RakNetSocket2* openSocket = client->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
+    REQUIRE( openSocket != nullptr );
 
-        return 4;
-    }
-
-    printf( "Disconnecting client\n" );
-    CommonFunctions::DisconnectAndWait( client, "127.0.0.1", 60000 );
-
-    printf( "Testing ConnectWithSocket using socket from GetSocket\n" );
-    theSocket = client->GetSocket( UNASSIGNED_SYSTEM_ADDRESS ); //Get open Socket
-
-    timer2.Start();
-
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && !timer2.IsExpired() )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, theSocket );
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[5 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 5;
-    }
+    REQUIRE( ConnectWithSocketAndWait( client, serverAddress, openSocket, 5000 ) );
 
     TestHelpers::BroadCastTestPacket( client );
-
-    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[6 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 6;
-    }
-
-    return 0;
-}
-
-std::string ConnectWithSocketTest::GetTestName() const
-{
-    return "ConnectWithSocketTest";
-}
-
-std::string ConnectWithSocketTest::ErrorCodeToString( int errorCode ) const
-{
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
-    {
-        return errorList[errorCode - 1];
-    }
-    else
-    {
-        return "Undefined Error";
-    }
-}
-
-ConnectWithSocketTest::ConnectWithSocketTest( void )
-{
-    errorList.emplace_back( "Client did not connect after 5 seconds" );
-    errorList.emplace_back( "Control test send didn't work" );
-    errorList.emplace_back( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSockets or ConnectWithSocket problem" );
-    errorList.emplace_back( "Server did not recieve test packet from client" );
-    errorList.emplace_back( "Client did not connect after 5 secods Using ConnectWithSocket, could be GetSocket or ConnectWithSocket problem" );
-    errorList.emplace_back( "Server did not recieve test packet from client" );
-}
-
-ConnectWithSocketTest::~ConnectWithSocketTest( void )
-{
-}
-
-void ConnectWithSocketTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
-    }
+    CHECK( TestHelpers::WaitForTestPacket( server, 5000 ) );
 }

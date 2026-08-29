@@ -8,341 +8,241 @@
  *
  */
 
-#include "EightPeerTest.h"
+#include "ConnectionWaits.h"
+#include "PeerScope.h"
+
+#include "BitStream.h"
+#include "GetTime.h"
+#include "MessageIdentifiers.h"
+#include "RakNetTime.h"
+#include "RakNetTypes.h"
+#include "RakPeerInterface.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <thread>
+#include <vector>
 
 /*
-What is being done here is having 8 peers all connect to eachother and be
-connected. Then it check if they all connect. If so send data in ordered reliable mode for 100
-loops.
+Eight peers connect to one another until every peer holds the other seven, then
+each of them broadcasts a hundred RELIABLE_ORDERED packets carrying its own index
+and a sequence number. Every peer must receive all hundred from each of the other
+seven, in the order they were sent, and hold every connection for the duration.
 
-Possible ideas for changes:
-Possibly use rakpeerinterfaces GetSystemList() for number of
-connected peers instead of manually tracking. Would be slower though,
-shouldn't be significant at this number but the recieve speed it part of the test.
+RakPeerInterface functions explicitly tested:
 
-Success conditions:
-Peers connect and receive all packets in order.
-No disconnections allowed in this version of the test.
+    Send (HIGH_PRIORITY, RELIABLE_ORDERED, broadcast)
+    GetSystemList
 
-Failure conditions:
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Connect, Receive, DeallocatePacket,
+GetConnectionState.
 
-If cannot connect to all peers for 20 seconds.
-All packets are not recieved.
-All packets are not in order.
-Disconnection.
+Connectedness is read from GetSystemList rather than counted out of
+ID_CONNECTION_REQUEST_ACCEPTED and ID_NEW_INCOMING_CONNECTION packets by hand.
+
+The tail of the receive loop is where the runtime of a test like this hides: a
+per-peer wait of up to a second for one more packet, on eight peers with empty
+queues, cost 126.7 s in the baseline (docs/research/test-suite-baseline.md). The
+drain below is bounded by kDeliveryBudget but ends as soon as the counts are
+complete, and the test runs in about 2.6 s in Release - measured, which is why it
+does not carry [slow].
 */
-int EightPeerTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr int kPeerNum = 8;
+constexpr unsigned short kBasePort = 60000;
+
+// Deliberately not equal: room for twice the peer count in total, incoming capped
+// at the peer count. Every peer needs the other seven, so neither number binds.
+constexpr unsigned int kMaxConnections = kPeerNum * 2;
+constexpr unsigned short kMaxIncoming = kPeerNum;
+
+constexpr int kNumPackets = 100;
+constexpr unsigned char kPacketId = ID_USER_PACKET_ENUM + 1;
+
+// Hang guard on the tail of the send stream, not a tuning knob: RELIABLE_ORDERED
+// promises every packet arrives, so this bounds a wedged run rather than buying
+// delivery. Over loopback the drain below exits in well under a second.
+constexpr TimeMS kDeliveryBudget = 30000;
+
+} // namespace
+
+// Wrap-safe on a uint32_t TimeMS, where a plain >= is not. See ConnectionWaits.h.
+using ConnectionWaits::Expired;
+
+TEST_CASE( "Eight fully connected peers each receive every packet the other seven broadcast, in order", "[network]" )
 {
-    const int peerNum = 8;
-    RakPeerInterface* peerList[peerNum];              //A list of 8 peers
-    int connectionAmount[peerNum];                    //Counter for me to keep track of connection requests and accepts
-    int recievedFromList[peerNum][peerNum];           //Counter for me to keep track of packets received
-    int lastNumberReceivedFromList[peerNum][peerNum]; //Counter for me to keep track of last recieved sequence number
-    const int numPackets = 100;
-    Packet* packet;
-    BitStream bitStream;
-    destroyList.clear();
+    PeerScope peers;
 
-    //Initializations of the arrays
-    for( int i = 0; i < peerNum; i++ )
+    RakPeerInterface* peerList[kPeerNum];
+
+    for( int i = 0; i < kPeerNum; i++ )
     {
-        peerList[i] = RakPeerInterface::GetInstance();
-        destroyList.push_back( peerList[i] );
-        connectionAmount[i] = 0;
-
-        for( int j = 0; j < peerNum; j++ )
-        {
-            recievedFromList[i][j] = 0;
-            lastNumberReceivedFromList[i][j] = 0;
-        }
-
-        peerList[i]->Startup( peerNum * 2, &SocketDescriptor( 60000 + i, 0 ), 1 );
-        peerList[i]->SetMaximumIncomingConnections( peerNum );
+        // Client() rather than Server(), even though these peers accept
+        // connections: Server() sets the incoming limit to its Startup slot
+        // count, and this test wants those two numbers different.
+        peerList[i] = peers.Client( static_cast<unsigned short>( kBasePort + i ), kMaxConnections );
+        peerList[i]->SetMaximumIncomingConnections( kMaxIncoming );
     }
 
-    //Connect all the peers together
-    for( int i = 0; i < peerNum; i++ )
+    for( int i = 0; i < kPeerNum; i++ )
     {
-        for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
+        // From i + 1, so a pair is attempted once rather than from both ends.
+        for( int j = i + 1; j < kPeerNum; j++ )
         {
-            if( peerList[i]->Connect( "127.0.0.1", 60000 + j, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-            {
-                if( isVerbose )
-                {
-                    DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                }
-                return 1; //This fails the test, don't bother going on.
-            }
+            INFO( "peer " << i << " connecting to peer " << j );
+            REQUIRE( peerList[i]->Connect( "127.0.0.1", kBasePort + j, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
         }
     }
 
-    TimeMS entryTime = GetTimeMS(); //Loop entry time
-    TimeMS finishTimer = GetTimeMS();
-    bool initialConnectOver = false; //Our initial connect all has been done.
+    // Every ordered pair, both directions of each attempt - see ConnectionWaits.h.
+    // This waits for the requests to settle, not to succeed; the count below is
+    // what says they succeeded.
+    ConnectionWaits::WaitForAllPairsToSettle( peerList, kPeerNum, kBasePort );
 
-    for( int k = 0; k < numPackets || GetTimeMS() - finishTimer < 5000; ) //Quit after we send 100 messages while connected, if not all connected and not failure, otherwise fail after 20 seconds and exit
+    std::vector<SystemAddress> systemList;
+    std::vector<RakNetGUID> guidList;
+
+    for( int i = 0; i < kPeerNum; i++ )
     {
-        bool allConnected = true;          //Start true, only one failed case makes it all fail
-        for( int i = 0; i < peerNum; i++ ) //Make sure all peers are connected to eachother
-        {
-            if( connectionAmount[i] < peerNum - 1 )
-            {
-                allConnected = false;
-            }
-        }
+        peerList[i]->GetSystemList( systemList, guidList );
 
-        if( GetTimeMS() - entryTime > 20000 && !initialConnectOver && !allConnected ) //failed for 20 seconds
-        {
+        const int connectionCount = static_cast<int>( guidList.size() );
 
-            if( isVerbose )
-                DebugTools::ShowError( "Failed to connect to all peers after 20 seconds", !noPauses && isVerbose, __LINE__, __FILE__ );
-            return 2;
-            break;
-        }
-
-        if( allConnected )
-        {
-            if( !initialConnectOver )
-                initialConnectOver = true;
-            if( k < numPackets )
-            {
-                for( int i = 0; i < peerNum; i++ ) //Have all peers send a message to all peers
-                {
-
-                    bitStream.Reset();
-
-                    bitStream.Write( (unsigned char)( ID_USER_PACKET_ENUM + 1 ) );
-
-                    bitStream.Write( k );
-                    bitStream.Write( i );
-
-                    peerList[i]->Send( &bitStream, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true );
-                }
-            }
-            k++;
-        }
-
-        if( k >= numPackets - 3 ) //This is our last 3 packets, give it time to send packet and arrive on interface, 2 seconds is more than enough
-        {
-            std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
-            if( k == numPackets )
-            {
-                finishTimer = GetTimeMS();
-            }
-        }
-
-        for( int i = 0; i < peerNum; i++ ) //Receive for all peers
-        {
-            if( allConnected ) //If all connected try to make the data more visually appealing by bunching it in one receive
-            {
-                int waittime = 0;
-                do
-                {
-                    packet = peerList[i]->Receive();
-                    waittime++;
-
-                    if( !packet )
-                    {
-                        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-                    }
-
-                    if( waittime > 1000 ) //Check for packet every millisec and if one second has passed move on, don't block execution
-                    {
-                        break;
-                    }
-                } while( !packet ); //For testing purposes wait for packet a little while, go if not recieved
-            }
-            else //Otherwise just keep recieving quickly until connected
-            {
-                packet = peerList[i]->Receive();
-            }
-            if( isVerbose )
-                printf( "For peer %i with %i connected peers.\n", i, connectionAmount[i] );
-            while( packet )
-            {
-                switch( packet->data[0] )
-                {
-                case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-                    if( isVerbose )
-                    {
-                        printf( "Another client has disconnected.\n" );
-                        DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-                    return 3;
-                    break;
-                case ID_REMOTE_CONNECTION_LOST:
-                    if( isVerbose )
-                    {
-                        printf( "Another client has lost the connection.\n" );
-                        DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-                    return 3;
-                    break;
-                case ID_REMOTE_NEW_INCOMING_CONNECTION:
-                    if( isVerbose )
-                        printf( "Another client has connected.\n" );
-                    break;
-                case ID_CONNECTION_REQUEST_ACCEPTED:
-                    if( isVerbose )
-                        printf( "Our connection request has been accepted.\n" );
-                    connectionAmount[i]++;
-
-                    break;
-                case ID_CONNECTION_ATTEMPT_FAILED:
-
-                    if( isVerbose )
-                        DebugTools::ShowError( "A connection has failed.\n Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    return 2;
-                    break;
-
-                case ID_NEW_INCOMING_CONNECTION:
-                    if( isVerbose )
-                        printf( "A connection is incoming.\n" );
-                    connectionAmount[i]++; //For this test assume connection. Test will fail if connection fails.
-                    break;
-                case ID_NO_FREE_INCOMING_CONNECTIONS: //Should not happend
-                    if( isVerbose )
-                    {
-                        printf( "The server is full. This shouldn't happen in this test ever.\n" );
-
-                        DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-                    return 2;
-                    break;
-
-                case ID_ALREADY_CONNECTED:
-                    if( isVerbose )
-                        printf( "Already connected\n" ); //Shouldn't happen
-
-                    break;
-
-                case ID_DISCONNECTION_NOTIFICATION:
-                    if( isVerbose )
-                    {
-                        printf( "We have been disconnected.\n" );
-
-                        DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-                    return 3;
-                    break;
-                case ID_CONNECTION_LOST:
-                    allConnected = false;
-                    connectionAmount[i]--;
-                    if( isVerbose )
-                    {
-                        printf( "Connection lost.\n" );
-
-                        DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-
-                    return 3;
-
-                    break;
-                default:
-
-                    if( packet->data[0] == ID_USER_PACKET_ENUM + 1 )
-                    {
-                        int thePeerNum;
-                        int sequenceNum;
-                        bitStream.Reset();
-                        bitStream.Write( (char*)packet->data, packet->length );
-                        bitStream.IgnoreBits( 8 );
-                        bitStream.Read( sequenceNum );
-                        bitStream.Read( thePeerNum );
-                        if( isVerbose )
-                            printf( "Message %i from %i\n", sequenceNum, thePeerNum );
-
-                        if( thePeerNum >= 0 && thePeerNum < peerNum )
-                        {
-                            if( lastNumberReceivedFromList[i][thePeerNum] == sequenceNum )
-                            {
-                                lastNumberReceivedFromList[i][thePeerNum]++;
-                            }
-                            else
-                            {
-                                if( isVerbose )
-                                {
-                                    printf( "Packets out of order" );
-                                    DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                                }
-                                return 4;
-                            }
-                            recievedFromList[i][thePeerNum]++;
-                        }
-                    }
-                    break;
-                }
-                peerList[i]->DeallocatePacket( packet );
-                // Stay in the loop as long as there are more packets.
-                packet = peerList[i]->Receive();
-            }
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
+        // REQUIRE: every send below is a broadcast to whoever is connected, so a
+        // peer short of its seven silently turns the packet counts at the bottom
+        // into a report about a connection failure that happened up here.
+        INFO( "peer " << i );
+        REQUIRE( connectionCount == kPeerNum - 1 );
     }
 
-    for( int i = 0; i < peerNum; i++ )
-    {
+    // The connection notifications are of no further interest, and the send
+    // stream below is easier to reason about against empty queues.
+    ConnectionWaits::DrainAll( peerList, kPeerNum );
 
-        for( int j = 0; j < peerNum; j++ )
+    // [receiver][sender]
+    int receivedFrom[kPeerNum][kPeerNum] = {};
+    int nextExpected[kPeerNum][kPeerNum] = {};
+
+    auto handleReceived = [&]( int receiver, const Packet* packet ) {
+        const unsigned char id = packet->data[0];
+
+        // Every peer was connected a moment ago and nothing here closes a
+        // connection, so any of these is the test's subject breaking.
+        if( id == ID_DISCONNECTION_NOTIFICATION || id == ID_CONNECTION_LOST ||
+            id == ID_REMOTE_DISCONNECTION_NOTIFICATION || id == ID_REMOTE_CONNECTION_LOST )
         {
-            if( i != j )
-            {
-                if( isVerbose )
-                    printf( "%i recieved %i packets from %i\n", i, recievedFromList[i][j], j );
-                if( recievedFromList[i][j] != numPackets )
-                {
-                    if( isVerbose )
-                    {
-                        printf( "Not all packets recieved. it was in reliable ordered mode so that means test failed or wait time needs increasing\n" );
+            FAIL( "peer " << receiver << " lost a connection mid-test, message id " << static_cast<int>( id ) );
+        }
 
-                        DebugTools::ShowError( "Test failed.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-                    return 5;
+        if( id != kPacketId )
+        {
+            return;
+        }
+
+        BitStream bitStream( packet->data, packet->length, false );
+        bitStream.IgnoreBytes( 1 );
+
+        int sequence = 0;
+        int sender = 0;
+
+        // REQUIRE: read unchecked, a short packet would index the two 8x8 tables
+        // below with whatever the stack held.
+        REQUIRE( bitStream.Read( sequence ) );
+        REQUIRE( bitStream.Read( sender ) );
+
+        REQUIRE( sender >= 0 );
+        REQUIRE( sender < kPeerNum );
+
+        INFO( "peer " << receiver << " receiving from peer " << sender );
+
+        // REQUIRE rather than the suite's CHECK default, because this latches: the
+        // expected number advances one per packet, so one break in the ordering
+        // puts every packet behind it out of step too, and a CHECK would report
+        // the same defect hundreds of times instead of reporting more.
+        REQUIRE( sequence == nextExpected[receiver][sender] );
+
+        nextExpected[receiver][sender]++;
+        receivedFrom[receiver][sender]++;
+    };
+
+    // Deliberately NOT ConnectionWaits::DrainAll, and deliberately not named like
+    // one: this does not throw the packets away, it feeds every one of them to the
+    // state machine above, which is the test's subject.
+    auto handleAllReceived = [&]() {
+        for( int i = 0; i < kPeerNum; i++ )
+        {
+            for( Packet* packet = peerList[i]->Receive(); packet;
+                 peerList[i]->DeallocatePacket( packet ), packet = peerList[i]->Receive() )
+            {
+                handleReceived( i, packet );
+            }
+        }
+    };
+
+    for( int sequence = 0; sequence < kNumPackets; sequence++ )
+    {
+        for( int i = 0; i < kPeerNum; i++ )
+        {
+            BitStream bitStream;
+            bitStream.Write( kPacketId );
+            bitStream.Write( sequence );
+            bitStream.Write( i );
+
+            // Send fails on an empty or null buffer rather than on a busy peer, so
+            // a false here is a bug in the three lines above it.
+            INFO( "peer " << i << " sending packet " << sequence );
+            REQUIRE( peerList[i]->Send( &bitStream, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true ) );
+        }
+
+        handleAllReceived();
+
+        // A yield rather than a pause.
+        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
+    }
+
+    auto allDelivered = [&]() {
+        for( int i = 0; i < kPeerNum; i++ )
+        {
+            for( int j = 0; j < kPeerNum; j++ )
+            {
+                if( i != j && receivedFrom[i][j] < kNumPackets )
+                {
+                    return false;
                 }
             }
         }
+
+        return true;
+    };
+
+    const TimeMS deliveryDeadline = GetTimeMS() + kDeliveryBudget;
+
+    while( !allDelivered() && !Expired( deliveryDeadline ) )
+    {
+        handleAllReceived();
+
+        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
 
-    printf( "All packets recieved in order,pass\n" );
-    return 0;
-}
-
-std::string EightPeerTest::GetTestName() const
-{
-    return "EightPeerTest";
-}
-
-std::string EightPeerTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
+    // CHECK: these are the last statements in the test, and a peer that is short
+    // of one sender's packets should not hide the other 55 pairs.
+    for( int i = 0; i < kPeerNum; i++ )
     {
-    case  0: return "No error";                             break;
-    case  1: return "Connect function returned failure.";   break;
-    case  2: return "Peers failed to connect.";             break;
-    case  3: return "There was a disconnection.";           break;
-    case  4: return "Not ordered.";                         break;
-    case  5: return "Not reliable.";                        break;
-    default: return "Undefined Error";                      break;
-    }
-    // clang-format on
-}
+        for( int j = 0; j < kPeerNum; j++ )
+        {
+            if( i == j )
+            {
+                continue;
+            }
 
-EightPeerTest::EightPeerTest( void )
-{
-}
-
-EightPeerTest::~EightPeerTest( void )
-{
-}
-
-void EightPeerTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
+            INFO( "peer " << i << " from peer " << j );
+            CHECK( receivedFrom[i][j] == kNumPackets );
+        }
     }
 }

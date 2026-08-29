@@ -10,11 +10,11 @@
 
 #pragma once
 
-
 #include "RakNetTime.h"
 #include "GetTime.h"
 
 using namespace RakNet;
+
 class RakTimer
 {
 public:

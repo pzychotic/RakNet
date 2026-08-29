@@ -8,91 +8,46 @@
  *
  */
 
-#include "MiscellaneousTestsTest.h"
+#include "PeerScope.h"
+
+#include "CommonFunctions.h"
+#include "MessageIdentifiers.h"
+#include "RakPeerInterface.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 /*
-Description:
-Tests:
-virtual void    SetRouterInterface (RouterInterface *routerInterface)=0
-virtual void    RemoveRouterInterface (RouterInterface *routerInterface)=0
-virtual bool    AdvertiseSystem (const char *host, unsigned short remotePort, const char *data, int dataLength, unsigned connectionSocketIndex=0)=0
+An unconnected client advertises itself to a server, which must surface the
+advertisement as ID_ADVERTISE_SYSTEM. No connection is established first - that is
+the point of AdvertiseSystem.
 
-Success conditions:
+RakPeerInterface functions explicitly tested:
 
-Failure conditions:
+    AdvertiseSystem
 
-RakPeerInterface Functions used, tested indirectly by its use,list may not be complete:
-Startup
-SetMaximumIncomingConnections
-Receive
-DeallocatePacket
-Send
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Receive, DeallocatePacket.
 
-RakPeerInterface Functions Explicitly Tested:
-SetRouterInterface
-RemoveRouterInterface
-AdvertiseSystem
-
+SetRouterInterface and RemoveRouterInterface are NOT covered, despite the name
+this test used to carry: no router code was ever written for it.
 */
-int MiscellaneousTestsTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kServerPort = 60000;
+
+} // namespace
+
+TEST_CASE( "An unconnected client's AdvertiseSystem reaches a server as ID_ADVERTISE_SYSTEM", "[network]" )
 {
-    destroyList.clear();
+    PeerScope peers;
 
-    RakPeerInterface *client, *server;
+    RakPeerInterface* client = peers.Client();
+    RakPeerInterface* server = peers.Server( kServerPort );
 
-    TestHelpers::StandardClientPrep( client, destroyList );
-    TestHelpers::StandardServerPrep( server, destroyList );
+    client->AdvertiseSystem( "127.0.0.1", kServerPort, 0, 0 );
 
-    printf( "Testing AdvertiseSystem\n" );
-
-    client->AdvertiseSystem( "127.0.0.1", 60000, 0, 0 );
-
-    if( !CommonFunctions::WaitForMessageWithID( server, ID_ADVERTISE_SYSTEM, 5000 ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[1 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 1;
-    }
-
-    return 0;
-}
-
-std::string MiscellaneousTestsTest::GetTestName() const
-{
-    return "MiscellaneousTestsTest";
-}
-
-std::string MiscellaneousTestsTest::ErrorCodeToString( int errorCode ) const
-{
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
-    {
-        return errorList[errorCode - 1];
-    }
-    else
-    {
-        return "Undefined Error";
-    }
-}
-
-void MiscellaneousTestsTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
-    }
-}
-
-MiscellaneousTestsTest::MiscellaneousTestsTest( void )
-{
-
-    errorList.emplace_back( "Did not recieve client advertise" );
-    errorList.emplace_back( "The router interface should not be called because no send has happened yet" );
-    errorList.emplace_back( "Router failed to trigger on failed directed send" );
-    errorList.emplace_back( "Router was not properly removed" );
-}
-
-MiscellaneousTestsTest::~MiscellaneousTestsTest( void )
-{
+    CHECK( CommonFunctions::WaitForMessageWithID( server, ID_ADVERTISE_SYSTEM, 5000 ) );
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.10 )
+cmake_minimum_required( VERSION 3.24 )   # 3.24: FetchContent FIND_PACKAGE_ARGS, used by Tests/
 
 project( RakNet )
 
@@ -25,5 +25,10 @@ endif()
 add_subdirectory( Source )
 
 if( RAKNET_ENABLE_TESTS AND RAKNET_ENABLE_STATIC )
+    # Must be called from the top-level directory or ctest cannot run from the build
+    # root. Deliberately not include( CTest ), which would also add a BUILD_TESTING
+    # cache option and a set of CDash Nightly* targets we do not want.
+    enable_testing()
+
     add_subdirectory( Tests )
 endif()

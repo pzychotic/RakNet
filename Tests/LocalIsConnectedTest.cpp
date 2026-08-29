@@ -8,238 +8,104 @@
  *
  */
 
-#include "LocalIsConnectedTest.h"
+#include "PeerScope.h"
+
+#include "CommonFunctions.h"
+#include "MessageIdentifiers.h"
+#include "RakPeerInterface.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <cstring>
 #include <thread>
 
 /*
-Description:
-Tests
+Everything a peer can tell you about itself and its own connection, checked against
+what it is actually doing: GetConnectionState is read at each step of a connect,
+close and reconnect cycle, and the three local-identity calls are checked against
+IsLocalIP.
 
-IsLocalIP
-SendLoopback
-GetConnectionState
-GetLocalIP
-GetInternalID
+RakPeerInterface functions explicitly tested:
 
-Success conditions:
-All tests pass
+    GetConnectionState (through CommonFunctions::ConnectionStateMatchesOptions)
+    IsLocalIP
+    SendLoopback
+    GetLocalIP
+    GetInternalID
 
-Failure conditions:
-Any test fails
-
-RakPeerInterface Functions used, tested indirectly by its use:
-Startup
-SetMaximumIncomingConnections
-Receive
-DeallocatePacket
-Send
-
-RakPeerInterface Functions Explicitly Tested:
-IsLocalIP
-SendLoopback
-GetConnectionState
-GetLocalIP
-GetInternalID
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Connect, CloseConnection, Receive,
+DeallocatePacket.
 */
-int LocalIsConnectedTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kServerPort = 60000;
+
+constexpr int kLoopbackMessageId = ID_USER_PACKET_ENUM + 1;
+
+} // namespace
+
+TEST_CASE( "GetConnectionState follows a client through connect, close and reconnect, and SendLoopback, GetLocalIP and GetInternalID all stay local", "[network]" )
 {
-    RakPeerInterface *server, *client;
-    destroyList.clear();
+    PeerScope peers;
 
-    server = RakPeerInterface::GetInstance();
-    destroyList.push_back( server );
-    client = RakPeerInterface::GetInstance();
-    destroyList.push_back( client );
+    RakPeerInterface* client = peers.Client();
+    RakPeerInterface* server = peers.Server( kServerPort );
 
-    client->Startup( 1, &SocketDescriptor(), 1 );
-    server->Startup( 1, &SocketDescriptor( 60000, 0 ), 1 );
-    server->SetMaximumIncomingConnections( 1 );
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
 
-    SystemAddress serverAddress( "127.0.0.1", 60000 );
+    // The Connect is asserted separately from the wait below, which discards
+    // Connect()'s result: only this line distinguishes a refused request from a
+    // slow one.
+    REQUIRE( client->Connect( "127.0.0.1", kServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
+    REQUIRE( CommonFunctions::WaitAndConnect( client, "127.0.0.1", kServerPort, 5000 ) );
 
-    TimeMS entryTime = GetTimeMS();
-    bool lastConnect = false;
-    if( isVerbose )
-        printf( "Testing GetConnectionState\n" );
-
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            lastConnect = client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 ) == CONNECTION_ATTEMPT_STARTED;
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !lastConnect ) //Use thise method to only check if the connect function fails, detecting connected client is done next
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client could not connect after 5 seconds\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 1;
-    }
-
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "IsConnected did not detect connected client", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 2;
-    }
     client->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
 
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, false, false, true ) )
-    {
-        DebugTools::ShowError( "IsConnected did not detect disconnecting client", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 3;
-    }
+    // IS_CONNECTED is still an accepted answer: CloseConnection is asynchronous, so
+    // the state need not have moved yet. What must not have happened is a jump
+    // straight to IS_NOT_CONNECTED.
+    CHECK( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, false, false, true ) );
 
+    // Long enough for the close to finish, so the Connect() below is a fresh
+    // attempt rather than a no-op on a connection that is still up.
     std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-    client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 );
 
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true ) )
-    {
-        DebugTools::ShowError( "IsConnected did not detect connecting client", !noPauses && isVerbose, __LINE__, __FILE__ );
+    // REQUIRE on the result, not a bare call: the check below accepts IS_CONNECTED
+    // as well as connecting and pending, so if the close above had not taken effect
+    // this Connect() would return ALREADY_CONNECTED, queue nothing, and "did it
+    // detect a connecting client" would pass on the stale connection.
+    REQUIRE( client->Connect( "127.0.0.1", kServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
 
-        return 4;
-    }
+    CHECK( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true ) );
 
-    entryTime = GetTimeMS();
+    // REQUIRE: SendLoopback below is only interesting on a peer with a live
+    // connection to ignore.
+    REQUIRE( CommonFunctions::WaitAndConnect( client, "127.0.0.1", kServerPort, 5000 ) );
 
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
+    CHECK( client->IsLocalIP( "127.0.0.1" ) );
 
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 );
-        }
+    // One copy is enough: SendLoopback pushes straight onto the peer's own
+    // receive queue (RakPeer.cpp), so nothing here can drop it in transit.
+    char loopbackMessage[] = "AAAAAAAAAA";
+    loopbackMessage[0] = static_cast<char>( kLoopbackMessageId );
+    client->SendLoopback( loopbackMessage, static_cast<int>( strlen( loopbackMessage ) ) + 1 );
 
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
+    CHECK( CommonFunctions::WaitForMessageWithID( client, kLoopbackMessageId, 1000 ) );
 
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client could not connect after 5 seconds\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 1;
-    }
-
-    if( isVerbose )
-        printf( "Testing IsLocalIP\n" );
-
-    if( !client->IsLocalIP( "127.0.0.1" ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "IsLocalIP failed test\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 5;
-    }
-
-    if( isVerbose )
-        printf( "Testing SendLoopback\n" );
-    char str[] = "AAAAAAAAAA";
-    str[0] = (char)( ID_USER_PACKET_ENUM + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-    client->SendLoopback( str, (int)strlen( str ) + 1 );
-
-    bool recievedPacket = false;
-    Packet* packet;
-
-    TimeMS stopWaiting = GetTimeMS() + 1000;
-    while( GetTimeMS() < stopWaiting )
-    {
-
-        for( packet = client->Receive(); packet; client->DeallocatePacket( packet ), packet = client->Receive() )
-        {
-
-            if( packet->data[0] == ID_USER_PACKET_ENUM + 1 )
-            {
-
-                recievedPacket = true;
-            }
-        }
-    }
-
-    if( !recievedPacket )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "SendLoopback failed test\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 6;
-    }
-
-    if( isVerbose )
-        printf( "Testing GetLocalIP\n" );
     const char* localIp = client->GetLocalIP( 0 );
 
-    if( !client->IsLocalIP( localIp ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "GetLocalIP failed test\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 7;
-    }
+    // REQUIRE: IsLocalIP reads through it.
+    REQUIRE( localIp != nullptr );
+    CHECK( client->IsLocalIP( localIp ) );
 
-    if( isVerbose )
-        printf( "Testing GetInternalID\n" );
+    char internalIp[128] = { 0 };
+    client->GetInternalID().ToString( false, internalIp );
 
-    SystemAddress localAddress = client->GetInternalID();
-
-    char convertedIp[39] = { '\0' };
-    localAddress.ToString( false, convertedIp );
-
-    printf( "GetInternalID returned %s\n", convertedIp );
-
-    if( !client->IsLocalIP( convertedIp ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "GetInternalID failed test\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 8;
-    }
-
-    return 0;
-}
-
-std::string LocalIsConnectedTest::GetTestName() const
-{
-    return "LocalIsConnectedTest";
-}
-
-std::string LocalIsConnectedTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
-    {
-    case  0: return "No error";                                         break;
-    case  1: return "Client could not connect after 5 seconds";         break;
-    case  2: return "IsConnected did not detect connected client";      break;
-    case  3: return "IsConnected did not detect disconnecting client";  break;
-    case  4: return "IsConnected did not detect connecting client";     break;
-    case  5: return "IsLocalIP failed test";                            break;
-    case  6: return "Sendloopback failed test";                         break;
-    case  7: return "GetLocalIP failed test";                           break;
-    case  8: return "GetInternalID failed test";                        break;
-    default: return "Undefined Error";                                  break;
-    }
-    // clang-format on
-}
-
-LocalIsConnectedTest::LocalIsConnectedTest( void )
-{
-}
-
-LocalIsConnectedTest::~LocalIsConnectedTest( void )
-{
-}
-
-void LocalIsConnectedTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
-    }
+    INFO( "GetInternalID returned " << internalIp );
+    CHECK( client->IsLocalIP( internalIp ) );
 }

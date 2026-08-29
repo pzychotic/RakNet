@@ -8,380 +8,207 @@
  *
  */
 
-#include "ReliableOrderedConvertedTest.h"
+#include "PeerScope.h"
+#include "ConnectionWaits.h"
+
+#include "BitStream.h"
+#include "GetTime.h"
+#include "MessageIdentifiers.h"
+#include "Rand.h"
+#include "RakNetTime.h"
+#include "RakPeerInterface.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <thread>
-
-FILE* fp;
-int memoryUsage = 0;
-
-char lastError[512];
-
-void* ReliableOrderedConvertedTest::LoggedMalloc( size_t size, const char* file, unsigned int line )
-{
-    memoryUsage += (int)size;
-    if( fp )
-        fprintf( fp, "Alloc %s:%i %i bytes %i total\n", file, line, size, memoryUsage );
-    char* p = (char*)malloc( size + sizeof( size ) );
-    memcpy( p, &size, sizeof( size ) );
-    return p + sizeof( size );
-}
-void ReliableOrderedConvertedTest::LoggedFree( void* p, const char* file, unsigned int line )
-{
-    char* realP = (char*)p - sizeof( size_t );
-    size_t allocatedSize;
-    memcpy( &allocatedSize, realP, sizeof( size_t ) );
-    memoryUsage -= (int)allocatedSize;
-    if( fp )
-        fprintf( fp, "Free %s:%i %i bytes %i total\n", file, line, allocatedSize, memoryUsage );
-    free( realP );
-}
-void* ReliableOrderedConvertedTest::LoggedRealloc( void* p, size_t size, const char* file, unsigned int line )
-{
-    char* realP = (char*)p - sizeof( size_t );
-    size_t allocatedSize;
-    memcpy( &allocatedSize, realP, sizeof( size_t ) );
-    memoryUsage -= (int)allocatedSize;
-    memoryUsage += (int)size;
-    p = realloc( realP, size + sizeof( size ) );
-    memcpy( p, &size, sizeof( size ) );
-    if( fp )
-        fprintf( fp, "Realloc %s:%i %i to %i bytes %i total\n", file, line, allocatedSize, size, memoryUsage );
-    return (char*)p + sizeof( size );
-}
+#include <vector>
 
 /*
-What is being done here is having a server connect to a client.
+A sender pushes one RELIABLE_ORDERED packet every 30 ms for twelve seconds, on a
+single channel, each with a randomly sized payload so the reliability layer has to
+split and reassemble rather than move one fixed size. Every packet carries its own
+sequence number, and the receiver checks that the numbers arrive consecutively - so
+a drop, a duplicate or a reordering is caught at the packet it happens on.
 
-Packets are sent at 30 millisecond intervals for 12 seconds.
+RakPeerInterface functions explicitly tested:
 
-Length and sequence are checked for each packet.
+    Send (HIGH_PRIORITY, RELIABLE_ORDERED)
 
-Success conditions:
-All packets are correctly recieved in order.
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Connect, Receive, DeallocatePacket.
 
-Failure conditions:
-
-All packets are not  correctly recieved.
-All packets are not in order.
-
+SetMalloc_Ex, SetRealloc_Ex and SetFree_Ex are NOT covered, despite a set of
+allocation hooks this test used to carry: they were inside a comment block and
+their logging functions were non-static members that could not have been passed to
+the setters anyway.
 */
 
-int ReliableOrderedConvertedTest::RunTest( bool isVerbose, bool noPauses )
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kReceiverPort = 60000;
+
+// Only one connection is ever made; the number is what the test was measured at.
+constexpr unsigned int kReceiverMaxConnections = 32;
+
+// One channel, one constant. It stays on the wire as one more field whose round
+// trip is checked - never as an index into anything, since a malformed packet
+// could carry any of 256 values.
+constexpr unsigned char kChannel = 0;
+
+constexpr unsigned char kPacketId = ID_USER_PACKET_ENUM + 1;
+
+constexpr TimeMS kTestDurationMs = 12000;
+constexpr TimeMS kSendIntervalMs = 30;
+
+// Payload size is 1 to kMaxPadBytes, drawn from the global Mersenne Twister.
+// Random on purpose: varying the size across the split threshold is the only
+// reason this test sends anything but a header.
+//
+// This test never seeds, and an unseeded randomMT reloads from a fixed default
+// seed (Source/Rand.cpp), so under ctest - one process per test - the sizes repeat
+// run for run. The generator is global, though, so a whole-binary `RakNetTests`
+// run with no filter gets whatever the tests ahead of this one in link order left
+// behind; ComprehensiveConvert and DroppedConnectionConvert both seed it to 12345
+// and then draw from it.
+constexpr unsigned int kMaxPadBytes = 5000;
+
+// Lets the packets still in flight land before the counts are compared.
+// RELIABLE_ORDERED promises they will, so this is a hang guard rather than a
+// tuning knob; over loopback it exits in milliseconds and costs the test nothing.
+constexpr TimeMS kFinalDrainBudgetMs = 5000;
+
+// Twelve seconds at one send every 30 ms is about 400. A floor with slack rather
+// than an exact count, and its job is to rule out the vacuous pass: the send loop
+// is gated on ID_CONNECTION_REQUEST_ACCEPTED, so a run in which the connection
+// never came up sends nothing, receives nothing, and matches zero against zero.
+constexpr unsigned int kMinimumPacketsSent = 300;
+
+} // namespace
+
+// Wrap-safe on a uint32_t TimeMS, where a plain >= is not. See ConnectionWaits.h.
+using ConnectionWaits::Expired;
+
+TEST_CASE( "Every packet sent RELIABLE_ORDERED arrives, once, in the order it was sent", "[network]" )
 {
-    RakPeerInterface *sender, *receiver;
-    unsigned int packetNumberSender[32], packetNumberReceiver[32], receivedPacketNumberReceiver, receivedTimeReceiver;
-    char str[256];
-    char ip[32];
-    TimeMS sendInterval, nextSend, currentTime, quitTime;
-    unsigned short remotePort, localPort;
-    unsigned char streamNumberSender, streamNumberReceiver;
-    BitStream bitStream;
-    Packet* packet;
-    bool doSend = false;
+    PeerScope peers;
 
-    for( int i = 0; i < 32; i++ )
-    {
-        packetNumberSender[i] = 0;
-        packetNumberReceiver[i] = 0;
-    }
+    // Receiver first, so the Connect() below lands on a peer that is already
+    // listening rather than paying a retry cycle out of a fixed twelve-second
+    // budget - and so the connected client is destroyed before the server.
+    RakPeerInterface* receiver = peers.Server( kReceiverPort, kReceiverMaxConnections );
+    RakPeerInterface* sender = peers.Client();
 
-    /*
-    if (argc==2)
-    {
-    fp = fopen(argv[1],"wt");
-    SetMalloc_Ex(LoggedMalloc);
-    SetRealloc_Ex(LoggedRealloc);
-    SetFree_Ex(LoggedFree);
-    }
-    else
-    */
-    fp = 0;
-    destroyList.clear();
+    // Nothing else here can tell a refused request from a slow one.
+    REQUIRE( sender->Connect( "127.0.0.1", kReceiverPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
 
-    sender = RakPeerInterface::GetInstance();
-    destroyList.push_back( sender );
-    //sender->ApplyNetworkSimulator(.02, 100, 50);
+    unsigned int packetsSent = 0;
+    unsigned int packetsReceived = 0;
 
-    /*
-    if (str[0]==0)
-    sendInterval=30;
-    else
-    sendInterval=atoi(str);*/
+    bool connected = false;
 
-    sendInterval = 30;
+    // Absolute time of the next send; only meaningful once connected.
+    TimeMS nextSend = 0;
 
-    /*
-    printf("Enter remote IP: ");
-    Gets(ip, sizeof(ip));
-    if (ip[0]==0)*/
-    strcpy( ip, "127.0.0.1" );
-
-    /*
-    printf("Enter remote port: ");
-    Gets(str, sizeof(str));
-    if (str[0]==0)*/
-    strcpy( str, "60000" );
-    remotePort = atoi( str );
-    /*
-    printf("Enter local port: ");
-    Gets(str, sizeof(str));
-    if (str[0]==0)*/
-    strcpy( str, "0" );
-    localPort = atoi( str );
-
-    if( isVerbose )
-        printf( "Connecting...\n" );
-
-    sender->Startup( 1, &SocketDescriptor( localPort, 0 ), 1 );
-    sender->Connect( ip, remotePort, 0, 0 );
-
-    receiver = RakPeerInterface::GetInstance();
-    destroyList.push_back( receiver );
-
-    /*
-    printf("Enter local port: ");
-    Gets(str, sizeof(str));
-    if (str[0]==0)*/
-    strcpy( str, "60000" );
-    localPort = atoi( str );
-
-    if( isVerbose )
-        printf( "Waiting for connections...\n" );
-
-    receiver->Startup( 32, &SocketDescriptor( localPort, 0 ), 1 );
-    receiver->SetMaximumIncomingConnections( 32 );
-
-    //  if (sender)
-    //      sender->ApplyNetworkSimulator(128000, 50, 100);
-    //  if (receiver)
-    //      receiver->ApplyNetworkSimulator(128000, 50, 100);
-
-    /*printf("How long to run this test for, in seconds?\n");
-    Gets(str, sizeof(str));
-    if (str[0]==0)*/
-    strcpy( str, "12" );
-
-    currentTime = GetTimeMS();
-    quitTime = atoi( str ) * 1000 + currentTime;
-
-    nextSend = currentTime;
-
-    while( currentTime < quitTime )
-    //while (1)
-    {
-
-        packet = sender->Receive();
-        while( packet )
+    auto handleReceived = [&]( const Packet* packet ) {
+        if( packet->data[0] != kPacketId )
         {
-            // PARSE TYPES
-            switch( packet->data[0] )
+            return;
+        }
+
+        BitStream bitStream( packet->data, packet->length, false );
+        bitStream.IgnoreBytes( 1 );
+
+        unsigned int number = 0;
+        unsigned char channel = 0;
+
+        // REQUIRE: the comparisons below are only meaningful if the fields were
+        // there to read at all, and a short packet read unchecked leaves whatever
+        // the stack held.
+        REQUIRE( bitStream.Read( number ) );
+        REQUIRE( bitStream.Read( channel ) );
+
+        CHECK( channel == kChannel );
+
+        // REQUIRE rather than the suite's CHECK default, because this latches: the
+        // expected number advances one per packet, so a single break in the
+        // ordering makes every one of the ~400 packets behind it mismatch too, and
+        // one out-of-order RELIABLE_ORDERED delivery is already a complete
+        // diagnosis.
+        REQUIRE( number == packetsReceived );
+
+        packetsReceived++;
+    };
+
+    auto drainReceiver = [&]() {
+        for( Packet* packet = receiver->Receive(); packet; receiver->DeallocatePacket( packet ), packet = receiver->Receive() )
+        {
+            handleReceived( packet );
+        }
+    };
+
+    const TimeMS entryTime = GetTimeMS();
+
+    while( GetTimeMS() - entryTime < kTestDurationMs )
+    {
+        // The one message id this test acts on: it starts the send stream and sets
+        // its clock.
+        for( Packet* packet = sender->Receive(); packet; sender->DeallocatePacket( packet ), packet = sender->Receive() )
+        {
+            if( packet->data[0] == ID_CONNECTION_REQUEST_ACCEPTED )
             {
-            case ID_CONNECTION_REQUEST_ACCEPTED:
-                if( isVerbose )
-                    printf( "ID_CONNECTION_REQUEST_ACCEPTED\n" );
-                doSend = true;
-                nextSend = currentTime;
-                break;
-            case ID_NO_FREE_INCOMING_CONNECTIONS:
-                if( isVerbose )
-                    printf( "ID_NO_FREE_INCOMING_CONNECTIONS\n" );
-                break;
-            case ID_DISCONNECTION_NOTIFICATION:
-                if( isVerbose )
-                    printf( "ID_DISCONNECTION_NOTIFICATION\n" );
-                break;
-            case ID_CONNECTION_LOST:
-                if( isVerbose )
-                    printf( "ID_CONNECTION_LOST\n" );
-                break;
-            case ID_CONNECTION_ATTEMPT_FAILED:
-                if( isVerbose )
-                    printf( "Connection attempt failed\n" );
-                break;
+                connected = true;
+                nextSend = GetTimeMS();
             }
-
-            sender->DeallocatePacket( packet );
-            packet = sender->Receive();
         }
 
-        while( doSend && currentTime > nextSend )
+        while( connected && Expired( nextSend ) )
         {
-            streamNumberSender = 0;
-            //  streamNumber = randomMT() % 32;
-            // Do the send
-            bitStream.Reset();
-            bitStream.Write( (unsigned char)( ID_USER_PACKET_ENUM + 1 ) );
-            bitStream.Write( packetNumberSender[streamNumberSender]++ );
-            bitStream.Write( streamNumberSender );
-            bitStream.Write( currentTime );
-            char* pad;
-            int padLength = ( randomMT() % 5000 ) + 1;
-            pad = new char[padLength];
-            bitStream.Write( pad, padLength );
-            delete[] pad;
-            // Send on a random priority with a random stream
-            // if (sender->Send(&bitStream, HIGH_PRIORITY, (PacketReliability) (RELIABLE + (randomMT() %2)) ,streamNumber, UNASSIGNED_SYSTEM_ADDRESS, true)==false)
-            if( sender->Send( &bitStream, HIGH_PRIORITY, RELIABLE_ORDERED, streamNumberSender, UNASSIGNED_SYSTEM_ADDRESS, true ) == false )
-                packetNumberSender[streamNumberSender]--; // Didn't finish connecting yet?
+            BitStream bitStream;
+            bitStream.Write( kPacketId );
+            bitStream.Write( packetsSent );
+            bitStream.Write( kChannel );
 
-            RakNetStatistics* rssSender;
-            rssSender = sender->GetStatistics( sender->GetSystemAddressFromIndex( 0 ) );
-            if( isVerbose )
-                printf( "Snd: %i.\n", packetNumberSender[streamNumberSender] );
+            // Zeroed rather than uninitialised, so no heap contents go on the
+            // wire. Nothing reads the padding; only its length matters.
+            const std::vector<char> pad( randomMT() % kMaxPadBytes + 1, 0 );
+            bitStream.Write( pad.data(), static_cast<unsigned int>( pad.size() ) );
 
-            nextSend += sendInterval;
+            // Send fails on a null or empty buffer, not on a busy peer, so a false
+            // here is a bug in the four lines above rather than a slow link.
+            REQUIRE( sender->Send( &bitStream, HIGH_PRIORITY, RELIABLE_ORDERED, kChannel, UNASSIGNED_SYSTEM_ADDRESS, true ) );
 
-            // Test halting
-            //  if (rand()%20==0)
-            //      nextSend+=1000;
+            packetsSent++;
+            nextSend += kSendIntervalMs;
         }
 
-        packet = receiver->Receive();
-        while( packet )
-        {
-            switch( packet->data[0] )
-            {
-            case ID_NEW_INCOMING_CONNECTION:
-                if( isVerbose )
-                    printf( "ID_NEW_INCOMING_CONNECTION\n" );
-                break;
-            case ID_DISCONNECTION_NOTIFICATION:
-                if( isVerbose )
-                    printf( "ID_DISCONNECTION_NOTIFICATION\n" );
-                break;
-            case ID_CONNECTION_LOST:
-                if( isVerbose )
-                    printf( "ID_CONNECTION_LOST\n" );
-                break;
-            case ID_USER_PACKET_ENUM + 1:
-                bitStream.Reset();
-                bitStream.Write( (char*)packet->data, packet->length );
-                bitStream.IgnoreBits( 8 ); // Ignore ID_USER_PACKET_ENUM+1
-                bitStream.Read( receivedPacketNumberReceiver );
-                bitStream.Read( streamNumberReceiver );
-                bitStream.Read( receivedTimeReceiver );
+        drainReceiver();
 
-                if( receivedPacketNumberReceiver != packetNumberReceiver[streamNumberReceiver] )
-                {
-
-                    //WARNING: If you modify the below code make sure the whole string remains in bounds, sprintf will NOT do it for you.
-                    //The error string is 512 in length
-
-                    //Note: Removed buffer checking because chance is insignificant, left code if wanted in future. Needs limits.h ISO C standard.
-
-                    /*
-                    int maxIntWorkingCopy= INT_MAX;
-
-                    int maxIntCharLen =0;
-
-                    while (maxIntWorkingCopy>0)
-                    {maxIntCharLen++;
-                    maxIntWorkingCopy/=10;
-                    }
-
-                    if (strlen(lastError)>maxIntCharLen* 3 +27)//512 should be a good len for now
-                    {*/
-
-                    sprintf( lastError, "Expecting %i got %i (channel %i).", packetNumberReceiver[streamNumberReceiver], receivedPacketNumberReceiver, streamNumberReceiver );
-
-                    /*
-                    }
-                    else
-                    {
-                    sprintf(lastError,"Did not get what was expected. More details can be given if the error string buffer size is increased.");
-
-                    }*/
-
-                    if( isVerbose )
-                    {
-
-                        RakNetStatistics *rssSender, *rssReceiver;
-                        char message[2048];
-
-                        rssSender = sender->GetStatistics( sender->GetSystemAddressFromIndex( 0 ) );
-
-                        rssReceiver = receiver->GetStatistics( receiver->GetSystemAddressFromIndex( 0 ) );
-                        StatisticsToString( rssSender, message, 2 );
-                        printf( "Server stats %s\n", message );
-                        StatisticsToString( rssReceiver, message, 2 );
-                        printf( "Client stats%s", message );
-
-                        DebugTools::ShowError( lastError, !noPauses && isVerbose, __LINE__, __FILE__ );
-                    }
-
-                    return 1;
-                }
-                else if( isVerbose )
-                {
-                    printf( "Got %i.Channel %i.Len %i.", packetNumberReceiver[streamNumberReceiver], streamNumberReceiver, packet->length );
-
-                    printf( "Sent=%u Received=%u Diff=%i.\n", receivedTimeReceiver, currentTime, (int)currentTime - (int)receivedTimeReceiver );
-                }
-
-                packetNumberReceiver[streamNumberReceiver]++;
-                break;
-            }
-
-            receiver->DeallocatePacket( packet );
-            packet = receiver->Receive();
-        }
-
+        // A yield rather than a pause: the send cadence is 30 ms and the loop
+        // wants to be back before the next one is due.
         std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
-
-        currentTime = GetTimeMS();
     }
 
-    if( isVerbose )
+    // Everything below is measured against this: without it both counts are zero
+    // and equal, and a run in which nothing ever connected passes.
+    REQUIRE( connected );
+
+    const TimeMS drainDeadline = GetTimeMS() + kFinalDrainBudgetMs;
+    while( packetsReceived < packetsSent && !Expired( drainDeadline ) )
     {
+        drainReceiver();
 
-        RakNetStatistics *rssSender, *rssReceiver;
-        char message[2048];
-
-        rssSender = sender->GetStatistics( sender->GetSystemAddressFromIndex( 0 ) );
-
-        rssReceiver = receiver->GetStatistics( receiver->GetSystemAddressFromIndex( 0 ) );
-        StatisticsToString( rssSender, message, 2 );
-        printf( "Server stats %s\n", message );
-        StatisticsToString( rssReceiver, message, 2 );
-        printf( "Client stats%s", message );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
 
-    if( fp )
-        fclose( fp );
+    INFO( "sent " << packetsSent << ", received " << packetsReceived );
 
-    return 0;
-}
+    CHECK( packetsSent >= kMinimumPacketsSent );
 
-std::string ReliableOrderedConvertedTest::GetTestName() const
-{
-    return "ReliableOrderedConvertedTest";
-}
-
-std::string ReliableOrderedConvertedTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
-    {
-    case  0: return "No error";                                                             break;
-    case  1: return std::string( "The very last error for this object was " ) + lastError;  break;
-    default: return "Undefined Error";                                                      break;
-    }
-    // clang-format on
-}
-
-ReliableOrderedConvertedTest::ReliableOrderedConvertedTest( void )
-{
-}
-
-ReliableOrderedConvertedTest::~ReliableOrderedConvertedTest( void )
-{
-}
-void ReliableOrderedConvertedTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
-    }
+    // Not "most of them arrived": RELIABLE_ORDERED promises all of them, and the
+    // loop above has already waited out the ones that were in flight.
+    CHECK( packetsReceived == packetsSent );
 }

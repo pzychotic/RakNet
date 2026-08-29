@@ -84,16 +84,6 @@ bool CommonFunctions::WaitAndConnect( RakPeerInterface* peer, char* ip, unsigned
     return 0;
 }
 
-void CommonFunctions::DisconnectAndWait( RakPeerInterface* peer, char* ip, unsigned short int port )
-{
-    SystemAddress targetAddress( ip, port );
-    while( CommonFunctions::ConnectionStateMatchesOptions( peer, targetAddress, true, true, true, true ) ) //disconnect client
-    {
-
-        peer->CloseConnection( targetAddress, true, 0, LOW_PRIORITY );
-    }
-}
-
 bool CommonFunctions::WaitForMessageWithID( RakPeerInterface* reciever, int id, int millisecondsToWait )
 {
 

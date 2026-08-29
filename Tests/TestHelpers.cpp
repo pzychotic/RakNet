@@ -18,36 +18,6 @@ TestHelpers::~TestHelpers( void )
 {
 }
 
-void TestHelpers::StandardServerPrep( RakPeerInterface*& server )
-{
-
-    server = RakPeerInterface::GetInstance();
-    server->Startup( 1, &SocketDescriptor( 60000, 0 ), 1 );
-    server->SetMaximumIncomingConnections( 1 );
-}
-
-void TestHelpers::StandardClientPrep( RakPeerInterface*& client )
-{
-
-    client = RakPeerInterface::GetInstance();
-
-    client->Startup( 1, &SocketDescriptor(), 1 );
-}
-
-void TestHelpers::StandardServerPrep( RakPeerInterface*& server, std::vector<RakPeerInterface*>& destroyList )
-{
-
-    StandardServerPrep( server );
-    destroyList.push_back( server );
-}
-
-void TestHelpers::StandardClientPrep( RakPeerInterface*& client, std::vector<RakPeerInterface*>& destroyList )
-{
-
-    StandardClientPrep( client );
-    destroyList.push_back( client );
-}
-
 //returns false if not connected
 bool TestHelpers::WaitAndConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee, int millisecondsToWait )
 {
@@ -101,17 +71,4 @@ bool TestHelpers::WaitForTestPacket( RakPeerInterface* reciever, int millisecond
     }
 
     return false;
-}
-
-void TestHelpers::RecieveForXTime( RakPeerInterface* reciever, int millisecondsToWait )
-{
-    RakTimer timer( millisecondsToWait );
-
-    Packet* packet;
-    while( !timer.IsExpired() )
-    {
-        for( packet = reciever->Receive(); packet; reciever->DeallocatePacket( packet ), packet = reciever->Receive() )
-        {
-        }
-    }
 }

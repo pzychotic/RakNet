@@ -14,28 +14,20 @@
 #include "MessageIdentifiers.h"
 #include "BitStream.h"
 #include "RakPeer.h"
-#include "DebugTools.h"
 #include "CommonFunctions.h"
 #include "RakTimer.h"
 
-#include <vector>
-
 using namespace RakNet;
+
 class TestHelpers
 {
 public:
     TestHelpers( void );
     ~TestHelpers( void );
 
-    static void StandardServerPrep( RakPeerInterface*& server );
-    static void StandardClientPrep( RakPeerInterface*& client );
-    static void StandardServerPrep( RakPeerInterface*& server, std::vector<RakPeerInterface*>& destroyList );
-    static void StandardClientPrep( RakPeerInterface*& client, std::vector<RakPeerInterface*>& destroyList );
-
     static bool WaitAndConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee, int millisecondsToWait );
     static bool ConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee );
     static bool BroadCastTestPacket( RakPeerInterface* sender, PacketReliability rel = RELIABLE_ORDERED, PacketPriority pr = HIGH_PRIORITY, int typeNum = ID_USER_PACKET_ENUM + 1 );
     static bool WaitForTestPacket( RakPeerInterface* reciever, int millisecondsToWait );
-    static void RecieveForXTime( RakPeerInterface* reciever, int millisecondsToWait );
     static bool SendTestPacketDirected( RakPeerInterface* sender, char* ip, int port, PacketReliability rel = RELIABLE_ORDERED, PacketPriority pr = HIGH_PRIORITY, int typeNum = ID_USER_PACKET_ENUM + 1 );
 };

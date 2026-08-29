@@ -8,313 +8,177 @@
  *
  */
 
-#include "PeerConnectDisconnectTest.h"
+#include "CommonFunctions.h"
+#include "ConnectionWaits.h"
+#include "PeerScope.h"
+
+#include "GetTime.h"
+#include "RakNetTime.h"
+#include "RakNetTypes.h"
+#include "RakPeerInterface.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <thread>
-
-void PeerConnectDisconnectTest::WaitForConnectionRequestsToComplete( RakPeerInterface** peerList, int peerNum, bool isVerbose )
-{
-    bool msgWasPrinted = false;
-
-    for( int i = 0; i < peerNum; i++ )
-    {
-        for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
-        {
-            SystemAddress currentSystem( "127.0.0.1", 60000 + j );
-
-            while( CommonFunctions::ConnectionStateMatchesOptions( peerList[i], currentSystem, false, true, true ) )
-            {
-                if( msgWasPrinted == false )
-                {
-                    printf( "Waiting for connection requests to complete.\n" );
-                    msgWasPrinted = true;
-                }
-
-                std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
-            }
-        }
-    }
-}
-void PeerConnectDisconnectTest::WaitAndPrintResults( RakPeerInterface** peerList, int peerNum, bool isVerbose )
-{
-    WaitForConnectionRequestsToComplete( peerList, peerNum, isVerbose );
-
-    Packet* packet;
-
-    // Log all events per peer
-    for( int i = 0; i < peerNum; i++ ) //Receive for all peers
-    {
-        if( isVerbose )
-            printf( "For peer %i\n", i );
-
-        for( packet = peerList[i]->Receive(); packet; peerList[i]->DeallocatePacket( packet ), packet = peerList[i]->Receive() )
-        {
-            switch( packet->data[0] )
-            {
-            case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-                if( isVerbose )
-                    printf( "Another client has disconnected.\n" );
-
-                break;
-            case ID_REMOTE_CONNECTION_LOST:
-                if( isVerbose )
-                    printf( "Another client has lost the connection.\n" );
-
-                break;
-            case ID_REMOTE_NEW_INCOMING_CONNECTION:
-                if( isVerbose )
-                    printf( "Another client has connected.\n" );
-                break;
-            case ID_CONNECTION_REQUEST_ACCEPTED:
-                if( isVerbose )
-                    printf( "Our connection request has been accepted.\n" );
-
-                break;
-            case ID_CONNECTION_ATTEMPT_FAILED:
-                if( isVerbose )
-                    printf( "A connection has failed.\n" );
-
-                break;
-
-            case ID_NEW_INCOMING_CONNECTION:
-                if( isVerbose )
-                    printf( "A connection is incoming.\n" );
-
-                break;
-            case ID_NO_FREE_INCOMING_CONNECTIONS:
-                if( isVerbose )
-                    printf( "The server is full.\n" );
-
-                break;
-
-            case ID_ALREADY_CONNECTED:
-                if( isVerbose )
-                    printf( "Already connected\n" );
-
-                break;
-
-            case ID_DISCONNECTION_NOTIFICATION:
-                if( isVerbose )
-                    printf( "We have been disconnected.\n" );
-                break;
-            case ID_CONNECTION_LOST:
-                if( isVerbose )
-                    printf( "Connection lost.\n" );
-
-                break;
-            default:
-
-                break;
-            }
-        }
-    }
-}
+#include <vector>
 
 /*
-What is being done here is having 8 peers all connect to eachother, disconnect, connect again.
+Eight peers connect to one another, then spend ten seconds closing every
+connection they hold and immediately reopening it. When the churn stops, every
+peer must be holding the other seven again.
 
-Do this for about 10 seconds. Then allow them all to connect for one last time.
+RakPeerInterface functions explicitly tested:
 
-Good ideas for changes:
-After the last check run a eightpeers like test an add the conditions
-of that test as well.
+    Connect
+    CloseConnection
+    GetSystemList
 
-Make sure that if we initiate the connection we get a proper message
-and if not we get a proper message. Add proper conditions.
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Receive, DeallocatePacket, GetConnectionState.
 
-Randomize sending the disconnect notes
+The connection cap is three times the peer count, so neither limit binds and the
+test is about the churn.
 
-Success conditions:
-All connected normally.
+THIS TEST CARRIED THE SUITE'S ONE KNOWN FLAKE, ~1 run in 34 in Debug, reported as
+"Failed on peer number 6 with 6 peers". It had two halves, and the two waits below
+are what closed them:
 
-Failure conditions:
-Doesn't reconnect normally.
+  - Its all-pairs wait polled peerList[i] toward j > i only. At eight peers that
+    polls peer 6 once and peer 7 never - and peer 6, which initiates to peer 7
+    alone, is exactly the peer that failed; its six inbound registrations were what
+    nothing waited for. ConnectionWaits::WaitForAllPairsToSettle sweeps every
+    ordered pair, i outer and j inner, so both sides of every attempt have reached
+    a final state when it returns (see ConnectionWaits.h).
+  - Even swept in full, that wait waits for a request to SETTLE, not to SUCCEED: a
+    peer whose attempt just failed satisfies it immediately, and the counts were
+    then read once, straight after it. ConnectionWaits::WaitForConnectionCounts
+    turns that check into a polled predicate, so the counts are read until they are
+    meaningful or a ten-second deadline passes.
 
-During the very first connect loop any connect returns false.
-
-Connect function returns false and peer is not connected to anything.
-
+Nothing here is tagged, retried or widened. A missing settle window is a test
+defect, and a green repeat run is not evidence that it is gone.
 */
-int PeerConnectDisconnectTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr int kPeerNum = 8;
+constexpr unsigned short kBasePort = 60000;
+
+// Startup slot count and incoming limit both.
+constexpr unsigned int kMaxConnections = kPeerNum * 3;
+
+// How long to keep closing and reopening connections.
+constexpr TimeMS kChurnDuration = 10000;
+
+// After closing every connection, before reopening them: CloseConnection with a
+// disconnection notification leaves the peer IS_DISCONNECTING for as long as it
+// takes to send it, and a Connect issued in that window is skipped rather than
+// attempted.
+constexpr TimeMS kCloseSettlePause = 100;
+
+// A floor with slack, not an expected count: the churn does 71 rounds in Release
+// and 67 in Debug, and a round costs the 100 ms pause plus a settle sweep. Its
+// only job is to rule out a run in which the loop churned once or not at all and
+// the count wait below then reported on the initial connect - the test names ten
+// seconds of closing and reopening, so it should fail if it did not do that.
+constexpr int kMinimumChurnRounds = 10;
+
+} // namespace
+
+// Wrap-safe on a uint32_t TimeMS, where a plain >= is not. See ConnectionWaits.h.
+using ConnectionWaits::Expired;
+
+TEST_CASE( "Eight peers closing and reopening every connection for ten seconds all end up connected to the other seven", "[network]" )
 {
-    const int peerNum = 8;
-    const int maxConnections = peerNum * 3; //Max allowed connections for test set to times 3 to eliminate problem variables
-    RakPeerInterface* peerList[peerNum];    //A list of 8 peers
+    PeerScope peers;
 
-    destroyList.clear();
+    RakPeerInterface* peerList[kPeerNum];
 
-    //Initializations of the arrays
-    for( int i = 0; i < peerNum; i++ )
+    for( int i = 0; i < kPeerNum; i++ )
     {
-        peerList[i] = RakPeerInterface::GetInstance();
-        destroyList.push_back( peerList[i] );
-
-        peerList[i]->Startup( maxConnections, &SocketDescriptor( 60000 + i, 0 ), 1 );
-        peerList[i]->SetMaximumIncomingConnections( maxConnections );
+        // Server(): the Startup slot count and the incoming limit are the same
+        // number here, which is exactly the pair Server() sets.
+        peerList[i] = peers.Server( static_cast<unsigned short>( kBasePort + i ), kMaxConnections );
     }
 
-    //Connect all the peers together
-
-    for( int i = 0; i < peerNum; i++ )
-    {
-
-        for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
+    // One shape for every connect pass, whether or not anything is connected when
+    // it runs - the first pass cannot skip anything.
+    auto connectMissingPairs = [&]() {
+        for( int i = 0; i < kPeerNum; i++ )
         {
-
-            if( peerList[i]->Connect( "127.0.0.1", 60000 + j, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
+            // From i + 1, so a pair is attempted once rather than from both ends.
+            for( int j = i + 1; j < kPeerNum; j++ )
             {
+                const SystemAddress target( "127.0.0.1", static_cast<unsigned short>( kBasePort + j ) );
 
-                if( isVerbose )
-                    DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
+                // Connected, connecting, pending or disconnecting: leave it be.
+                if( CommonFunctions::ConnectionStateMatchesOptions( peerList[i], target, true, true, true, true ) )
+                {
+                    continue;
+                }
 
-                return 1; //This fails the test, don't bother going on.
+                INFO( "peer " << i << " connecting to peer " << j );
+                REQUIRE( peerList[i]->Connect( "127.0.0.1", kBasePort + j, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
             }
         }
-    }
+    };
 
-    TimeMS entryTime = GetTimeMS(); //Loop entry time
+    connectMissingPairs();
 
     std::vector<SystemAddress> systemList;
     std::vector<RakNetGUID> guidList;
 
-    printf( "Entering disconnect loop \n" );
+    int churnRounds = 0;
 
-    while( GetTimeMS() - entryTime < 10000 ) //Run for 10 Secoonds
+    const TimeMS churnDeadline = GetTimeMS() + kChurnDuration;
+
+    while( !Expired( churnDeadline ) )
     {
-        //Disconnect all peers IF connected to any
-        for( int i = 0; i < peerNum; i++ )
+        for( int i = 0; i < kPeerNum; i++ )
         {
-            peerList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
+            peerList[i]->GetSystemList( systemList, guidList );
 
-            for( const SystemAddress& rSystem : systemList ) //Disconnect them all
+            for( const SystemAddress& address : systemList )
             {
-                peerList[i]->CloseConnection( rSystem, true, 0, LOW_PRIORITY );
+                peerList[i]->CloseConnection( address, true, 0, LOW_PRIORITY );
             }
         }
 
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+        std::this_thread::sleep_for( std::chrono::milliseconds( kCloseSettlePause ) );
 
-        //Connect
+        connectMissingPairs();
 
-        for( int i = 0; i < peerNum; i++ )
-        {
+        ConnectionWaits::WaitForAllPairsToSettle( peerList, kPeerNum, kBasePort );
 
-            for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
-            {
-                SystemAddress currentSystem( "127.0.0.1", 60000 + j );
+        // Counted after the wait, so a round is one completed close-and-reopen
+        // cycle rather than one entry into the loop body.
+        churnRounds++;
 
-                if( !CommonFunctions::ConnectionStateMatchesOptions( peerList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
-                {
-
-                    if( peerList[i]->Connect( "127.0.0.1", 60000 + j, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-                    {
-
-                        if( isVerbose )
-                            DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-                        return 1; //This fails the test, don't bother going on.
-                    }
-                }
-            }
-        }
-
-        WaitAndPrintResults( peerList, peerNum, isVerbose );
+        // Every iteration, and this is not decoration: the churn generates a
+        // connection notification per end per round, and a loop that polls without
+        // draining grows its queues without bound.
+        ConnectionWaits::DrainAll( peerList, kPeerNum );
     }
 
-    WaitAndPrintResults( peerList, peerNum, isVerbose );
+    // The last word: whatever the churn left half-open gets one more attempt, then
+    // both sides of every attempt are waited out.
+    connectMissingPairs();
 
-    printf( "Connecting peers\n" );
+    ConnectionWaits::WaitForAllPairsToSettle( peerList, kPeerNum, kBasePort );
 
-    //Connect
+    // The count wait below does not drain - see ConnectionWaits.h - and it is the
+    // longest single poll in the test, so the queues go into it empty.
+    ConnectionWaits::DrainAll( peerList, kPeerNum );
 
-    for( int i = 0; i < peerNum; i++ )
-    {
+    // CHECK rather than REQUIRE: it reports on the loop above rather than gating
+    // anything below, and it should not hide the verdict.
+    CHECK( churnRounds >= kMinimumChurnRounds );
 
-        for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
-        {
-            SystemAddress currentSystem( "127.0.0.1", 60000 + j );
-
-            if( !CommonFunctions::ConnectionStateMatchesOptions( peerList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
-            {
-                printf( "Calling Connect() for peer %i to peer %i.\n", i, j );
-
-                if( peerList[i]->Connect( "127.0.0.1", 60000 + j, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-                {
-                    peerList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-
-                    if( isVerbose )
-                        DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-                    return 1; //This fails the test, don't bother going on.
-                }
-            }
-            else
-            {
-                if( CommonFunctions::ConnectionStateMatchesOptions( peerList[i], currentSystem, false, false, false, true ) == false )
-                    printf( "Not calling Connect() for peer %i to peer %i because it is disconnecting.\n", i, j );
-                else if( CommonFunctions::ConnectionStateMatchesOptions( peerList[i], currentSystem, false, true, true ) == false )
-                    printf( "Not calling Connect() for peer %i to peer %i because it is connecting.\n", i, j );
-                else if( CommonFunctions::ConnectionStateMatchesOptions( peerList[i], currentSystem, true ) == false )
-                    printf( "Not calling Connect() for peer %i to peer %i because it is connected).\n", i, j );
-            }
-        }
-    }
-
-    WaitAndPrintResults( peerList, peerNum, isVerbose );
-
-    for( int i = 0; i < peerNum; i++ )
-    {
-        peerList[i]->GetSystemList( systemList, guidList );
-        int connNum = static_cast<int>( guidList.size() ); //Get the number of connections for the current peer
-        if( connNum != peerNum - 1 )   //Did we connect to all?
-        {
-            if( isVerbose )
-            {
-                printf( "Not all peers reconnected normally.\nFailed on peer number %i with %i peers\n", i, connNum );
-
-                DebugTools::ShowError( "", !noPauses && isVerbose, __LINE__, __FILE__ );
-            }
-
-            return 2;
-        }
-    }
-
-
-    if( isVerbose )
-        printf( "Pass\n" );
-    return 0;
-}
-
-std::string PeerConnectDisconnectTest::GetTestName() const
-{
-    return "PeerConnectDisconnectTest";
-}
-
-std::string PeerConnectDisconnectTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
-    {
-    case  0: return "No error";                         break;
-    case  1: return "The connect function failed.";     break;
-    case  2: return "Peers did not connect normally.";  break;
-    default: return "Undefined Error";                  break;
-    }
-    // clang-format on
-}
-
-PeerConnectDisconnectTest::PeerConnectDisconnectTest( void )
-{
-}
-
-PeerConnectDisconnectTest::~PeerConnectDisconnectTest( void )
-{
-}
-void PeerConnectDisconnectTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
-    }
+    // The test's verdict, and a polled predicate rather than a reading taken after
+    // a wait - taking it once is half of what made this test flaky. It fails if
+    // the peers never connect, listing every peer's count.
+    ConnectionWaits::WaitForConnectionCounts( peerList, kPeerNum, kPeerNum - 1 );
 }

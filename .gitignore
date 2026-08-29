@@ -31,3 +31,6 @@ Debug/
 Release/
 .DS_Store
 .Trashes
+
+# CMake build trees
+build*/

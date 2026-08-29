@@ -8,226 +8,154 @@
  *
  */
 
-#include "MaximumConnectTest.h"
+#include "ConnectionWaits.h"
+#include "PeerScope.h"
 
-#include <chrono>
-#include <thread>
+#include "RakNetTypes.h"
+#include "RakPeerInterface.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <vector>
 
 /*
-What is being done here is having 8 peers all connect to eachother over the max defined connection.
+Eight peers, each started with room for four connections and an incoming limit of
+four, all try to connect to one another: peer i calls Connect on every peer above
+it, so all 28 pairs are attempted against 32 connection slots. No peer may end up
+holding more than four connections.
 
-It runs the connect, wait 20 seconds then see the current connections.
+RakPeerInterface functions explicitly tested:
 
-Success conditions:
-All extra connections Refused.
+    SetMaximumIncomingConnections
+    GetMaximumIncomingConnections
+    GetSystemList
 
-Failure conditions:
-There are more connected than allowed.
-The connect function fails, the test is not even done.
-GetMaximumIncomingConnections returns wrong value.
+Exercised indirectly by getting to that point: Startup, Connect, Receive,
+DeallocatePacket, GetConnectionState.
 
-RakPeerInterface Functions used, tested indirectly by its use:
-Startup
-Connect
-SetMaximumIncomingConnections
-Receive
-DeallocatePacket
-GetSystemList
+Which peer ends up connected to which is NOT deterministic, and no assertion here
+pretends otherwise. Measured over thirteen runs, the eight peers between them held
+18 to 22 connection ends, distributed differently every time - hence a floor with
+slack rather than a count, and a symmetry check rather than a shape.
 
-RakPeerInterface Functions Explicitly Tested:
-SetMaximumIncomingConnections
-GetMaximumIncomingConnections
-
+Two limits are in play, and this test cannot tell them apart. The incoming limit
+in its name is checked as GetNumberOfRemoteInitiatedConnections() <
+GetMaximumIncomingConnections() (Source/RakPeer.cpp:3493), and that count only
+counts connections already CONNECTED - so when eight peers fire at once over
+loopback, seven requests can arrive at a peer before any of them completes and all
+seven are allowed. What actually caps a peer here is Startup's slot count, set to
+the same four: a peer with seven outstanding requests of its own spends its slots
+holding them, its targets' acceptances are then dropped, and that is why the
+low-numbered peers - the ones that initiate the most - routinely end up with the
+fewest connections. Perturbing SetMaximumIncomingConnections alone does not
+reliably move any assertion here; perturbing the slot count moves all of them.
 */
-int MaximumConnectTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr int kPeerNum = 8;
+constexpr unsigned short kBasePort = 60000;
+
+// Both the Startup slot count and the incoming limit.
+constexpr unsigned short kMaxConnections = 4;
+
+// Counted in connection ends: one connection contributes two, one to each of the
+// peers holding it. Measured at 18 to 22 over thirteen runs, so this is a floor
+// with better than twice the slack rather than an expected count. Its whole job
+// is to rule out the vacuous pass - every assertion above it is an upper bound,
+// and a run in which not one connection was ever made satisfies all of them.
+constexpr int kMinimumConnectionEnds = 8;
+
+bool HoldsPort( const std::vector<SystemAddress>& connections, unsigned short port )
 {
-    const int peerNum = 8;
-    const int maxConnections = 4;        //Max allowed connections for test
-    RakPeerInterface* peerList[peerNum]; //A list of 8 peers
-
-    Packet* packet;
-    destroyList.clear();
-
-    int connReturn;
-    //Initializations of the arrays
-    for( int i = 0; i < peerNum; i++ )
+    for( const SystemAddress& address : connections )
     {
-        peerList[i] = RakPeerInterface::GetInstance();
-        destroyList.push_back( peerList[i] );
-
-        peerList[i]->Startup( maxConnections, &SocketDescriptor( 60000 + i, 0 ), 1 );
-        peerList[i]->SetMaximumIncomingConnections( maxConnections );
-
-        connReturn = peerList[i]->GetMaximumIncomingConnections();
-        if( connReturn != maxConnections )
+        if( address.GetPort() == port )
         {
-            if( isVerbose )
-            {
-                printf( "Getmaxconnections wrong for peer %i, %i should be the value but the value is %i.Fail\n", i, maxConnections, connReturn );
-
-                DebugTools::ShowError( "", !noPauses && isVerbose, __LINE__, __FILE__ );
-            }
+            return true;
         }
     }
 
-    //Connect all the peers together
+    return false;
+}
 
-    for( int i = 0; i < peerNum; i++ )
+} // namespace
+
+TEST_CASE( "Eight peers all connecting to one another do connect, and none ends up over its connection limit", "[network]" )
+{
+    PeerScope peers;
+
+    RakPeerInterface* peerList[kPeerNum];
+
+    for( int i = 0; i < kPeerNum; i++ )
     {
+        peerList[i] = peers.Server( static_cast<unsigned short>( kBasePort + i ), kMaxConnections );
 
-        for( int j = i + 1; j < peerNum; j++ ) //Start at i+1 so don't connect two of the same together.
+        INFO( "peer " << i );
+        CHECK( peerList[i]->GetMaximumIncomingConnections() == kMaxConnections );
+    }
+
+    for( int i = 0; i < kPeerNum; i++ )
+    {
+        // From i + 1, so a pair is attempted once rather than from both ends.
+        for( int j = i + 1; j < kPeerNum; j++ )
         {
-
-            if( peerList[i]->Connect( "127.0.0.1", 60000 + j, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-            {
-
-                if( isVerbose )
-                    DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-                return 1; //This fails the test, don't bother going on.
-            }
+            INFO( "peer " << i << " connecting to peer " << j );
+            REQUIRE( peerList[i]->Connect( "127.0.0.1", kBasePort + j, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
         }
     }
 
-    TimeMS entryTime = GetTimeMS(); //Loop entry time
+    // Every ordered pair, both directions of each attempt - see ConnectionWaits.h
+    // for why the direction the test never calls Connect on is the one that
+    // matters. When this returns, no further connection can form and no further
+    // refusal can arrive, so the system lists below are readings rather than
+    // snapshots of a race.
+    ConnectionWaits::WaitForAllPairsToSettle( peerList, kPeerNum, kBasePort );
 
-    while( GetTimeMS() - entryTime < 20000 ) //Run for 20 Secoonds
-    {
+    ConnectionWaits::DrainAll( peerList, kPeerNum );
 
-        for( int i = 0; i < peerNum; i++ ) //Receive for all peers
-        {
-
-            packet = peerList[i]->Receive();
-
-            if( isVerbose && packet )
-                printf( "For peer %i\n", i );
-
-            while( packet )
-            {
-                switch( packet->data[0] )
-                {
-                case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-                    if( isVerbose )
-                        printf( "Another client has disconnected.\n" );
-
-                    break;
-                case ID_REMOTE_CONNECTION_LOST:
-                    if( isVerbose )
-                        printf( "Another client has lost the connection.\n" );
-
-                    break;
-                case ID_REMOTE_NEW_INCOMING_CONNECTION:
-                    if( isVerbose )
-                        printf( "Another client has connected.\n" );
-                    break;
-                case ID_CONNECTION_REQUEST_ACCEPTED:
-                    if( isVerbose )
-                        printf( "Our connection request has been accepted.\n" );
-
-                    break;
-                case ID_CONNECTION_ATTEMPT_FAILED:
-                    if( isVerbose )
-                        printf( "A connection has failed.\n" ); //Should happen in this test
-
-                    break;
-
-                case ID_NEW_INCOMING_CONNECTION:
-                    if( isVerbose )
-                        printf( "A connection is incoming.\n" );
-
-                    break;
-                case ID_NO_FREE_INCOMING_CONNECTIONS:
-                    if( isVerbose )
-                        printf( "The server is full.\n" );
-
-                    break;
-
-                case ID_ALREADY_CONNECTED:
-                    if( isVerbose )
-                        printf( "Already connected\n" ); //Shouldn't happen
-
-                    break;
-
-                case ID_DISCONNECTION_NOTIFICATION:
-                    if( isVerbose )
-                        printf( "We have been disconnected.\n" );
-                    break;
-                case ID_CONNECTION_LOST:
-                    if( isVerbose )
-                        printf( "Connection lost.\n" );
-
-                    break;
-                default:
-
-                    break;
-                }
-
-                peerList[i]->DeallocatePacket( packet );
-
-                // Stay in the loop as long as there are more packets.
-                packet = peerList[i]->Receive();
-            }
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) ); //If needed for testing
-    }
+    // Read once, so every check below is against one settled state rather than
+    // eight separately-timed reads of it.
+    std::vector<std::vector<SystemAddress>> connectionsOf( kPeerNum );
 
     std::vector<SystemAddress> systemList;
     std::vector<RakNetGUID> guidList;
 
-    for( int i = 0; i < peerNum; i++ )
+    for( int i = 0; i < kPeerNum; i++ )
     {
         peerList[i]->GetSystemList( systemList, guidList );
+        connectionsOf[i] = systemList;
+    }
 
-        int connNum = static_cast<int>( guidList.size() ); //Get the number of connections for the current peer
-        if( connNum > maxConnections ) //Did we connect to more?
+    int connectionEnds = 0;
+
+    for( int i = 0; i < kPeerNum; i++ )
+    {
+        const int connectionCount = static_cast<int>( connectionsOf[i].size() );
+        connectionEnds += connectionCount;
+
+        // CHECK, not REQUIRE: nothing below depends on it, and one peer over the
+        // limit should not hide another.
+        INFO( "peer " << i );
+        CHECK( connectionCount <= kMaxConnections );
+    }
+
+    CHECK( connectionEnds >= kMinimumConnectionEnds );
+
+    // The other half of what the wait above buys: a connection is a thing two
+    // peers hold, so if peer i lists peer j then peer j lists peer i. Only
+    // askable because both sides of every attempt have settled.
+    for( int i = 0; i < kPeerNum; i++ )
+    {
+        for( int j = i + 1; j < kPeerNum; j++ )
         {
-            if( isVerbose )
-            {
-                printf( "More connections were allowed to peer %i, %i total.Fail\n", i, connNum );
+            const bool iHoldsJ = HoldsPort( connectionsOf[i], static_cast<unsigned short>( kBasePort + j ) );
+            const bool jHoldsI = HoldsPort( connectionsOf[j], static_cast<unsigned short>( kBasePort + i ) );
 
-                DebugTools::ShowError( "", !noPauses && isVerbose, __LINE__, __FILE__ );
-            }
-
-            return 2;
+            INFO( "peer " << i << " and peer " << j );
+            CHECK( iHoldsJ == jHoldsI );
         }
-    }
-
-    if( isVerbose )
-        printf( "Pass\n" );
-    return 0;
-}
-
-std::string MaximumConnectTest::GetTestName() const
-{
-    return "MaximumConnectTest";
-}
-
-std::string MaximumConnectTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
-    {
-    case  0: return "No error";                                             break;
-    case  1: return "The connect function failed";                          break;
-    case  2: return "An extra connection was allowed";                      break;
-    case  3: return "GetMaximumIncomingConnectionsn returned wrong value";  break;
-    default: return "Undefined Error";                                      break;
-    }
-    // clang-format on
-}
-
-MaximumConnectTest::MaximumConnectTest( void )
-{
-}
-
-MaximumConnectTest::~MaximumConnectTest( void )
-{
-}
-
-void MaximumConnectTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
     }
 }

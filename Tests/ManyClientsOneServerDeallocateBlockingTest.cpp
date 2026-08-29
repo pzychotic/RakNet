@@ -8,413 +8,153 @@
  *
  */
 
-#include "ManyClientsOneServerDeallocateBlockingTest.h"
+#include "CommonFunctions.h"
+#include "ConnectionWaits.h"
+#include "PeerScope.h"
+
+#include "GetTime.h"
+#include "RakNetTime.h"
+#include "RakPeerInterface.h"
+#include "RakNetTypes.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <thread>
-
-void ManyClientsOneServerDeallocateBlockingTest::WaitForConnectionRequestsToComplete( RakPeerInterface** clientList, int clientNum, bool isVerbose )
-{
-    bool msgWasPrinted = false;
-
-    for( int i = 0; i < clientNum; i++ )
-    {
-        SystemAddress currentSystem( "127.0.0.1", 60000 );
-
-        while( CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, false, true, true ) )
-        {
-            if( msgWasPrinted == false )
-            {
-                printf( "Waiting for connection requests to complete.\n" );
-                msgWasPrinted = true;
-            }
-
-            std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
-        }
-    }
-}
-
-void ManyClientsOneServerDeallocateBlockingTest::WaitAndPrintResults( RakPeerInterface** clientList, int clientNum, bool isVerbose, RakPeerInterface* server )
-{
-    WaitForConnectionRequestsToComplete( clientList, clientNum, isVerbose );
-
-    Packet* packet;
-
-    if( isVerbose )
-        printf( "For server\n" );
-
-    for( packet = server->Receive(); packet; server->DeallocatePacket( packet ), packet = server->Receive() )
-    {
-        switch( packet->data[0] )
-        {
-        case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-            if( isVerbose )
-                printf( "Another client has disconnected.\n" );
-
-            break;
-        case ID_REMOTE_CONNECTION_LOST:
-            if( isVerbose )
-                printf( "Another client has lost the connection.\n" );
-
-            break;
-        case ID_REMOTE_NEW_INCOMING_CONNECTION:
-            if( isVerbose )
-                printf( "Another client has connected.\n" );
-            break;
-        case ID_CONNECTION_REQUEST_ACCEPTED:
-            if( isVerbose )
-                printf( "Our connection request has been accepted.\n" );
-
-            break;
-        case ID_CONNECTION_ATTEMPT_FAILED:
-            if( isVerbose )
-                printf( "A connection has failed.\n" );
-
-            break;
-
-        case ID_NEW_INCOMING_CONNECTION:
-            if( isVerbose )
-                printf( "A connection is incoming.\n" );
-
-            break;
-        case ID_NO_FREE_INCOMING_CONNECTIONS:
-            if( isVerbose )
-                printf( "The server is full.\n" );
-
-            break;
-
-        case ID_ALREADY_CONNECTED:
-            if( isVerbose )
-                printf( "Already connected\n" );
-
-            break;
-
-        case ID_DISCONNECTION_NOTIFICATION:
-            if( isVerbose )
-                printf( "We have been disconnected.\n" );
-            break;
-        case ID_CONNECTION_LOST:
-            if( isVerbose )
-                printf( "Connection lost.\n" );
-
-            break;
-        default:
-
-            break;
-        }
-    }
-
-    //std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-
-    // Log all events per peer
-    for( int i = 0; i < clientNum; i++ ) //Receive for all peers
-    {
-        if( isVerbose )
-            printf( "For client %i\n", i );
-
-        for( packet = clientList[i]->Receive(); packet; clientList[i]->DeallocatePacket( packet ), packet = clientList[i]->Receive() )
-        {
-            switch( packet->data[0] )
-            {
-            case ID_REMOTE_DISCONNECTION_NOTIFICATION:
-                if( isVerbose )
-                    printf( "Another client has disconnected.\n" );
-
-                break;
-            case ID_REMOTE_CONNECTION_LOST:
-                if( isVerbose )
-                    printf( "Another client has lost the connection.\n" );
-
-                break;
-            case ID_REMOTE_NEW_INCOMING_CONNECTION:
-                if( isVerbose )
-                    printf( "Another client has connected.\n" );
-                break;
-            case ID_CONNECTION_REQUEST_ACCEPTED:
-                if( isVerbose )
-                    printf( "Our connection request has been accepted.\n" );
-
-                break;
-            case ID_CONNECTION_ATTEMPT_FAILED:
-                if( isVerbose )
-                    printf( "A connection has failed.\n" );
-
-                break;
-
-            case ID_NEW_INCOMING_CONNECTION:
-                if( isVerbose )
-                    printf( "A connection is incoming.\n" );
-
-                break;
-            case ID_NO_FREE_INCOMING_CONNECTIONS:
-                if( isVerbose )
-                    printf( "The server is full.\n" );
-
-                break;
-
-            case ID_ALREADY_CONNECTED:
-                if( isVerbose )
-                    printf( "Already connected\n" );
-
-                break;
-
-            case ID_DISCONNECTION_NOTIFICATION:
-                if( isVerbose )
-                    printf( "We have been disconnected.\n" );
-                break;
-            case ID_CONNECTION_LOST:
-                if( isVerbose )
-                    printf( "Connection lost.\n" );
-
-                break;
-            default:
-
-                break;
-            }
-        }
-    }
-}
+#include <vector>
 
 /*
+The server's timeout is set to one second, then 256 clients connect to it.
 
-The server timeout for this test is set to one second.
+For thirty seconds, every client that has managed to connect is destroyed outright
+- no CloseConnection, no disconnect notification - and a fresh one is started in
+its place. The test sleeps for twice the timeout so the server's timeout is what
+notices, then reconnects everyone. Deallocating a live client is the point: this is
+the only test in the suite that does it, and it is what PeerScope::ReplaceWithClient
+exists for.
 
-What is being done here is having 256 clients connect to a server.
+After the loop, everyone is given one last chance to connect, and all 256 must be
+holding exactly one connection.
 
-Then the client is deallocated.
+This version waits for connects in a blocking loop, hence the name; its
+non-blocking sibling is ManyClientsOneServerNonBlockingTest.
 
-It is put to sleep for double the timeout amount.
+RakPeerInterface functions explicitly tested:
 
-After that the timeout should trigger and the clients register as disconnected.
+    SetTimeoutTime
+    GetTimeoutTime
+    Connect
+    GetSystemList
 
-Then the connection is started again.
-
-Do this for about 30 seconds.
-
-It is put to sleep for double the timeout amount.
-
-Then allow them all to connect for one last time.
-
-This version waits for connect and such in a loop, blocking execution so it is a blocking test.
-
-Good ideas for changes:
-After the last check run a eightpeers like test an add the conditions
-of that test as well.
-
-Success conditions:
-All connected normally.
-
-Failure conditions:
-Doesn't reconnect normally.
-
-During the very first connect loop any connect returns false.
-
-Connect function returns false and peer is not connected to anything,pending a connection, or disconnecting.
-
-GetTimeoutTime does not match the set timeout.
-
-RakPeerInterface Functions used, tested indirectly by its use:
-Startup
-Connect
-SetMaximumIncomingConnections
-Receive
-Send
-DeallocatePacket
-GetSystemList
-SetMaximumIncomingConnections
-
-RakPeerInterface Functions Explicitly Tested:
-GetTimeoutTime
-SetTimeoutTime
-Connect
-IsConnected
-
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Receive, DeallocatePacket, GetConnectionState.
 */
-int ManyClientsOneServerDeallocateBlockingTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kServerPort = 60000;
+constexpr int kClientNum = 256;
+constexpr TimeMS kTimeoutTime = 1000;
+
+void WaitAndDrain( RakPeerInterface* const* clientList, RakPeerInterface* server )
 {
-    //Initializations of the arrays
-    for( int i = 0; i < clientNum; i++ )
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    ConnectionWaits::WaitForRequestsToSettle( clientList, kClientNum, serverAddress );
+
+    ConnectionWaits::Drain( server );
+    ConnectionWaits::DrainAll( clientList, kClientNum );
+}
+
+} // namespace
+
+TEST_CASE( "Clients deallocated mid-connection are timed out by the server and all 256 reconnect", "[network][slow]" )
+{
+    PeerScope peers;
+
+    // The server first: creation order is teardown order reversed, and destroying
+    // 256 connected clients before the server they are connected to is the order
+    // PeerScope is written around.
+    RakPeerInterface* server = peers.Server( kServerPort, kClientNum );
+
+    server->SetTimeoutTime( kTimeoutTime, UNASSIGNED_SYSTEM_ADDRESS );
+
+    // REQUIRE: the thirty-second loop below is built entirely on the server
+    // noticing a vanished client within this window, so a timeout that did not
+    // take makes everything after it meaningless.
+    REQUIRE( server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS ) == kTimeoutTime );
+
+    RakPeerInterface* clientList[kClientNum];
+
+    for( int i = 0; i < kClientNum; i++ )
     {
-
-        clientList[i] = RakPeerInterface::GetInstance();
-
-        clientList[i]->Startup( 1, &SocketDescriptor(), 1 );
+        clientList[i] = peers.Client();
     }
 
-    server = RakPeerInterface::GetInstance();
-    server->Startup( clientNum, &SocketDescriptor( 60000, 0 ), 1 );
-    server->SetMaximumIncomingConnections( clientNum );
-
-    const int timeoutTime = 1000;
-    server->SetTimeoutTime( timeoutTime, UNASSIGNED_SYSTEM_ADDRESS );
-
-    int retTimeout = (int)server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS );
-    if( retTimeout != timeoutTime )
+    for( int i = 0; i < kClientNum; i++ )
     {
-
-        if( isVerbose )
-            DebugTools::ShowError( "GetTimeoutTime did not match the timeout that was set. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 3;
+        INFO( "client " << i );
+        REQUIRE( clientList[i]->Connect( "127.0.0.1", kServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
     }
 
-    //Connect all the clients to the server
-
-    for( int i = 0; i < clientNum; i++ )
-    {
-
-        if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-        {
-
-            if( isVerbose )
-                DebugTools::ShowError( "Problem while calling connect.\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-            return 1; //This fails the test, don't bother going on.
-        }
-    }
-
-    TimeMS entryTime = GetTimeMS(); //Loop entry time
-
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
     std::vector<SystemAddress> systemList;
     std::vector<RakNetGUID> guidList;
 
-    if( isVerbose )
-        printf( "Entering disconnect loop \n" );
+    const TimeMS entryTime = GetTimeMS();
 
-    while( GetTimeMS() - entryTime < 30000 ) //Run for 30 Secoonds
+    while( GetTimeMS() - entryTime < 30000 )
     {
-        //Deallocate client IF connected
-        for( int i = 0; i < clientNum; i++ )
+        for( int i = 0; i < kClientNum; i++ )
         {
-            clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
+            clientList[i]->GetSystemList( systemList, guidList );
 
-            if( systemList.size() >= 1 )
+            if( !systemList.empty() )
             {
-                RakPeerInterface::DestroyInstance( clientList[i] );
-                clientList[i] = RakPeerInterface::GetInstance();
-
-                clientList[i]->Startup( 1, &SocketDescriptor(), 1 );
+                INFO( "client " << i );
+                peers.ReplaceWithClient( clientList[i] );
             }
         }
 
         std::this_thread::sleep_for( std::chrono::milliseconds( 2000 ) ); //Allow connections to timeout.
 
-        //Connect
-
-        for( int i = 0; i < clientNum; i++ )
+        for( int i = 0; i < kClientNum; i++ )
         {
-            SystemAddress currentSystem( "127.0.0.1", 60000 );
-
-            if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
+            if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], serverAddress, true, true, true, true ) )
             {
-
-                if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-                {
-
-                    if( isVerbose )
-                        DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-                    return 1; //This fails the test, don't bother going on.
-                }
+                INFO( "client " << i );
+                REQUIRE( clientList[i]->Connect( "127.0.0.1", kServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
             }
         }
 
-        WaitAndPrintResults( clientList, clientNum, isVerbose, server );
+        WaitAndDrain( clientList, server );
     }
 
-    WaitAndPrintResults( clientList, clientNum, isVerbose, server );
-
-    printf( "Connecting clients\n" );
+    WaitAndDrain( clientList, server );
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 2000 ) ); //Allow connections to timeout.
 
-    //Connect
-
-    for( int i = 0; i < clientNum; i++ )
+    for( int i = 0; i < kClientNum; i++ )
     {
-        SystemAddress currentSystem( "127.0.0.1", 60000 );
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, true, true, true, true ) ) //Are we connected or is there a pending operation ?
+        if( !CommonFunctions::ConnectionStateMatchesOptions( clientList[i], serverAddress, true, true, true, true ) )
         {
-            printf( "Calling Connect() for client %i.\n", i );
-
-            if( clientList[i]->Connect( "127.0.0.1", 60000, 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-            {
-                clientList[i]->GetSystemList( systemList, guidList ); //Get connectionlist
-
-                if( isVerbose )
-                    DebugTools::ShowError( "Problem while calling connect. \n", !noPauses && isVerbose, __LINE__, __FILE__ );
-
-                return 1; //This fails the test, don't bother going on.
-            }
-        }
-        else
-        {
-            if( CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, false, false, false, true ) == false )
-                printf( "Not calling Connect() for client %i because it is disconnecting.\n", i );
-            else if( CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, false, true, true ) == false )
-                printf( "Not calling Connect() for client %i  because it is connecting.\n", i );
-            else if( CommonFunctions::ConnectionStateMatchesOptions( clientList[i], currentSystem, true ) == false )
-                printf( "Not calling Connect() for client %i because it is connected).\n", i );
+            INFO( "client " << i );
+            REQUIRE( clientList[i]->Connect( "127.0.0.1", kServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
         }
     }
 
-    WaitAndPrintResults( clientList, clientNum, isVerbose, server );
+    WaitAndDrain( clientList, server );
 
-    for( int i = 0; i < clientNum; i++ )
+    // CHECK, not REQUIRE: this is the last statement in the test, so a client that
+    // failed to reconnect costs nothing to keep going past, and reporting all of
+    // them beats reporting the lowest-numbered one.
+    for( int i = 0; i < kClientNum; i++ )
     {
         clientList[i]->GetSystemList( systemList, guidList );
-        //Get the number of connections for the current peer
-        if( guidList.size() != 1 )     //Did we connect all?
-        {
-            if( isVerbose )
-            {
-                printf( "Not all clients reconnected normally.\nFailed on client number %i\n", i );
 
-                DebugTools::ShowError( "", !noPauses && isVerbose, __LINE__, __FILE__ );
-            }
-
-            return 2;
-        }
+        INFO( "client " << i );
+        CHECK( guidList.size() == 1 );
     }
-
-    if( isVerbose )
-        printf( "Pass\n" );
-    return 0;
-}
-
-std::string ManyClientsOneServerDeallocateBlockingTest::GetTestName() const
-{
-    return "ManyClientsOneServerDeallocateBlockingTest";
-}
-
-std::string ManyClientsOneServerDeallocateBlockingTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
-    {
-    case  0: return "No error";                                                 break;
-    case  1: return "The connect function failed";                              break;
-    case  2: return "Peers did not connect normally";                           break;
-    case  3: return "GetTimeoutTime did not match the timeout that was set";    break;
-    default: return "Undefined Error";                                          break;
-    }
-    // clang-format on
-}
-
-ManyClientsOneServerDeallocateBlockingTest::ManyClientsOneServerDeallocateBlockingTest( void )
-{
-}
-
-ManyClientsOneServerDeallocateBlockingTest::~ManyClientsOneServerDeallocateBlockingTest( void )
-{
-}
-
-void ManyClientsOneServerDeallocateBlockingTest::DestroyPeers()
-{
-
-    for( int i = 0; i < clientNum; i++ )
-        RakPeerInterface::DestroyInstance( clientList[i] );
-
-    RakPeerInterface::DestroyInstance( server );
 }

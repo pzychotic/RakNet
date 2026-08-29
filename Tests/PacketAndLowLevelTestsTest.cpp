@@ -8,326 +8,142 @@
  *
  */
 
-#include "PacketAndLowLevelTestsTest.h"
+#include "PeerScope.h"
+
+#include "CommonFunctions.h"
+#include "MessageIdentifiers.h"
+#include "RakPeerInterface.h"
+#include "TestHelpers.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 /*
-Description:
-Tests out the sunctions:
-virtual int RakPeerInterface::GetSplitMessageProgressInterval   (   void         )       const "
-virtual void RakPeerInterface::PushBackPacket   (   Packet *     packet,        bool    pushAtHead      )           "
-virtual bool RakPeerInterface::SendList     (   char **      data,      const int *     lengths,        const int   numParameters,      PacketPriority      priority,       PacketReliability   reliability,        char    orderingChannel,        SystemAddress   systemAddress,      bool    broadcast       )           "
-virtual void RakPeerInterface::SetSplitMessageProgressInterval  (   int     interval     )
-virtual void RakPeerInterface::SetUnreliableTimeout     (   TimeMS       timeoutMS       )
-virtual Packet* RakPeerInterface::AllocatePacket    (   unsigned     dataSize    )
-AttachPlugin (PluginInterface2 *plugin)=0
-DetachPlugin (PluginInterface2 *plugin)=0
+Walks a connected pair through the low-level packet API - a batched SendList, a
+packet large enough to force splitting and report ID_DOWNLOAD_PROGRESS, and two
+packets injected straight into the receive queue with PushBackPacket - checking
+after each that ordinary send and receive still work. That "still works" check is
+the real subject: these calls reach past the normal send path, and the risk is that
+they leave the queue in a state later traffic cannot get out of.
 
-Success conditions:
+RakPeerInterface functions explicitly tested:
 
-Failure conditions:
+    SendList
+    SetSplitMessageProgressInterval
+    GetSplitMessageProgressInterval
+    AllocatePacket
+    PushBackPacket
 
-RakPeerInterface Functions used, tested indirectly by its use,list may not be complete:
-Startup
-SetMaximumIncomingConnections
-Receive
-DeallocatePacket
-Send
-IsConnected
-RakPeerInterface Functions Explicitly Tested:
-GetSplitMessageProgressInterval
-PushBackPacket
-SendList
-SetSplitMessageProgressInterval
-AllocatePacket
-GetMTUSize
-AttachPlugin
-DetachPlugin
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Receive, DeallocatePacket, Send, IsConnected.
 
+AttachPlugin, DetachPlugin and GetMTUSize are NOT covered, despite the name this
+test used to carry: the plugin half was never more than a commented-out block and
+GetMTUSize was never called at all.
 */
-int PacketAndLowLevelTestsTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kServerPort = 60000;
+
+// Large enough to be split by any plausible MTU, which is what makes
+// ID_DOWNLOAD_PROGRESS fire.
+constexpr int kHugePacketSize = 3000000;
+
+// Five messages of "AAAA" plus terminator. SendList coalesces them into one
+// packet, so the receiver sees 5 x 5 bytes in one delivery.
+constexpr int kSendListMessages = 5;
+constexpr int kSendListMessageLen = 5;
+
+} // namespace
+
+TEST_CASE( "SendList, split packets and PushBackPacket deliver without breaking later traffic", "[network]" )
 {
-    RakPeerInterface *server, *client;
-    destroyList.clear();
+    PeerScope peers;
 
-    TestHelpers::StandardClientPrep( client, destroyList );
-    TestHelpers::StandardServerPrep( server, destroyList );
-    printf( "Connecting to server\n" );
-    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) )
-    {
+    RakPeerInterface* client = peers.Client();
+    RakPeerInterface* server = peers.Server( kServerPort );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[1 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
+    REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) );
 
-        return 1;
-    }
-
-    printf( "Testing SendList\n" );
-
-    char* dataList2[5];
-    char** dataList = (char**)dataList2;
-    int lengths[5];
     char curString1[] = "AAAA";
     char curString2[] = "ABBB";
     char curString3[] = "ACCC";
     char curString4[] = "ADDD";
     char curString5[] = "AEEE";
 
-    dataList[0] = curString1;
-    dataList[1] = curString2;
-    dataList[2] = curString3;
-    dataList[3] = curString4;
-    dataList[4] = curString5;
+    char* dataList[kSendListMessages] = { curString1, curString2, curString3, curString4, curString5 };
+    int lengths[kSendListMessages];
 
-    for( int i = 0; i < 5; i++ )
+    for( int i = 0; i < kSendListMessages; i++ )
     {
         dataList[i][0] = ID_USER_PACKET_ENUM + 1 + i;
-        lengths[i] = 5;
+        lengths[i] = kSendListMessageLen;
     }
 
-    client->SendList( (const char**)dataList, lengths, 5, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true );
+    client->SendList( (const char**)dataList, lengths, kSendListMessages, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true );
 
-    Packet* packet;
-    if( !( packet = CommonFunctions::WaitAndReturnMessageWithID( server, ID_USER_PACKET_ENUM + 1, 1000 ) ) )
-    {
+    Packet* packet = CommonFunctions::WaitAndReturnMessageWithID( server, ID_USER_PACKET_ENUM + 1, 1000 );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[9 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 9;
-    }
-
-    if( packet->length != 25 )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[13], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 14;
-    }
+    // REQUIRE: packet->length below dereferences it.
+    REQUIRE( packet != nullptr );
+    CHECK( packet->length == kSendListMessages * kSendListMessageLen );
 
     server->DeallocatePacket( packet );
 
-    // ??? investigate
-    //PluginInterface2* myPlug=new PacketChangerPlugin();
-
-    //printf("Test attach detach of plugins\n");
-    //client->AttachPlugin(myPlug);
-    //TestHelpers::BroadCastTestPacket(client);
-    //if (TestHelpers::WaitForTestPacket(server,2000))
-    //{
-
-    //  if (isVerbose)
-    //      DebugTools::ShowError(errorList[2-1],!noPauses && isVerbose,__LINE__,__FILE__);
-
-    //  return 2;
-    //}
-
-    //client->DetachPlugin(myPlug);
-
-
     TestHelpers::BroadCastTestPacket( client );
-    if( !TestHelpers::WaitForTestPacket( server, 2000 ) )
-    {
+    CHECK( TestHelpers::WaitForTestPacket( server, 2000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[3 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
+    // Both are handed to PushBackPacket further down, which is what eventually
+    // frees them.
+    Packet* hugePacket = client->AllocatePacket( kHugePacketSize );
+    REQUIRE( hugePacket != nullptr );
 
-        return 3;
-    }
-
-    printf( "Test AllocatePacket\n" );
-    Packet *hugePacket, *hugePacket2;
-    const int dataSize = 3000000; //around 30 meg didn't want to calculate the exact
-    hugePacket = client->AllocatePacket( dataSize );
-    hugePacket2 = client->AllocatePacket( dataSize );
-
-    /*//Couldn't find a good cross platform way for allocated memory so skipped this check
-    if (somemalloccheck<3000000)
-    {}
-    */
-
-    printf( "Assuming 3000000 allocation for splitpacket, testing setsplitpacket\n" );
+    Packet* hugePacket2 = client->AllocatePacket( kHugePacketSize );
+    REQUIRE( hugePacket2 != nullptr );
 
     hugePacket->data[0] = ID_USER_PACKET_ENUM + 1;
     hugePacket2->data[0] = ID_USER_PACKET_ENUM + 1;
 
+    // One millisecond, so progress is reported as often as it possibly can be.
     server->SetSplitMessageProgressInterval( 1 );
+    CHECK( server->GetSplitMessageProgressInterval() == 1 );
 
-    if( server->GetSplitMessageProgressInterval() != 1 )
-    {
+    // REQUIRE: with nothing sent there is no split to report progress on.
+    REQUIRE( client->Send( (const char*)hugePacket->data, kHugePacketSize, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true ) > 0 );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[4 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
+    CHECK( CommonFunctions::WaitForMessageWithID( server, ID_DOWNLOAD_PROGRESS, 2000 ) );
 
-        return 4;
-    }
-
-    if( !client->Send( (const char*)hugePacket->data, dataSize, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[5 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 5;
-    }
-
-    if( !CommonFunctions::WaitForMessageWithID( server, ID_DOWNLOAD_PROGRESS, 2000 ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[6 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 6;
-    }
-
-    while( CommonFunctions::WaitForMessageWithID( server, ID_DOWNLOAD_PROGRESS, 500 ) ) //Clear out the rest before next test
+    // Drain the rest of the progress reports, so the checks below are looking at
+    // their own traffic.
+    while( CommonFunctions::WaitForMessageWithID( server, ID_DOWNLOAD_PROGRESS, 500 ) )
     {
     }
 
-    printf( "Making sure still connected, if not connect\n" );
-    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) ) //Make sure connected before test
-    {
+    // A three-megabyte transfer can cost the connection; reconnect if so, since
+    // every check below needs the pair connected. Returns true immediately when
+    // the connection survived.
+    REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[11 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 11;
-    }
-
-    printf( "Making sure standard send/recieve still functioning\n" );
     TestHelpers::BroadCastTestPacket( client );
-    if( !TestHelpers::WaitForTestPacket( server, 5000 ) )
-    {
+    CHECK( TestHelpers::WaitForTestPacket( server, 5000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[12], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 13;
-    }
-
-    printf( "Testing PushBackPacket\n" );
-
+    // Onto the tail of the receive queue.
     server->PushBackPacket( hugePacket, false );
+    CHECK( TestHelpers::WaitForTestPacket( server, 2000 ) );
 
-    if( !TestHelpers::WaitForTestPacket( server, 2000 ) )
-    {
+    REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[7 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 7;
-    }
-
-    printf( "Making sure still connected, if not connect\n" );
-    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) ) //Make sure connected before test
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[11 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 11;
-    }
-
-    printf( "Making sure standard send/recieve still functioning\n" );
     TestHelpers::BroadCastTestPacket( client );
-    if( !TestHelpers::WaitForTestPacket( server, 2000 ) )
-    {
+    CHECK( TestHelpers::WaitForTestPacket( server, 2000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[12 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 12;
-    }
-
-    printf( "PushBackPacket head true test\n" );
+    // And onto the head of it.
     server->PushBackPacket( hugePacket2, true );
+    CHECK( TestHelpers::WaitForTestPacket( server, 2000 ) );
 
-    if( !TestHelpers::WaitForTestPacket( server, 2000 ) )
-    {
+    REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( errorList[10 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 10;
-    }
-
-    printf( "Making sure still connected, if not connect\n" );
-    if( !TestHelpers::WaitAndConnectTwoPeersLocally( client, server, 5000 ) ) //Make sure connected before test
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[11 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 11;
-    }
-
-    printf( "Run recieve test\n" );
     TestHelpers::BroadCastTestPacket( client );
-    if( !TestHelpers::WaitForTestPacket( server, 2000 ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( errorList[12 - 1], !noPauses && isVerbose, __LINE__, __FILE__ );
-
-        return 12;
-    }
-
-    return 0;
-}
-
-void PacketAndLowLevelTestsTest::FloodWithHighPriority( RakPeerInterface* client )
-{
-
-    for( int i = 0; i < 60000; i++ )
-    {
-        TestHelpers::BroadCastTestPacket( client, UNRELIABLE, HIGH_PRIORITY, ID_USER_PACKET_ENUM + 2 );
-    }
-}
-
-std::string PacketAndLowLevelTestsTest::GetTestName() const
-{
-    return "PacketAndLowLevelTestsTest";
-}
-
-std::string PacketAndLowLevelTestsTest::ErrorCodeToString( int errorCode ) const
-{
-    if( errorCode > 0 && (unsigned int)errorCode <= errorList.size() )
-    {
-        return errorList[errorCode - 1];
-    }
-    else
-    {
-        return "Undefined Error";
-    }
-}
-
-void PacketAndLowLevelTestsTest::DestroyPeers()
-{
-    for( RakPeerInterface* pPeer : destroyList )
-    {
-        RakPeerInterface::DestroyInstance( pPeer );
-    }
-}
-
-PacketAndLowLevelTestsTest::PacketAndLowLevelTestsTest( void )
-{
-
-    errorList.emplace_back( "Client failed to connect to server" );
-    errorList.emplace_back( "Attached plugin failed to modify packet" );
-    errorList.emplace_back( "Plugin is still modifying packets after detach" );
-    errorList.emplace_back( "GetSplitMessageProgressInterval returned wrong value" );
-    errorList.emplace_back( "Send to server failed" );
-    errorList.emplace_back( "Large packet did not split or did not properly get ID_DOWNLOAD_PROGRESS after SetSplitMessageProgressInterval is set to 1 millisecond" );
-    errorList.emplace_back( "Did not recieve and put on packet made with AllocatePacket and put on recieve stack with PushBackPacket" );
-    errorList.emplace_back( "Client failed to connect to server" );
-    errorList.emplace_back( "Did not recieve all packets from SendList" );
-    errorList.emplace_back( "Did not recieve and put on packet made with AllocatePacket and put on recieve stack with PushBackPacket" );
-    errorList.emplace_back( "Client failed to connect to server" );
-    errorList.emplace_back( "PushBackPacket messed up future communication" );
-    errorList.emplace_back( "Send/Recieve failed" );
-    errorList.emplace_back( "Recieved size incorrect" );
-}
-
-PacketAndLowLevelTestsTest::~PacketAndLowLevelTestsTest( void )
-{
+    CHECK( TestHelpers::WaitForTestPacket( server, 2000 ) );
 }

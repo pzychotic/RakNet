@@ -8,534 +8,153 @@
  *
  */
 
-#include "SecurityFunctionsTest.h"
+#include "CommonFunctions.h"
+#include "ConnectionWaits.h"
+#include "PeerScope.h"
+
+#include "GetTime.h"
+#include "RakNetTime.h"
+#include "RakPeerInterface.h"
+#include "RakNetTypes.h"
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <string>
 #include <thread>
 
 /*
-Description:
+Puts one server behind an incoming password and a ban list, then walks a single
+client through every gate: no password, the wrong password, the right password,
+banned, unbanned by RemoveFromBanList, banned again, unbanned by ClearBanList.
+Each gate is asserted in both directions - the three connections that must be
+refused matter as much as the three that must succeed.
 
-Tests:
-virtual void RakPeerInterface::AddToSecurityExceptionList   (   const char *     ip      )
-virtual void RakPeerInterface::AddToBanList     (   const char *     IP,        TimeMS      milliseconds = 0        )
-virtual void RakPeerInterface::GetIncomingPassword      (   char *       passwordData,      int *   passwordDataLength      )
-virtual void RakPeerInterface::InitializeSecurity   (   const char *     pubKeyE,       const char *    pubKeyN,        const char *    privKeyP,       const char *    privKeyQ        )
-virtual bool RakPeerInterface::IsBanned     (   const char *     IP      )
-virtual bool RakPeerInterface::IsInSecurityExceptionList    (   const char *     ip      )
-virtual void RakPeerInterface::RemoveFromSecurityExceptionList      (   const char *     ip      )
-virtual void RakPeerInterface::RemoveFromBanList    (   const char *     IP      )
-virtual void RakPeerInterface::SetIncomingPassword      (   const char *     passwordData,      int     passwordDataLength      )
-virtual void    ClearBanList (void)=0
+RakPeerInterface functions explicitly tested:
 
-Success conditions:
-All functions pass tests.
+    SetIncomingPassword
+    GetIncomingPassword
+    AddToBanList
+    IsBanned
+    RemoveFromBanList
+    ClearBanList
 
-Failure conditions:
-Any function fails test.
+Exercised indirectly by getting to that point: Startup,
+SetMaximumIncomingConnections, Connect, CloseConnection, GetConnectionState.
 
-Client connects with no password
-Client connects with wrong password
-Client failed to connect with correct password
-Client was banned but connected anyways
-GetIncomingPassword returned wrong password
-IsBanned does not show localhost as banned
-Localhost was not unbanned
-Client failed to connect after banlist removal
-Client failed to connect after banlist removal with clear function
-Client did not connect encrypted
-Client connected encrypted but shouldn't have
-IsInSecurityExceptionList does not register localhost addition
-
-RakPeerInterface Functions used, tested indirectly by its use:
-Startup
-SetMaximumIncomingConnections
-Receive
-DeallocatePacket
-Send
-IsConnected
-GetStatistics
-
-RakPeerInterface Functions Explicitly Tested:
-SetIncomingPassword
-GetIncomingPassword
-AddToBanList
-IsBanned
-RemoveFromBanList
-ClearBanList
-InitializeSecurity  //Disabled because of RakNetStatistics changes
-AddToSecurityExceptionList  //Disabled because of RakNetStatistics changes
-IsInSecurityExceptionList //Disabled because of RakNetStatistics changes
-RemoveFromSecurityExceptionList //Disabled because of RakNetStatistics changes
-
+NOT covered, and this is the record that the gap is known rather than lost:
+InitializeSecurity, AddToSecurityExceptionList, IsInSecurityExceptionList and
+RemoveFromSecurityExceptionList. Nothing here could assert anything about them in
+this build - LIBCAT_SECURITY defaults to 0 (Source/NativeFeatureIncludes.h), which
+compiles all four out to no-ops. Covering them needs that build option on and a
+test written against the current three-argument InitializeSecurity( publicKey,
+privateKey, bRequireClientKey ).
 */
-int SecurityFunctionsTest::RunTest( bool isVerbose, bool noPauses )
+
+using namespace RakNet;
+
+namespace {
+
+constexpr unsigned short kServerPort = 60000;
+
+// Six call sites, three passwords, two budgets. Returns whether the connection
+// happened rather than asserting, because half of the call sites expect it NOT to.
+bool TryToConnect( RakPeerInterface* client, const SystemAddress& server, const char* password, int passwordLength, int millisecondsToWait )
 {
-    char thePassword[] = "password";
-    server = RakPeerInterface::GetInstance();
+    const TimeMS entryTime = GetTimeMS();
 
-    client = RakPeerInterface::GetInstance();
-
-    client->Startup( 1, &SocketDescriptor(), 1 );
-    server->Startup( 1, &SocketDescriptor( 60000, 0 ), 1 );
-    server->SetMaximumIncomingConnections( 1 );
-    server->SetIncomingPassword( thePassword, (int)strlen( thePassword ) );
-
-    char returnedPass[22];
-    int returnedLen = 22;
-    server->GetIncomingPassword( returnedPass, &returnedLen );
-    returnedPass[returnedLen] = 0; //Password is a data block convert to null terminated string to make the test easier
-
-    if( strcmp( returnedPass, thePassword ) != 0 )
+    while( !CommonFunctions::ConnectionStateMatchesOptions( client, server, true ) && GetTimeMS() - entryTime < static_cast<TimeMS>( millisecondsToWait ) )
     {
-        if( isVerbose )
+        // Only re-issue Connect when nothing is already in flight, or the
+        // second attempt is refused as a duplicate.
+        if( !CommonFunctions::ConnectionStateMatchesOptions( client, server, true, true, true, true ) )
         {
-
-            printf( "%s was returned but %s is the password\n", returnedPass, thePassword );
-            DebugTools::ShowError( "GetIncomingPassword returned wrong password\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        }
-        return 5;
-    }
-
-    SystemAddress serverAddress( "127.0.0.1", 60000 );
-
-    TimeMS entryTime = GetTimeMS();
-
-    if( isVerbose )
-        printf( "Testing if no password is rejected\n" );
-
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 );
+            client->Connect( "127.0.0.1", server.GetPort(), password, passwordLength );
         }
 
         std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
-    if( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client connected with no password\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 1;
-    }
+    return CommonFunctions::ConnectionStateMatchesOptions( client, server, true );
+}
 
-    if( isVerbose )
-        printf( "Testing if incorrect password is rejected\n" );
+// Close once, then wait - never a poll that re-issues the close, which livelocks.
+// See ConnectionWaits::WaitForDisconnect.
+//
+// Both call sites disconnect the same client from the same server, so the wait's
+// own message - which names the port and the state - cannot say which of them
+// expired. Hence the label, which says which gate the client was being taken back
+// out of.
+void Disconnect( RakPeerInterface* client, const SystemAddress& server, const char* afterWhichGate )
+{
+    INFO( "disconnecting after " << afterWhichGate );
 
-    char badPass[] = "badpass";
-    entryTime = GetTimeMS();
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
+    client->CloseConnection( server, true, 0, LOW_PRIORITY );
+    ConnectionWaits::WaitForDisconnect( client, server );
+}
 
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), badPass, (int)strlen( badPass ) );
-        }
+} // namespace
 
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
+TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server accepts", "[network]" )
+{
+    PeerScope peers;
 
-    if( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client connected with wrong password\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 2;
-    }
+    const std::string thePassword = "password";
 
-    if( isVerbose )
-        printf( "Testing if correct password is accepted\n" );
+    RakPeerInterface* server = peers.Server( kServerPort );
+    server->SetIncomingPassword( thePassword.c_str(), static_cast<int>( thePassword.size() ) );
 
-    entryTime = GetTimeMS();
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 50000 ) // ??? why does it take so long to connect?
-    {
+    RakPeerInterface* client = peers.Client();
 
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
-        }
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
 
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
+    // A data block read back with its length, never null-terminated in place at
+    // returnedPassword[returnedLength] - that writes one past the end whenever the
+    // password fills the buffer.
+    char returnedPassword[22];
+    int returnedLength = sizeof( returnedPassword );
+    server->GetIncomingPassword( returnedPassword, &returnedLength );
 
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client failed to connect with correct password\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 3;
-    }
+    // Nothing below reads this back: the gates that follow depend on
+    // SetIncomingPassword having taken, not on GetIncomingPassword reporting it.
+    CHECK( std::string( returnedPassword, returnedLength ) == thePassword );
 
-    while( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) ) //disconnect client
-    {
+    // REQUIRE, not CHECK, for the two refusals: they share one connection with the
+    // acceptance below and there is no disconnect between them, so a client that
+    // wrongly gets in here makes both following gates meaningless rather than
+    // merely failed.
+    REQUIRE_FALSE( TryToConnect( client, serverAddress, 0, 0, 5000 ) );
 
-        client->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
-    }
+    const std::string badPassword = "badpass";
+    REQUIRE_FALSE( TryToConnect( client, serverAddress, badPassword.c_str(), static_cast<int>( badPassword.size() ), 5000 ) );
 
-    if( isVerbose )
-        printf( "Testing if connection is rejected after adding to ban list\n" );
+    // 50 s rather than the 5 s every other attempt gets. Why the first accepted
+    // connection is the slow one has never been explained; the budget is a ceiling
+    // a healthy run does not approach, not a measurement.
+    REQUIRE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 50000 ) );
 
+    Disconnect( client, serverAddress, "the correct password was accepted" );
+
+    // Each ban section starts from a disconnected client and ends by disconnecting
+    // again, so a failure in one does not poison the next - hence CHECK from here
+    // down, and a broken ban list reports every gate it breaks in a single run.
     server->AddToBanList( "127.0.0.1", 0 );
-
-    entryTime = GetTimeMS();
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !server->IsBanned( "127.0.0.1" ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( "IsBanned does not show localhost as banned\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 6;
-    }
-
-    if( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client was banned but connected anyways\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 4;
-    }
-
-    if( isVerbose )
-        printf( "Testing if connection is accepted after ban removal by RemoveFromBanList\n" );
+    CHECK( server->IsBanned( "127.0.0.1" ) );
+    CHECK_FALSE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
 
     server->RemoveFromBanList( "127.0.0.1" );
-    if( server->IsBanned( "127.0.0.1" ) )
-    {
+    CHECK_FALSE( server->IsBanned( "127.0.0.1" ) );
+    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
 
-        if( isVerbose )
-            DebugTools::ShowError( "Localhost was not unbanned\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 7;
-    }
+    Disconnect( client, serverAddress, "RemoveFromBanList let the client back in" );
 
-    entryTime = GetTimeMS();
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client failed to connect after banlist removal\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 8;
-    }
-
-    while( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) ) //disconnect client
-    {
-
-        client->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
-    }
-
-    if( isVerbose )
-        printf( "Testing if connection is rejected after adding to ban list\n" );
-
+    // The same ban, lifted the other way, which is the only reason this second
+    // half exists.
     server->AddToBanList( "127.0.0.1", 0 );
-
-    entryTime = GetTimeMS();
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !server->IsBanned( "127.0.0.1" ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( "IsBanned does not show localhost as banned\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 6;
-    }
-
-    if( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client was banned but connected anyways\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 4;
-    }
-
-    if( isVerbose )
-        printf( "Testing if connection is accepted after ban removal by ClearBanList\n" );
+    CHECK( server->IsBanned( "127.0.0.1" ) );
+    CHECK_FALSE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
 
     server->ClearBanList();
-    if( server->IsBanned( "127.0.0.1" ) )
-    {
-
-        if( isVerbose )
-            DebugTools::ShowError( "Localhost was not unbanned\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 7;
-    }
-
-    entryTime = GetTimeMS();
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) && GetTimeMS() - entryTime < 5000 )
-    {
-
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
-        {
-            client->Connect( "127.0.0.1", serverAddress.GetPort(), thePassword, (int)strlen( thePassword ) );
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    }
-
-    if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true ) )
-    {
-        if( isVerbose )
-            DebugTools::ShowError( "Client failed to connect after banlist removal with clear function\n", !noPauses && isVerbose, __LINE__, __FILE__ );
-        return 9;
-    }
-
-    while( CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) ) //disconnect client
-    {
-
-        client->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
-    }
-
-    /*//Disabled because of statistics changes
-
-        if (isVerbose)
-            printf("Testing InitializeSecurity on server\n");
-
-        //-----------------------------
-
-        // RSACrypt is a using namespace RakNet;
-    class that handles RSA encryption/decryption internally
-
-        RSACrypt rsacrypt;
-
-        uint32_t e;
-        uint32_t modulus[RAKNET_RSA_FACTOR_LIMBS];
-
-        uint32_t p[RAKNET_RSA_FACTOR_LIMBS/2],q[RAKNET_RSA_FACTOR_LIMBS/2];
-
-        printf("Generating %i bit key. This will take a while...\n", RAKNET_RSA_FACTOR_LIMBS*32);
-        rsacrypt.generatePrivateKey(RAKNET_RSA_FACTOR_LIMBS);
-        e=rsacrypt.getPublicExponent();
-        rsacrypt.getPublicModulus(modulus);
-        rsacrypt.getPrivateP(p);
-        rsacrypt.getPrivateQ(q);
-
-        RakPeerInterface::DestroyInstance(server);
-        server=RakPeerInterface::GetInstance();
-
-        server->InitializeSecurity(0,0,(char*)p, (char*)q);
-        server->Startup(1,30,&SocketDescriptor(60000,0),1);
-        server->SetMaximumIncomingConnections(1);
-        server->SetIncomingPassword(thePassword,strlen(thePassword));
-
-        if (isVerbose)
-            printf("Testing if client connects encrypted\n");
-
-        entryTime=GetTimeMS();
-        while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&GetTimeMS()-entryTime<5000)
-        {
-
-            if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
-            {
-                client->Connect("127.0.0.1",serverAddress.port,thePassword,strlen(thePassword));
-            }
-
-            std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-        }
-
-        char str2[]="AAAAAAAAAA";
-        str2[0]=(char)(ID_USER_PACKET_ENUM+1);
-        client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
-        client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
-
-        Packet *packet;
-        entryTime=GetTimeMS();
-        while(GetTimeMS()-entryTime<1000)
-        {
-            for (packet=server->Receive(); packet;server->DeallocatePacket(packet), packet=server->Receive())
-            {
-
-            }
-        }
-
-        RakNetStatistics *rss;
-
-        rss=client->GetStatistics(serverAddress);
-
-        if (rss->encryptionBitsSent<=0)//If we did connect encrypted we should see encryptionBitsSent
-        {
-            if (isVerbose)
-                DebugTools::ShowError("Client did not connect encrypted\n",!noPauses && isVerbose,__LINE__,__FILE__);
-            return 10;
-        }
-
-        while(CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))//disconnect client
-        {
-
-            client->CloseConnection (serverAddress,true,0,LOW_PRIORITY);
-        }
-
-        //Destroy to clear statistics
-        RakPeerInterface::DestroyInstance(client);
-
-        client=RakPeerInterface::GetInstance();
-
-        client->Startup(1,30,&SocketDescriptor(),1);
-
-        if (isVerbose)
-            printf("Testing AddToSecurityExceptionList client should connect without encryption\n");
-
-        server->AddToSecurityExceptionList("127.0.0.1");
-
-        if (!server->IsInSecurityExceptionList("127.0.0.1"))
-        {
-            if (isVerbose)
-                DebugTools::ShowError("IsInSecurityExceptionList does not register localhost addition\n",!noPauses && isVerbose,__LINE__,__FILE__);
-            return 12;
-        }
-
-        entryTime=GetTimeMS();
-        while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&GetTimeMS()-entryTime<5000)
-        {
-
-            if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
-            {
-                client->Connect("127.0.0.1",serverAddress.port,thePassword,strlen(thePassword));
-            }
-
-            std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-        }
-
-        str2[0]=(char)(ID_USER_PACKET_ENUM+1);
-        client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
-        client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
-
-        //  Packet *packet;
-
-        entryTime=GetTimeMS();
-        while(GetTimeMS()-entryTime<1000)
-        {
-            for (packet=server->Receive(); packet;server->DeallocatePacket(packet), packet=server->Receive())
-            {
-
-            }
-        }
-
-        rss=client->GetStatistics(serverAddress);
-
-        if (rss->encryptionBitsSent>0)//If we did connect encrypted we should see encryptionBitsSent
-        {
-            if (isVerbose)
-                DebugTools::ShowError("Client connected encrypted but shouldn't have\n",!noPauses && isVerbose,__LINE__,__FILE__);
-            return 11;
-        }
-
-        if (isVerbose)
-            printf("Testing RemoveFromSecurityExceptionList\n");
-
-        while(CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))//disconnect client
-        {
-
-            client->CloseConnection (serverAddress,true,0,LOW_PRIORITY);
-        }
-
-        server->RemoveFromSecurityExceptionList("127.0.0.1");
-
-        if (isVerbose)
-            printf("Testing if client connects encrypted\n");
-
-        entryTime=GetTimeMS();
-        while(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true)&&GetTimeMS()-entryTime<5000)
-        {
-
-            if(!CommonFunctions::ConnectionStateMatchesOptions (client,serverAddress,true,true,true,true))
-            {
-                client->Connect("127.0.0.1",serverAddress.port,thePassword,strlen(thePassword));
-            }
-
-            std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-        }
-
-        str2[0]=(char)(ID_USER_PACKET_ENUM+1);
-        client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
-        client->Send(str2,(int) strlen(str2)+1, HIGH_PRIORITY, RELIABLE_ORDERED ,0, UNASSIGNED_SYSTEM_ADDRESS, true);
-
-        entryTime=GetTimeMS();
-        while(GetTimeMS()-entryTime<1000)
-        {
-            for (packet=server->Receive(); packet;server->DeallocatePacket(packet), packet=server->Receive())
-            {
-
-            }
-        }
-
-        rss=client->GetStatistics(serverAddress);
-
-        if (rss->encryptionBitsSent<=0)//If we did connect encrypted we should see encryptionBitsSent
-        {
-            if (isVerbose)
-                DebugTools::ShowError("Client did not connect encrypted\n",!noPauses && isVerbose,__LINE__,__FILE__);
-            return 10;
-        }
-
-    */
-
-    return 0;
-}
-
-std::string SecurityFunctionsTest::GetTestName() const
-{
-    return "SecurityFunctionsTest";
-}
-
-std::string SecurityFunctionsTest::ErrorCodeToString( int errorCode ) const
-{
-    // clang-format off
-    switch( errorCode )
-    {
-    case  0: return "No error";                                                             break;
-    case  1: return "Client connected with no password";                                    break;
-    case  2: return "Client connected with wrong password";                                 break;
-    case  3: return "Client failed to connect with correct password";                       break;
-    case  4: return "Client was banned but connected anyways";                              break;
-    case  5: return "GetIncomingPassword returned wrong password";                          break;
-    case  6: return "IsBanned does not show localhost as banned";                           break;
-    case  7: return "Localhost was not unbanned";                                           break;
-    case  8: return "Client failed to connect after banlist removal";                       break;
-    case  9: return "Client failed to connect after banlist removal with clear function";   break;
-    case 10: return "Client did not connect encrypted";                                     break;
-    case 11: return "Client connected encrypted but shouldn't have";                        break;
-    case 12: return "IsInSecurityExceptionList does not register localhost addition";       break;
-    default: return "Undefined Error";                                                      break;
-    }
-    // clang-format on
-}
-
-SecurityFunctionsTest::SecurityFunctionsTest( void )
-{
-}
-
-SecurityFunctionsTest::~SecurityFunctionsTest( void )
-{
-}
-
-void SecurityFunctionsTest::DestroyPeers()
-{
-    RakPeerInterface::DestroyInstance( client );
-    RakPeerInterface::DestroyInstance( server );
+    CHECK_FALSE( server->IsBanned( "127.0.0.1" ) );
+    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
 }
