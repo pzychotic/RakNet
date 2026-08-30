@@ -1,0 +1,11 @@
+# Commits that touched formatting only. Skip them in blame with:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# (or per-invocation: git blame --ignore-revs-file .git-blame-ignore-revs)
+
+# Added .clang-format file and reformatted all source files.
+75d63ea765a8bc6957c03c641bd895522ebe1478
+
+# [Repo] Normalized line endings to LF via .gitattributes
+7c9c65909ae0ab8b56a121af1cff9d85a99ef409

@@ -1,0 +1,76 @@
+# Line-ending policy for RakNet.
+#
+# History stores LF for every text file. What lands in your working tree is
+# decided at checkout: core.autocrlf / core.eol pick it for the `text` files
+# below, while the `eol=` entries pin the formats that are not negotiable.
+#
+# Consequence: never stage a file with `-c core.autocrlf=false` again. Git
+# normalizes on the way in, so a one-line edit produces a one-line diff on
+# every platform.
+
+# Default: detect text vs binary, store text as LF.
+* text=auto
+
+# --- Source and docs ------------------------------------------------------
+# Listed explicitly so they are never left to the binary heuristic, which
+# misfires on files containing a stray lone CR.
+*.c      text
+*.cpp    text
+*.h      text
+*.hpp    text
+*.cs     text
+*.i      text
+*.js     text
+*.css    text
+*.html   text
+*.htm    text
+*.md     text
+*.txt    text
+*.cmake  text
+CMakeLists.txt text
+
+# --- Must be CRLF in the working tree -------------------------------------
+# Batch scripts can misparse with LF endings; the MSBuild/VS formats are
+# rewritten by the IDE if they arrive as LF.
+*.bat            text eol=crlf
+*.cmd            text eol=crlf
+*.sln            text eol=crlf
+*.vcproj         text eol=crlf
+*.vcxproj        text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.csproj         text eol=crlf
+*.props          text eol=crlf
+*.targets        text eol=crlf
+
+# --- Must be LF in the working tree ---------------------------------------
+*.sh     text eol=lf
+
+# --- Binary ---------------------------------------------------------------
+# Present in the tree today:
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.chm    binary
+*.docx   binary
+# Defensive, for a C++ tree that may grow build output or assets:
+*.ico    binary
+*.bmp    binary
+*.pdf    binary
+*.zip    binary
+*.7z     binary
+*.gz     binary
+*.tar    binary
+*.dll    binary
+*.exe    binary
+*.lib    binary
+*.a      binary
+*.so     binary
+*.dylib  binary
+*.obj    binary
+*.o      binary
+*.pdb    binary
+*.ttf    binary
+*.otf    binary
+*.woff   binary
+*.woff2  binary
