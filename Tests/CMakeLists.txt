@@ -48,6 +48,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/CrossConnectionConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/DroppedConnectionConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/EightPeerTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/GuidGenerationTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LocalIsConnectedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerDeallocateBlockingTest.cpp
@@ -109,12 +110,20 @@ target_link_libraries( RakNetTests PRIVATE RakNetStatic Catch2::Catch2WithMain )
 # Dev inner loop, skipping the [slow] tests:
 #   ctest --test-dir <build> -C <Config> --output-on-failure --no-tests=error -LE slow
 #
-# Roughly 3 minutes instead of 9. A convenience, never the default: the three
-# [slow] tests are 68% of the suite's wall clock and the likeliest place a
-# regression hides. Measured in Release, ManyClientsOneServerDeallocateBlocking
-# 169.29 s, ManyClientsOneServerNonBlocking 99.47 s and
-# ManyClientsOneServerBlocking 91.75 s, together 360.51 s of the suite's 533.94 s.
-# ADD_TAGS_AS_LABELS below is what makes -LE work with no extra wiring.
+# Roughly 3 1/2 minutes instead of 4 1/2, and worth much less than it used to be.
+# A convenience, never the default: [slow] is the likeliest place a regression
+# hides. ADD_TAGS_AS_LABELS below is what makes -LE work with no extra wiring.
+#
+# One test carries the tag now, where three did before GUID generation stopped
+# sleeping: ManyClientsOneServerDeallocateBlocking, measured in Release at 54.8, 56.2
+# and 60.2 s across three runs of a 273.6-276.7 s suite. The rule is "over 60 s in
+# Release" and that test straddles it - a 5.4 s spread with the top of it over the
+# line, and 64.4 s in Debug - so it keeps the tag deliberately; the file header says
+# why at length. ManyClientsOneServerNonBlocking (36 s) and
+# ManyClientsOneServerBlocking (28 s) are clear of the threshold and lost the tag.
+#
+# For the record, those three cost 169.29 s, 99.47 s and 91.75 s of a 533.94 s
+# suite before the fix - 68% of it.
 # ---------------------------------------------------------------------------
 catch_discover_tests( RakNetTests
     # POST_BUILD, the default, is broken on multi-config generators: it writes one

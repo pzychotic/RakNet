@@ -33,6 +33,7 @@
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "Rand.h"
+#include "PlatformRandom.h"
 #include "PluginInterface2.h"
 #include "StringCompressor.h"
 #include "RakNetTypes.h"
@@ -3907,42 +3908,45 @@ inline void RakPeer::AddPacketToProducer( Packet* p )
     packetReturnQueue.push_back( p );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-union Buff6AndBuff8
-{
-    unsigned char buff6[6];
-    uint64_t buff8;
-};
 uint64_t RakPeerInterface::Get64BitUniqueRandomNumber( void )
 {
-    // Mac address is a poor solution because you can't have multiple connections from the same system
-    uint64_t g = RakNet::GetTimeUS();
+    uint64_t g = 0;
+    if( RakNet::FillRandomBytes( &g, sizeof( g ) ) == false )
+        return 0;
 
-    RakNet::TimeUS lastTime, thisTime;
-    // Sleep a small random time, then use the last 4 bits as a source of randomness
-    for( int j = 0; j < 4; j++ )
-    {
-        unsigned char diffByte = 0;
-        for( int i = 0; i < 4; i++ )
-        {
-            lastTime = RakNet::GetTimeUS();
-            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-            thisTime = RakNet::GetTimeUS();
-            RakNet::TimeUS diff = thisTime - lastTime;
-            diffByte ^= (unsigned char)( ( diff & 15 ) << ( i * 2 ) );
-            if( i == 3 )
-            {
-                diffByte ^= (unsigned char)( ( diff & 15 ) >> 2 );
-            }
-        }
-
-        ( (char*)&g )[4 + j] ^= diffByte;
-    }
     return g;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+uint64_t RakPeer::DrawGuidValue( bool ( *fillRandomBytes )( void*, size_t ) )
+{
+    // Two values are reserved and a RakNetGUID must never land on either: 0 is Startup's
+    // "generation failed" sentinel, and (uint64_t)-1 is UNASSIGNED_RAKNET_GUID, which a
+    // live peer colliding with would compare equal to "no peer" in AddressOrGUID.
+    //
+    // Redrawing is only correct for a *successful* draw that landed on one of them.
+    // Get64BitUniqueRandomNumber reports failure by returning 0 - the same value we redraw
+    // on - so looping on its result would spin forever inside a constructor whenever the
+    // random source is unreadable. Hence a source reporting failure separately from its
+    // output. The attempt cap covers the remaining case: a source that "succeeds" while
+    // returning a constant.
+    const int maxAttempts = 8;
+    for( int attempt = 0; attempt < maxAttempts; attempt++ )
+    {
+        uint64_t g = 0;
+        if( fillRandomBytes( &g, sizeof( g ) ) == false )
+            return 0;
+
+        if( g != 0 && g != UNASSIGNED_RAKNET_GUID.g )
+            return g;
+    }
+
+    return 0;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::GenerateGUID( void )
 {
-    myGuid.g = Get64BitUniqueRandomNumber();
+    // Startup checks for 0 and returns COULD_NOT_GENERATE_GUID.
+    myGuid.g = DrawGuidValue( &RakNet::FillRandomBytes );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

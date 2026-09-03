@@ -681,6 +681,21 @@ public:
         } connectMode;
     };
 
+    /// \internal
+    /// Draws a value fit to be a RakNetGUID: neither 0 (Startup's "generation failed"
+    /// sentinel) nor UNASSIGNED_RAKNET_GUID, redrawing a bounded number of times if it
+    /// lands on one. Returns 0 when \a fillRandomBytes fails or keeps returning a
+    /// reserved value.
+    ///
+    /// The entropy source is a parameter, and this is public, for one reason: with the
+    /// real CSPRNG behind it neither the redraw nor the give-up path is reachable, so
+    /// they could only be covered by a test that supplies its own source. Callers in
+    /// the library pass RakNet::FillRandomBytes and have no other use for the seam.
+    ///
+    /// \param[in] fillRandomBytes Entropy source, with FillRandomBytes' contract.
+    /// \return A value that is neither reserved, or 0 if none could be drawn.
+    static uint64_t DrawGuidValue( bool ( *fillRandomBytes )( void*, size_t ) );
+
 protected:
 
     friend void UpdateNetworkLoop( void* arg );

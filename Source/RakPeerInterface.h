@@ -381,7 +381,17 @@ public:
     /// Return the address bound to a socket at the specified index
     virtual SystemAddress GetMyBoundAddress( const int socketIndex = 0 ) = 0;
 
-    /// Get a random number (to generate a GUID)
+    /// Get a random 64-bit number from the operating system's random number source.
+    /// See CONTEXT.md for what a RakNetGUID promises.
+    ///
+    /// This exists for the exported and SWIG-bound API. New code inside the library
+    /// should call RakNet::FillRandomBytes, which reports failure separately from its
+    /// output, or RakPeer::DrawGuidValue when the value is to be a RakNetGUID - the
+    /// single return value here cannot tell a failed draw from a drawn zero, and it
+    /// screens out neither of the two values reserved for RakNetGUID.
+    ///
+    /// \return 0 if the random source could not be read. Callers that cannot tolerate
+    /// a zero must check for it - this is the only failure signal available.
     static uint64_t Get64BitUniqueRandomNumber( void );
 
     /// Given a connected system, give us the unique GUID representing that instance of RakPeer.

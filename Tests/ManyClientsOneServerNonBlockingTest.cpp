@@ -70,21 +70,22 @@ the overwhelming majority of iterations find every client connected, connecting
 or disconnecting and do nothing at all. A floor on sweeps in this file would be a
 floor on how fast the machine spins.
 
-WHERE THE TIME GOES, since it is not the loops and the next reader should not
-have to measure it again. Of a 99.4-100.0 s body, 68.0 s is building the 257
-peers and 14.5 s is destroying them, against 10.0 s of churn and 7.0 s of fixed
-recovery window. RakPeerInterface::GetInstance() costs ~245 ms on its own -
-RakPeer's constructor calls GenerateGUID, which harvests entropy from sixteen
-1 ms sleeps, and a 1 ms sleep on Windows is ~15.6 ms. Nothing here works around it.
+WHERE THE TIME WENT, since it was not the loops. Of a 99.4-100.0 s body, 68.0 s
+was building the 257 peers and 14.5 s destroying them, against 10.0 s of churn and
+7.0 s of fixed recovery window. RakPeerInterface::GetInstance() cost ~245 ms on its
+own - RakPeer's constructor called GenerateGUID, which harvested entropy from
+sixteen 1 ms sleeps, and a 1 ms sleep on Windows is ~15.6 ms.
 
-Debug and Release finish within 0.5 s of each other - 99.4-100.0 s against
-99.8-99.9 s, an inflation of 1.00 - which follows from the paragraph above: four
-fifths of the runtime is sleeps and fixed windows, and neither gets slower without
-optimisation. As a ctest entry the test measures 98.10-99.75 s in Release and
-98.52-100.32 s in Debug; those OVERLAP the body ranges rather than sitting above
-them, because the per-entry process launch and PRE_TEST discovery are real but
-smaller than the run-to-run spread of a 100 s test and cannot be read off these
-numbers.
+Debug and Release used to finish within 0.5 s of each other - 99.4-100.0 s against
+99.8-99.9 s, an inflation of 1.00 - which followed from the paragraph above: four
+fifths of the runtime was sleeps and fixed windows, and neither gets slower without
+optimisation.
+
+Both of those are stale now. GenerateGUID draws from the operating system's random
+number source, GetInstance() costs ~0.004 ms, and peer construction is no longer
+the bulk of this test - so the Debug/Release inflation should be a normal one
+again. The old numbers are kept as the baseline the fix is measured against.
+Do not read them as current.
 */
 
 using namespace RakNet;
@@ -146,7 +147,7 @@ constexpr int kMinimumReconnects = 10 * kClientNum;
 // Wrap-safe on a uint32_t TimeMS, where a plain >= is not. See ConnectionWaits.h.
 using ConnectionWaits::Expired;
 
-TEST_CASE( "256 clients closing and reopening their connection as fast as they can are all connected again five seconds after the churn stops", "[network][slow]" )
+TEST_CASE( "256 clients closing and reopening their connection as fast as they can are all connected again five seconds after the churn stops", "[network]" )
 {
     PeerScope peers;
 

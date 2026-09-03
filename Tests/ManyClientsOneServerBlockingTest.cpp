@@ -66,18 +66,18 @@ either - it fails on its own if the server never completes registration for a
 client the client believes it is connected to. Each client is one address and one
 address holds one entry, so the server cannot be over 256.
 
-WHERE THE 89 SECONDS GO, because it is not where the name suggests and the next
-reader should not have to measure it again: 65.1 s is building the 257 peers and
-13.9 s is destroying them, against 10.1 s for the whole ten-second loop and under
-0.1 s for every close, connect and drain in it. RakPeerInterface::GetInstance()
-costs ~245 ms on its own - RakPeer's constructor calls GenerateGUID, which harvests
-entropy from sixteen 1 ms sleeps, and a 1 ms sleep on Windows is ~15.6 ms. Nothing
-here works around it.
+WHERE THE 89 SECONDS WENT, because it was not where the name suggests: 65.1 s was
+building the 257 peers and 13.9 s destroying them, against 10.1 s for the whole
+ten-second loop and under 0.1 s for every close, connect and drain in it.
+RakPeerInterface::GetInstance() cost ~245 ms on its own - RakPeer's constructor
+called GenerateGUID, which harvested entropy from sixteen 1 ms sleeps, and a 1 ms
+sleep on Windows is ~15.6 ms.
 
-Those are the phases of one 89.2 s in-process run; the body varies 86-91 s run to
-run. As a ctest entry the test is 91.1-91.4 s in Release and 92.5-94.0 s in Debug,
-the extra being the per-entry process launch and PRE_TEST discovery every entry
-pays.
+That is fixed. GenerateGUID now draws from the operating system's random number
+source and GetInstance() costs ~0.004 ms, so building the 257 peers is no longer
+the bulk of this test. The numbers in the paragraph above are kept because the
+shape of the test has not changed and they are the baseline the fix is measured
+against. Do not read them as current.
 */
 
 using namespace RakNet;
@@ -116,7 +116,7 @@ constexpr int kMinimumSweeps = 10;
 // Wrap-safe on a uint32_t TimeMS, where a plain >= is not. See ConnectionWaits.h.
 using ConnectionWaits::Expired;
 
-TEST_CASE( "256 clients closing and reopening their connection for ten seconds all end up connected to the one server", "[network][slow]" )
+TEST_CASE( "256 clients closing and reopening their connection for ten seconds all end up connected to the one server", "[network]" )
 {
     PeerScope peers;
 

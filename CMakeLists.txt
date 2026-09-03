@@ -3,7 +3,8 @@ cmake_minimum_required( VERSION 3.24 )   # 3.24: FetchContent FIND_PACKAGE_ARGS,
 project( RakNet )
 
 IF (WIN32 AND NOT UNIX)
-	set(RAKNET_LIBRARY_LIBS ws2_32.lib)
+	# bcrypt: BCryptGenRandom, the entropy source behind RakNet::FillRandomBytes.
+	set(RAKNET_LIBRARY_LIBS ws2_32.lib bcrypt.lib)
 ELSE(WIN32 AND NOT UNIX)
 	set(RAKNET_LIBRARY_LIBS pthread)
 ENDIF(WIN32 AND NOT UNIX)

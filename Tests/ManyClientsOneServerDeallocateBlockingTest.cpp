@@ -48,6 +48,24 @@ RakPeerInterface functions explicitly tested:
 
 Exercised indirectly by getting to that point: Startup,
 SetMaximumIncomingConnections, Receive, DeallocatePacket, GetConnectionState.
+
+WHY THIS STILL CARRIES [slow] WHEN A SINGLE MEASUREMENT SAYS IT SHOULD NOT, so the
+next reader does not "correct" it off one run. The rule is over 60 s in Release.
+This test was 156.5 s and is now 54.8, 56.2 and 60.2 s across three idle-machine
+Release runs, because GUID generation stopped sleeping. Its two ManyClientsOneServer
+siblings dropped to 36 s and 28 s and lost the tag outright.
+
+This one STRADDLES the threshold: a 5.4 s spread with the top of it on the wrong
+side, plus 64.4 s in Debug. It is not a test that is under 60 s, it is a test whose
+answer depends on which run you look at - and a tag is a static string, so it has
+to be decided once. Tagged is the safe side of that: [slow] costs a dev inner loop
+56-60 s it can skip, where untagged costs a suite that quietly grew a minute.
+
+It is also 20-22% of the suite's wall clock on its own, which is exactly what
+-LE slow exists to skip.
+
+Retag it only if it drops clear of 60 s with real margin across several runs - not
+on one fast one.
 */
 
 using namespace RakNet;
