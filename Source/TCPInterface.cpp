@@ -776,22 +776,24 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
 #else
 
+    (void)bindAddress;
+
     struct addrinfo hints, *res;
-    int sockfd;
+    __TCPSOCKET__ sockfd;
     memset( &hints, 0, sizeof hints );
     hints.ai_family = socketFamily;
     hints.ai_socktype = SOCK_STREAM;
     char portStr[32];
-    auto res = std::to_chars( portStr, portStr + 31, remotePort );
-    RakAssert( res.ec == std::errc() );
-    *res.ptr = '\0';
+    auto portRes = std::to_chars( portStr, portStr + 31, remotePort );
+    RakAssert( portRes.ec == std::errc() );
+    *portRes.ptr = '\0';
 
     getaddrinfo( host, portStr, &hints, &res );
     sockfd = socket__( res->ai_family, res->ai_socktype, res->ai_protocol );
     blockingSocketListMutex.lock();
-    blockingSocketList.Insert( sockfd, _FILE_AND_LINE_ );
+    blockingSocketList.push_back( sockfd );
     blockingSocketListMutex.unlock();
-    int connectResult = connect__( sockfd, res->ai_addr, res->ai_addrlen );
+    int connectResult = connect__( sockfd, res->ai_addr, (int)res->ai_addrlen );
     freeaddrinfo( res ); // free the linked-list
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
