@@ -1179,15 +1179,39 @@ void BitStream::Serialize( const std::string& str )
 
 bool BitStream::Deserialize( std::string& str )
 {
+    // Cleared on entry, and again on failure below, so the caller is never handed
+    // a value left over from a previous read: without it "received empty" and
+    // "received nothing" are indistinguishable in a reused destination.
+    str.clear();
+
     uint16_t size = 0;
-    bool b = Read( size );
-    if( b && size > 0 )
+    if( !Read( size ) )
+        return false;
+
+    // The two halves of the aligned-bytes API are asymmetric, and this is where
+    // that has to be compensated for. Serialize above reaches WriteAlignedBytes,
+    // which aligns unconditionally before it looks at the length, so an empty
+    // string still emits padding; ReadAlignedBytes returns false on a zero length
+    // *before* it reaches its own AlignReadToByteBoundary. Skipping the alignment
+    // here would leave the read offset up to 7 bits behind the write offset, and
+    // every field after the string would come back garbage.
+    if( size == 0 )
     {
-        str.resize( size );
-        b = ReadAlignedBytes( reinterpret_cast<unsigned char*>( str.data() ), size );
+        AlignReadToByteBoundary();
+        return true;
     }
 
-    return b;
+    str.resize( size );
+    if( !ReadAlignedBytes( reinterpret_cast<unsigned char*>( str.data() ), size ) )
+    {
+        // The resize already happened and ReadAlignedBytes leaves the buffer
+        // untouched when it fails, so without this the caller holds size bytes of
+        // whatever resize value-initialised.
+        str.clear();
+        return false;
+    }
+
+    return true;
 }
 
 void BitStream::SerializeCompressed( const std::string& str )
