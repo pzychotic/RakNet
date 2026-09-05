@@ -35,7 +35,9 @@ namespace RakNet {
 
 /// \brief Error codes returned by a remote system as to why an RPC function call cannot execute
 /// \details Error code follows packet ID ID_RPC_REMOTE_ERROR, that is packet->data[1]<BR>
-/// Name of the function will be appended starting at packet->data[2]
+/// The name of the function follows at packet->data[2], written by BitStream::Write( std::string ) -
+/// a uint16 length and then the characters, with no terminator. Read it back with
+/// BitStream::Read( std::string ) rather than treating packet->data[2] as a C string.
 /// \ingroup RPC_PLUGIN_GROUP
 enum RPCErrorCodes
 {

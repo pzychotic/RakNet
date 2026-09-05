@@ -258,11 +258,21 @@ void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
 
     if( registeredNonblockingFunctions.find( uniqueID ) == registeredNonblockingFunctions.end() )
     {
+        // Same framing as the error OnReceive sends over the network: the two
+        // identifier bytes, then the function name length-prefixed by Write. The
+        // only reader of either - the drain loop in CallBlocking, which this
+        // packet passes through - parses that form, so building it by hand with
+        // strcpy left it unparseable.
+        BitStream bsOut;
+        bsOut.Write( (MessageID)ID_RPC_REMOTE_ERROR );
+        bsOut.Write( (unsigned char)RPC_ERROR_FUNCTION_NOT_REGISTERED );
+        bsOut.Write( std::string( uniqueID ) );
+
         if( rakPeerInterface )
-            p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) + (unsigned int)strlen( uniqueID ) + 1 );
+            p = AllocatePacketUnified( bsOut.GetNumberOfBytesUsed() );
 #if _RAKNET_SUPPORT_PacketizedTCP == 1 && _RAKNET_SUPPORT_TCPInterface == 1
         else
-            p = tcpInterface->AllocatePacket( sizeof( MessageID ) + sizeof( unsigned char ) + (unsigned int)strlen( uniqueID ) + 1 );
+            p = tcpInterface->AllocatePacket( bsOut.GetNumberOfBytesUsed() );
 #endif
 
         if( rakPeerInterface )
@@ -274,9 +284,7 @@ void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
 
         p->systemAddress = UNASSIGNED_SYSTEM_ADDRESS;
         p->systemAddress.systemIndex = (SystemIndex)-1;
-        p->data[0] = ID_RPC_REMOTE_ERROR;
-        p->data[1] = RPC_ERROR_FUNCTION_NOT_REGISTERED;
-        strcpy( (char*)p->data + 2, uniqueID );
+        memcpy( p->data, bsOut.GetData(), bsOut.GetNumberOfBytesUsed() );
 
         PushBackPacketUnified( p, false );
 
