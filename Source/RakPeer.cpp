@@ -3739,6 +3739,7 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
 {
     unsigned* sendList;
     unsigned sendListSize;
+    bool sendListHeapAllocated = false; // sendList may come from alloca or the heap; only free the latter
     bool callerDataAllocationUsed;
     unsigned int remoteSystemIndex, sendListIndex; // Iterates into the list of remote systems
     callerDataAllocationUsed = false;
@@ -3767,6 +3768,7 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
         sendList = (unsigned*)alloca( sizeof( unsigned ) );
 #else
         sendList = (unsigned*)rakMalloc_Ex( sizeof( unsigned ), _FILE_AND_LINE_ );
+        sendListHeapAllocated = true;
 #endif
 
         if( remoteSystemList[remoteSystemIndex].isActive &&
@@ -3781,10 +3783,14 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
     else
     {
 #if USE_ALLOCA == 1
-        sendList = (unsigned*)alloca( sizeof( unsigned ) * maximumNumberOfPeers );
-#else
-        sendList = (unsigned*)rakMalloc_Ex( sizeof( unsigned ) * maximumNumberOfPeers, _FILE_AND_LINE_ );
+        if( sizeof( unsigned ) * maximumNumberOfPeers < MAX_ALLOCA_STACK_ALLOCATION )
+            sendList = (unsigned*)alloca( sizeof( unsigned ) * maximumNumberOfPeers );
+        else
 #endif
+        {
+            sendList = (unsigned*)rakMalloc_Ex( sizeof( unsigned ) * maximumNumberOfPeers, _FILE_AND_LINE_ );
+            sendListHeapAllocated = true;
+        }
 
         // remoteSystemList in network thread
         unsigned int idx;
@@ -3800,9 +3806,8 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
 
     if( sendListSize == 0 )
     {
-#if !defined( USE_ALLOCA )
-        rakFree_Ex( sendList, _FILE_AND_LINE_ );
-#endif
+        if( sendListHeapAllocated )
+            rakFree_Ex( sendList, _FILE_AND_LINE_ );
 
         return false;
     }
@@ -3826,9 +3831,8 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
             remoteSystemList[sendList[sendListIndex]].lastReliableSend = ( RakNet::TimeMS )( currentTime / (RakNet::TimeUS)1000 );
     }
 
-#if !defined( USE_ALLOCA )
-    rakFree_Ex( sendList, _FILE_AND_LINE_ );
-#endif
+    if( sendListHeapAllocated )
+        rakFree_Ex( sendList, _FILE_AND_LINE_ );
 
     // Return value only meaningful if true was passed for useCallerDataAllocation.  Means the reliability layer used that data copy, so the caller should not deallocate it
     return callerDataAllocationUsed;

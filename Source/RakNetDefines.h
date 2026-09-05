@@ -33,8 +33,13 @@
 // #define __BITSTREAM_NATIVE_END
 
 /// Maximum (stack) size to use with _alloca before using new and delete instead.
+/// 128 KiB. RakNet threads are std::thread and so take the platform default stack, which is
+/// only ~1 MiB on Windows. A quarter of that is 256 KiB; halving it again leaves headroom for
+/// the frames above and below the allocation, on both the RakNet-owned network thread and an
+/// application thread of unknown depth. StringCompressor's 64 KiB worst case still keeps the
+/// stack path with 2x margin.
 #ifndef MAX_ALLOCA_STACK_ALLOCATION
-#define MAX_ALLOCA_STACK_ALLOCATION 1048576
+#define MAX_ALLOCA_STACK_ALLOCATION 131072
 #endif
 
 /// Uncomment to use RakMemoryOverride for custom memory tracking
