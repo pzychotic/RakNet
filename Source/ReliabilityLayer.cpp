@@ -1891,14 +1891,27 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
     if( minExtraPing > 0 || extraPingVariance > 0 )
     {
 #ifdef FLIP_SEND_ORDER_TEST
-        // Flip order of sends without delaying them for testing
+        // Reverse the order of sends, for testing. sendTime 0 always satisfies the drain
+        // loop at the top of Update(), so pushing at the head makes the pending sends a
+        // LIFO. No per-packet delay is added, but the drain has already run by the time
+        // Update() reaches us, so the whole batch goes out one tick later than it would
+        // have. That skew is uniform and is not what this harness is measuring.
         DataAndTime* dat = RakNet::OP_NEW<DataAndTime>( __FILE__, __LINE__ );
         memcpy( dat->data, (char*)bitStream->GetData(), length );
         dat->s = s;
         dat->length = length;
         dat->sendTime = 0;
-        dat->extraSocketOptions = extraSocketOptions;
-        delayList.PushAtHead( dat, 0, _FILE_AND_LINE_ );
+        // DataAndTime::extraSocketOptions is left unset: there is no such variable in this
+        // scope (upstream assigned one that never existed), the delay branch below does not
+        // set it either, and the drain never reads it. The field is dead.
+        delayList.push_front( dat );
+        // Returning here is deliberate. Queueing the datagram and then also sending it
+        // below would put it on the wire twice - that is a duplication harness, not a
+        // reordering one, and reordering is what this macro is for. Upstream fell through
+        // at this point; that is a bug we are not inheriting, so do not "restore" it.
+        // Like the delay branch below, this path bypasses the bpsMetrics accounting and
+        // LIBCAT_SECURITY encryption further down, because the drain calls Send() directly.
+        return;
 #else
         RakNet::TimeMS delay = minExtraPing;
         if( extraPingVariance > 0 )
