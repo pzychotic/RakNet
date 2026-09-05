@@ -24,11 +24,11 @@ namespace RakNet {
 RakNet::Time RAK_DLL_EXPORT GetTime();
 
 /// Return the time as 32 bit
-/// \note The maximum delta between returned calls is 1 second - however, RakNet calls this constantly anyway. See NormalizeTime() in the cpp.
+/// \note Counted from a per-process baseline, not a shared epoch. Only deltas are meaningful.
 RakNet::TimeMS RAK_DLL_EXPORT GetTimeMS();
 
 /// Return the time as 64 bit
-/// \note The maximum delta between returned calls is 1 second - however, RakNet calls this constantly anyway. See NormalizeTime() in the cpp.
+/// \note Counted from a per-process baseline, not a shared epoch. Only deltas are meaningful.
 RakNet::TimeUS RAK_DLL_EXPORT GetTimeUS();
 
 /// a > b?

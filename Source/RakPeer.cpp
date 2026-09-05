@@ -206,11 +206,7 @@ RakPeer::RakPeer()
     isMainLoopThreadActive = false;
     incomingDatagramEventHandler = 0;
 
-#if defined( GET_TIME_SPIKE_LIMIT ) && GET_TIME_SPIKE_LIMIT > 0
-    occasionalPing = true;
-#else
     occasionalPing = false;
-#endif
     for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
         ipList[i] = UNASSIGNED_SYSTEM_ADDRESS;
     allowConnectionResponseIPMigration = false;
