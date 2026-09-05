@@ -30,23 +30,10 @@ struct StringMaker<RakNet::SystemAddress>
 {
     static std::string convert( const RakNet::SystemAddress& value )
     {
-        if( value == RakNet::UNASSIGNED_SYSTEM_ADDRESS )
-        {
-            return "UNASSIGNED_SYSTEM_ADDRESS";
-        }
+        char buffer[128] = { 0 };
+        value.ToString( true, buffer );
 
-        // Deliberately ToString( false, ... ) plus the port by hand, rather
-        // than ToString( true, ... ). Both of SystemAddress's writePort=true
-        // paths are broken: Source/RakNetTypes.cpp:276 calls
-        // std::to_chars( dest, ... ), writing the port at the START of the
-        // buffer and clobbering the IP it just wrote, so the address prints as
-        // "60000" rather than "127.0.0.1|60000". The const char* overload
-        // delegates to the same code and shares the bug. Routed around rather
-        // than fixed, so this is correct whether or not the library ever is.
-        char ip[128] = { 0 };
-        value.ToString( false, ip );
-
-        return std::string( ip ) + '|' + std::to_string( value.GetPort() );
+        return std::string( buffer );
     }
 };
 

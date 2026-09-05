@@ -273,7 +273,8 @@ void SystemAddress::ToString_Old( bool writePort, char* dest, char portDelineato
     if( writePort )
     {
         strcat( dest, portStr );
-        auto res = std::to_chars( dest, dest + strlen( dest ), GetPort() );
+        char* portStart = dest + strlen( dest );
+        auto res = std::to_chars( portStart, portStart + 5, GetPort() );
         RakAssert( res.ec == std::errc() );
         *res.ptr = '\0';
     }
@@ -324,7 +325,8 @@ void SystemAddress::ToString_New( bool writePort, char* dest, char portDelineato
         ch[0] = portDelineator;
         ch[1] = 0;
         strcat( dest, (const char*)ch );
-        auto res = std::to_chars( dest, dest + strlen( dest ), ntohs( address.addr4.sin_port ) );
+        char* portStart = dest + strlen( dest );
+        auto res = std::to_chars( portStart, portStart + 5, ntohs( address.addr4.sin_port ) );
         RakAssert( res.ec == std::errc() );
         *res.ptr = '\0';
     }
