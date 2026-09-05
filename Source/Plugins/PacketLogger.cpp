@@ -368,7 +368,7 @@ const char* PacketLogger::UserIDTOString( unsigned char Id )
     static char str[256];
     auto res = std::to_chars( str, str + 255, Id );
     RakAssert( res.ec == std::errc() );
-    res.ptr = '\0';
+    *res.ptr = '\0';
     return str;
 }
 const char* PacketLogger::IDTOString( unsigned char Id )
