@@ -10,6 +10,14 @@ This fork contains most of the pending pull requests from the official Oculus VR
 
 This fork also contains other various fixes that I've found necessary - mostly addressing compilation issues on various platforms.
 
+Upgrading from stock 4.081
+------------------------------------------
+
+The core has since been modernized to C++17, which broke the public API in five ways. See
+[MIGRATION.md](MIGRATION.md) for what changed and what to do about it, including which
+changes are source-only (four of the five) and which are visible on the wire (one). The core
+wire protocol is unchanged, and this fork still interoperates with a stock 4.081 peer.
+
 Package notes
 ------------------------------------------
 The Help directory contains index.html, which is full help documentation in HTML format
@@ -26,7 +34,7 @@ See Help\swigtutorial.html
 Upgrading from version 3
 ------------------------------------------
 
-See 3.x_to_4.x_upgrade.txt
+See 3.x_to_4.x_upgrade.txt, then [MIGRATION.md](MIGRATION.md) for stock 4.081 to this fork.
 
 Windows users (Visual Studio 2008 and 2010)
 -----------------------------------------
