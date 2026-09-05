@@ -107,48 +107,79 @@ void GetMyIP_Windows_Linux( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_I
 #endif
 }
 
+// Sends one datagram. Returns the number of bytes sent, or a negative value on failure -
+// per ADR-0002 that return value is the only failure channel.
+//
+// There is deliberately no retry loop. The one this replaced spun on `while( len == 0 )`,
+// which is the single outcome a sendto__ of a non-empty datagram cannot produce, while
+// the negative result it can produce left the loop after a printf - so it retried nothing
+// that happens and gave up on everything that does. Worse, the branch every non-AF_INET
+// address took held only `#if RAKNET_SUPPORT_IPV6 == 1` code, and that define is 0 by
+// default, so in the default build such an address left len at 0 forever: an unbreakable
+// loop re-running the TTL getsockopt__/setsockopt__ pair on every pass.
+//
+// Retrying a transient failure is not this function's job in any case. Reliable traffic is
+// resent from ReliabilityLayer's own timers, and unreliable traffic is unreliable by
+// contract.
 RNS2SendResult RNS2_Berkley::Send_NoVDP( RNS2Socket rns2Socket, RNS2_SendParameters* sendParameters, const char* file, unsigned int line )
 {
     (void)file;
     (void)line;
 
-    int len = 0;
-    do
+    // Which families are sendable is a property of the build rather than of the socket:
+    // without RAKNET_SUPPORT_IPV6, SystemAddress carries no sockaddr_in6 to hand to
+    // sendto__. An address of any other family is rejected here, before the socket is
+    // touched, so there is no TTL state to restore on the way out.
+    const int addressFamily = sendParameters->systemAddress.address.addr4.sin_family;
+    const sockaddr* destination;
+    socklen_t destinationLength;
+
+    if( addressFamily == AF_INET )
     {
-        int oldTTL = -1;
-        if( sendParameters->ttl > 0 )
-        {
-            socklen_t opLen = sizeof( oldTTL );
-            // Get the current TTL
-            if( getsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, &opLen ) != -1 )
-            {
-                int newTTL = sendParameters->ttl;
-                setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&newTTL, sizeof( newTTL ) );
-            }
-        }
-
-        if( sendParameters->systemAddress.address.addr4.sin_family == AF_INET )
-        {
-            len = sendto__( rns2Socket, sendParameters->data, sendParameters->length, 0, (const sockaddr*)&sendParameters->systemAddress.address.addr4, sizeof( sockaddr_in ) );
-        }
-        else
-        {
+        destination = (const sockaddr*)&sendParameters->systemAddress.address.addr4;
+        destinationLength = (socklen_t)sizeof( sockaddr_in );
+    }
 #if RAKNET_SUPPORT_IPV6 == 1
-            len = sendto__( rns2Socket, sendParameters->data, sendParameters->length, 0, (const sockaddr*)&sendParameters->systemAddress.address.addr6, sizeof( sockaddr_in6 ) );
+    else if( addressFamily == AF_INET6 )
+    {
+        destination = (const sockaddr*)&sendParameters->systemAddress.address.addr6;
+        destinationLength = (socklen_t)sizeof( sockaddr_in6 );
+    }
 #endif
-        }
+    else
+    {
+        RAKNET_DEBUG_PRINTF( "sendto skipped: address family %i is not one this build can send to.\n", addressFamily );
+        return -1;
+    }
 
-        if( len < 0 )
+    // Untouched by the hang fix and wrong for AF_INET6, which is worth stating rather than
+    // leaving to be rediscovered: GetIPPROTO returns IPPROTO_IPV6 for such an address, but
+    // the option name stays IP_TTL, and the IPv6 spelling is IPV6_UNICAST_HOPS. So the
+    // getsockopt__ below simply fails there, oldTTL stays -1, and a per-datagram TTL is
+    // silently not applied. Pre-existing, out of scope here, and a separate defect.
+    int oldTTL = -1;
+    if( sendParameters->ttl > 0 )
+    {
+        socklen_t opLen = sizeof( oldTTL );
+        // Get the current TTL
+        if( getsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, &opLen ) != -1 )
         {
-            RAKNET_DEBUG_PRINTF( "sendto failed with code %i for char %i and length %i.\n", len, sendParameters->data[0], sendParameters->length );
+            int newTTL = sendParameters->ttl;
+            setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&newTTL, sizeof( newTTL ) );
         }
+    }
 
-        if( oldTTL != -1 )
-        {
-            setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, sizeof( oldTTL ) );
-        }
+    int len = sendto__( rns2Socket, sendParameters->data, sendParameters->length, 0, destination, destinationLength );
 
-    } while( len == 0 );
+    if( len < 0 )
+    {
+        RAKNET_DEBUG_PRINTF( "sendto failed with code %i for char %i and length %i.\n", len, sendParameters->data[0], sendParameters->length );
+    }
+
+    if( oldTTL != -1 )
+    {
+        setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, sizeof( oldTTL ) );
+    }
 
     return len;
 }
