@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 /*
 The shared BitStream round-trip harness.
@@ -246,3 +248,59 @@ TEST_CASE( "empty std::string round trips through WriteCompressed at every start
 
     rt.CheckSentinel();
 }
+
+/*
+Raw character buffers and BitStream::Write.
+
+There is no negative-compilation harness in this repo, so the deleted overloads
+are covered the way a single translation unit can cover them: WriteIsCallable
+below asks, in the immediate context of a template argument, whether
+BitStream::Write( T ) is a viable call. Selecting a deleted overload makes that
+expression ill-formed, so substitution fails and the trait is false - which turns
+"this must not compile" into an assertion the normal build checks, without the
+file itself failing to compile.
+
+The corresponding real call sites, which do have to stay commented out:
+
+    bs.Write( "literal" );      // error: Write(const char *, Write_a_std_string_instead) is deleted
+    bs.Write( somecharptr );    // error: Write(char *, Write_a_std_string_instead) is deleted
+
+Both used to compile, and both silently mis-encoded. Why they are deleted rather
+than reinstated with std::string semantics, and what each one has to be rewritten
+to, is on the deleted declarations in BitStream.h; it is not repeated here.
+*/
+
+namespace {
+
+template<class T, class = void>
+struct WriteIsCallable : std::false_type
+{
+};
+
+template<class T>
+struct WriteIsCallable<T, std::void_t<decltype( std::declval<BitStream&>().Write( std::declval<T>() ) )>> : std::true_type
+{
+};
+
+// String literals, and any other array of characters.
+static_assert( !WriteIsCallable<const char ( & )[6]>::value, "Write( \"literal\" ) must not compile" );
+static_assert( !WriteIsCallable<char ( & )[6]>::value, "Write( charArray ) must not compile" );
+static_assert( !WriteIsCallable<const unsigned char ( & )[6]>::value, "Write( unsigned char array ) must not compile" );
+
+// The pointer spellings the upstream non-template overloads covered, wide ones
+// included - those have no replacement here, which is the point of rejecting them.
+static_assert( !WriteIsCallable<char*>::value, "Write( char* ) must not compile" );
+static_assert( !WriteIsCallable<const char*>::value, "Write( const char* ) must not compile" );
+static_assert( !WriteIsCallable<unsigned char*>::value, "Write( unsigned char* ) must not compile" );
+static_assert( !WriteIsCallable<const unsigned char*>::value, "Write( const unsigned char* ) must not compile" );
+static_assert( !WriteIsCallable<wchar_t*>::value, "Write( wchar_t* ) must not compile" );
+static_assert( !WriteIsCallable<const wchar_t*>::value, "Write( const wchar_t* ) must not compile" );
+static_assert( !WriteIsCallable<const wchar_t ( & )[6]>::value, "Write( L\"literal\" ) must not compile" );
+
+// The replacement, and the unrelated types that must keep working. The bytes the
+// replacement puts on the wire are covered by the round trips above; this only
+// pins that the call is still viable.
+static_assert( WriteIsCallable<std::string>::value, "Write( std::string ) is the replacement and must compile" );
+static_assert( WriteIsCallable<uint32_t>::value, "Write( integral ) must be unaffected" );
+
+} // namespace

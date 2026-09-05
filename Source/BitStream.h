@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <cfloat>
+#include <cstddef>
 #include <string>
 #include "RakMemoryOverride.h"
 #include "RakNetDefines.h"
@@ -212,6 +213,66 @@ public:
     /// \param[in] inTemplateVar The value to write
     template<class templateType>
     void Write( const templateType& inTemplateVar );
+
+    /// \brief Raw character buffers cannot be written with the one-argument Write().
+    /// \details Upstream RakNet had non-template Write() overloads for char*,
+    /// unsigned char* and their const spellings, which serialized the pointed-to
+    /// string in RakString's length-prefixed form. Those overloads are gone. The
+    /// replacement is Write( std::string ), which produces that same wire format.
+    ///
+    /// Without these deletions neither call fails - both silently mis-encode.
+    /// Write( "hello" ) deduces templateType = char[6] and writes six raw bytes
+    /// with no length prefix (byte-reversed on a big-endian target), and
+    /// Write( p ) for a char* p deduces templateType = char* and writes the
+    /// pointer value itself onto the wire.
+    ///
+    /// Deleting is deliberate, rather than restoring the old overloads with
+    /// std::string semantics: it forces every call site to be looked at, because
+    /// a caller who meant "the bytes at p" wanted Write( p, length ) and not the
+    /// string form. That makes it a source break against stock 4.081, and it is
+    /// the end state rather than a step towards restoring Write( const char* ).
+    ///
+    /// Write a std::string instead:  Write( std::string( s ) )
+    /// ...or, for a raw byte range:  Write( s, lengthInBytes )
+    ///
+    /// Only the one-argument Write() is guarded. WriteCompressed(), WriteDelta()
+    /// and Serialize() forward a raw buffer into the same primary template and
+    /// mis-encode it the same way; guarding them is a separate change, because
+    /// each has its own std::string overload to point a caller at.
+    ///
+    /// The unused trailing parameter exists to get the advice above into the
+    /// compiler diagnostic. C++17 has no `= delete( "reason" )` and every compiler
+    /// prints the deleted function's *signature*, so the alternative is spelled in
+    /// the tag type's name: the error reads `Write(const char *,
+    /// Write_a_std_string_instead): function was explicitly deleted`. It is
+    /// defaulted, so these still match a one-argument call, and it is taken by
+    /// value rather than as a pointer so that nothing converts to it: a trailing
+    /// `Write_a_std_string_instead* = nullptr` would make `Write( buffer, 0 )`
+    /// ambiguous against the byte-range overload below, because a literal 0
+    /// converts to unsigned int and to a pointer equally well.
+    struct Write_a_std_string_instead
+    {
+    };
+    template<std::size_t N>
+    void Write( const char ( &inputByteArray )[N], Write_a_std_string_instead = {} ) = delete;
+    template<std::size_t N>
+    void Write( const unsigned char ( &inputByteArray )[N], Write_a_std_string_instead = {} ) = delete;
+    void Write( char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void Write( const char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void Write( unsigned char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void Write( const unsigned char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+
+    /// \brief Wide character buffers likewise, which upstream's fifth overload took.
+    /// \details There is no wide-string serializer in this fork - RakWString went
+    /// with RakString and nothing replaced it - so the caller has to decide on an
+    /// encoding and write a std::string, rather than have one silently chosen for
+    /// them. Deleted for the same reason as the narrow spellings above: without it
+    /// Write( L"hello" ) writes the code units raw and Write( wcharPtr ) writes the
+    /// pointer value.
+    template<std::size_t N>
+    void Write( const wchar_t ( &inputByteArray )[N], Write_a_std_string_instead = {} ) = delete;
+    void Write( wchar_t* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void Write( const wchar_t* inputByteArray, Write_a_std_string_instead = {} ) = delete;
 
     /// \brief Write the dereferenced pointer to any integral type to a bitstream.
     /// \details Undefine __BITSTREAM_NATIVE_END if you need endian swapping.
@@ -960,12 +1021,6 @@ inline void BitStream::Write( const std::string& inTemplateVar )
 {
     Serialize( inTemplateVar );
 }
-
-// keep these for now to force linker errors when using them by accident
-template<>
-inline void BitStream::Write( const char* const& inTemplateVar );
-template<>
-inline void BitStream::Write( const unsigned char* const& inTemplateVar );
 
 /// \brief Write any integral type to a bitstream.
 /// \details If the current value is different from the last value
