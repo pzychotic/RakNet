@@ -318,6 +318,7 @@ void ReliabilityLayer::InitializeVariables( void )
     sendReliableMessageNumberIndex = 0;
     internalOrderIndex = 0;
     timeToNextUnreliableCull = 0;
+    timeToNextSplitPacketChannelSweep = 0;
     unreliableLinkedListHead = 0;
     lastUpdateTime = RakNet::GetTimeUS();
     bandwidthExceededStatistic = false;
@@ -381,23 +382,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
 
     for( unsigned i = 0; i < splitPacketChannelList.Size(); i++ )
     {
-        for( unsigned j = 0; j < splitPacketChannelList[i]->splitPacketList.AllocSize(); j++ )
-        {
-            const InternalPacket* pPacket = splitPacketChannelList[i]->splitPacketList.Get( j );
-            if( pPacket != nullptr )
-            {
-                FreeInternalPacketData( splitPacketChannelList[i]->splitPacketList.Get( j ), _FILE_AND_LINE_ );
-                ReleaseToInternalPacketPool( splitPacketChannelList[i]->splitPacketList.Get( j ) );
-            }
-        }
-#if PREALLOCATE_LARGE_MESSAGES == 1
-        if( splitPacketChannelList[i]->returnedPacket )
-        {
-            FreeInternalPacketData( splitPacketChannelList[i]->returnedPacket, __FILE__, __LINE__ );
-            ReleaseToInternalPacketPool( splitPacketChannelList[i]->returnedPacket );
-        }
-#endif
-        RakNet::OP_DELETE( splitPacketChannelList[i], __FILE__, __LINE__ );
+        FreeSplitPacketChannel( splitPacketChannelList[i] );
     }
     splitPacketChannelList.Clear( false, _FILE_AND_LINE_ );
 
@@ -923,9 +908,18 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     if( internalPacket->reliability != RELIABLE_ORDERED && internalPacket->reliability != RELIABLE_SEQUENCED && internalPacket->reliability != UNRELIABLE_SEQUENCED )
                         internalPacket->orderingChannel = 255; // Use 255 to designate not sequenced and not ordered
 
-                    InsertIntoSplitPacketList( internalPacket, timeRead );
+                    // Read before the insert: on either outcome internalPacket now belongs
+                    // to the split packet channel, or has already been freed.
+                    const SplitPacketIdType splitPacketIdOfChunk = internalPacket->splitPacketId;
 
-                    internalPacket = BuildPacketFromSplitPacketList( internalPacket->splitPacketId, timeRead,
+                    if( InsertIntoSplitPacketList( internalPacket, timeRead ) == false )
+                    {
+                        // The chunk was rejected or could not be stored, and there may be
+                        // no channel under this splitPacketId to reassemble from.
+                        goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
+                    }
+
+                    internalPacket = BuildPacketFromSplitPacketList( splitPacketIdOfChunk, timeRead,
                                                                      s, systemAddress, rnr, updateBitStream );
 
                     if( internalPacket == 0 )
@@ -1468,6 +1462,42 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
         {
             timeToNextUnreliableCull -= timeSinceLastTick;
         }
+    }
+
+    // Reap split packet channels that stalled part-way through reassembly. Nothing else
+    // frees them: a channel is released on complete reassembly or on connection teardown,
+    // so a System that opens channels and never completes them holds the memory until the
+    // connection resets.
+    //
+    // Three deliberate choices here:
+    //
+    // - A sibling of the unreliable cull above, not nested inside it. That block is
+    //   skipped entirely unless SetUnreliableTimeout was called, and this sweep has to run
+    //   on every connection.
+    // - Not at the tail of Update, where the sweep upstream wrote (and then commented out)
+    //   sat. Update returns early both above this point and below it, so the tail is not
+    //   reliably reached.
+    // - Unconditional on reliability. Upstream's version reaped only UNRELIABLE and
+    //   UNRELIABLE_SEQUENCED channels, which a hostile System evades by marking its chunks
+    //   RELIABLE.
+    //
+    // Rate-limited like the cull above, using timeoutTime rather than a new constant. The
+    // sweep interval and the stall threshold are deliberately the same number, so they
+    // come from one place: sweeping every T and reaping at a stall of T puts the worst
+    // case at 2T, which GetSplitPacketChannelStallTime sets to timeoutTime - the same
+    // bound a connection with no traffic at all is held to.
+    if( timeSinceLastTick >= timeToNextSplitPacketChannelSweep )
+    {
+        if( splitPacketChannelList.Size() > 0 )
+        {
+            FreeStalledSplitPacketChannels( time );
+        }
+
+        timeToNextSplitPacketChannelSweep = GetSplitPacketChannelStallTime();
+    }
+    else
+    {
+        timeToNextSplitPacketChannelSweep -= timeSinceLastTick;
     }
 
 
@@ -2357,6 +2387,17 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         internalPacket->splitPacketCount = 0;
     }
 
+    if( internalPacket->splitPacketCount > MAXIMUM_SPLIT_PACKET_COUNT )
+    {
+        // Deliberately not folded into the "encoding is garbage" test below, and
+        // deliberately without its assert: the field is well formed, it just carries a
+        // value no conforming sender produces, and a System must not be able to fire
+        // a local assert. Rejected here so nothing downstream ever sizes an allocation
+        // from it - see MAXIMUM_SPLIT_PACKET_COUNT for where the bound comes from.
+        ReleaseToInternalPacketPool( internalPacket );
+        return 0;
+    }
+
     if( readSuccess == false ||
         internalPacket->dataBitLength == 0 ||
         internalPacket->reliability >= NUMBER_OF_RELIABILITIES ||
@@ -2556,7 +2597,7 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 //-------------------------------------------------------------------------------------------------------
 // Insert a packet into the split packet list
 //-------------------------------------------------------------------------------------------------------
-void ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket, CCTimeType time )
+bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket, CCTimeType time )
 {
     bool objectExists;
     unsigned index;
@@ -2565,6 +2606,7 @@ void ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
     if( objectExists == false )
     {
         SplitPacketChannel* newChannel = RakNet::OP_NEW<SplitPacketChannel>( __FILE__, __LINE__ );
+        newChannel->lastUpdateTime = time;
 #if PREALLOCATE_LARGE_MESSAGES == 1
         index = splitPacketChannelList.Insert( internalPacket->splitPacketId, newChannel, true, __FILE__, __LINE__ );
         newChannel->returnedPacket = CreateInternalPacketCopy( internalPacket, 0, 0, time );
@@ -2574,10 +2616,23 @@ void ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         RakAssert( newChannel->returnedPacket->data );
 #else
         newChannel->firstPacket = 0;
-        index = splitPacketChannelList.Insert( internalPacket->splitPacketId, newChannel, true, __FILE__, __LINE__ );
-        // Preallocate to the final size, to avoid runtime copies
-        newChannel->splitPacketList.Preallocate( internalPacket, __FILE__, __LINE__ );
 
+        // Preallocate to the final size, to avoid runtime copies. Before the Insert, not
+        // after: SplitPacketChannelComp orders channels by splitPacketList.PacketId(),
+        // which only exists once the list is allocated. Preallocate is also the one step
+        // here that can fail, and a channel that never entered the list is far cheaper to
+        // unwind than one that did.
+        if( newChannel->splitPacketList.Preallocate( internalPacket, __FILE__, __LINE__ ) == false )
+        {
+            // Out of memory, or a count this Peer will not honour. Drop the chunk and the
+            // channel with it rather than the process - ADR-0002.
+            RakNet::OP_DELETE( newChannel, __FILE__, __LINE__ );
+            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( internalPacket );
+            return false;
+        }
+
+        index = splitPacketChannelList.Insert( internalPacket->splitPacketId, newChannel, true, __FILE__, __LINE__ );
 #endif
     }
 
@@ -2662,7 +2717,7 @@ void ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
     {
         FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
         ReleaseToInternalPacketPool( internalPacket );
-        return;
+        return false;
     }
     splitPacketChannelList[index]->lastUpdateTime = time;
 
@@ -2699,6 +2754,75 @@ void ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
     }
 
 #endif
+
+    return true;
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Free a split packet channel and every chunk it is holding
+//-------------------------------------------------------------------------------------------------------
+void ReliabilityLayer::FreeSplitPacketChannel( SplitPacketChannel* splitPacketChannel )
+{
+    for( unsigned int j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
+    {
+        InternalPacket* pPacket = splitPacketChannel->splitPacketList.Get( j );
+        if( pPacket != nullptr )
+        {
+            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( pPacket );
+        }
+    }
+
+#if PREALLOCATE_LARGE_MESSAGES == 1
+    if( splitPacketChannel->returnedPacket )
+    {
+        FreeInternalPacketData( splitPacketChannel->returnedPacket, _FILE_AND_LINE_ );
+        ReleaseToInternalPacketPool( splitPacketChannel->returnedPacket );
+    }
+#endif
+
+    RakNet::OP_DELETE( splitPacketChannel, _FILE_AND_LINE_ );
+}
+
+//-------------------------------------------------------------------------------------------------------
+// How long a split packet channel may take no new chunk before it counts as stalled
+//-------------------------------------------------------------------------------------------------------
+CCTimeType ReliabilityLayer::GetSplitPacketChannelStallTime( void ) const
+{
+    // Half the connection timeout with no progress. Update sweeps at this same interval,
+    // so a stalled channel is freed within timeoutTime of its last chunk; that pairing is
+    // the reason for the half, and the reason both halves read this one function.
+    //
+    // timeoutTime is milliseconds. time and lastUpdateTime are milliseconds when
+    // CC_TIME_TYPE_BYTES is 4 and microseconds when it is 8.
+#if CC_TIME_TYPE_BYTES == 4
+    return (CCTimeType)timeoutTime / 2;
+#else
+    return (CCTimeType)timeoutTime * (CCTimeType)1000 / 2;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Free every split packet channel that has stalled part-way through reassembly
+//-------------------------------------------------------------------------------------------------------
+void ReliabilityLayer::FreeStalledSplitPacketChannels( CCTimeType time )
+{
+    const CCTimeType stallTime = GetSplitPacketChannelStallTime();
+
+    // RemoveAtIndex shifts the tail down, so only advance when nothing was removed.
+    unsigned int i = 0;
+    while( i < splitPacketChannelList.Size() )
+    {
+        if( time > splitPacketChannelList[i]->lastUpdateTime + stallTime )
+        {
+            FreeSplitPacketChannel( splitPacketChannelList[i] );
+            splitPacketChannelList.RemoveAtIndex( i );
+        }
+        else
+        {
+            ++i;
+        }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------

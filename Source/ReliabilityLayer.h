@@ -55,6 +55,24 @@ class RakNetRandom;
 typedef uint64_t reliabilityHeapWeightType;
 
 
+/// Upper bound on the splitPacketCount this Peer will accept off the wire.
+///
+/// Derived, not chosen: 65536 is 2^16, the keyspace of the 16-bit SplitPacketIdType
+/// (InternalPacket.h), which already bounds the number of simultaneously live
+/// split-packet channels at 65,536. Both split-packet limits therefore come from the
+/// same wire field.
+///
+/// It costs 512 KiB for the pointer array of one fully-populated channel, and still
+/// accepts messages of 65536 x 516 = 33.8 MiB at MTU 576 and 65536 x 1432 = 93.8 MiB
+/// at MTU 1492 - beyond anything a conforming sender produces, since a real sender's
+/// count is bounded by its own message size and MTU.
+///
+/// Without a bound, splitPacketCount is read straight off the wire unvalidated and
+/// Preallocate below touches every page of the array it allocates, so a single
+/// 14-byte message can ask for 16 GiB and a single 1492-byte datagram carrying 105 of
+/// them can ask for over a terabyte.
+constexpr SplitPacketIndexType MAXIMUM_SPLIT_PACKET_COUNT = 65536;
+
 class SortedSplittedPackets
 {
 private:
@@ -72,23 +90,39 @@ public:
     }
     ~SortedSplittedPackets()
     {
-        if( allocation_size > 0 )
+        if( data != NULL )
         {
-            RakNet::OP_DELETE_ARRAY( data, _FILE_AND_LINE_ );
+            rakFree_Ex( data, _FILE_AND_LINE_ );
         }
     }
 
-    void Preallocate( InternalPacket* internalPacket, const char* file, unsigned int line )
+    /// Reserve room for every chunk of the split message \a internalPacket belongs to.
+    /// \retval false The count is 0 or above MAXIMUM_SPLIT_PACKET_COUNT, or the
+    /// allocation failed. The object is left unallocated and must not be used.
+    bool Preallocate( InternalPacket* internalPacket, const char* file, unsigned int line )
     {
         RakAssert( data == NULL );
-        allocation_size = internalPacket->splitPacketCount;
-        data = RakNet::OP_NEW_ARRAY<InternalPacket*>( allocation_size, file, line );
-        packetId = internalPacket->splitPacketId;
 
-        for( unsigned int i = 0; i < allocation_size; ++i )
+        const SplitPacketIndexType count = internalPacket->splitPacketCount;
+        if( count == 0 || count > MAXIMUM_SPLIT_PACKET_COUNT )
         {
-            data[i] = NULL;
+            return false;
         }
+
+        // rakMalloc_Ex rather than OP_NEW_ARRAY: OP_NEW_ARRAY takes an int, so a count
+        // at or above 0x80000000 would arrive negative, and it allocates with a throwing
+        // new either way. ADR-0002 rules both out in Source/ - failure here has to be a
+        // return value, not a terminate().
+        data = (InternalPacket**)rakMalloc_Ex( sizeof( InternalPacket* ) * (size_t)count, file, line );
+        if( data == NULL )
+        {
+            return false;
+        }
+
+        memset( data, 0, sizeof( InternalPacket* ) * (size_t)count );
+        allocation_size = count;
+        packetId = internalPacket->splitPacketId;
+        return true;
     }
     bool Add( InternalPacket* internalPacket, const char* file, unsigned int line )
     {
@@ -129,7 +163,11 @@ public:
 
 struct SplitPacketChannel
 {
-    CCTimeType lastUpdateTime;
+    /// Stamped when the channel is created and refreshed by every chunk that lands in
+    /// it. Read by ReliabilityLayer::FreeStalledSplitPacketChannels to reap channels
+    /// whose remaining chunks never arrive. Initialised here because the struct has no
+    /// constructor and nothing else writes it before the first successful Add.
+    CCTimeType lastUpdateTime = 0;
 
     SortedSplittedPackets splitPacketList;
 
@@ -327,12 +365,28 @@ private:
     void SplitPacket( InternalPacket* internalPacket );
 
     /// Insert a packet into the split packet list
-    void InsertIntoSplitPacketList( InternalPacket* internalPacket, CCTimeType time );
+    /// \retval true \a internalPacket is now held by a live split packet channel, so a
+    /// reassembly attempt for its splitPacketId is worth making.
+    /// \retval false The chunk was rejected or could not be stored. \a internalPacket has
+    /// been freed and there may be no channel for its splitPacketId; do not reassemble.
+    bool InsertIntoSplitPacketList( InternalPacket* internalPacket, CCTimeType time );
 
     /// Take all split chunks with the specified splitPacketId and try to reconstruct a packet. If we can, allocate and return it.  Otherwise return 0
     InternalPacket* BuildPacketFromSplitPacketList( SplitPacketIdType splitPacketId, CCTimeType time,
                                                     RakNetSocket2* s, SystemAddress& systemAddress, RakNetRandom* rnr, BitStream& updateBitStream );
     InternalPacket* BuildPacketFromSplitPacketList( SplitPacketChannel* splitPacketChannel, CCTimeType time );
+
+    /// Free a split packet channel and every chunk it is holding.
+    void FreeSplitPacketChannel( SplitPacketChannel* splitPacketChannel );
+
+    /// How long a split packet channel may take no new chunk before it counts as stalled,
+    /// in whatever unit CCTimeType is. Also the interval Update sweeps at, which is what
+    /// bounds a stalled channel's lifetime at timeoutTime; see the call site.
+    CCTimeType GetSplitPacketChannelStallTime( void ) const;
+
+    /// Free every split packet channel that has been stalled for
+    /// GetSplitPacketChannelStallTime. Called from Update on a rate limiter.
+    void FreeStalledSplitPacketChannels( CCTimeType time );
 
     /// Creates a copy of the specified internal packet with data copied from the original starting at dataByteOffset for dataByteLength bytes.
     /// Does not copy any split data parameters as that information is always generated does not have any reason to be copied
@@ -546,6 +600,7 @@ private:
     double totalUserDataBytesAcked;
     CCTimeType timeOfLastContinualSend;
     CCTimeType timeToNextUnreliableCull;
+    CCTimeType timeToNextSplitPacketChannelSweep;
 
     // This doesn't need to be a member, but I do it to avoid reallocations
     DataStructures::RangeList<DatagramSequenceNumberType> incomingAcks;
