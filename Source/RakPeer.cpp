@@ -1339,7 +1339,7 @@ void RakPeer::HandleConnectionCancelQueue()
             if( (*it)->systemAddress == requestedConnectionCancelQueue.front() )
             {
 #if LIBCAT_SECURITY == 1
-                CAT_AUDIT_PRINTF( "AUDIT: Deleting requestedConnectionQueue %i client_handshake %x\n", i, (*it)->client_handshake );
+                CAT_AUDIT_PRINTF( "AUDIT: Deleting requestedConnectionQueue client_handshake %p\n", (void*)( *it )->client_handshake );
                 RakNet::OP_DELETE( (*it)->client_handshake, _FILE_AND_LINE_ );
 #endif
                 RakNet::OP_DELETE( (*it), _FILE_AND_LINE_ );
@@ -3896,7 +3896,7 @@ void RakPeer::ClearRequestedConnectionList( void )
     for( RequestedConnectionStruct* pConnection : freeQueue )
     {
 #if LIBCAT_SECURITY == 1
-        CAT_AUDIT_PRINTF( "AUDIT: In ClearRequestedConnectionList(), Deleting freeQueue index %i client_handshake %x\n", i, pConnection->client_handshake );
+        CAT_AUDIT_PRINTF( "AUDIT: In ClearRequestedConnectionList(), Deleting freeQueue client_handshake %p\n", (void*)pConnection->client_handshake );
         RakNet::OP_DELETE( pConnection->client_handshake, _FILE_AND_LINE_ );
 #endif
         RakNet::OP_DELETE( pConnection, _FILE_AND_LINE_ );
