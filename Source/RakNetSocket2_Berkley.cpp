@@ -152,11 +152,12 @@ RNS2SendResult RNS2_Berkley::Send_NoVDP( RNS2Socket rns2Socket, RNS2_SendParamet
         return -1;
     }
 
-    // Untouched by the hang fix and wrong for AF_INET6, which is worth stating rather than
-    // leaving to be rediscovered: GetIPPROTO returns IPPROTO_IPV6 for such an address, but
-    // the option name stays IP_TTL, and the IPv6 spelling is IPV6_UNICAST_HOPS. So the
-    // getsockopt__ below simply fails there, oldTTL stays -1, and a per-datagram TTL is
-    // silently not applied. Pre-existing, out of scope here, and a separate defect.
+    // Untouched by the hang fix, and mismatched for AF_INET6: GetIPPROTO returns
+    // IPPROTO_IPV6 for such an address while the option name stays IP_TTL, where the IPv6
+    // spelling is IPV6_UNICAST_HOPS. On Windows this is harmless by coincidence - ws2ipdef.h
+    // gives both the value 4 - which is why it has never been noticed. Elsewhere the two
+    // numbers differ and the pair below addresses some unrelated option. Pre-existing, out
+    // of scope here, and tracked as its own defect.
     int oldTTL = -1;
     if( sendParameters->ttl > 0 )
     {
