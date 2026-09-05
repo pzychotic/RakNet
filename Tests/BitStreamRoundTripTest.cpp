@@ -1,4 +1,5 @@
 #include "BitStream.h"
+#include "StringCompressorScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -192,4 +193,56 @@ TEST_CASE( "a truncated std::string read fails and leaves the destination empty"
     std::string str = "value from a previous read";
     CHECK_FALSE( rt.Reader().Read( str ) );
     CHECK( str.empty() );
+}
+
+TEST_CASE( "non-empty std::string round trips through WriteCompressed at every starting offset", "[bitstream]" )
+{
+    // The compressed path is Huffman coded, so it is bit granular throughout and
+    // has no alignment step of its own to get wrong. The sentinel is still the
+    // point: it fails unless the decoder stops on exactly the bit the encoder
+    // stopped on, which is what MessageFilter's RPC4 handler depends on.
+    StringCompressorScope compressor;
+
+    const int pad = GENERATE( 0, 1, 2, 3, 4, 5, 6, 7 );
+    CAPTURE( pad );
+
+    RoundTrip rt;
+    rt.Pad( pad );
+    rt.Writer().WriteCompressed( std::string( kPayload ) );
+    rt.WriteSentinel();
+
+    rt.Reader();
+    rt.ReadPad( pad );
+
+    std::string str;
+    REQUIRE( rt.Reader().ReadCompressed( str ) );
+    CHECK( str == kPayload );
+
+    rt.CheckSentinel();
+}
+
+TEST_CASE( "empty std::string round trips through WriteCompressed at every starting offset", "[bitstream]" )
+{
+    // Empty *and* unaligned is the combination that hid the uncompressed bug this
+    // file was created for, so the compressed path gets the same sweep rather than
+    // only the offset-zero case. The destination starts non-empty so a decoder that
+    // writes nothing at all is told apart from one that correctly clears it.
+    StringCompressorScope compressor;
+
+    const int pad = GENERATE( 0, 1, 2, 3, 4, 5, 6, 7 );
+    CAPTURE( pad );
+
+    RoundTrip rt;
+    rt.Pad( pad );
+    rt.Writer().WriteCompressed( std::string() );
+    rt.WriteSentinel();
+
+    rt.Reader();
+    rt.ReadPad( pad );
+
+    std::string str = "value from a previous read";
+    REQUIRE( rt.Reader().ReadCompressed( str ) );
+    CHECK( str.empty() );
+
+    rt.CheckSentinel();
 }

@@ -56,6 +56,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerDeallocateBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerNonBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MaximumConnectTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MessageFilterTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MiscellaneousTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OfflineMessagesConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketAndLowLevelTestsTest.cpp
@@ -79,6 +80,7 @@ set( RAKNET_TEST_SUPPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/RakNetStringMakers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakTimer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakTimer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorScope.h
     ${CMAKE_CURRENT_SOURCE_DIR}/TestHelpers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/TestHelpers.cpp
 )
