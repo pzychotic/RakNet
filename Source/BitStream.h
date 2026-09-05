@@ -235,10 +235,12 @@ public:
     /// Write a std::string instead:  Write( std::string( s ) )
     /// ...or, for a raw byte range:  Write( s, lengthInBytes )
     ///
-    /// Only the one-argument Write() is guarded. WriteCompressed(), WriteDelta()
-    /// and Serialize() forward a raw buffer into the same primary template and
-    /// mis-encode it the same way; guarding them is a separate change, because
-    /// each has its own std::string overload to point a caller at.
+    /// WriteDelta() and Serialize() forward a raw buffer straight into Write(),
+    /// so they inherit these deletions and are compile errors as well; the
+    /// diagnostic names the deleted Write() and points inside BitStream.h rather
+    /// than at the call site, which is worse advice but not a hazard. The one
+    /// write-side entry point that does *not* forward to Write() is
+    /// WriteCompressed(), which is guarded separately below.
     ///
     /// The unused trailing parameter exists to get the advice above into the
     /// compiler diagnostic. C++17 has no `= delete( "reason" )` and every compiler
@@ -302,6 +304,43 @@ public:
     template<class templateType>
     void WriteCompressed( const templateType& inTemplateVar );
 
+    /// \brief Raw character buffers cannot be written with the one-argument WriteCompressed() either.
+    /// \details Same hazard, same fix, same tag type as the deleted Write()
+    /// overloads above - see the commentary there for why deleting is the end
+    /// state rather than restoring std::string semantics. WriteCompressed() needs
+    /// its own set because it does not forward to Write(): it reaches the primary
+    /// template directly, so an unguarded spelling compresses the pointer value
+    /// itself, or the raw code units of a literal, onto the wire.
+    ///
+    /// Write a std::string instead:  WriteCompressed( std::string( s ) )
+    ///
+    /// There is no compressed raw-byte-range form to point at: the three-argument
+    /// WriteCompressed( bytes, sizeInBits, unsignedData ) is private. A caller who
+    /// meant the bytes at p rather than the string wants Write( p, lengthInBytes ),
+    /// which is uncompressed.
+    ///
+    /// These replace two declared-but-undefined explicit specializations for
+    /// `const char* const&` and `const unsigned char* const&`, which produced a
+    /// link error naming a mangled symbol for exactly those two spellings and let
+    /// every other one - `char*`, `unsigned char*`, `wchar_t*`, a string literal -
+    /// through to the primary template to mis-encode silently.
+    ///
+    /// WriteCompressedDelta() forwards here and so is a compile error too, with
+    /// the diagnostic reported inside BitStream.h; SerializeCompressed( true, p )
+    /// likewise, from this branch. Neither needs its own entry.
+    template<std::size_t N>
+    void WriteCompressed( const char ( &inputByteArray )[N], Write_a_std_string_instead = {} ) = delete;
+    template<std::size_t N>
+    void WriteCompressed( const unsigned char ( &inputByteArray )[N], Write_a_std_string_instead = {} ) = delete;
+    template<std::size_t N>
+    void WriteCompressed( const wchar_t ( &inputByteArray )[N], Write_a_std_string_instead = {} ) = delete;
+    void WriteCompressed( char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void WriteCompressed( const char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void WriteCompressed( unsigned char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void WriteCompressed( const unsigned char* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void WriteCompressed( wchar_t* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+    void WriteCompressed( const wchar_t* inputByteArray, Write_a_std_string_instead = {} ) = delete;
+
     /// \brief Write any integral type to a bitstream.
     /// \details If the current value is different from the last value
     /// the current value will be written.  Otherwise, a single bit will be written
@@ -324,6 +363,44 @@ public:
     template<class templateType>
     bool Read( templateType& outTemplateVar );
 
+    /// \brief Raw character pointers cannot be read into with the one-argument Read().
+    /// \details The mirror of the deleted Write() overloads above, and deleted for
+    /// the same reason: Read( p ) for a char* p deduces templateType = char* and
+    /// reads sizeof(void*) bytes over the *pointer variable* rather than into the
+    /// buffer it points at. The caller either wanted the string - Read( std::string& ),
+    /// which decodes what Write( std::string ) produced - or a raw byte range, which
+    /// is Read( char* output, unsigned int numberOfBytes ).
+    ///
+    /// The tag type is a separate one from the write side on purpose. A diagnostic
+    /// for a failed Read() that reads `Write_a_std_string_instead` gives the caller
+    /// the wrong advice; what they want is Read( std::string& ).
+    ///
+    /// These replace two declared-but-undefined explicit specializations for
+    /// `char*&` and `unsigned char*&`, which failed at link time with a mangled
+    /// symbol and no mention of std::string, and which missed `const char*&` and
+    /// `wchar_t*&` entirely - those reached the primary template and overwrote the
+    /// pointer variable.
+    ///
+    /// The parameter is a reference, so Read( charPtr ) for a char* lvalue selects
+    /// the char*& entry; const char*& needs its own, because a char* lvalue does not
+    /// bind to it and deduction produces it separately.
+    ///
+    /// ReadDelta() forwards here and so is a compile error too, with the diagnostic
+    /// reported inside BitStream.h; it does not need its own entry.
+    ///
+    /// Taken by value and defaulted for the reasons spelled out on the Write()
+    /// deletions; in particular this must not make Read( buffer, 0 ) ambiguous
+    /// against the byte-range overload below.
+    struct Read_a_std_string_instead
+    {
+    };
+    bool Read( char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool Read( const char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool Read( unsigned char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool Read( const unsigned char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool Read( wchar_t*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool Read( const wchar_t*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+
     /// \brief Read any integral type from a bitstream.
     /// \details If the written value differed from the value compared against in the write function,
     /// var will be updated.  Otherwise it will retain the current value.
@@ -342,6 +419,27 @@ public:
     /// \return true on success, false on failure.
     template<class templateType>
     bool ReadCompressed( templateType& outTemplateVar );
+
+    /// \brief Raw character pointers cannot be read into with the one-argument ReadCompressed() either.
+    /// \details Same hazard and same fix as the deleted Read() overloads above.
+    /// These replace declared-but-undefined specializations for `char*&` and
+    /// `unsigned char*&`; `wchar_t*&` was missed by those and mis-decoded silently.
+    ///
+    /// Read a std::string instead:  ReadCompressed( std::string& )
+    ///
+    /// As on the write side there is no compressed raw-byte-range form to point at -
+    /// the three-argument ReadCompressed( bytes, sizeInBits, unsignedData ) is
+    /// private - so a caller who meant the bytes wants Read( output, numberOfBytes ),
+    /// which is uncompressed.
+    ///
+    /// ReadCompressedDelta() and SerializeCompressed( false, p ) forward here and
+    /// are compile errors through these; neither needs its own entry.
+    bool ReadCompressed( char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool ReadCompressed( const char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool ReadCompressed( unsigned char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool ReadCompressed( const unsigned char*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool ReadCompressed( wchar_t*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
+    bool ReadCompressed( const wchar_t*& outTemplateVar, Read_a_std_string_instead = {} ) = delete;
 
     /// \brief Read any integral type from a bitstream.
     /// \details If the written value differed from the value compared against in the write function,
@@ -1144,11 +1242,6 @@ inline void BitStream::WriteCompressed( const std::string& inTemplateVar )
     SerializeCompressed( inTemplateVar );
 }
 
-template<>
-inline void BitStream::WriteCompressed( const char* const& inTemplateVar );
-template<>
-inline void BitStream::WriteCompressed( const unsigned char* const& inTemplateVar );
-
 /// \brief Write any integral type to a bitstream.
 /// \details If the current value is different from the last value
 /// the current value will be written.  Otherwise, a single bit will be written
@@ -1315,12 +1408,6 @@ inline bool BitStream::Read( std::string& outTemplateVar )
     return Deserialize( outTemplateVar );
 }
 
-// keep these for now to force linker errors when using them by accident
-template<>
-inline bool BitStream::Read( char*& outTemplateVar );
-template<>
-inline bool BitStream::Read( unsigned char*& outTemplateVar );
-
 /// \brief Read any integral type from a bitstream.
 /// \details If the written value differed from the value compared against in the write function,
 /// var will be updated.  Otherwise it will retain the current value.
@@ -1430,11 +1517,6 @@ inline bool BitStream::ReadCompressed( std::string& outTemplateVar )
 {
     return DeserializeCompressed( outTemplateVar );
 }
-
-template<>
-inline bool BitStream::ReadCompressed( char*& outTemplateVar );
-template<>
-inline bool BitStream::ReadCompressed( unsigned char*& outTemplateVar );
 
 /// \brief Read any integral type from a bitstream.
 /// \details If the written value differed from the value compared against in the write function,

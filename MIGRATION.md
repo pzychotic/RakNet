@@ -20,7 +20,7 @@ protocol.
 | 1 | Everything moved into `namespace RakNet` | Source only |
 | 2 | `DataStructures::List` gone from public signatures | Source only |
 | 3 | `RakString` / `RakWString` replaced by `std::string` | Source only |
-| 4 | `BitStream::Write` rejects raw character buffers | Source only |
+| 4 | `BitStream` rejects raw character buffers | Source only |
 | 5 | `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed | **Wire-visible** |
 
 ---
@@ -209,7 +209,7 @@ application payload that writes an empty string after a bit-packed field.
 
 ---
 
-## 4. `BitStream::Write` and raw character buffers
+## 4. `BitStream` and raw character buffers
 
 **Source break, not a wire break.** `Write( std::string )` emits exactly what
 `RakString::Serialize` emitted.
@@ -236,28 +236,33 @@ are compile errors. The `wchar_t` spellings upstream also had go with them, and 
 have no replacement: nothing in this fork serializes wide strings any more, so the caller
 picks an encoding and writes a `std::string`.
 
-The deleted overloads carry an unused trailing `Write_a_std_string_instead` parameter
-so that the alternative appears in the compiler's diagnostic; C++17 has no
-`= delete( "reason" )`.
+The same treatment covers `WriteCompressed()`, `Read()` and `ReadCompressed()`. The rule is
+one sentence: **a raw character buffer is never a valid argument to the one-argument form of
+any of the four**, whatever its constness and whether it is narrow, wide or an array. Every
+such call is a compile error naming a `std::string` alternative.
 
-On the read side, `Read( RakString& )` and `Read( RakWString& )` are gone with the types.
-`Read( std::string& )` replaces them, and `Read( char* output, unsigned int
-numberOfBytes )` remains for a raw byte range.
+```cpp
+bs.WriteCompressed( std::string( s ) );   // instead of WriteCompressed( charPtr )
+bs.Read( str );                           // std::string&, instead of Read( charPtr )
+bs.ReadCompressed( str );                 // likewise
+bs.Read( output, numberOfBytes );         // still there, for a raw byte range
+```
 
-`Read( char*& )` and `Read( unsigned char*& )` are *not* deleted. They survive as
-declared-but-undefined explicit specializations, under a comment inherited from upstream —
-"keep these for now to force linker errors when using them by accident". Unlike the `Write`
-case, deduction does reach them, so they do what they were meant to do; but the failure is
-a **link** error late in your build, naming a mangled symbol, rather than a compile error
-naming `std::string`. `ReadCompressed( char*& )` and `ReadCompressed( unsigned char*& )`
-are the same construction. Read into a `std::string` and the question does not arise.
+The deleted overloads carry an unused trailing tag parameter so that the alternative appears
+in the compiler's diagnostic; C++17 has no `= delete( "reason" )`. The tag names the
+direction — `Write_a_std_string_instead` on the write side, `Read_a_std_string_instead` on
+the read side — so a rejected `Read` does not advise writing.
 
-### Why deleting rather than restoring `Write( const char* )` with `std::string` semantics
+`Read( RakString& )` and `Read( RakWString& )` are gone with the types; `Read( std::string& )`
+replaces them.
 
-Deleting forces every call site to be read. A caller who wrote `Write( p )` may have
-meant the string at `p`, in which case `Write( std::string( p ) )` is right — or the
-bytes at `p`, in which case the string form is wrong and `Write( p, length )` is the
-replacement. A restored overload would silently pick one of those for them.
+### The entry points that forward
+
+`WriteDelta()`, `Serialize()`, `WriteCompressedDelta()`, `SerializeCompressed()`,
+`ReadDelta()` and `ReadCompressedDelta()` have no deletions of their own. They forward a raw
+buffer into one of the four guarded functions, so they are compile errors through it —
+`WriteDelta( charPtr, charPtr )` names the deleted `Write( char*, … )`. The only difference
+is that the diagnostic is reported inside `BitStream.h` rather than at your call site.
 
 ### The hazard this replaced (only in this fork, between `42353af` and the fix in `67276b7`)
 
@@ -269,17 +274,12 @@ declared-but-undefined specializations meant to force a linker error were never
 reached by deduction. Anyone who built against this fork in that window, rather than
 against stock 4.081, has to re-check those call sites for produced-and-stored data.
 
-Only the one-argument `Write()` is guarded by deletion, but the guard reaches further than
-that, because `WriteDelta()` and `Serialize()` forward to it. `WriteDelta( charPtr, charPtr )`
-and `Serialize( true, charPtr )` are compile errors too, naming the same deleted `Write`;
-the diagnostic just points inside `BitStream.h` rather than at your call site.
+### Why deleting rather than restoring `Write( const char* )` with `std::string` semantics
 
-**`WriteCompressed()` is the one that is still dangerous**, because it does not forward to
-`Write()`. It has declared-but-undefined specializations for `const char* const&` and
-`const unsigned char* const&`, so `WriteCompressed( constCharPtr )` fails at link time. A
-non-const `char*` and a string literal miss those specializations, reach the primary
-template, compile, link, and silently encode the pointer value or the raw bytes — exactly
-the hazard `Write` was fixed for. `WriteCompressed( std::string )` is the correct call.
+Deleting forces every call site to be read. A caller who wrote `Write( p )` may have
+meant the string at `p`, in which case `Write( std::string( p ) )` is right — or the
+bytes at `p`, in which case the string form is wrong and `Write( p, length )` is the
+replacement. A restored overload would silently pick one of those for them.
 
 ---
 
