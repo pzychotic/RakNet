@@ -267,7 +267,7 @@ RakPeer::~RakPeer()
 
 #if LIBCAT_SECURITY == 1
     // Encryption and security
-    CAT_AUDIT_PRINTF( "AUDIT: Deleting RakPeer security objects, handshake = %x, cookie jar = %x\n", _server_handshake, _cookie_jar );
+    CAT_AUDIT_PRINTF( "AUDIT: Deleting RakPeer security objects, handshake = %p, cookie jar = %p\n", (void*)_server_handshake, (void*)_cookie_jar );
     if( _server_handshake )
         RakNet::OP_DELETE( _server_handshake, _FILE_AND_LINE_ );
     if( _cookie_jar )
@@ -525,20 +525,20 @@ bool RakPeer::InitializeSecurity( const char* public_key, const char* private_ke
 
     if( _server_handshake )
     {
-        CAT_AUDIT_PRINTF( "AUDIT: Deleting old server_handshake %x\n", _server_handshake );
+        CAT_AUDIT_PRINTF( "AUDIT: Deleting old server_handshake %p\n", (void*)_server_handshake );
         RakNet::OP_DELETE( _server_handshake, _FILE_AND_LINE_ );
     }
     if( _cookie_jar )
     {
-        CAT_AUDIT_PRINTF( "AUDIT: Deleting old cookie jar %x\n", _cookie_jar );
+        CAT_AUDIT_PRINTF( "AUDIT: Deleting old cookie jar %p\n", (void*)_cookie_jar );
         RakNet::OP_DELETE( _cookie_jar, _FILE_AND_LINE_ );
     }
 
     _server_handshake = RakNet::OP_NEW<cat::ServerEasyHandshake>( _FILE_AND_LINE_ );
     _cookie_jar = RakNet::OP_NEW<cat::CookieJar>( _FILE_AND_LINE_ );
 
-    CAT_AUDIT_PRINTF( "AUDIT: Created new server_handshake %x\n", _server_handshake );
-    CAT_AUDIT_PRINTF( "AUDIT: Created new cookie jar %x\n", _cookie_jar );
+    CAT_AUDIT_PRINTF( "AUDIT: Created new server_handshake %p\n", (void*)_server_handshake );
+    CAT_AUDIT_PRINTF( "AUDIT: Created new cookie jar %p\n", (void*)_cookie_jar );
     CAT_AUDIT_PRINTF( "AUDIT: Running _server_handshake->Initialize()\n" );
 
     if( _server_handshake->Initialize( public_key, private_key ) )
@@ -578,7 +578,7 @@ bool RakPeer::InitializeSecurity( const char* public_key, const char* private_ke
 void RakPeer::DisableSecurity( void )
 {
 #if LIBCAT_SECURITY == 1
-    CAT_AUDIT_PRINTF( "AUDIT: DisableSecurity() called, so deleting _server_handshake %x and cookie_jar %x\n", _server_handshake, _cookie_jar );
+    CAT_AUDIT_PRINTF( "AUDIT: DisableSecurity() called, so deleting _server_handshake %p and cookie_jar %p\n", (void*)_server_handshake, (void*)_cookie_jar );
     RakNet::OP_DELETE( _server_handshake, _FILE_AND_LINE_ );
     _server_handshake = 0;
     RakNet::OP_DELETE( _cookie_jar, _FILE_AND_LINE_ );
@@ -4324,7 +4324,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                             return true;
                         }
 
-                        CAT_AUDIT_PRINTF( "AUDIT: Looks good, preparing to send challenge to server! client_handshake = %x\n", client_handshake );
+                        CAT_AUDIT_PRINTF( "AUDIT: Looks good, preparing to send challenge to server! client_handshake = %p\n", (void*)client_handshake );
                     }
 
 #endif // LIBCAT_SECURITY
@@ -4451,7 +4451,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     rakPeer->requestedConnectionQueueMutex.unlock();
 
 #if LIBCAT_SECURITY == 1
-                    CAT_AUDIT_PRINTF( "AUDIT: Deleting client_handshake object %x and rcs->client_handshake object %x\n", client_handshake, rcs->client_handshake );
+                    CAT_AUDIT_PRINTF( "AUDIT: Deleting client_handshake object %p and rcs->client_handshake object %p\n", (void*)client_handshake, (void*)rcs->client_handshake );
                     RakNet::OP_DELETE( client_handshake, _FILE_AND_LINE_ );
                     RakNet::OP_DELETE( rcs->client_handshake, _FILE_AND_LINE_ );
 #endif // LIBCAT_SECURITY
@@ -4495,7 +4495,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     rakPeer->requestedConnectionQueue.erase( it );
 
 #if LIBCAT_SECURITY == 1
-                    CAT_AUDIT_PRINTF( "AUDIT: Connection attempt canceled so deleting rcs->client_handshake object %x\n", rcs->client_handshake );
+                    CAT_AUDIT_PRINTF( "AUDIT: Connection attempt canceled so deleting rcs->client_handshake object %p\n", (void*)rcs->client_handshake );
                     RakNet::OP_DELETE( rcs->client_handshake, _FILE_AND_LINE_ );
 #endif // LIBCAT_SECURITY
                     RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
@@ -5060,7 +5060,7 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                     }
 
 #if LIBCAT_SECURITY == 1
-                    CAT_AUDIT_PRINTF( "AUDIT: Connection attempt FAILED so deleting rcs->client_handshake object %x\n", rcs->client_handshake );
+                    CAT_AUDIT_PRINTF( "AUDIT: Connection attempt FAILED so deleting rcs->client_handshake object %p\n", (void*)rcs->client_handshake );
                     RakNet::OP_DELETE( rcs->client_handshake, _FILE_AND_LINE_ );
 #endif
                     RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
