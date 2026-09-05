@@ -124,19 +124,49 @@ public:
         packetId = internalPacket->splitPacketId;
         return true;
     }
+    /// Store \a internalPacket in the slot its splitPacketIndex names.
+    /// \retval false The chunk does not belong in this channel, or its slot is already
+    /// taken. Nothing was stored, and the caller still owns the chunk.
     bool Add( InternalPacket* internalPacket, const char* file, unsigned int line )
     {
         RakAssert( data != NULL );
-        RakAssert( internalPacket->splitPacketIndex < allocation_size );
         RakAssert( packetId == internalPacket->splitPacketId );
-        RakAssert( data[internalPacket->splitPacketIndex] == NULL );
-        if( data[internalPacket->splitPacketIndex] == NULL )
+
+        // Every field tested below arrives off the wire, so none of them may be guarded by
+        // a RakAssert: a System must not be able to abort a debug build, and an assert
+        // compiled out of a release build is no bound at all.
+        //
+        // The channel was sized once, from the splitPacketCount of whichever chunk under
+        // this splitPacketId arrived first, and nothing upstream of here checks that later
+        // chunks agree with it - CreateInternalPacketFromBitStream only tests
+        // splitPacketIndex < splitPacketCount, both read out of the same datagram. So a
+        // chunk claiming count=2 opens a two-slot channel, and a following chunk claiming
+        // count=65536, index=60000 passes that gate and arrives here. Both counts are under
+        // MAXIMUM_SPLIT_PACKET_COUNT, so the cap does not close this.
+        //
+        // The disagreeing count is the real inconsistency, and rejecting it also bounds the
+        // index; the index is still checked on its own so this stays correct if the count
+        // test is ever relaxed.
+        if( internalPacket->splitPacketCount != allocation_size )
         {
-            data[internalPacket->splitPacketIndex] = internalPacket;
-            ++addedPacketsCount;
-            return true;
+            return false;
         }
-        return false;
+        if( internalPacket->splitPacketIndex >= allocation_size )
+        {
+            return false;
+        }
+
+        // A duplicate chunk, which is reachable from the wire as well: an UNRELIABLE split
+        // message is not deduplicated by message number, so the same index can simply be
+        // sent twice.
+        if( data[internalPacket->splitPacketIndex] != NULL )
+        {
+            return false;
+        }
+
+        data[internalPacket->splitPacketIndex] = internalPacket;
+        ++addedPacketsCount;
+        return true;
     }
 
     unsigned int AllocSize()

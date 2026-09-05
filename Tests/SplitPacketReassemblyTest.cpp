@@ -16,14 +16,20 @@ the way a hostile System would rather than the way RakNet's own sender does.
 splitPacketCount arrives as an unvalidated uint32_t. The pointer array
 SortedSplittedPackets::Preallocate sizes from it is filled with NULL, so every page
 is touched, and the wire minimum for a split message is 14 bytes - so one datagram
-buys an allocation of up to 16 GiB per channel and 105 channels fit in an MTU. The
-first four cases below pin the bound (MAXIMUM_SPLIT_PACKET_COUNT), the rejection of
-a count above it, the rejection of a count that would arrive negative through
-OP_NEW_ARRAY's int parameter, and what happens when the capped allocation still fails.
+buys an allocation of up to 16 GiB per channel and 105 channels fit in an MTU. Four
+cases pin the bound (MAXIMUM_SPLIT_PACKET_COUNT), the rejection of a count above it,
+the rejection of a count that would arrive negative through OP_NEW_ARRAY's int
+parameter, and what happens when the capped allocation still fails.
 
-The last case pins the other half: a channel whose remaining chunks never arrive is
-reaped on a timer rather than held until the connection resets, for every reliability
-level - a sweep conditional on reliability is evaded by marking the chunks RELIABLE.
+A fifth pins what the cap does *not* close. A channel is sized once, from the first
+chunk to arrive under a given splitPacketId, and nothing checks that later chunks agree
+with it - so two datagrams that each pass every parse gate, and are each under the cap,
+put the write in SortedSplittedPackets::Add far past the end of that channel's array.
+
+The last pins the other half of the memory story: a channel whose remaining chunks never
+arrive is reaped on a timer rather than held until the connection resets, for every
+reliability level - a sweep conditional on reliability is evaded by marking the chunks
+RELIABLE.
 
 These tests build datagrams by hand rather than going through a Peer because there is
 no supported way to ask a Peer to send a malformed one. ReliabilityLayer is driven
@@ -406,6 +412,56 @@ TEST_CASE( "An enormous split packet count is dropped rather than allocated", "[
         CheckOrdinarySplitMessageReassembles( layer );
         CHECK_FALSE( layer.IsDeadConnection() );
     }
+}
+
+TEST_CASE( "A chunk disagreeing with its channel's split packet count is dropped", "[network]" )
+{
+    // A channel is sized once, from the splitPacketCount of the first chunk to arrive under
+    // a given splitPacketId, and CreateInternalPacketFromBitStream only checks
+    // splitPacketIndex < splitPacketCount - both read out of the same datagram. So two
+    // datagrams that each pass every parse gate, and are each under
+    // MAXIMUM_SPLIT_PACKET_COUNT, put SortedSplittedPackets::Add far past the end of an
+    // array it sized from the first of them. The cap does not close this.
+    //
+    // Completing the well-formed message at the end acks, which needs a socket.
+    PeerScope peers;
+    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
+    REQUIRE( socket != nullptr );
+
+    LayerUnderTest layer( socket );
+
+    // Sizes the channel at two slots.
+    SplitChunk first;
+    first.splitPacketCount = 2;
+    first.splitPacketIndex = 0;
+    first.payload = 'x';
+    CHECK( layer.DeliverChunk( first ) );
+    CHECK( layer.ReceiveBits() == 0 );
+
+    // Same splitPacketId, so it lands in the channel above; a count 32,768 times larger,
+    // so its index clears the parse gate; an index far outside the two slots that exist.
+    // Before the fix this wrote data[60000] of a 2-element array - a RakAssert in Debug,
+    // silent heap corruption in Release.
+    SplitChunk hostile;
+    hostile.splitPacketCount = MAXIMUM_SPLIT_PACKET_COUNT;
+    hostile.splitPacketIndex = 60000;
+    hostile.payload = 'z';
+    REQUIRE( hostile.splitPacketIndex < hostile.splitPacketCount );
+    REQUIRE( hostile.splitPacketCount > first.splitPacketCount );
+
+    CHECK( layer.DeliverChunk( hostile ) );
+    CHECK( layer.ReceiveBits() == 0 );
+    CHECK_FALSE( layer.IsDeadConnection() );
+
+    // The hostile chunk was dropped and the channel it targeted was left intact and still
+    // two slots wide, so the message it was crafted against completes normally.
+    SplitChunk second = first;
+    second.splitPacketIndex = 1;
+    second.payload = 'y';
+    CHECK( layer.DeliverChunk( second ) );
+    CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 2 ) );
+
+    CHECK_FALSE( layer.IsDeadConnection() );
 }
 
 TEST_CASE( "A failed channel allocation drops the datagram instead of the process", "[network]" )
