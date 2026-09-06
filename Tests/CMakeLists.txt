@@ -76,6 +76,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressAndGuidTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressToStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceBindAddressLengthTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceFullClientTableTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TruncatedConnectionRequestTest.cpp
 )
 

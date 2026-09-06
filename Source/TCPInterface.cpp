@@ -293,7 +293,13 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     if( bindAddress != 0 && strlen( bindAddress ) > MAXIMUM_BIND_ADDRESS_LENGTH )
         return UNASSIGNED_SYSTEM_ADDRESS;
 
-    int newRemoteClientIndex = -1;
+    // The loop has two exits: break with a slot claimed, or fall through with the counter
+    // equal to remoteClientsLength. That second value is the "table is full" answer, and it
+    // is one past the end of the array, so it has to be caught before anything indexes with
+    // it - both here and on the connect thread the non-blocking arm hands it to. The
+    // initialiser is that same "nothing found" value, so the guard still holds if an edit
+    // ever puts an exit between here and the loop.
+    int newRemoteClientIndex = remoteClientsLength;
     for( newRemoteClientIndex = 0; newRemoteClientIndex < remoteClientsLength; newRemoteClientIndex++ )
     {
         std::lock_guard<std::mutex> guard( remoteClients[newRemoteClientIndex].isActiveMutex );
@@ -303,7 +309,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             break;
         }
     }
-    if( newRemoteClientIndex == -1 )
+    if( newRemoteClientIndex == remoteClientsLength )
         return UNASSIGNED_SYSTEM_ADDRESS;
 
     if( block )
@@ -990,7 +996,10 @@ void UpdateTCPInterfaceLoop( void* arg )
 
                 if( newSock != 0 )
                 {
-                    int newRemoteClientIndex = -1;
+                    // As in Connect: the loop falls through with the counter at
+                    // remoteClientsLength when every slot is taken, and that is the value
+                    // the guard below has to test, and the value it starts from.
+                    int newRemoteClientIndex = sts->remoteClientsLength;
                     for( newRemoteClientIndex = 0; newRemoteClientIndex < sts->remoteClientsLength; newRemoteClientIndex++ )
                     {
                         sts->remoteClients[newRemoteClientIndex].isActiveMutex.lock();
@@ -1027,9 +1036,12 @@ void UpdateTCPInterfaceLoop( void* arg )
                         }
                         sts->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
                     }
-                    if( newRemoteClientIndex == -1 )
+                    if( newRemoteClientIndex == sts->remoteClientsLength )
                     {
-                        closesocket__( sts->listenSocket );
+                        // Nowhere to put it. Close the connection we just accepted, not the
+                        // listen socket: the interface has to go on accepting, so that a
+                        // slot freeing up is all it takes to serve the next one.
+                        closesocket__( newSock );
                     }
                 }
                 else
