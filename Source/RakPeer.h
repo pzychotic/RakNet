@@ -718,8 +718,9 @@ protected:
     RakPeer::RemoteSystemStruct* GetRemoteSystem( const AddressOrGUID systemIdentifier, bool calledFromNetworkThread, bool onlyActive ) const;
     void ValidateRemoteSystemLookup( void ) const;
     RemoteSystemStruct* GetRemoteSystemFromGUID( const RakNetGUID guid, bool onlyActive ) const;
-    ///Parse out a connection request packet
-    void ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteSystem, const SystemAddress& systemAddress, const char* data, int byteSize );
+    ///Parse out a connection request packet. False if the header would not parse - see
+    ///the definition for what that does and does not cover.
+    bool ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteSystem, const SystemAddress& systemAddress, const char* data, int byteSize );
     void OnConnectionRequest( RakPeer::RemoteSystemStruct* remoteSystem, RakNet::Time incomingTimestamp );
     ///Send a reliable disconnect packet to this player and disconnect them when it is delivered
     void NotifyAndFlagForShutdown( const SystemAddress systemAddress, bool performImmediate, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority );

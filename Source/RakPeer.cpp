@@ -3018,16 +3018,65 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromGUID( const RakNetGUID 
     return 0;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteSystem, const SystemAddress& systemAddress, const char* data, int byteSize )
+// The ID_CONNECTION_REQUEST header, exactly as ProcessOfflineNetworkPacket writes it:
+//
+//     MessageID | RakNetGUID | RakNet::Time | doSecurity
+//
+// 18 bytes at minimum, with the password, if any, following. There is no
+// OFFLINE_MESSAGE_DATA_ID in it - that 16-byte cookie belongs to the offline handshake
+// messages, and a reader that skips it here lands 16 bytes past the end.
+//
+// Both readers of that layout go through this one function, so it is decoded in one
+// place rather than in two hand-written copies that can drift apart. Drifting apart is
+// exactly how the second reader came to skip a field this message has never carried, and
+// a comment asking two decoders to stay in step is not what holds them together.
+//
+// Every field is read into a local and the caller's outputs are written only once all
+// three have arrived. BitStream::ReadBits leaves its output untouched when the stream is
+// short, so an unchecked read of a truncated request leaves whatever was on the stack in
+// the destination: a timestamp the Peer would echo into ID_CONNECTION_REQUEST_ACCEPTED,
+// the flag gating the security handshake, or a guid - which this Peer happens not to use,
+// though a reader has no way to know that about its caller. Returning false having written
+// none of them is what keeps all three out of reach.
+//
+// bs is left wherever the reads got to, so a caller that gets false must not read on.
+static bool ReadConnectionRequestHeader( BitStream& bs, RakNetGUID& guid, RakNet::Time& timestamp, unsigned char& doSecurity )
+{
+    bs.IgnoreBytes( sizeof( MessageID ) );
+
+    RakNetGUID readGuid;
+    RakNet::Time readTimestamp = 0;
+    unsigned char readDoSecurity = 0;
+    if( bs.Read( readGuid ) == false ||
+        bs.Read( readTimestamp ) == false ||
+        bs.Read( readDoSecurity ) == false )
+        return false;
+
+    guid = readGuid;
+    timestamp = readTimestamp;
+    doSecurity = readDoSecurity;
+    return true;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// False means only that the header would not parse, and leaves what to do about that to
+// the caller - the two call sites are in different states and answer it differently.
+// Everything that depends on the contents of a header that did parse - a wrong password,
+// a failed security proof - is handled here and still reported as true: that is a request
+// this Peer understood and declined, not a message it could not read.
+bool RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteSystem, const SystemAddress& systemAddress, const char* data, int byteSize )
 {
     BitStream bs( (unsigned char*)data, byteSize, false );
-    bs.IgnoreBytes( sizeof( MessageID ) );
+
     RakNetGUID guid;
-    bs.Read( guid );
     RakNet::Time incomingTimestamp;
-    bs.Read( incomingTimestamp );
     unsigned char doSecurity;
-    bs.Read( doSecurity );
+    if( ReadConnectionRequestHeader( bs, guid, incomingTimestamp, doSecurity ) == false )
+        return false;
+
+    // Read to advance the stream past it, and kept in the shared layout, but not used:
+    // the System's identity is taken from ID_OPEN_CONNECTION_REQUEST_2, in
+    // AssignSystemAddressToRemoteSystemList.
+    (void)guid;
 
 #if LIBCAT_SECURITY == 1
     unsigned char doClientKey;
@@ -3035,7 +3084,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
     {
         // Ignore message on bad state
         if( doSecurity != 1 || !remoteSystem->reliabilityLayer.GetAuthenticatedEncryption() )
-            return;
+            return true;
 
         // Validate client proof of key
         unsigned char proof[cat::EasyHandshake::PROOF_BYTES];
@@ -3043,7 +3092,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
         if( !remoteSystem->reliabilityLayer.GetAuthenticatedEncryption()->ValidateProof( proof, sizeof( proof ) ) )
         {
             remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
-            return;
+            return true;
         }
 
         CAT_OBJCLR( remoteSystem->client_public_key );
@@ -3068,7 +3117,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
                     bitStream.Write( (unsigned char)2 );                                // Indicate client identity is invalid
                     SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
                     remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
-                    return;
+                    return true;
                 }
             }
 
@@ -3084,7 +3133,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
                 bitStream.Write( (unsigned char)1 );                                // Indicate client identity is missing
                 SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
                 remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
-                return;
+                return true;
             }
         }
     }
@@ -3102,13 +3151,15 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
         bitStream.Write( GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS ) );
         SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
         remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
-        return;
+        return true;
     }
 
     // OK
     remoteSystem->connectMode = RemoteSystemStruct::HANDLING_CONNECTION_REQUEST;
 
     OnConnectionRequest( remoteSystem, incomingTimestamp );
+
+    return true;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::OnConnectionRequest( RakPeer::RemoteSystemStruct* remoteSystem, RakNet::Time incomingTimestamp )
@@ -5304,9 +5355,16 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
             // For unknown senders we only accept a few specific packets
             if( remoteSystem->connectMode == RemoteSystemStruct::UNVERIFIED_SENDER )
             {
-                if( (unsigned char)( data )[0] == ID_CONNECTION_REQUEST )
+                // Nothing gates the message id here on byteSize - every other arm in this
+                // loop carries a length test and this one does not - so a one-byte
+                // ID_CONNECTION_REQUEST reaches the reader, on a fresh connection and with
+                // no race to win. It is answered here the same way every other unparseable
+                // first message is: this arm's whole job is deciding whether a System that
+                // has not proved anything yet is talking sense, and a request whose header
+                // is short is not. A conforming System never sends one.
+                if( (unsigned char)( data )[0] == ID_CONNECTION_REQUEST &&
+                    ParseConnectionRequestPacket( remoteSystem, systemAddress, (const char*)data, byteSize ) )
                 {
-                    ParseConnectionRequestPacket( remoteSystem, systemAddress, (const char*)data, byteSize );
                     rakFree_Ex( data, _FILE_AND_LINE_ );
                 }
                 else
@@ -5338,26 +5396,22 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                     }
                     else
                     {
-                        // MessageID | RakNetGUID | RakNet::Time | doSecurity - the layout
-                        // ProcessOfflineNetworkPacket writes and ParseConnectionRequestPacket
-                        // reads, 18 bytes at minimum. There is no OFFLINE_MESSAGE_DATA_ID in
-                        // it: that 16-byte cookie belongs to the offline handshake messages,
-                        // and skipping it here put the timestamp read 16 bytes past the end of
-                        // the message.
+                        // The layout lives in ReadConnectionRequestHeader, which is the only
+                        // decode of it; this reader wants the timestamp alone, but takes all
+                        // three so that there is nowhere for the two readers to disagree. It
+                        // used to skip a 16-byte OFFLINE_MESSAGE_DATA_ID that this message has
+                        // never carried, which put the timestamp read past the end of it.
+                        //
+                        // Nothing is echoed unless the read filled it: what goes out below is
+                        // read back by the requester as its own send-ping time and handed to
+                        // OnConnectedPong, so stack contents here poison that connection's ping
+                        // table and clock differential for the rest of its life. A conforming
+                        // System never sends a short one, so declining to reply costs nothing.
                         BitStream bs( (unsigned char*)data, byteSize, false );
-                        bs.IgnoreBytes( sizeof( MessageID ) );
-                        bs.IgnoreBytes( RakNetGUID::size() );
-
-                        // Initialised, and echoed only when the read actually filled it.
-                        // BitStream::ReadBits leaves its output untouched when the stream is
-                        // short, so an unchecked read of a truncated ID_CONNECTION_REQUEST put
-                        // stack contents into the ID_CONNECTION_REQUEST_ACCEPTED below - which
-                        // the requester reads back as its own send-ping time and feeds to
-                        // OnConnectedPong, poisoning that connection's ping table and clock
-                        // differential for the rest of its life. A conforming System never
-                        // sends a short one, so declining to reply costs nothing.
+                        RakNetGUID unusedGuid;
                         RakNet::Time incomingTimestamp = 0;
-                        if( bs.Read( incomingTimestamp ) )
+                        unsigned char unusedDoSecurity = 0;
+                        if( ReadConnectionRequestHeader( bs, unusedGuid, incomingTimestamp, unusedDoSecurity ) )
                         {
                             // Got a connection request message from someone we are already connected to. Just reply normally.
                             // This can happen due to race conditions with the fully connected mesh

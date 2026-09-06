@@ -75,6 +75,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SplitPacketReassemblyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressAndGuidTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressToStringTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TruncatedConnectionRequestTest.cpp
 )
 
 # Support code shared by the tests.
