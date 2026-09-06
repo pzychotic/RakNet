@@ -3066,7 +3066,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
                     BitStream bitStream;
                     bitStream.Write( (MessageID)ID_REMOTE_SYSTEM_REQUIRES_PUBLIC_KEY ); // Report an error since the client is not providing an identity when it is necessary to connect
                     bitStream.Write( (unsigned char)2 );                                // Indicate client identity is invalid
-                    SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBytesUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
+                    SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
                     remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
                     return;
                 }
@@ -3082,7 +3082,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
                 BitStream bitStream;
                 bitStream.Write( (MessageID)ID_REMOTE_SYSTEM_REQUIRES_PUBLIC_KEY ); // Report an error since the client is not providing an identity when it is necessary to connect
                 bitStream.Write( (unsigned char)1 );                                // Indicate client identity is missing
-                SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBytesUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
+                SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
                 remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
                 return;
             }
@@ -3100,7 +3100,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
         BitStream bitStream;
         bitStream.Write( (MessageID)ID_INVALID_PASSWORD );
         bitStream.Write( GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS ) );
-        SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBytesUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
+        SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, RELIABLE, 0, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
         remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
         return;
     }
