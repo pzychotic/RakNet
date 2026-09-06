@@ -362,6 +362,13 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             SystemAddress failedSystemAddress = s->systemAddress;
             RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
 
+            // No thread was started, so nothing will ever clear the slot claimed above.
+            // Released before the failure is pushed, so the slot is free by the time the
+            // application can observe the failure and retry.
+            remoteClients[newRemoteClientIndex].isActiveMutex.lock();
+            remoteClients[newRemoteClientIndex].SetActive( false );
+            remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
+
             failedConnectionAttemptMutex.lock();
             failedConnectionAttempts.push_back( failedSystemAddress );
             failedConnectionAttemptMutex.unlock();
