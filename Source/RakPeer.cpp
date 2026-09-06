@@ -4162,7 +4162,10 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             if( serverHasSecurity )
                 bsOut.Write( cookie );
 
-            rakPeer->requestedConnectionQueueMutex.lock();
+            // Scoped, because one of the LIBCAT_SECURITY error paths below returns without
+            // reaching an unlock(). Those paths are reviewed by reading only: LIBCAT_SECURITY
+            // has never compiled in this fork, so none of this has been compiled or run.
+            std::unique_lock<std::mutex> queueLock( rakPeer->requestedConnectionQueueMutex );
             for( RakPeer::RequestedConnectionStruct* rcs : rakPeer->requestedConnectionQueue )
             {
                 if( rcs->systemAddress == systemAddress )
@@ -4188,7 +4191,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                                               rcs->remote_public_key,
                                               cat::EasyHandshake::PUBLIC_KEY_BYTES ) == false )
                         {
-                            rakPeer->requestedConnectionQueueMutex.unlock();
+                            queueLock.unlock();
                             CAT_AUDIT_PRINTF( "AUDIT: Expected public key does not match what was sent by server -- Reporting back ID_PUBLIC_KEY_MISMATCH to user\n" );
 
                             Packet* packet = rakPeer->AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
@@ -4225,7 +4228,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
 #if LIBCAT_SECURITY == 1
                         if( rcs->client_handshake != 0 )
                         {
-                            rakPeer->requestedConnectionQueueMutex.unlock();
+                            queueLock.unlock();
                             CAT_AUDIT_PRINTF( "AUDIT: Security disabled by server but we expected security (indicated by client_handshake not null) so failing!\n" );
 
                             Packet* packet = rakPeer->AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
@@ -4244,7 +4247,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
 
                     // Binding address
                     bsOut.Write( rcs->systemAddress );
-                    rakPeer->requestedConnectionQueueMutex.unlock();
+                    queueLock.unlock();
                     // MTU
                     bsOut.Write( mtu );
                     // Our guid
@@ -4264,7 +4267,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     return true;
                 }
             }
-            rakPeer->requestedConnectionQueueMutex.unlock();
         }
         else if( (unsigned char)( data )[0] == (MessageID)ID_OPEN_CONNECTION_REPLY_2 )
         {
@@ -4299,8 +4301,8 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             cat::ClientEasyHandshake* client_handshake = 0;
 #endif // LIBCAT_SECURITY
 
-            bool unlock = true;
-            rakPeer->requestedConnectionQueueMutex.lock();
+            // Scoped, as in the ID_OPEN_CONNECTION_REPLY_1 handler above, and likewise unverified.
+            std::unique_lock<std::mutex> queueLock( rakPeer->requestedConnectionQueueMutex );
             for( RakPeer::RequestedConnectionStruct* rcs : rakPeer->requestedConnectionQueue )
             {
                 if( rcs->systemAddress == systemAddress )
@@ -4312,7 +4314,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                         if( rcs->client_handshake == 0 )
                         {
                             CAT_AUDIT_PRINTF( "AUDIT: Server wants security but we didn't set a public key -- Reporting back ID_REMOTE_SYSTEM_REQUIRES_PUBLIC_KEY to user\n" );
-                            rakPeer->requestedConnectionQueueMutex.unlock();
+                            queueLock.unlock();
 
                             Packet* packet = rakPeer->AllocPacket( 2, _FILE_AND_LINE_ );
                             packet->data[0] = ID_REMOTE_SYSTEM_REQUIRES_PUBLIC_KEY; // Attempted a connection and couldn't
@@ -4329,8 +4331,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
 
 #endif // LIBCAT_SECURITY
 
-                    rakPeer->requestedConnectionQueueMutex.unlock();
-                    unlock = false;
+                    queueLock.unlock();
 
                     RakAssert( rcs->actionToTake == RakPeer::RequestedConnectionStruct::CONNECT );
                     // You might get this when already connected because of cross-connections
@@ -4368,7 +4369,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                                     if( !rcs->client_handshake->ProcessAnswerWithIdentity( answer, ident, remoteSystem->reliabilityLayer.GetAuthenticatedEncryption() ) )
                                     {
                                         CAT_AUDIT_PRINTF( "AUDIT: Processing answer -- Invalid Answer\n" );
-                                        rakPeer->requestedConnectionQueueMutex.unlock();
 
                                         return true;
                                     }
@@ -4380,7 +4380,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                                     if( !rcs->client_handshake->ProcessAnswer( answer, remoteSystem->reliabilityLayer.GetAuthenticatedEncryption() ) )
                                     {
                                         CAT_AUDIT_PRINTF( "AUDIT: Processing answer -- Invalid Answer\n" );
-                                        rakPeer->requestedConnectionQueueMutex.unlock();
 
                                         return true;
                                     }
@@ -4439,7 +4438,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                         }
                     }
 
-                    rakPeer->requestedConnectionQueueMutex.lock();
+                    queueLock.lock();
                     for( auto it = rakPeer->requestedConnectionQueue.begin(); it != rakPeer->requestedConnectionQueue.end(); ++it )
                     {
                         if( (*it)->systemAddress == systemAddress )
@@ -4448,7 +4447,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                             break;
                         }
                     }
-                    rakPeer->requestedConnectionQueueMutex.unlock();
+                    queueLock.unlock();
 
 #if LIBCAT_SECURITY == 1
                     CAT_AUDIT_PRINTF( "AUDIT: Deleting client_handshake object %p and rcs->client_handshake object %p\n", (void*)client_handshake, (void*)rcs->client_handshake );
@@ -4460,9 +4459,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     break;
                 }
             }
-
-            if( unlock )
-                rakPeer->requestedConnectionQueueMutex.unlock();
 
             return true;
         }
