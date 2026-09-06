@@ -647,15 +647,24 @@ void TCPInterface::CloseConnection( SystemAddress systemAddress )
     }
     else
     {
+        // Reached when systemIndex does not name the connection - it is stale, unset, or
+        // out of range - so nothing in here may index with it. The entry to close is the
+        // one this loop matches, i, which is in range by construction.
         for( int i = 0; i < remoteClientsLength; i++ )
         {
-            // Not ReleaseRemoteClient: this clears an entry other than the one it locked,
-            // which is a defect of its own rather than something to settle inside a
-            // refactor. Left as it stands so the change here moves no behaviour.
-            std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
-            if( remoteClients[i].isActive && remoteClients[i].systemAddress == systemAddress )
+            bool isMatch;
             {
-                remoteClients[systemAddress.systemIndex].SetActive( false );
+                std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
+                isMatch = remoteClients[i].isActive && remoteClients[i].systemAddress == systemAddress;
+            }
+
+            // The lock is dropped before ReleaseRemoteClient, which takes the same one.
+            // Anything that frees the entry in between only makes SetActive( false )
+            // redundant, and the fast path above compares an entry's address with no lock
+            // at all, so this window is the narrower of the two already here.
+            if( isMatch )
+            {
+                ReleaseRemoteClient( i );
                 break;
             }
         }
