@@ -183,6 +183,83 @@ protected:
         unsigned short socketFamily;
     };
 
+    /// The one lock / SetActive( false ) / unlock that frees the entry at \a index. Called
+    /// by RemoteClientSlot, by the connect thread and the update loop - which release a
+    /// slot claimed elsewhere and so hold an index rather than a handle - and by
+    /// CloseConnection.
+    void ReleaseRemoteClient( int index );
+
+    /// \internal
+    /// \brief A scoped claim on one remoteClients entry.
+    ///
+    /// Construction is the one walk of the array that finds a free entry, and it leaves
+    /// that entry's isActiveMutex held. Unless the claim is committed, the destructor
+    /// gives the entry back, which is what makes a claimed-but-never-handed-on slot
+    /// unrepresentable rather than something each claiming site has to remember not to
+    /// leak.
+    ///
+    /// There are two ways to fill the entry in, and the handle supports both because its
+    /// two callers genuinely differ:
+    ///
+    /// - Publish first: write .socket and .systemAddress through Get() while the handle
+    ///   still holds the lock, then Activate(). The entry is never visible as active with
+    ///   its address unset. This is what the accept path in UpdateTCPInterfaceLoop wants.
+    /// - Activate first: call Activate() straight away and fill the entry in afterwards.
+    ///   Connect has to do this, because what it fills the entry in from is a connect that
+    ///   can block for as long as the network takes, and the update loop takes every
+    ///   entry's isActiveMutex on each pass - holding one across a connect would stall the
+    ///   whole interface. It is safe because the select loop skips an active entry whose
+    ///   socket is still 0; see the socketCopy != 0 check in UpdateTCPInterfaceLoop.
+    class RemoteClientSlot
+    {
+    public:
+        /// Claims \a owner's first free entry, or nothing at all if the table is full.
+        explicit RemoteClientSlot( TCPInterface& owner );
+
+        /// Gives the entry back unless the claim was committed.
+        ~RemoteClientSlot();
+
+        RemoteClientSlot( const RemoteClientSlot& ) = delete;
+        RemoteClientSlot& operator=( const RemoteClientSlot& ) = delete;
+
+        /// Whether this handle holds an entry. False is the "table is full" answer,
+        /// carried by the handle rather than by a loop counter's terminal value, and it is
+        /// also what a released handle reports. Nothing below may be called when it is
+        /// false; a committed handle still reports true, because the entry it names goes
+        /// on being the caller's to read.
+        bool IsClaimed( void ) const;
+
+        /// Index of the held entry, which is what SystemAddress::systemIndex carries.
+        int GetIndex( void ) const;
+
+        /// The held entry. Before Activate() this handle holds its isActiveMutex, so
+        /// writes made through here are published before the entry becomes active.
+        RemoteClient& Get( void ) const;
+
+        /// Marks the entry active and drops its lock.
+        void Activate( void );
+
+        /// Gives the entry back now rather than at the end of the scope, for callers that
+        /// want the slot free before they publish a failure the application can retry on.
+        /// The handle holds nothing afterwards.
+        void Release( void );
+
+        /// Hands the claim on: the entry stays active past this scope, and whoever it was
+        /// handed to is the one that releases it. Only valid after Activate().
+        void Commit( void );
+
+    private:
+        TCPInterface& tcpInterface;
+        std::unique_lock<std::mutex> entryLock;
+
+        /// remoteClientsLength when this handle holds no entry.
+        int index;
+        bool isActivated;
+
+        /// Whether this handle is still the one that owes the entry a release.
+        bool isReleasePending;
+    };
+
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     SSL_CTX* ctx;
     SSL_METHOD* meth;

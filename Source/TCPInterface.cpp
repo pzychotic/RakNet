@@ -280,6 +280,87 @@ void TCPInterface::Stop( void )
     activeSSLConnections.clear();
 #endif
 }
+void TCPInterface::ReleaseRemoteClient( int index )
+{
+    std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
+    remoteClients[index].SetActive( false );
+}
+TCPInterface::RemoteClientSlot::RemoteClientSlot( TCPInterface& owner )
+: tcpInterface( owner )
+, index( owner.remoteClientsLength )
+, isActivated( false )
+, isReleasePending( false )
+{
+    for( int i = 0; i < owner.remoteClientsLength; i++ )
+    {
+        std::unique_lock<std::mutex> lock( owner.remoteClients[i].isActiveMutex );
+        if( owner.remoteClients[i].isActive == false )
+        {
+            // Keeps the entry's lock, so nothing else can claim it and the caller's writes
+            // land before Activate() publishes it. index stops being remoteClientsLength
+            // here, which is what IsClaimed reads.
+            entryLock = std::move( lock );
+            index = i;
+            isReleasePending = true;
+            return;
+        }
+    }
+}
+TCPInterface::RemoteClientSlot::~RemoteClientSlot()
+{
+    Release();
+}
+bool TCPInterface::RemoteClientSlot::IsClaimed( void ) const
+{
+    return index != tcpInterface.remoteClientsLength;
+}
+int TCPInterface::RemoteClientSlot::GetIndex( void ) const
+{
+    RakAssert( IsClaimed() );
+    return index;
+}
+RemoteClient& TCPInterface::RemoteClientSlot::Get( void ) const
+{
+    RakAssert( IsClaimed() );
+    return tcpInterface.remoteClients[index];
+}
+void TCPInterface::RemoteClientSlot::Activate( void )
+{
+    RakAssert( isReleasePending && isActivated == false );
+    tcpInterface.remoteClients[index].SetActive( true );
+    isActivated = true;
+    entryLock.unlock();
+}
+void TCPInterface::RemoteClientSlot::Release( void )
+{
+    if( isReleasePending == false )
+        return;
+
+    isReleasePending = false;
+
+    if( isActivated )
+    {
+        // Active and unlocked, so giving it back means taking the lock again.
+        tcpInterface.ReleaseRemoteClient( index );
+    }
+    else
+    {
+        // Never published as active, so dropping the lock is the whole of the release.
+        entryLock.unlock();
+    }
+
+    // The entry is anyone's again, so this handle no longer names it: IsClaimed goes
+    // false, and Get and GetIndex stop handing out a reference to a slot already given up.
+    index = tcpInterface.remoteClientsLength;
+}
+void TCPInterface::RemoteClientSlot::Commit( void )
+{
+    // Committing before Activate() would hand on an entry that is not active and leave its
+    // lock held for good, so it is a caller error rather than a state to recover from. The
+    // index is kept: the caller goes on reading the entry it just handed on.
+    RakAssert( isActivated );
+    isReleasePending = false;
+}
 SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort, bool block, unsigned short socketFamily, const char* bindAddress )
 {
     if( threadRunning == 0 )
@@ -289,28 +370,22 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     // limit; the blocking arm passes the pointer straight through and has none. Enforcing
     // the smaller of the two here gives Connect one contract rather than one per arm, and
     // rejecting is the honest answer: truncating would bind to an address the caller never
-    // asked for. Ahead of the slot loop, so a rejected call claims no remoteClients slot.
+    // asked for. Ahead of the slot claim, so a rejected call claims no remoteClients slot.
     if( bindAddress != 0 && strlen( bindAddress ) > MAXIMUM_BIND_ADDRESS_LENGTH )
         return UNASSIGNED_SYSTEM_ADDRESS;
 
-    // The loop has two exits: break with a slot claimed, or fall through with the counter
-    // equal to remoteClientsLength. That second value is the "table is full" answer, and it
-    // is one past the end of the array, so it has to be caught before anything indexes with
-    // it - both here and on the connect thread the non-blocking arm hands it to. The
-    // initialiser is that same "nothing found" value, so the guard still holds if an edit
-    // ever puts an exit between here and the loop.
-    int newRemoteClientIndex = remoteClientsLength;
-    for( newRemoteClientIndex = 0; newRemoteClientIndex < remoteClientsLength; newRemoteClientIndex++ )
-    {
-        std::lock_guard<std::mutex> guard( remoteClients[newRemoteClientIndex].isActiveMutex );
-        if( remoteClients[newRemoteClientIndex].isActive == false )
-        {
-            remoteClients[newRemoteClientIndex].SetActive( true );
-            break;
-        }
-    }
-    if( newRemoteClientIndex == remoteClientsLength )
+    // "Table is full" is the handle's answer rather than a loop counter left one past the
+    // end of the array, so there is no out-of-range index here to guard against indexing
+    // with. Connect is the handle's activate-first caller: what fills the entry in is a
+    // connect that can block, and holding the entry's lock across that would stall the
+    // update loop, so the entry goes active now and is filled in below.
+    RemoteClientSlot slot( *this );
+    if( slot.IsClaimed() == false )
         return UNASSIGNED_SYSTEM_ADDRESS;
+
+    slot.Activate();
+    const int newRemoteClientIndex = slot.GetIndex();
+    RemoteClient& newRemoteClient = slot.Get();
 
     if( block )
     {
@@ -324,9 +399,9 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         __TCPSOCKET__ sockfd = SocketConnect( buffout, remotePort, socketFamily, bindAddress );
         if( sockfd == 0 )
         {
-            remoteClients[newRemoteClientIndex].isActiveMutex.lock();
-            remoteClients[newRemoteClientIndex].SetActive( false );
-            remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
+            // Released here rather than left to the end of the scope, so the slot is free
+            // by the time the application can observe the failure and retry.
+            slot.Release();
 
             failedConnectionAttemptMutex.lock();
             failedConnectionAttempts.push_back( systemAddress );
@@ -335,14 +410,18 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             return UNASSIGNED_SYSTEM_ADDRESS;
         }
 
-        remoteClients[newRemoteClientIndex].socket = sockfd;
-        remoteClients[newRemoteClientIndex].systemAddress = systemAddress;
+        newRemoteClient.socket = sockfd;
+        newRemoteClient.systemAddress = systemAddress;
+
+        // The connection is live and the entry is the caller's until CloseConnection or
+        // the update loop gives it back.
+        slot.Commit();
 
         completedConnectionAttemptMutex.lock();
-        completedConnectionAttempts.push_back( remoteClients[newRemoteClientIndex].systemAddress );
+        completedConnectionAttempts.push_back( newRemoteClient.systemAddress );
         completedConnectionAttemptMutex.unlock();
 
-        return remoteClients[newRemoteClientIndex].systemAddress;
+        return newRemoteClient.systemAddress;
     }
     else
     {
@@ -368,16 +447,20 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             SystemAddress failedSystemAddress = s->systemAddress;
             RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
 
-            // No thread was started, so nothing will ever clear the slot claimed above.
-            // Released before the failure is pushed, so the slot is free by the time the
+            // No thread was started, so nothing else will ever clear the slot. Released
+            // before the failure is pushed, so the slot is free by the time the
             // application can observe the failure and retry.
-            remoteClients[newRemoteClientIndex].isActiveMutex.lock();
-            remoteClients[newRemoteClientIndex].SetActive( false );
-            remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
+            slot.Release();
 
             failedConnectionAttemptMutex.lock();
             failedConnectionAttempts.push_back( failedSystemAddress );
             failedConnectionAttemptMutex.unlock();
+        }
+        else
+        {
+            // The connect thread owns the slot now, and gives it back itself if the
+            // connection fails.
+            slot.Commit();
         }
         return UNASSIGNED_SYSTEM_ADDRESS;
     }
@@ -560,13 +643,15 @@ void TCPInterface::CloseConnection( SystemAddress systemAddress )
 
     if( systemAddress.systemIndex < remoteClientsLength && remoteClients[systemAddress.systemIndex].systemAddress == systemAddress )
     {
-        std::lock_guard<std::mutex> guard( remoteClients[systemAddress.systemIndex].isActiveMutex );
-        remoteClients[systemAddress.systemIndex].SetActive( false );
+        ReleaseRemoteClient( systemAddress.systemIndex );
     }
     else
     {
         for( int i = 0; i < remoteClientsLength; i++ )
         {
+            // Not ReleaseRemoteClient: this clears an entry other than the one it locked,
+            // which is a defect of its own rather than something to settle inside a
+            // refactor. Left as it stands so the change here moves no behaviour.
             std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
             if( remoteClients[i].isActive && remoteClients[i].systemAddress == systemAddress )
             {
@@ -862,9 +947,7 @@ void ConnectionAttemptLoop( void* arg )
     __TCPSOCKET__ sockfd = tcpInterface->SocketConnect( str1, systemAddress.GetPort(), socketFamily, bindAddress );
     if( sockfd == 0 )
     {
-        tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.lock();
-        tcpInterface->remoteClients[newRemoteClientIndex].SetActive( false );
-        tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
+        tcpInterface->ReleaseRemoteClient( newRemoteClientIndex );
 
         tcpInterface->failedConnectionAttemptMutex.lock();
         tcpInterface->failedConnectionAttempts.push_back( systemAddress );
@@ -996,47 +1079,45 @@ void UpdateTCPInterfaceLoop( void* arg )
 
                 if( newSock != 0 )
                 {
-                    // As in Connect: the loop falls through with the counter at
-                    // remoteClientsLength when every slot is taken, and that is the value
-                    // the guard below has to test, and the value it starts from.
-                    int newRemoteClientIndex = sts->remoteClientsLength;
-                    for( newRemoteClientIndex = 0; newRemoteClientIndex < sts->remoteClientsLength; newRemoteClientIndex++ )
+                    // "Table is full" is the handle's answer, so there is no index one past
+                    // the end of the array in play here. The writes below happen while the
+                    // handle still holds the entry's lock, so the entry is never visible as
+                    // active with its socket and address unset - the ordering the old
+                    // hand-rolled lock/unlock had, kept rather than argued about.
+                    TCPInterface::RemoteClientSlot slot( *sts );
+                    if( slot.IsClaimed() )
                     {
-                        sts->remoteClients[newRemoteClientIndex].isActiveMutex.lock();
-                        if( sts->remoteClients[newRemoteClientIndex].isActive == false )
-                        {
-                            sts->remoteClients[newRemoteClientIndex].socket = newSock;
+                        RemoteClient& newRemoteClient = slot.Get();
+                        newRemoteClient.socket = newSock;
 
 #if RAKNET_SUPPORT_IPV6 != 1
-                            sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_addr.s_addr = sockAddr.sin_addr.s_addr;
-                            sts->remoteClients[newRemoteClientIndex].systemAddress.SetPortNetworkOrder( sockAddr.sin_port );
-                            sts->remoteClients[newRemoteClientIndex].systemAddress.systemIndex = newRemoteClientIndex;
+                        newRemoteClient.systemAddress.address.addr4.sin_addr.s_addr = sockAddr.sin_addr.s_addr;
+                        newRemoteClient.systemAddress.SetPortNetworkOrder( sockAddr.sin_port );
+                        newRemoteClient.systemAddress.systemIndex = (SystemIndex)slot.GetIndex();
 #else
-                            if( sockAddr.ss_family == AF_INET )
-                            {
-                                memcpy( &sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4, (sockaddr_in*)&sockAddr, sizeof( sockaddr_in ) );
-                                //  sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_port=ntohs( sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr4.sin_port );
-                            }
-                            else
-                            {
-                                memcpy( &sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6, (sockaddr_in6*)&sockAddr, sizeof( sockaddr_in6 ) );
-                                //  sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6.sin6_port=ntohs( sts->remoteClients[newRemoteClientIndex].systemAddress.address.addr6.sin6_port );
-                            }
+                        if( sockAddr.ss_family == AF_INET )
+                        {
+                            memcpy( &newRemoteClient.systemAddress.address.addr4, (sockaddr_in*)&sockAddr, sizeof( sockaddr_in ) );
+                            //  newRemoteClient.systemAddress.address.addr4.sin_port=ntohs( newRemoteClient.systemAddress.address.addr4.sin_port );
+                        }
+                        else
+                        {
+                            memcpy( &newRemoteClient.systemAddress.address.addr6, (sockaddr_in6*)&sockAddr, sizeof( sockaddr_in6 ) );
+                            //  newRemoteClient.systemAddress.address.addr6.sin6_port=ntohs( newRemoteClient.systemAddress.address.addr6.sin6_port );
+                        }
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
-                            sts->remoteClients[newRemoteClientIndex].SetActive( true );
-                            sts->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
+                        slot.Activate();
 
+                        // The entry belongs to the connection now; this loop gives it back
+                        // when the connection is lost, not when this scope ends.
+                        slot.Commit();
 
-                            SystemAddress* newConnectionSystemAddress = sts->newIncomingConnections.Allocate( _FILE_AND_LINE_ );
-                            *newConnectionSystemAddress = sts->remoteClients[newRemoteClientIndex].systemAddress;
-                            sts->newIncomingConnections.Push( newConnectionSystemAddress );
-
-                            break;
-                        }
-                        sts->remoteClients[newRemoteClientIndex].isActiveMutex.unlock();
+                        SystemAddress* newConnectionSystemAddress = sts->newIncomingConnections.Allocate( _FILE_AND_LINE_ );
+                        *newConnectionSystemAddress = newRemoteClient.systemAddress;
+                        sts->newIncomingConnections.Push( newConnectionSystemAddress );
                     }
-                    if( newRemoteClientIndex == sts->remoteClientsLength )
+                    else
                     {
                         // Nowhere to put it. Close the connection we just accepted, not the
                         // listen socket: the interface has to go on accepting, so that a
@@ -1096,8 +1177,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                         SystemAddress* lostConnectionSystemAddress = sts->lostConnections.Allocate( _FILE_AND_LINE_ );
                         *lostConnectionSystemAddress = sts->remoteClients[i].systemAddress;
                         sts->lostConnections.Push( lostConnectionSystemAddress );
-                        std::lock_guard<std::mutex> guard( sts->remoteClients[i].isActiveMutex );
-                        sts->remoteClients[i].SetActive( false );
+                        sts->ReleaseRemoteClient( i );
                     }
                     else
                     {
@@ -1135,8 +1215,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                                 SystemAddress* lostConnectionSystemAddress = sts->lostConnections.Allocate( _FILE_AND_LINE_ );
                                 *lostConnectionSystemAddress = sts->remoteClients[i].systemAddress;
                                 sts->lostConnections.Push( lostConnectionSystemAddress );
-                                std::lock_guard<std::mutex> guard( sts->remoteClients[i].isActiveMutex );
-                                sts->remoteClients[i].SetActive( false );
+                                sts->ReleaseRemoteClient( i );
                                 continue;
                             }
                         }
