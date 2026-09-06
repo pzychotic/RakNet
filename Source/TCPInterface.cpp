@@ -285,6 +285,14 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     if( threadRunning == 0 )
         return UNASSIGNED_SYSTEM_ADDRESS;
 
+    // The non-blocking arm copies bindAddress into a fixed array, so it has a hard length
+    // limit; the blocking arm passes the pointer straight through and has none. Enforcing
+    // the smaller of the two here gives Connect one contract rather than one per arm, and
+    // rejecting is the honest answer: truncating would bind to an address the caller never
+    // asked for. Ahead of the slot loop, so a rejected call claims no remoteClients slot.
+    if( bindAddress != 0 && strlen( bindAddress ) > MAXIMUM_BIND_ADDRESS_LENGTH )
+        return UNASSIGNED_SYSTEM_ADDRESS;
+
     int newRemoteClientIndex = -1;
     for( newRemoteClientIndex = 0; newRemoteClientIndex < remoteClientsLength; newRemoteClientIndex++ )
     {
@@ -335,6 +343,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         ThisPtrPlusSysAddr* s = RakNet::OP_NEW<ThisPtrPlusSysAddr>( _FILE_AND_LINE_ );
         s->systemAddress.FromStringExplicitPort( host, remotePort );
         s->systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
+        // Bounded by the length check at the top of Connect.
         if( bindAddress )
             strcpy( s->bindAddress, bindAddress );
         else
@@ -829,7 +838,9 @@ void ConnectionAttemptLoop( void* arg )
     TCPInterface* tcpInterface = s->tcpInterface;
     int newRemoteClientIndex = systemAddress.systemIndex;
     unsigned short socketFamily = s->socketFamily;
-    char bindAddress[64];
+    // Sized from the source array rather than repeating its extent, and that array was
+    // bounded by Connect before the thread was started, so this copy cannot overrun.
+    char bindAddress[sizeof( s->bindAddress )];
     strcpy( bindAddress, s->bindAddress );
     RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
 

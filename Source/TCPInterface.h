@@ -55,6 +55,11 @@ public:
     TCPInterface();
     virtual ~TCPInterface();
 
+    /// Longest bindAddress Connect() will take, not counting the terminator. The array it is
+    /// copied into is sized from this, so the two cannot drift apart; public because it is
+    /// part of Connect()'s contract and callers have no other way to see the array.
+    static constexpr size_t MAXIMUM_BIND_ADDRESS_LENGTH = 63;
+
     // TODO - add socketdescriptor
     /// Starts the TCP server on the indicated port
     /// \param[in] port Which port to listen on.
@@ -68,6 +73,9 @@ public:
     void Stop( void );
 
     /// Connect to the specified host on the specified port
+    /// \param[in] bindAddress Local address to bind to, or 0 for none. At most
+    /// MAXIMUM_BIND_ADDRESS_LENGTH characters: a longer one is rejected with
+    /// UNASSIGNED_SYSTEM_ADDRESS rather than truncated.
     SystemAddress Connect( const char* host, unsigned short remotePort, bool block = true, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
@@ -171,7 +179,7 @@ protected:
         TCPInterface* tcpInterface;
         SystemAddress systemAddress;
         bool useSSL;
-        char bindAddress[64];
+        char bindAddress[MAXIMUM_BIND_ADDRESS_LENGTH + 1];
         unsigned short socketFamily;
     };
 
