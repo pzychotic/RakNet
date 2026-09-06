@@ -5297,17 +5297,31 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
                     }
                     else
                     {
-
+                        // MessageID | RakNetGUID | RakNet::Time | doSecurity - the layout
+                        // ProcessOfflineNetworkPacket writes and ParseConnectionRequestPacket
+                        // reads, 18 bytes at minimum. There is no OFFLINE_MESSAGE_DATA_ID in
+                        // it: that 16-byte cookie belongs to the offline handshake messages,
+                        // and skipping it here put the timestamp read 16 bytes past the end of
+                        // the message.
                         BitStream bs( (unsigned char*)data, byteSize, false );
                         bs.IgnoreBytes( sizeof( MessageID ) );
-                        bs.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
                         bs.IgnoreBytes( RakNetGUID::size() );
-                        RakNet::Time incomingTimestamp;
-                        bs.Read( incomingTimestamp );
 
-                        // Got a connection request message from someone we are already connected to. Just reply normally.
-                        // This can happen due to race conditions with the fully connected mesh
-                        OnConnectionRequest( remoteSystem, incomingTimestamp );
+                        // Initialised, and echoed only when the read actually filled it.
+                        // BitStream::ReadBits leaves its output untouched when the stream is
+                        // short, so an unchecked read of a truncated ID_CONNECTION_REQUEST put
+                        // stack contents into the ID_CONNECTION_REQUEST_ACCEPTED below - which
+                        // the requester reads back as its own send-ping time and feeds to
+                        // OnConnectedPong, poisoning that connection's ping table and clock
+                        // differential for the rest of its life. A conforming System never
+                        // sends a short one, so declining to reply costs nothing.
+                        RakNet::Time incomingTimestamp = 0;
+                        if( bs.Read( incomingTimestamp ) )
+                        {
+                            // Got a connection request message from someone we are already connected to. Just reply normally.
+                            // This can happen due to race conditions with the fully connected mesh
+                            OnConnectionRequest( remoteSystem, incomingTimestamp );
+                        }
                     }
                     rakFree_Ex( data, _FILE_AND_LINE_ );
                 }

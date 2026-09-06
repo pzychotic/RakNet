@@ -1239,12 +1239,14 @@ total 7 bytes
 These are places where the code in this tree is self-inconsistent, dead, or where behaviour could not be
 pinned down from the source alone.
 
-1. **`ID_CONNECTION_REQUEST` is parsed two different ways.**
+1. **`ID_CONNECTION_REQUEST` was parsed two different ways — fixed in this fork.**
    `ParseConnectionRequestPacket` reads `MessageID | GUID | Time | doSecurity`
-   ([RakPeer.cpp:2990](Source/RakPeer.cpp:2990)), matching the writer. But the "already connected, reply
-   anyway" path reads `MessageID | OFFLINE_MESSAGE_DATA_ID | GUID | Time`
-   ([RakPeer.cpp:5297](Source/RakPeer.cpp:5297)) — 16 bytes too far. The timestamp echoed back in that
-   case is garbage. This matches upstream RakNet 4.081; it is not a regression in this tree.
+   ([RakPeer.cpp:2990](Source/RakPeer.cpp:2990)), matching the writer. The "already connected, reply
+   anyway" path used to read `MessageID | OFFLINE_MESSAGE_DATA_ID | GUID | Time` — 16 bytes too far,
+   so the read failed, and since `ReadBits` does not write its output on failure the timestamp echoed
+   back was uninitialised stack contents. Both paths now read the same layout, and the reply is sent
+   only when the timestamp was actually read. Upstream RakNet 4.081 still has the two readers; the
+   wire format is unchanged either way, since only the *value* echoed differs.
 2. **`GetDataHeaderByteLength()` returns 9 for a 4-byte header** — see §4.5. Harmless but wasteful.
 3. **`RangeList::Serialize` can loop forever in principle.** `SendACKs` loops
    `while (acknowlegements.Size() > 0)`; if `maxBits` were ever too small for a single range,
