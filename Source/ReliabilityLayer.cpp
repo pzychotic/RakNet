@@ -345,6 +345,7 @@ void ReliabilityLayer::InitializeVariables( void )
     lastUpdateTime = RakNet::GetTimeUS();
     bandwidthExceededStatistic = false;
     remoteSystemTime = 0;
+    splitMessageProgressInterval = 0;
     unreliableTimeout = 0;
     lastBpsClear = 0;
 
@@ -2068,7 +2069,12 @@ void ReliabilityLayer::ApplyNetworkSimulator( double _packetloss, RakNet::TimeMS
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::SetSplitMessageProgressInterval( int interval )
 {
-    splitMessageProgressInterval = interval;
+    // The interval arrives straight from the public API, which documents 0 as "never
+    // report progress" but does not say what a negative means. In InsertIntoSplitPacketList
+    // it is the right-hand side of a % whose left-hand side is unsigned, so a negative one
+    // is converted to a huge divisor and quietly behaves as "never" already. Storing it as
+    // 0 makes that the guard's decision rather than an accident of the conversion.
+    splitMessageProgressInterval = interval > 0 ? interval : 0;
 }
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::SetUnreliableTimeout( RakNet::TimeMS timeoutMS )

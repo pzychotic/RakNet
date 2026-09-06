@@ -26,10 +26,15 @@ chunk to arrive under a given splitPacketId, and nothing checks that later chunk
 with it - so two datagrams that each pass every parse gate, and are each under the cap,
 put the write in SortedSplittedPackets::Add far past the end of that channel's array.
 
-The last pins the other half of the memory story: a channel whose remaining chunks never
+A sixth pins the other half of the memory story: a channel whose remaining chunks never
 arrive is reaped on a timer rather than held until the connection resets, for every
 reliability level - a sweep conditional on reliability is evaded by marking the chunks
 RELIABLE.
+
+The last pins ID_DOWNLOAD_PROGRESS, which is the one thing a *partial* split message may
+put in front of the user. splitMessageProgressInterval is both the guard for that block
+and the divisor inside it, so whether it is reported at all, and how often, has to be a
+property of the layer rather than of whatever the layer's memory happened to hold.
 
 These tests build datagrams by hand rather than going through a Peer because there is
 no supported way to ask a Peer to send a malformed one. ReliabilityLayer is driven
@@ -148,8 +153,7 @@ public:
     : m_socket( socket )
     , m_address( "127.0.0.1", kUnusedPeerPort )
     {
-        m_layer.Reset( true, kMTUSize, false );
-        m_layer.SetTimeoutTime( kTimeoutTime );
+        ResetForReuse();
 
         // Reset stamps lastUpdateTime from the real clock, and Update ignores any time
         // at or before it. Start just past that so simulated time only moves forward.
@@ -197,6 +201,20 @@ public:
     }
 
     bool IsDeadConnection() { return m_layer.IsDeadConnection(); }
+
+    /// What RakPeer::SetSplitMessageProgressInterval pushes into each layer. Deliberately
+    /// not called by the constructor: the default the layer starts with is what most of
+    /// these cases are about.
+    void SetProgressInterval( int interval ) { m_layer.SetSplitMessageProgressInterval( interval ); }
+
+    /// Put the layer back the way the constructor found it, the way RakPeer does when a
+    /// System's slot in remoteSystemList is handed to the next connection.
+    void ResetForReuse()
+    {
+        m_layer.Reset( true, kMTUSize, false );
+        m_layer.SetTimeoutTime( kTimeoutTime );
+        m_datagramNumber = 0;
+    }
 
 private:
     ReliabilityLayer m_layer;
@@ -269,6 +287,12 @@ size_t MallocProbe::s_failSize = 0;
 // What a channel at exactly the cap costs: one pointer per chunk.
 constexpr size_t kCapCost = sizeof( InternalPacket* ) * (size_t)MAXIMUM_SPLIT_PACKET_COUNT;
 
+// The ID_DOWNLOAD_PROGRESS packet InsertIntoSplitPacketList builds: the message id, then
+// packets-so-far, split-packet-count and byte-length as unsigned ints, then a copy of the
+// first chunk's payload - one byte here, the wire minimum WriteSplitChunk writes.
+constexpr unsigned int kProgressPacketBytes =
+    (unsigned int)( sizeof( MessageID ) + sizeof( unsigned int ) * 3 + 1 );
+
 /// Deliver an ordinary, well-formed two-chunk split message under kSplitPacketId and
 /// check it reassembles into its two payload bytes.
 ///
@@ -290,6 +314,20 @@ void CheckOrdinarySplitMessageReassembles( LayerUnderTest& layer )
     CHECK( layer.DeliverChunk( second ) );
 
     CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 2 ) );
+}
+
+/// Deliver every chunk of \a message but the last, in order, and check what each of those
+/// incomplete arrivals put in front of the user: \a expectedBits each time, 0 when no
+/// progress is meant to be reported at all. Leaves the message one chunk short, so the
+/// caller can still finish it.
+void CheckIncompleteArrivalsQueue( LayerUnderTest& layer, SplitChunk message, BitSize_t expectedBits )
+{
+    for( SplitPacketIndexType index = 0; index + 1 < message.splitPacketCount; ++index )
+    {
+        message.splitPacketIndex = index;
+        CHECK( layer.DeliverChunk( message ) );
+        CHECK( layer.ReceiveBits() == expectedBits );
+    }
 }
 
 } // namespace
@@ -556,4 +594,91 @@ TEST_CASE( "A split packet channel that stalls is reaped, whatever its reliabili
 
         CHECK_FALSE( layer.IsDeadConnection() );
     }
+}
+
+TEST_CASE( "A partial split message reports download progress only when an interval asks for it", "[network]" )
+{
+    // splitMessageProgressInterval decides both whether InsertIntoSplitPacketList emits
+    // ID_DOWNLOAD_PROGRESS and how often. Upstream, the only thing that ever wrote it was
+    // SetSplitMessageProgressInterval - not the constructor, not InitializeVariables, not
+    // Reset - so a layer no caller had configured read uninitialised memory on every
+    // arriving chunk, and the first section below could not be written: it passed or
+    // failed on heap contents. Only the order of the calls in
+    // AssignSystemAddressToRemoteSystemList, which pushes the interval in right after
+    // Reset, made a RakPeer connection defined. InitializeVariables now sets it to the
+    // documented default of 0, so the default is the layer's rather than the caller's.
+    //
+    // Completing the message at the end acks, which needs a socket. A started Peer's own
+    // socket is the least ceremonious way to get one; the address the layer sends to is a
+    // port nothing is listening on, so the traffic goes nowhere.
+    PeerScope peers;
+    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
+    REQUIRE( socket != nullptr );
+
+    LayerUnderTest layer( socket );
+
+    // Three chunks, so there are two arrivals that leave the message incomplete - enough
+    // for an interval of 1 to fire twice, and for an interval of 2 to fire once.
+    SplitChunk chunk;
+    chunk.splitPacketCount = 3;
+    chunk.splitPacketIndex = 0;
+    chunk.payload = 'x';
+
+    SECTION( "no interval set, so nothing is queued for the user until it completes" )
+    {
+        // The acceptance case: a layer no caller has configured reports nothing.
+        CheckIncompleteArrivalsQueue( layer, chunk, 0 );
+    }
+
+    SECTION( "a negative interval is treated as no interval rather than reaching the modulo" )
+    {
+        // The API documents 0 as "never" and says nothing about a negative. Pinning it as
+        // "never" too: SetSplitMessageProgressInterval stores it as 0, and the guard is
+        // then what decides, rather than the unsigned conversion of a negative divisor.
+        layer.SetProgressInterval( -1 );
+
+        CheckIncompleteArrivalsQueue( layer, chunk, 0 );
+    }
+
+    SECTION( "an interval of 1 reports every incomplete arrival" )
+    {
+        // The control for the two sections above: without it they would pass on a layer
+        // that had lost the ability to report progress at all.
+        layer.SetProgressInterval( 1 );
+
+        CheckIncompleteArrivalsQueue( layer, chunk, BYTES_TO_BITS( kProgressPacketBytes ) );
+    }
+
+    SECTION( "an interval of 2 reports every second incomplete arrival" )
+    {
+        layer.SetProgressInterval( 2 );
+
+        chunk.splitPacketIndex = 0;
+        CHECK( layer.DeliverChunk( chunk ) );
+        CHECK( layer.ReceiveBits() == 0 );
+
+        chunk.splitPacketIndex = 1;
+        CHECK( layer.DeliverChunk( chunk ) );
+        CHECK( layer.ReceiveBits() == BYTES_TO_BITS( kProgressPacketBytes ) );
+    }
+
+    SECTION( "a Reset clears an interval a previous connection had set" )
+    {
+        // Reset( true, ... ) reinitialises the layer for reuse by the next connection, so
+        // an interval set on this one may not survive into that one.
+        layer.SetProgressInterval( 1 );
+        layer.ResetForReuse();
+
+        CheckIncompleteArrivalsQueue( layer, chunk, 0 );
+    }
+
+    // Whatever was or was not reported along the way, the completed message itself is
+    // delivered exactly once, and it is the three payload bytes rather than a progress
+    // packet: the block is guarded on the message being incomplete.
+    chunk.splitPacketIndex = 2;
+    CHECK( layer.DeliverChunk( chunk ) );
+    CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 3 ) );
+    CHECK( layer.ReceiveBits() == 0 );
+
+    CHECK_FALSE( layer.IsDeadConnection() );
 }
