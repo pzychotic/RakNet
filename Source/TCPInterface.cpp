@@ -350,8 +350,12 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
 
         if( errorCode != 0 )
         {
+            SystemAddress failedSystemAddress = s->systemAddress;
             RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
-            failedConnectionAttempts.push_back( s->systemAddress );
+
+            failedConnectionAttemptMutex.lock();
+            failedConnectionAttempts.push_back( failedSystemAddress );
+            failedConnectionAttemptMutex.unlock();
         }
         return UNASSIGNED_SYSTEM_ADDRESS;
     }
@@ -825,11 +829,13 @@ void ConnectionAttemptLoop( void* arg )
     TCPInterface* tcpInterface = s->tcpInterface;
     int newRemoteClientIndex = systemAddress.systemIndex;
     unsigned short socketFamily = s->socketFamily;
+    char bindAddress[64];
+    strcpy( bindAddress, s->bindAddress );
     RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
 
     char str1[64];
     systemAddress.ToString( false, str1 );
-    __TCPSOCKET__ sockfd = tcpInterface->SocketConnect( str1, systemAddress.GetPort(), socketFamily, s->bindAddress );
+    __TCPSOCKET__ sockfd = tcpInterface->SocketConnect( str1, systemAddress.GetPort(), socketFamily, bindAddress );
     if( sockfd == 0 )
     {
         tcpInterface->remoteClients[newRemoteClientIndex].isActiveMutex.lock();
