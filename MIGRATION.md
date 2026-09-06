@@ -8,6 +8,10 @@ This document is written for someone who has a working 4.081 integration and wan
 it onto this fork. It is not a changelog. Each entry says what the API was, what it is now,
 and what to do about it.
 
+Two hardening limits sit outside that count. They break no API and stop no build, but they
+reject inputs stock accepted, so they have a section of their own at the end:
+[Limits that stock did not have](#limits-that-stock-did-not-have).
+
 **The short version:** four of the five breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
@@ -362,3 +366,42 @@ The plugins that remain are `NatPunchthroughClient`/`Server`, `NatTypeDetectionC
 `Server`, `Router2`, `RelayPlugin`, `UDPProxyClient`/`Coordinator`/`Server`,
 `UDPForwarder`, `RPC4Plugin`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistory`,
 `RakNetTransport2`, `TelnetTransport`, and the `PacketLogger` family.
+
+## Limits that stock did not have
+
+Neither of these is an API break — no signature changed and nothing stops compiling. Both
+reject inputs that stock 4.081 accepted, so an integration that was moving very large
+messages should read this. Both are the *same* limit seen from its two ends, and they are
+derived from one another rather than chosen separately.
+
+**A Peer will not reassemble a message split into more than 65536 chunks.** Stock read
+`splitPacketCount` off the wire with no upper bound and immediately allocated a pointer
+array of that size, so a single 14-byte message could ask for 16 GiB and a single datagram
+carrying 105 of them could ask for over a terabyte. 65536 is the keyspace of the 16-bit
+split-packet id, which already bounded the number of simultaneously live channels, so both
+split-packet limits now come from the same wire field. A datagram claiming more is dropped.
+Stalled channels are also reaped on the connection's timeout rather than held until reset.
+
+`MAXIMUM_SPLIT_PACKET_COUNT`, `Source/ReliabilityLayer.h`.
+
+**A Peer will not send a message larger than 33,816,576 bytes.** `Send`, `Send( BitStream* )`
+and `SendList` return 0 — their documented "bad input" answer — for anything larger, where
+stock computed `length * 8` in `int` and had undefined behaviour from 268435456 bytes up.
+`SendList` applies the limit to the concatenation of its blocks, since that is the message
+the far end reassembles. Loopback sends are held to the same limit.
+
+`MAXIMUM_MESSAGE_SIZE`, `Source/MTUSize.h`.
+
+The value is the receive-side cap times the payload one datagram carries at 576, the lowest
+MTU the handshake can settle on: `65536 x ( 576 - 28 - 9 - 23 )`. Deriving it at the *floor*
+rather than at the MTU actually negotiated is what makes the two ends agree by construction —
+a message this Peer will emit is one every Peer will accept, whichever MTU the two ends land
+on and whichever target a broadcast reaches. A connection at MTU 1492 could physically carry
+93.8 MiB, but sizing the limit to that would mean `Send` succeeding or failing on the outcome
+of a handshake the caller never saw.
+
+Neither limit is configurable, and neither is reachable by a conforming stock 4.081 sender in
+practice: a real sender's chunk count is bounded by its own message size and MTU. If your
+application does move messages above 33.8 MiB, it has to chunk them itself — which it was
+already doing implicitly, and now finds out synchronously instead of by having the far end
+drop every piece.

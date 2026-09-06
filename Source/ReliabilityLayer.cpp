@@ -99,12 +99,12 @@ struct DatagramHeaderFormat
     bool needsBAndAs;
     bool isValid; // To differentiate between what I serialized, and offline data
 
-    static BitSize_t GetDataHeaderBitLength()
+    static constexpr BitSize_t GetDataHeaderBitLength()
     {
         return BYTES_TO_BITS( GetDataHeaderByteLength() );
     }
 
-    static unsigned int GetDataHeaderByteLength()
+    static constexpr unsigned int GetDataHeaderByteLength()
     {
         //return 2 + 3 + sizeof(RakNet::TimeMS) + sizeof(float)*2;
         return 2 + 3 +
@@ -204,6 +204,30 @@ struct DatagramHeaderFormat
     }
 };
 
+// MAXIMUM_MESSAGE_SIZE (MTUSize.h) is derived from four numbers, three of which are visible
+// only here. It cannot name them - DatagramHeaderFormat is local to this file - so it spells
+// the arithmetic out and relies on these asserts to keep that spelling honest. Change a
+// header layout or the receive-side cap and the build stops, rather than the send limit and
+// MAXIMUM_SPLIT_PACKET_COUNT quietly ceasing to agree.
+//
+// The fourth input, BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() ) == 23, is checked in
+// ReliabilityLayer::Reset instead: it builds an InternalPacket and calls a non-constexpr
+// member, so it cannot be evaluated at compile time without moving the message-header
+// serialization logic into the header, which is not worth the coupling.
+static_assert( DatagramHeaderFormat::GetDataHeaderByteLength() == 9,
+               "MAXIMUM_MESSAGE_SIZE subtracts 9 bytes for the datagram header" );
+static_assert( UDP_HEADER_SIZE == 28,
+               "MAXIMUM_MESSAGE_SIZE subtracts 28 bytes for the UDP header" );
+static_assert( MAXIMUM_SPLIT_PACKET_COUNT == 65536,
+               "MAXIMUM_MESSAGE_SIZE is 65536 datagrams' worth of payload; it and the "
+               "receive-side cap must come from the same number" );
+static_assert( MAXIMUM_MESSAGE_SIZE ==
+                   MAXIMUM_SPLIT_PACKET_COUNT *
+                       ( MINIMUM_NEGOTIATED_MTU_SIZE - UDP_HEADER_SIZE -
+                         DatagramHeaderFormat::GetDataHeaderByteLength() - 23u -
+                         RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES ),
+               "The send-side limit no longer matches what the receive side will reassemble" );
+
 int SplitPacketChannelComp( SplitPacketIdType const& key, SplitPacketChannel* const& data )
 {
     if( key < data->splitPacketList.PacketId() )
@@ -272,6 +296,11 @@ void ReliabilityLayer::Reset( bool resetVariables, int MTUSize, bool _useSecurit
 #else
         (void)_useSecurity;
 #endif // LIBCAT_SECURITY
+        // The fourth input to MAXIMUM_MESSAGE_SIZE's derivation (MTUSize.h). The other three
+        // are static_asserts above; this one is not constexpr-evaluable, so it is checked
+        // here, once per connection reset, instead.
+        RakAssert( BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() ) == 23 );
+
         congestionManager.Init( RakNet::GetTimeUS(), MTUSize - UDP_HEADER_SIZE );
     }
 }
@@ -1256,6 +1285,17 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     {
         return false;
     }
+
+    // Backstop. RakPeer::Send, Send( BitStream* ) and SendList all reject an oversized
+    // message before it reaches here, and every other caller of this layer sends a small
+    // control message, so this cannot fire today. It exists so that stays true: a message
+    // above MAXIMUM_MESSAGE_SIZE needs more than MAXIMUM_SPLIT_PACKET_COUNT chunks at the
+    // lowest MTU, and the far end would reject every one of them.
+    if( numberOfBytesToSend > MAXIMUM_MESSAGE_SIZE )
+    {
+        RakAssert( "ReliabilityLayer::Send: message exceeds MAXIMUM_MESSAGE_SIZE" && 0 );
+        return false;
+    }
     InternalPacket* internalPacket = AllocateFromInternalPacketPool();
     if( internalPacket == 0 )
     {
@@ -1333,8 +1373,9 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     if( splitPacket ) // If it uses a secure header it will be generated here
     {
         // Must split the packet.  This will also generate the SHA1 if it is required. It also adds it to the send list.
-        SplitPacket( internalPacket );
-        return true;
+        // False only if the chunk array could not be allocated, in which case SplitPacket has
+        // already freed internalPacket.
+        return SplitPacket( internalPacket );
     }
 
     RakAssert( internalPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
@@ -2492,13 +2533,16 @@ bool ReliabilityLayer::IsOlderOrderedPacket( OrderingIndexType newPacketOrdering
 // Split the passed packet into chunks under MTU_SIZEbytes (including headers) and save those new chunks
 // Optimized version
 //-------------------------------------------------------------------------------------------------------
-void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
+bool ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 {
     // Doing all sizes in bytes in this function so I don't write partial bytes with split packets
     internalPacket->splitPacketCount = 1; // This causes GetMessageHeaderLengthBits to account for the split packet header
     unsigned int headerLength = (unsigned int)BITS_TO_BYTES( GetMessageHeaderLengthBits( internalPacket ) );
     unsigned int dataByteLength = (unsigned int)BITS_TO_BYTES( internalPacket->dataBitLength );
-    int maximumSendBlockBytes, byteOffset, bytesToSend;
+    // Unsigned, matching dataByteLength. As int, byteOffset was a signed product of a chunk
+    // index and a block size; MAXIMUM_MESSAGE_SIZE keeps it far below INT_MAX now, but the
+    // signed arithmetic is gone rather than merely made unreachable.
+    unsigned int maximumSendBlockBytes, byteOffset, bytesToSend;
     InternalPacket** internalPacketArray;
 
     maximumSendBlockBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() );
@@ -2519,7 +2563,18 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 #endif
         internalPacketArray = (InternalPacket**)rakMalloc_Ex( sizeof( InternalPacket* ) * internalPacket->splitPacketCount, _FILE_AND_LINE_ );
 
-    for( uint32_t i = 0; i < (int)internalPacket->splitPacketCount; ++i )
+    // rakMalloc_Ex returns NULL rather than throwing (ADR-0002), and nothing checked it. At
+    // MAXIMUM_MESSAGE_SIZE this array is 512 KiB, which a memory-pressured process can
+    // plausibly fail to get. Drop the message rather than write through NULL.
+    if( internalPacketArray == 0 )
+    {
+        notifyOutOfMemory( _FILE_AND_LINE_ );
+        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+        ReleaseToInternalPacketPool( internalPacket );
+        return false;
+    }
+
+    for( uint32_t i = 0; i < internalPacket->splitPacketCount; ++i )
     {
         internalPacketArray[i] = AllocateFromInternalPacketPool();
 
@@ -2585,6 +2640,8 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 
     if( usedAlloca == false )
         rakFree_Ex( internalPacketArray, _FILE_AND_LINE_ );
+
+    return true;
 }
 
 //-------------------------------------------------------------------------------------------------------

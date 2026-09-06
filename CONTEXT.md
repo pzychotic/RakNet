@@ -1,7 +1,8 @@
 # RakNet
 
 A UDP networking library for games. This context covers the transport layer: the Peers
-that connect to each other, how they are named, and how those names are exchanged.
+that connect to each other, how they are named, how those names are exchanged, and what they
+send one another.
 
 ## Language
 
@@ -28,3 +29,12 @@ address changes a System may go through. It is:
   Never treat holding one as proof of anything.
 
 _Avoid_: Peer ID, GUID (unqualified), identity, token
+
+**Message**:
+The unit an application hands to `Send` and gets back from `Receive`. A Message is
+delivered whole or not at all: in transit it may be split across many datagrams and is
+reassembled before the receiving application sees it, so the number of datagrams a Message
+took to arrive is invisible to both ends. Its size is bounded — a Peer refuses to emit one
+larger than it can guarantee any other Peer will accept.
+_Avoid_: Packet (which is the struct `Receive` returns, and separately a chunk of a split
+Message — it means at least three things in this codebase already)

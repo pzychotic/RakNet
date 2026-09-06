@@ -112,8 +112,14 @@ bool IPAddressMatch( const char* pszIpToCheck, const char* pszIpToCheckFor )
 
 void UpdateNetworkLoop( void* arg );
 
-static const int NUM_MTU_SIZES = 3;
-static const int mtuSizes[NUM_MTU_SIZES] = { MAXIMUM_MTU_SIZE, 1200, 576 };
+static constexpr int NUM_MTU_SIZES = 3;
+static constexpr int mtuSizes[NUM_MTU_SIZES] = { MAXIMUM_MTU_SIZE, 1200, 576 };
+// MAXIMUM_MESSAGE_SIZE (MTUSize.h) is derived from the smallest MTU a connection can end up
+// using, which is the last entry of this list. Keeping that derivation honest is the reason
+// the constant exists at all - see the comment there.
+static_assert( mtuSizes[NUM_MTU_SIZES - 1] == MINIMUM_NEGOTIATED_MTU_SIZE,
+               "MAXIMUM_MESSAGE_SIZE assumes 576 is the lowest MTU that can be negotiated" );
+static_assert( mtuSizes[0] == MAXIMUM_MTU_SIZE, "The MTU list is offered largest first" );
 
 static RakNetRandom rnr;
 
@@ -996,6 +1002,14 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
     if( data == 0 || length < 0 )
         return 0;
 
+    // Ahead of the loopback branch below, and ahead of any use of \a data, so that a length
+    // no buffer could back is rejected without being dereferenced. A message too large to
+    // reach a System must not quietly succeed against yourself either.
+    //
+    // Return 0 - the documented "bad input" answer - and deliberately no RakAssert.
+    if( (unsigned int)length > MAXIMUM_MESSAGE_SIZE )
+        return 0;
+
     if( remoteSystemList == 0 || endThreads == true )
         return 0;
 
@@ -1025,7 +1039,10 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
         return usedSendReceipt;
     }
 
-    SendBuffered( data, length * 8, priority, reliability, orderingChannel, systemIdentifier, broadcast, RemoteSystemStruct::NO_ACTION, usedSendReceipt );
+    // BYTES_TO_BITS on a BitSize_t, not `length * 8`: the latter is int arithmetic and is
+    // undefined for length > 268435455, which the size check above now rejects - but the
+    // conversion is gone rather than merely made unreachable.
+    SendBuffered( data, BYTES_TO_BITS( (BitSize_t)length ), priority, reliability, orderingChannel, systemIdentifier, broadcast, RemoteSystemStruct::NO_ACTION, usedSendReceipt );
 
     return usedSendReceipt;
 }
@@ -1053,6 +1070,10 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
     if( bitStream->GetNumberOfBytesUsed() == 0 )
+        return 0;
+
+    // Ahead of the loopback branch below, for the reason given in Send( const char* ).
+    if( bitStream->GetNumberOfBytesUsed() > MAXIMUM_MESSAGE_SIZE )
         return 0;
 
     if( remoteSystemList == 0 || endThreads == true )
@@ -1126,6 +1147,21 @@ uint32_t RakPeer::SendList( const char** data, const int* lengths, const int num
         return 0;
 
     if( lengths == 0 )
+        return 0;
+
+    // The limit is on the concatenation, since that is the message the far end reassembles.
+    // Summed in uint64_t: SendBufferedList accumulates the same lengths into an unsigned int,
+    // which wraps, and a wrapped total would slip past this check and then under-allocate.
+    // Blocks with a non-positive length are skipped there, so they are skipped here too.
+    // Rejected by return value with no RakAssert.
+    uint64_t totalLength = 0;
+    for( int i = 0; i < numParameters; i++ )
+    {
+        if( lengths[i] > 0 )
+            totalLength += (uint64_t)lengths[i];
+    }
+
+    if( totalLength > MAXIMUM_MESSAGE_SIZE )
         return 0;
 
     if( broadcast == false && systemIdentifier.IsUndefined() )
@@ -3677,16 +3713,25 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
 void RakPeer::SendBufferedList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
     BufferedCommandStruct* bcs;
-    unsigned int totalLength = 0;
+    uint64_t totalLength = 0;
     unsigned int lengthOffset;
     int i;
     for( i = 0; i < numParameters; i++ )
     {
         if( lengths[i] > 0 )
-            totalLength += lengths[i];
+            totalLength += (uint64_t)lengths[i];
     }
     if( totalLength == 0 )
         return;
+
+    // SendList has already rejected anything larger. Summing in uint64_t rather than the
+    // unsigned int this used means an oversized total arrives here as itself instead of
+    // wrapping to a small one, so this guard can see it.
+    if( totalLength > MAXIMUM_MESSAGE_SIZE )
+    {
+        RakAssert( "SendBufferedList: total length exceeds MAXIMUM_MESSAGE_SIZE" && 0 );
+        return;
+    }
 
     char* dataAggregate;
     dataAggregate = (char*)rakMalloc_Ex( (size_t)totalLength, _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
@@ -3706,7 +3751,7 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
 
     if( broadcast == false && IsLoopbackAddress( systemIdentifier, true ) )
     {
-        SendLoopback( dataAggregate, totalLength );
+        SendLoopback( dataAggregate, (int)totalLength );
         rakFree_Ex( dataAggregate, _FILE_AND_LINE_ );
         return;
     }
@@ -3717,7 +3762,7 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
 
     bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
     bcs->data = dataAggregate;
-    bcs->numberOfBitsToSend = BYTES_TO_BITS( totalLength );
+    bcs->numberOfBitsToSend = BYTES_TO_BITS( (BitSize_t)totalLength );
     bcs->priority = priority;
     bcs->reliability = reliability;
     bcs->orderingChannel = orderingChannel;

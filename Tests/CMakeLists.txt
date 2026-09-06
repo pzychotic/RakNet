@@ -57,6 +57,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerDeallocateBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerNonBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MaximumConnectTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MaximumMessageSizeTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MessageFilterTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MiscellaneousTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OfflineMessagesConvertTest.cpp
