@@ -354,6 +354,10 @@ timing ones.
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 
+**Build switches:** `PREALLOCATE_LARGE_MESSAGES`. The switch selected an alternative
+split-packet reassembly strategy, but the code behind it never compiled in any RakNet
+release, so no build can ever have had it set to `1` — nothing you were doing stops working.
+
 The plugins that remain are `NatPunchthroughClient`/`Server`, `NatTypeDetectionClient`/
 `Server`, `Router2`, `RelayPlugin`, `UDPProxyClient`/`Coordinator`/`Server`,
 `UDPForwarder`, `RPC4Plugin`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistory`,

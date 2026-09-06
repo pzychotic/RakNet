@@ -455,7 +455,7 @@ bytes 5..6  : sin_port, raw memory (network byte order)
 The bitwise inversion of the address is deliberate ("Hide the address so routers don't modify it").
 `SystemAddress::size()` returns `4 + 2 + 1 = 7` for the non-IPv6 build
 ([RakNetTypes.cpp:185](Source/RakNetTypes.cpp:185)). `RAKNET_SUPPORT_IPV6` is 0 by default
-([RakNetDefines.h:109](Source/RakNetDefines.h:109)); with it on, the encoding is the version byte plus a
+([RakNetDefines.h:107](Source/RakNetDefines.h:107)); with it on, the encoding is the version byte plus a
 raw `sockaddr_in6`.
 
 ### 3.5 `ID_TIMESTAMP`
@@ -1144,16 +1144,15 @@ not big-endian ([ReliabilityLayer.cpp:2084](Source/ReliabilityLayer.cpp:2084),
 
 | Macro | Default | Effect if changed |
 |---|---|---|
-| `USE_SLIDING_WINDOW_CONGESTION_CONTROL` | 1 ([RakNetDefines.h:99](Source/RakNetDefines.h:99)) | 0 selects `CCRakNetUDT` and sets `INCLUDE_TIMESTAMP_WITH_DATAGRAMS 1`, adding a 4-byte `TimeMS` to data and ACK headers |
+| `USE_SLIDING_WINDOW_CONGESTION_CONTROL` | 1 ([RakNetDefines.h:103](Source/RakNetDefines.h:103)) | 0 selects `CCRakNetUDT` and sets `INCLUDE_TIMESTAMP_WITH_DATAGRAMS 1`, adding a 4-byte `TimeMS` to data and ACK headers |
 | `__GET_TIME_64BIT` | 1 ([RakNetDefines.h:22](Source/RakNetDefines.h:22)) | 0 makes `RakNet::Time` 4 bytes, halving every timestamp field in the handshake and ping messages |
 | `__BITSTREAM_NATIVE_END` | undefined ([RakNetDefines.h:33](Source/RakNetDefines.h:33)) | defining it removes all byte swapping, making multi-byte fields host-endian (little-endian on x86) and breaking interop with default builds on LE hosts |
 | `LIBCAT_SECURITY` | 0 ([NativeFeatureIncludes.h:42](Source/NativeFeatureIncludes.h:42)) | 1 adds cookies, public keys, challenge/answer and per-datagram authenticated encryption ([SecureHandshake.cpp:17](Source/SecureHandshake.cpp:17), [ReliabilityLayer.cpp:533](Source/ReliabilityLayer.cpp:533), [ReliabilityLayer.cpp:1930](Source/ReliabilityLayer.cpp:1930)) |
-| `RAKNET_SUPPORT_IPV6` | 0 ([RakNetDefines.h:109](Source/RakNetDefines.h:109)) | 1 changes `SystemAddress` from 7 bytes to `1 + sizeof(sockaddr_in6)` |
+| `RAKNET_SUPPORT_IPV6` | 0 ([RakNetDefines.h:107](Source/RakNetDefines.h:107)) | 1 changes `SystemAddress` from 7 bytes to `1 + sizeof(sockaddr_in6)` |
 | `RAKNET_PROTOCOL_VERSION` | 6 ([RakNetVersion.h:21](Source/RakNetVersion.h:21)) | must match exactly or `ID_INCOMPATIBLE_PROTOCOL_VERSION` is returned |
 | `MAXIMUM_MTU_SIZE` | 1492 ([MTUSize.h:32](Source/MTUSize.h:32)) | changes the largest probe and the receive buffer |
 | `NUMBER_OF_ORDERED_STREAMS` | 32 ([ReliabilityLayer.h:46](Source/ReliabilityLayer.h:46)) | receiver rejects `orderingChannel >= 32` regardless ([ReliabilityLayer.cpp:2350](Source/ReliabilityLayer.cpp:2350)) |
 | `MAXIMUM_NUMBER_OF_INTERNAL_IDS` | 10 ([RakNetDefines.h:68](Source/RakNetDefines.h:68)) | changes the length of the IP list in `ID_CONNECTION_REQUEST_ACCEPTED` / `ID_NEW_INCOMING_CONNECTION` |
-| `PREALLOCATE_LARGE_MESSAGES` | 0 ([RakNetDefines.h:105](Source/RakNetDefines.h:105)) | reassembly strategy only; no wire change |
 | `DATAGRAM_MESSAGE_ID_ARRAY_LENGTH` / `RESEND_BUFFER_ARRAY_LENGTH` | 512 / 512 | how far back acks are honoured, and how many reliable messages may be in flight |
 
 ---

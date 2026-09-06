@@ -104,12 +104,6 @@
 #define USE_SLIDING_WINDOW_CONGESTION_CONTROL 1
 #endif
 
-// When a large message is arriving, preallocate the memory for the entire block
-// This results in large messages not taking up time to reassembly with memcpy, but is vulnerable to attackers causing the host to run out of memory
-#ifndef PREALLOCATE_LARGE_MESSAGES
-#define PREALLOCATE_LARGE_MESSAGES 0
-#endif
-
 #ifndef RAKNET_SUPPORT_IPV6
 #define RAKNET_SUPPORT_IPV6 0
 #endif

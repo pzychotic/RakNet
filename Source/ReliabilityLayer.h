@@ -201,15 +201,8 @@ struct SplitPacketChannel
 
     SortedSplittedPackets splitPacketList;
 
-#if PREALLOCATE_LARGE_MESSAGES == 1
-    InternalPacket* returnedPacket;
-    bool gotFirstPacket;
-    unsigned int stride;
-    unsigned int splitPacketsArrived;
-#else
     // This is here for progress notifications, since progress notifications return the first packet data, if available
     InternalPacket* firstPacket;
-#endif
 };
 int RAK_DLL_EXPORT SplitPacketChannelComp( SplitPacketIdType const& key, SplitPacketChannel* const& data );
 
