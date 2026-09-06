@@ -107,6 +107,37 @@ void GetMyIP_Windows_Linux( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_I
 #endif
 }
 
+// See RakNetSocket2.h for why the option name has to be chosen by address family rather
+// than hardcoded alongside a level that moves.
+int GetTTLOptionName( const SystemAddress& systemAddress )
+{
+#if RAKNET_SUPPORT_IPV6 == 1
+    if( systemAddress.address.addr4.sin_family != AF_INET )
+        return IPV6_UNICAST_HOPS;
+#else
+    (void)systemAddress;
+#endif
+    return IP_TTL;
+}
+
+#if defined( IP_DONTFRAGMENT )
+// The same pairing for the don't-fragment flag. Latent rather than live: the only call
+// site is compiled out wherever the two numbers disagree, because glibc has no
+// IP_DONTFRAGMENT at all - Linux spells that IP_MTU_DISCOVER - so the name below is only
+// reached on Windows, where IP_DONTFRAGMENT and IPV6_DONTFRAG are both 14. Corrected for
+// symmetry with GetTTLOptionName, and so the coincidence stops being load-bearing.
+static int GetDontFragmentOptionName( const SystemAddress& systemAddress )
+{
+#if RAKNET_SUPPORT_IPV6 == 1
+    if( systemAddress.address.addr4.sin_family != AF_INET )
+        return IPV6_DONTFRAG;
+#else
+    (void)systemAddress;
+#endif
+    return IP_DONTFRAGMENT;
+}
+#endif
+
 // Sends one datagram. Returns the number of bytes sent, or a negative value on failure -
 // per ADR-0002 that return value is the only failure channel.
 //
@@ -152,21 +183,19 @@ RNS2SendResult RNS2_Berkley::Send_NoVDP( RNS2Socket rns2Socket, RNS2_SendParamet
         return -1;
     }
 
-    // Untouched by the hang fix, and mismatched for AF_INET6: GetIPPROTO returns
-    // IPPROTO_IPV6 for such an address while the option name stays IP_TTL, where the IPv6
-    // spelling is IPV6_UNICAST_HOPS. On Windows this is harmless by coincidence - ws2ipdef.h
-    // gives both the value 4 - which is why it has never been noticed. Elsewhere the two
-    // numbers differ and the pair below addresses some unrelated option. Pre-existing, out
-    // of scope here, and tracked as its own defect.
+    // The level and the option name are chosen together: see GetTTLOptionName.
+    const int ttlLevel = (int)sendParameters->systemAddress.GetIPPROTO();
+    const int ttlOptionName = GetTTLOptionName( sendParameters->systemAddress );
+
     int oldTTL = -1;
     if( sendParameters->ttl > 0 )
     {
         socklen_t opLen = sizeof( oldTTL );
         // Get the current TTL
-        if( getsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, &opLen ) != -1 )
+        if( getsockopt__( rns2Socket, ttlLevel, ttlOptionName, (char*)&oldTTL, &opLen ) != -1 )
         {
             int newTTL = sendParameters->ttl;
-            setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&newTTL, sizeof( newTTL ) );
+            setsockopt__( rns2Socket, ttlLevel, ttlOptionName, (char*)&newTTL, sizeof( newTTL ) );
         }
     }
 
@@ -179,7 +208,7 @@ RNS2SendResult RNS2_Berkley::Send_NoVDP( RNS2Socket rns2Socket, RNS2_SendParamet
 
     if( oldTTL != -1 )
     {
-        setsockopt__( rns2Socket, sendParameters->systemAddress.GetIPPROTO(), IP_TTL, (char*)&oldTTL, sizeof( oldTTL ) );
+        setsockopt__( rns2Socket, ttlLevel, ttlOptionName, (char*)&oldTTL, sizeof( oldTTL ) );
     }
 
     return len;
@@ -225,11 +254,7 @@ void RNS2_Berkley::SetIPHdrIncl( int ipHdrIncl )
 void RNS2_Berkley::SetDoNotFragment( int opt )
 {
 #if defined( IP_DONTFRAGMENT )
-#if defined( _WIN32 ) && !defined( _DEBUG )
-    // If this assert hit you improperly linked against WSock32.h
-    RakAssert( IP_DONTFRAGMENT == 14 );
-#endif
-    setsockopt__( rns2Socket, boundAddress.GetIPPROTO(), IP_DONTFRAGMENT, (char*)&opt, sizeof( opt ) );
+    setsockopt__( rns2Socket, (int)boundAddress.GetIPPROTO(), GetDontFragmentOptionName( boundAddress ), (char*)&opt, sizeof( opt ) );
 #endif
 }
 

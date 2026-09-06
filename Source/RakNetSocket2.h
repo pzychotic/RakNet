@@ -34,6 +34,22 @@ enum RNS2BindResult
 
 typedef int RNS2SendResult;
 
+// The socket option name that carries the per-datagram time to live for an address of
+// systemAddress's family: IP_TTL under IPPROTO_IP, IPV6_UNICAST_HOPS under IPPROTO_IPV6.
+//
+// getsockopt/setsockopt take a level and an option name, and a name only means anything
+// within its level. SystemAddress::GetIPPROTO moves the level with the address family, so
+// the name has to move with it or the pair addresses whatever option happens to carry that
+// number at the other level. Windows hides the mistake: ws2ipdef.h gives IP_TTL and
+// IPV6_UNICAST_HOPS both the value 4, so the IPv4 name under the IPv6 level still lands on
+// the hop limit. POSIX does not - on Linux IP_TTL is 2 and IPV6_UNICAST_HOPS is 16, and 2
+// under IPPROTO_IPV6 is IPV6_2292PKTINFO, which takes the write without complaint and
+// leaves the hop limit alone.
+//
+// Declared here rather than kept file-static so the pairing itself is testable; it is the
+// half of this that a run on Windows cannot tell apart from the defect.
+int RAK_DLL_EXPORT GetTTLOptionName( const SystemAddress& systemAddress );
+
 struct RNS2_SendParameters
 {
     RNS2_SendParameters() { ttl = 0; }
