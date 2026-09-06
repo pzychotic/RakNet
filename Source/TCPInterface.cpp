@@ -778,7 +778,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
     (void)bindAddress;
 
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res = 0;
     __TCPSOCKET__ sockfd;
     memset( &hints, 0, sizeof hints );
     hints.ai_family = socketFamily;
@@ -788,7 +788,9 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     RakAssert( portRes.ec == std::errc() );
     *portRes.ptr = '\0';
 
-    getaddrinfo( host, portStr, &hints, &res );
+    if( getaddrinfo( host, portStr, &hints, &res ) != 0 )
+        return 0;
+
     sockfd = socket__( res->ai_family, res->ai_socktype, res->ai_protocol );
     blockingSocketListMutex.lock();
     blockingSocketList.push_back( sockfd );
