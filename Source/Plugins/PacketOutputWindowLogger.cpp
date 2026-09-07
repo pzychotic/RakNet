@@ -33,7 +33,19 @@ void PacketOutputWindowLogger::WriteLog( const char* str )
 #if defined( UNICODE )
     const size_t len = std::strlen( str );
     std::wstring s( len, L' ' );
-    s.resize( std::mbstowcs( s.data(), str, len ) );
+    const size_t converted = std::mbstowcs( s.data(), str, len );
+
+    // mbstowcs reports an invalid multibyte sequence as (size_t)-1; resizing to
+    // that is a std::length_error, which ADR-0002 rules out reporting. Fall back
+    // to the narrow entry point rather than dropping the line.
+    if( converted == static_cast<size_t>( -1 ) )
+    {
+        OutputDebugStringA( str );
+        OutputDebugStringA( "\n" );
+        return;
+    }
+
+    s.resize( converted );
     s += L'\n';
 #else
     std::string s( str );
