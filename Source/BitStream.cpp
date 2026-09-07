@@ -1201,6 +1201,17 @@ bool BitStream::Deserialize( std::string& str )
         return true;
     }
 
+    // ReadAlignedBytes applies this same check, but only after it has been handed
+    // a buffer, so it has to be hoisted ahead of the resize: the length is
+    // untrusted, and the string must not be grown past the bytes actually present.
+    // Aligning first is what makes the two checks identical.
+    AlignReadToByteBoundary();
+    if( readOffset + BYTES_TO_BITS( size ) > numberOfBitsUsed )
+        return false;
+
+    // resize can only fail by throwing, which ADR-0002 rules out reporting. No
+    // way of filling a std::string avoids that; the bound above is what keeps the
+    // allocation to a size the peer has already sent.
     str.resize( size );
     if( !ReadAlignedBytes( reinterpret_cast<unsigned char*>( str.data() ), size ) )
     {

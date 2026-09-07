@@ -197,6 +197,49 @@ TEST_CASE( "a truncated std::string read fails and leaves the destination empty"
     CHECK( str.empty() );
 }
 
+TEST_CASE( "a std::string length prefix cannot allocate more than the stream holds", "[bitstream]" )
+{
+    // Nothing vouches for the length prefix, so a sender costs itself two bytes to
+    // claim 65535. Deserialize has to check that claim against the bytes actually
+    // present *before* it sizes the destination.
+    //
+    // Capacity is the observable: clear() does not shrink, so a destination sized
+    // from the claim still shows it afterwards.
+    RoundTrip rt;
+    rt.Writer().Write( static_cast<uint16_t>( 65535 ) );
+    rt.Writer().Write( static_cast<uint8_t>( 'x' ) );
+
+    std::string str;
+    CHECK_FALSE( rt.Reader().Read( str ) );
+    CHECK( str.empty() );
+    CHECK( str.capacity() < 65535 );
+}
+
+TEST_CASE( "a failed std::string read still consumes the size prefix's padding", "[bitstream]" )
+{
+    // Deserialize now returns before it reaches ReadAlignedBytes, which aligns
+    // before it checks. An early return that skipped the alignment would leave a
+    // caller treating the failure as recoverable up to 7 bits behind where
+    // ReadAlignedBytes left it. The read offset after the failure is the contract.
+    const int pad = GENERATE( 0, 1, 2, 3, 4, 5, 6, 7 );
+    CAPTURE( pad );
+
+    RoundTrip rt;
+    rt.Pad( pad );
+    rt.Writer().Write( static_cast<uint16_t>( 32 ) );
+    rt.Writer().Write( static_cast<uint8_t>( 'x' ) );
+
+    rt.Reader();
+    rt.ReadPad( pad );
+
+    std::string str;
+    CHECK_FALSE( rt.Reader().Read( str ) );
+
+    // pad bits, then the 16-bit size, rounded up to the next byte boundary.
+    const BitSize_t expected = ( ( static_cast<BitSize_t>( pad ) + 16 ) + 7 ) & ~static_cast<BitSize_t>( 7 );
+    CHECK( rt.Reader().GetReadOffset() == expected );
+}
+
 TEST_CASE( "non-empty std::string round trips through WriteCompressed at every starting offset", "[bitstream]" )
 {
     // The compressed path is Huffman coded, so it is bit granular throughout and
