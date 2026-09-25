@@ -1,6 +1,6 @@
 # RakNet does not use exceptions
 
-Status: accepted
+Status: accepted. Amended by ADR-0003 (allocation failure is fatal).
 
 `Source/` contains zero occurrences of `throw`, `try`, or `catch`. This has always been
 true and was never written down, so it survived only by everyone happening to follow it —
@@ -18,8 +18,9 @@ this way. It is that **any standard-library API whose only failure channel is an
 is off-limits in `Source/`**, however convenient. `std::random_device` is the worked
 example: both its constructor and `operator()` may throw, there is no no-throw mode, and
 so ADR-0001 calls the platform CSPRNG directly instead. Expect this to recur — `std::stoi`,
-`std::filesystem`'s throwing overloads, and anything allocating without `std::nothrow` all
-fall under it.
+`std::filesystem`'s throwing overloads, and the `std::thread` constructor all
+fall under it. (APIs that throw only `std::bad_alloc` were once listed here too; ADR-0003
+excludes them.)
 
 The cost is real: hand-written error returns instead of RAII-clean propagation, at every
 call site. It is accepted because the alternative excludes the builds RakNet exists to
