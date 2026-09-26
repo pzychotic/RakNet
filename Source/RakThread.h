@@ -20,13 +20,18 @@ class RAK_DLL_EXPORT RakThread
 {
 public:
 
-    /// Create a thread, simplified to be cross platform without all the extra junk
-    /// To then start that thread, call RakThread::Create(functionName, arguments);
+    /// Create and start a detached thread running func( arg ).
     /// \param[in] func Function you want to call
     /// \param[in] arg Argument to pass to the function
-    /// \return 0=success. >0 = error code
+    /// \param[in] priority In force from the thread's first instruction. On Windows a Win32 thread
+    /// priority level. On POSIX a sched_priority for the calling thread's policy; one the policy does
+    /// not accept, which under SCHED_OTHER is anything but its single value, leaves the thread on the
+    /// caller's scheduling.
+    /// \return 0=success. >0 = error code: errno from _beginthreadex, or the pthread_create result
     static int Create( std::function<void( void* )> func, void* arg, int priority = 0 );
 
+    // How the Win32 levels correspond to nice values, for a caller choosing one per platform.
+    // Create() does not take a nice value: a thread's nice value is inherited from its creator.
     // nice value  Win32 Priority
     // -20 to -16  THREAD_PRIORITY_HIGHEST
     // -15 to -6   THREAD_PRIORITY_ABOVE_NORMAL
