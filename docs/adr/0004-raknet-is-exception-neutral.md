@@ -53,7 +53,8 @@ what is actually present, or against a documented maximum. That covers a length 
 the wire or from a file that sizes a `resize`, `reserve` or `new[]`, as `9e1a453` does in
 `BitStream`. It equally covers objects allocated *per remote action*: connections, users,
 groups, nonces and split-packet channels each need a cap. Without one, a System that
-repeats a cheap message can make a Peer terminate.
+repeats a cheap message can make a Peer terminate. ADR-0005 says whose cap it is and
+what happens when a System reaches it.
 
 ## What is off-limits in `Source/`
 

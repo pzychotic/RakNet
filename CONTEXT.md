@@ -16,6 +16,12 @@ A Peer as seen from another Peer — the far side of a connection, held in a con
 record. The same running program is a Peer to itself and a System to everyone else.
 _Avoid_: Remote peer, host, endpoint
 
+**Half-open System**:
+A System that has begun the connection handshake but not completed it. It has a
+connection record but is not yet connected, and may send nothing but its connection
+request. It is dropped if the handshake does not finish in time.
+_Avoid_: Unverified sender, pending connection
+
 **RakNetGUID**:
 The 64-bit name a Peer answers to, chosen once at construction and stable across the
 address changes a System may go through. It is:
@@ -38,3 +44,9 @@ took to arrive is invisible to both ends. Its size is bounded — a Peer refuses
 larger than it can guarantee any other Peer will accept.
 _Avoid_: Packet (which is the struct `Receive` returns, and separately a chunk of a split
 Message — it means at least three things in this codebase already)
+
+**Offline datagram**:
+A single datagram exchanged with a System that has no connection record: a ping, a pong,
+an advertisement or out-of-band data. It is not a Message: it never goes through `Send`,
+is never split, and carries no delivery guarantee, so a Peer may drop it freely.
+_Avoid_: Unconnected message, offline message
