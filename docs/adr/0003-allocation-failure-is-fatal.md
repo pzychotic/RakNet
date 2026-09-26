@@ -1,6 +1,6 @@
 # Allocation failure is fatal
 
-Status: accepted. Amends ADR-0002.
+Status: superseded by ADR-0004 (RakNet is exception-neutral). Amended ADR-0002.
 
 ADR-0002 took two rules as one. The first is that nothing in `Source/` throws or catches,
 so a `-fno-exceptions` build compiles and no exception crosses a `RAK_DLL_EXPORT`

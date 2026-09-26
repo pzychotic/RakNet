@@ -1,6 +1,6 @@
 # RakNet does not use exceptions
 
-Status: accepted. Amended by ADR-0003 (allocation failure is fatal).
+Status: superseded by ADR-0004 (RakNet is exception-neutral). Previously amended by ADR-0003.
 
 `Source/` contains zero occurrences of `throw`, `try`, or `catch`. This has always been
 true and was never written down, so it survived only by everyone happening to follow it —

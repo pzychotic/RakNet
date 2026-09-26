@@ -14,10 +14,12 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 
 ## Coding standards
 
-RakNet uses **no exceptions**: nothing in `Source/` throws or catches, and library code
-reports failure by return value. Standard-library APIs that throw for anything *other*
-than allocation failure are off-limits there (`std::stoi`, throwing `std::filesystem`
-overloads, `std::random_device`, ...). Allocation failure is treated as fatal, so
-containers and `new` are fine. Allocation sizes read from the wire or a file must still be
-bounded before allocating. Tests are exempt. See `docs/adr/0002-raknet-does-not-use-exceptions.md`
-and `docs/adr/0003-allocation-failure-is-fatal.md`.
+RakNet is **exception-neutral**: `Source/` builds with exceptions disabled and fails the
+same way with them enabled. Library code reports failure by return value and never throws
+or catches. `RakThread.cpp`'s guarded `catch` is the one leftover, and it is slated for
+removal. Allocation failure and `std::mutex::lock` failure are fatal, so containers and
+`new` are fine. Every size or count a System drives, whether a length off the wire or
+objects created per remote message, is bounded before allocating. APIs that throw for a
+recoverable failure are off-limits: `std::stoi`, throwing `std::filesystem` overloads,
+`std::random_device`, `.at()`, `std::string`'s position-taking members, and the
+`std::thread` constructor. Tests are exempt. See `docs/adr/0004-raknet-is-exception-neutral.md`.
