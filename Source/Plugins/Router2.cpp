@@ -1347,6 +1347,8 @@ unsigned int Router2::ConnnectRequest::GetGuidIndex( RakNetGUID guid )
 void Router2::ReturnToUser( MessageID messageId, RakNetGUID endpointGuid, const SystemAddress& systemAddress, bool wasGeneratedLocally )
 {
     Packet* p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) );
+    if( p == 0 )
+        return;
     p->data[0] = messageId;
     p->systemAddress = systemAddress;
     p->systemAddress.systemIndex = (SystemIndex)-1;

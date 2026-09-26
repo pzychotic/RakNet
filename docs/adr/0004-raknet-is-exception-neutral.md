@@ -90,8 +90,8 @@ above.
 - **`std::set_new_handler` is the OOM hook.** The runtime calls it before throwing, in both
   modes. Use it to log, release a reserve, or abort deliberately. On MSVC a fail-fast skips
   `std::set_terminate`, so a terminate handler is not a reliable hook.
-- **`SetNotifyOutOfMemory` covers only the null-returning `rakMalloc` paths**, eight
-  sites. It is kept as public API. It is not an OOM hook for the library as a whole.
+- **`SetNotifyOutOfMemory` covers only the null-returning `rakMalloc` paths**. It is
+  kept as public API. It is not an OOM hook for the library as a whole.
 - **Replacing global `operator new`/`delete` is the way to control memory.** It covers the
   standard containers as well as RakNet's own `new`. `SetMalloc` and friends redirect only
   the `rakMalloc` family. `_USE_RAK_MEMORY_OVERRIDE` is frozen: kept and correct, but it is

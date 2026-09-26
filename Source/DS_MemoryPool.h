@@ -138,7 +138,14 @@ MemoryBlockType* MemoryPool<MemoryBlockType>::Allocate( const char* file, unsign
         return 0;
     availablePagesSize = 1;
     if( InitPage( availablePages, availablePages, file, line ) == false )
+    {
+        // Leave the pool empty rather than holding a page with no blocks, so the next
+        // Allocate tries again instead of reading the uninitialised page.
+        rakFree_Ex( availablePages, file, line );
+        availablePages = 0;
+        availablePagesSize = 0;
         return 0;
+    }
     // If this assert hits, we couldn't allocate even 1 block per page. Increase the page size
     RakAssert( availablePages->availableStackSize > 1 );
 

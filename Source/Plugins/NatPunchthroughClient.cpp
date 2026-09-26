@@ -283,6 +283,8 @@ void NatPunchthroughClient::Update( void )
 void NatPunchthroughClient::PushFailure( void )
 {
     Packet* p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) );
+    if( p == 0 )
+        return;
     p->data[0] = ID_NAT_PUNCHTHROUGH_FAILED;
     p->systemAddress = sp.targetAddress;
     p->systemAddress.systemIndex = (SystemIndex)-1;
@@ -906,6 +908,8 @@ void NatPunchthroughClient::OnReadyForNextPunchthrough( void )
 void NatPunchthroughClient::PushSuccess( void )
 {
     Packet* p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) );
+    if( p == 0 )
+        return;
     p->data[0] = ID_NAT_PUNCHTHROUGH_SUCCEEDED;
     p->systemAddress = sp.targetAddress;
     p->systemAddress.systemIndex = (SystemIndex)-1;

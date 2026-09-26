@@ -274,6 +274,8 @@ void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
         else
             p = tcpInterface->AllocatePacket( bsOut.GetNumberOfBytesUsed() );
 #endif
+        if( p == 0 )
+            return;
 
         if( rakPeerInterface )
             p->guid = rakPeerInterface->GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS );
@@ -308,6 +310,8 @@ void RPC4::CallLoopback( const char* uniqueID, BitStream* bitStream )
     else
         p = tcpInterface->AllocatePacket( out.GetNumberOfBytesUsed() );
 #endif
+    if( p == 0 )
+        return;
 
     if( rakPeerInterface )
         p->guid = rakPeerInterface->GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS );

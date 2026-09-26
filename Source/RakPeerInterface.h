@@ -510,7 +510,7 @@ public:
     /// \returns a packet for you to write to if you want to create a Packet for some reason.
     /// You can add it to the receive buffer with PushBackPacket
     /// \param[in] dataSize How many bytes to allocate for the buffer
-    /// \return A packet you can write to
+    /// \return A packet you can write to, or 0 if memory ran out (notifyOutOfMemory has been called)
     virtual Packet* AllocatePacket( unsigned dataSize ) = 0;
 
     /// Get the socket used with a particular active connection

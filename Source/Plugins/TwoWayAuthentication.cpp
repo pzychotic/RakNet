@@ -261,6 +261,8 @@ void TwoWayAuthentication::PushToUser( MessageID messageId, const std::string& p
     if( password.empty() == false )
         output.Write( password );
     Packet* p = AllocatePacketUnified( output.GetNumberOfBytesUsed() );
+    if( p == 0 )
+        return;
     p->systemAddress = remoteSystem.systemAddress;
     p->systemAddress.systemIndex = (SystemIndex)-1;
     p->guid = remoteSystem.rakNetGuid;

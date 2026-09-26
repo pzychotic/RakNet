@@ -107,8 +107,15 @@ Packet* PluginInterface2::AllocatePacketUnified( unsigned dataSize )
     }
 #endif
 
+    unsigned char* data = (unsigned char*)rakMalloc_Ex( dataSize, _FILE_AND_LINE_ );
+    if( data == 0 && dataSize != 0 )
+    {
+        notifyOutOfMemory( _FILE_AND_LINE_ );
+        return 0;
+    }
     Packet* packet = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
-    packet->data = (unsigned char*)rakMalloc_Ex( dataSize, _FILE_AND_LINE_ );
+    packet->data = data;
+    packet->length = dataSize;
     packet->bitSize = BYTES_TO_BITS( dataSize );
     packet->deleteData = true;
     packet->guid = UNASSIGNED_RAKNET_GUID;

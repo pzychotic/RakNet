@@ -244,6 +244,7 @@ protected:
     void SendUnified( const char* data, const int length, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
     bool SendListUnified( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
 
+    // 0 if memory ran out; notifyOutOfMemory has been called
     Packet* AllocatePacketUnified( unsigned dataSize );
     void PushBackPacketUnified( Packet* packet, bool pushAtHead );
     void DeallocPacketUnified( Packet* packet );

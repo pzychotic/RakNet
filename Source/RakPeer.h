@@ -958,6 +958,8 @@ protected:
 
     std::mutex packetReturnMutex;
     std::deque<Packet*> packetReturnQueue;
+    // Both return null after notifyOutOfMemory when an allocation fails; the caller drops
+    // the message. The second takes ownership of data either way, freeing it on failure.
     Packet* AllocPacket( unsigned dataSize, const char* file, unsigned int line );
     Packet* AllocPacket( unsigned dataSize, unsigned char* data, const char* file, unsigned int line );
 

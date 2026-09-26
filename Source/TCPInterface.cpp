@@ -697,8 +697,14 @@ void TCPInterface::DeallocatePacket( Packet* packet )
 }
 Packet* TCPInterface::AllocatePacket( unsigned dataSize )
 {
+    unsigned char* data = (unsigned char*)rakMalloc_Ex( dataSize, _FILE_AND_LINE_ );
+    if( data == 0 && dataSize != 0 )
+    {
+        notifyOutOfMemory( _FILE_AND_LINE_ );
+        return 0;
+    }
     Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
-    p->data = (unsigned char*)rakMalloc_Ex( dataSize, _FILE_AND_LINE_ );
+    p->data = data;
     p->length = dataSize;
     p->bitSize = BYTES_TO_BITS( dataSize );
     p->deleteData = false;

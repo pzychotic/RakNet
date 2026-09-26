@@ -68,13 +68,16 @@ void NatTypeDetectionClient::OnCompletion( NATTypeDetectionResult result )
 {
     Packet* p = AllocatePacketUnified( sizeof( MessageID ) + sizeof( unsigned char ) * 2 );
     //printf("Returning nat detection result to the user\n");
-    p->data[0] = ID_NAT_TYPE_DETECTION_RESULT;
-    p->systemAddress = serverAddress;
-    p->systemAddress.systemIndex = (SystemIndex)-1;
-    p->guid = rakPeerInterface->GetGuidFromSystemAddress( serverAddress );
-    p->data[1] = (unsigned char)result;
-    p->wasGeneratedLocally = true;
-    rakPeerInterface->PushBackPacket( p, true );
+    if( p != 0 )
+    {
+        p->data[0] = ID_NAT_TYPE_DETECTION_RESULT;
+        p->systemAddress = serverAddress;
+        p->systemAddress.systemIndex = (SystemIndex)-1;
+        p->guid = rakPeerInterface->GetGuidFromSystemAddress( serverAddress );
+        p->data[1] = (unsigned char)result;
+        p->wasGeneratedLocally = true;
+        rakPeerInterface->PushBackPacket( p, true );
+    }
 
     // Symmetric and port restricted are determined by server, so no need to notify server we are done
     if( result != NAT_TYPE_PORT_RESTRICTED && result != NAT_TYPE_SYMMETRIC )

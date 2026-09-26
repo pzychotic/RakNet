@@ -130,7 +130,7 @@ public:
     /// Queued events of lost connections
     SystemAddress HasLostConnection( void );
 
-    /// Return an allocated but empty packet, for custom use
+    /// Return an allocated but empty packet, for custom use, or 0 if memory ran out
     Packet* AllocatePacket( unsigned dataSize );
 
     // Push a packet back to the queue
