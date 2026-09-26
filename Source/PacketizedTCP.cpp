@@ -14,7 +14,6 @@
 #include "PacketizedTCP.h"
 #include "BitStream.h"
 #include "MessageIdentifiers.h"
-#include "RakAlloca.h"
 
 #include <stdint.h>
 

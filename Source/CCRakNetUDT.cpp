@@ -18,7 +18,6 @@
 #include <stdlib.h>
 //#include <memory.h>
 #include "RakAssert.h"
-#include "RakAlloca.h"
 
 namespace RakNet {
 

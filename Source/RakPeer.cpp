@@ -40,7 +40,6 @@
 #include "RakThread.h"
 #include "RakAssert.h"
 #include "RakNetVersion.h"
-#include "RakAlloca.h"
 #include "WSAStartupSingleton.h"
 
 #ifdef USE_THREADED_SEND

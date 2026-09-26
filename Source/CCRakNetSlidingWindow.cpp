@@ -17,7 +17,6 @@
 #include <cmath>
 #include <stdlib.h>
 #include "RakAssert.h"
-#include "RakAlloca.h"
 
 namespace RakNet {
 
