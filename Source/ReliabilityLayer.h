@@ -384,9 +384,8 @@ private:
     bool IsOlderOrderedPacket( OrderingIndexType newPacketOrderingIndex, OrderingIndexType waitingForPacketOrderingIndex );
 
     /// Split the passed packet into chunks under MTU_SIZE bytes (including headers) and save those new chunks
-    /// \retval false The array of chunks could not be allocated. \a internalPacket has been
-    /// freed and the message is dropped; the caller must not touch it.
-    bool SplitPacket( InternalPacket* internalPacket );
+    /// Takes ownership of \a internalPacket and releases it to the pool.
+    void SplitPacket( InternalPacket* internalPacket );
 
     /// Insert a packet into the split packet list
     /// \retval true \a internalPacket is now held by a live split packet channel, so a

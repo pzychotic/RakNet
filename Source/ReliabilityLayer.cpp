@@ -1374,9 +1374,8 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     if( splitPacket ) // If it uses a secure header it will be generated here
     {
         // Must split the packet.  This will also generate the SHA1 if it is required. It also adds it to the send list.
-        // False only if the chunk array could not be allocated, in which case SplitPacket has
-        // already freed internalPacket.
-        return SplitPacket( internalPacket );
+        SplitPacket( internalPacket );
+        return true;
     }
 
     RakAssert( internalPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
@@ -2537,9 +2536,8 @@ bool ReliabilityLayer::IsOlderOrderedPacket( OrderingIndexType newPacketOrdering
 
 //-------------------------------------------------------------------------------------------------------
 // Split the passed packet into chunks under MTU_SIZEbytes (including headers) and save those new chunks
-// Optimized version
 //-------------------------------------------------------------------------------------------------------
-bool ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
+void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 {
     // Doing all sizes in bytes in this function so I don't write partial bytes with split packets
     internalPacket->splitPacketCount = 1; // This causes GetMessageHeaderLengthBits to account for the split packet header
@@ -2549,56 +2547,29 @@ bool ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
     // index and a block size; MAXIMUM_MESSAGE_SIZE keeps it far below INT_MAX now, but the
     // signed arithmetic is gone rather than merely made unreachable.
     unsigned int maximumSendBlockBytes, byteOffset, bytesToSend;
-    InternalPacket** internalPacketArray;
 
     maximumSendBlockBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() );
 
     // Calculate how many packets we need to create
     internalPacket->splitPacketCount = ( ( dataByteLength - 1 ) / ( maximumSendBlockBytes ) + 1 );
 
-    // Optimization
-    // internalPacketArray = RakNet::OP_NEW<InternalPacket*>(internalPacket->splitPacketCount, _FILE_AND_LINE_ );
-    bool usedAlloca = false;
-#if USE_ALLOCA == 1
-    if( sizeof( InternalPacket* ) * internalPacket->splitPacketCount < MAX_ALLOCA_STACK_ALLOCATION )
-    {
-        internalPacketArray = (InternalPacket**)alloca( sizeof( InternalPacket* ) * internalPacket->splitPacketCount );
-        usedAlloca = true;
-    }
-    else
-#endif
-        internalPacketArray = (InternalPacket**)rakMalloc_Ex( sizeof( InternalPacket* ) * internalPacket->splitPacketCount, _FILE_AND_LINE_ );
-
-    // rakMalloc_Ex returns NULL rather than throwing (ADR-0002), and nothing checked it. At
-    // MAXIMUM_MESSAGE_SIZE this array is 512 KiB, which a memory-pressured process can
-    // plausibly fail to get. Drop the message rather than write through NULL.
-    if( internalPacketArray == 0 )
-    {
-        notifyOutOfMemory( _FILE_AND_LINE_ );
-        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-        ReleaseToInternalPacketPool( internalPacket );
-        return false;
-    }
-
-    for( uint32_t i = 0; i < internalPacket->splitPacketCount; ++i )
-    {
-        internalPacketArray[i] = AllocateFromInternalPacketPool();
-
-        *internalPacketArray[i] = *internalPacket;
-        internalPacketArray[i]->messageNumberAssigned = false;
-
-        if( i != 0 )
-            internalPacket->messageInternalOrder = internalOrderIndex++;
-    }
-
-    // This identifies which packet this is in the set
-    SplitPacketIndexType splitPacketIndex = 0;
-
     InternalPacketRefCountedData* refCounter = 0;
 
-    // Do a loop to send out all the packets
-    do
+    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+
+    // One pass per chunk: every step touches only this chunk, so no array of chunks is needed.
+    // Chunk i copies *internalPacket before internalOrderIndex advances for that i, which
+    // decides the messageInternalOrder each chunk carries.
+    for( SplitPacketIndexType splitPacketIndex = 0; splitPacketIndex < internalPacket->splitPacketCount; ++splitPacketIndex )
     {
+        InternalPacket* chunk = AllocateFromInternalPacketPool();
+
+        *chunk = *internalPacket;
+        chunk->messageNumberAssigned = false;
+
+        if( splitPacketIndex != 0 )
+            internalPacket->messageInternalOrder = internalOrderIndex++;
+
         byteOffset = splitPacketIndex * maximumSendBlockBytes;
         bytesToSend = dataByteLength - byteOffset;
 
@@ -2606,48 +2577,34 @@ bool ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
             bytesToSend = maximumSendBlockBytes;
 
         // Copy over our chunk of data
-
-        AllocInternalPacketData( internalPacketArray[splitPacketIndex], &refCounter, internalPacket->data, internalPacket->data + byteOffset );
-        //      internalPacketArray[ splitPacketIndex ]->data = (unsigned char*) rakMalloc_Ex( bytesToSend, _FILE_AND_LINE_ );
-        //      memcpy( internalPacketArray[ splitPacketIndex ]->data, internalPacket->data + byteOffset, bytesToSend );
+        AllocInternalPacketData( chunk, &refCounter, internalPacket->data, internalPacket->data + byteOffset );
 
         if( bytesToSend != maximumSendBlockBytes )
-            internalPacketArray[splitPacketIndex]->dataBitLength = internalPacket->dataBitLength - splitPacketIndex * ( maximumSendBlockBytes << 3 );
+            chunk->dataBitLength = internalPacket->dataBitLength - splitPacketIndex * ( maximumSendBlockBytes << 3 );
         else
-            internalPacketArray[splitPacketIndex]->dataBitLength = bytesToSend << 3;
+            chunk->dataBitLength = bytesToSend << 3;
 
-        internalPacketArray[splitPacketIndex]->splitPacketIndex = splitPacketIndex;
-        internalPacketArray[splitPacketIndex]->splitPacketId = splitPacketId;
-        internalPacketArray[splitPacketIndex]->splitPacketCount = internalPacket->splitPacketCount;
-        RakAssert( internalPacketArray[splitPacketIndex]->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
-    } while( ++splitPacketIndex < internalPacket->splitPacketCount );
+        chunk->splitPacketIndex = splitPacketIndex;
+        chunk->splitPacketId = splitPacketId;
+        chunk->splitPacketCount = internalPacket->splitPacketCount;
+        RakAssert( chunk->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+
+        // Queue the chunk for sending
+        chunk->headerLength = headerLength;
+        AddToUnreliableLinkedList( chunk );
+        RakAssert( chunk->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+        RakAssert( chunk->messageNumberAssigned == false );
+        outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( chunk->priority ), chunk } );
+        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+        statistics.messageInSendBuffer[(int)chunk->priority]++;
+        statistics.bytesInSendBuffer[(int)chunk->priority] += (double)BITS_TO_BYTES( chunk->dataBitLength );
+    }
 
     splitPacketId++; // It's ok if this wraps to 0
-
-    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
-
-    // Copy all the new packets into the split packet list
-    for( uint32_t i = 0; i < internalPacket->splitPacketCount; ++i )
-    {
-        internalPacketArray[i]->headerLength = headerLength;
-        RakAssert( internalPacketArray[i]->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
-        AddToUnreliableLinkedList( internalPacketArray[i] );
-        RakAssert( internalPacketArray[i]->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
-        RakAssert( internalPacketArray[i]->messageNumberAssigned == false );
-        outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( internalPacketArray[i]->priority ), internalPacketArray[i] } );
-        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
-        statistics.messageInSendBuffer[(int)internalPacketArray[i]->priority]++;
-        statistics.bytesInSendBuffer[(int)internalPacketArray[i]->priority] += (double)BITS_TO_BYTES( internalPacketArray[i]->dataBitLength );
-    }
 
     // Do not delete, original is referenced by all split packets to avoid numerous allocations. See AllocInternalPacketData above
     //  FreeInternalPacketData(internalPacket, _FILE_AND_LINE_ );
     ReleaseToInternalPacketPool( internalPacket );
-
-    if( usedAlloca == false )
-        rakFree_Ex( internalPacketArray, _FILE_AND_LINE_ );
-
-    return true;
 }
 
 //-------------------------------------------------------------------------------------------------------
