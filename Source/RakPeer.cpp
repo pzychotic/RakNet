@@ -3833,14 +3833,24 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool useCallerDataAllocation, RakNet::TimeUS currentTime, uint32_t receipt )
 {
-    unsigned* sendList;
-    unsigned sendListSize;
-    bool sendListHeapAllocated = false; // sendList may come from alloca or the heap; only free the latter
-    bool callerDataAllocationUsed;
-    unsigned int remoteSystemIndex, sendListIndex; // Iterates into the list of remote systems
-    callerDataAllocationUsed = false;
+    unsigned int remoteSystemIndex;
 
-    sendListSize = 0;
+    // Sends to one remote system. Only the last send may take the caller's allocation: Send
+    // may split the packet and thus deallocate data, so it is not valid for a later send.
+    auto sendTo = [&]( unsigned int idx, bool useData )
+    {
+        remoteSystemList[idx].reliabilityLayer.Send( data, numberOfBitsToSend, priority, reliability, orderingChannel, useData == false, remoteSystemList[idx].MTUSize, currentTime, receipt );
+
+        if( reliability == RELIABLE ||
+            reliability == RELIABLE_ORDERED ||
+            reliability == RELIABLE_SEQUENCED ||
+            reliability == RELIABLE_WITH_ACK_RECEIPT ||
+            reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT
+            //          ||
+            //          reliability==RELIABLE_SEQUENCED_WITH_ACK_RECEIPT
+        )
+            remoteSystemList[idx].lastReliableSend = ( RakNet::TimeMS )( currentTime / (RakNet::TimeUS)1000 );
+    };
 
     if( systemIdentifier.systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
         remoteSystemIndex = GetIndexFromSystemAddress( systemIdentifier.systemAddress, true );
@@ -3860,78 +3870,39 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
             return false;
         }
 
-#if USE_ALLOCA == 1
-        sendList = (unsigned*)alloca( sizeof( unsigned ) );
-#else
-        sendList = (unsigned*)rakMalloc_Ex( sizeof( unsigned ), _FILE_AND_LINE_ );
-        sendListHeapAllocated = true;
-#endif
+        if( remoteSystemList[remoteSystemIndex].isActive == false ||
+            remoteSystemList[remoteSystemIndex].connectMode == RemoteSystemStruct::DISCONNECT_ASAP ||
+            remoteSystemList[remoteSystemIndex].connectMode == RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY ||
+            remoteSystemList[remoteSystemIndex].connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
+            return false;
 
-        if( remoteSystemList[remoteSystemIndex].isActive &&
-            remoteSystemList[remoteSystemIndex].connectMode != RemoteSystemStruct::DISCONNECT_ASAP &&
-            remoteSystemList[remoteSystemIndex].connectMode != RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY &&
-            remoteSystemList[remoteSystemIndex].connectMode != RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
-        {
-            sendList[0] = remoteSystemIndex;
-            sendListSize = 1;
-        }
+        sendTo( remoteSystemIndex, useCallerDataAllocation );
+        return useCallerDataAllocation; // As below
     }
-    else
+
+    // Hold one eligible target back, so that the last one, which alone may take the
+    // caller's allocation, is known without listing them all first.
+    // remoteSystemList in network thread
+    unsigned int heldIndex = (unsigned int)-1;
+    for( unsigned int idx = 0; idx < maximumNumberOfPeers; idx++ )
     {
-#if USE_ALLOCA == 1
-        if( sizeof( unsigned ) * maximumNumberOfPeers < MAX_ALLOCA_STACK_ALLOCATION )
-            sendList = (unsigned*)alloca( sizeof( unsigned ) * maximumNumberOfPeers );
-        else
-#endif
-        {
-            sendList = (unsigned*)rakMalloc_Ex( sizeof( unsigned ) * maximumNumberOfPeers, _FILE_AND_LINE_ );
-            sendListHeapAllocated = true;
-        }
+        if( remoteSystemIndex != (unsigned int)-1 && idx == remoteSystemIndex )
+            continue;
 
-        // remoteSystemList in network thread
-        unsigned int idx;
-        for( idx = 0; idx < maximumNumberOfPeers; idx++ )
+        if( remoteSystemList[idx].isActive && remoteSystemList[idx].systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
         {
-            if( remoteSystemIndex != (unsigned int)-1 && idx == remoteSystemIndex )
-                continue;
-
-            if( remoteSystemList[idx].isActive && remoteSystemList[idx].systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
-                sendList[sendListSize++] = idx;
+            if( heldIndex != (unsigned int)-1 )
+                sendTo( heldIndex, false );
+            heldIndex = idx;
         }
     }
 
-    if( sendListSize == 0 )
-    {
-        if( sendListHeapAllocated )
-            rakFree_Ex( sendList, _FILE_AND_LINE_ );
-
+    if( heldIndex == (unsigned int)-1 )
         return false;
-    }
 
-    for( sendListIndex = 0; sendListIndex < sendListSize; sendListIndex++ )
-    {
-        // Send may split the packet and thus deallocate data.  Don't assume data is valid if we use the callerAllocationData
-        bool useData = useCallerDataAllocation && callerDataAllocationUsed == false && sendListIndex + 1 == sendListSize;
-        remoteSystemList[sendList[sendListIndex]].reliabilityLayer.Send( data, numberOfBitsToSend, priority, reliability, orderingChannel, useData == false, remoteSystemList[sendList[sendListIndex]].MTUSize, currentTime, receipt );
-        if( useData )
-            callerDataAllocationUsed = true;
-
-        if( reliability == RELIABLE ||
-            reliability == RELIABLE_ORDERED ||
-            reliability == RELIABLE_SEQUENCED ||
-            reliability == RELIABLE_WITH_ACK_RECEIPT ||
-            reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT
-            //          ||
-            //          reliability==RELIABLE_SEQUENCED_WITH_ACK_RECEIPT
-        )
-            remoteSystemList[sendList[sendListIndex]].lastReliableSend = ( RakNet::TimeMS )( currentTime / (RakNet::TimeUS)1000 );
-    }
-
-    if( sendListHeapAllocated )
-        rakFree_Ex( sendList, _FILE_AND_LINE_ );
-
+    sendTo( heldIndex, useCallerDataAllocation );
     // Return value only meaningful if true was passed for useCallerDataAllocation.  Means the reliability layer used that data copy, so the caller should not deallocate it
-    return callerDataAllocationUsed;
+    return useCallerDataAllocation;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ResetSendReceipt( void )
