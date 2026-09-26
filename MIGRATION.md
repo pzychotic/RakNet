@@ -362,6 +362,17 @@ timing ones.
 split-packet reassembly strategy, but the code behind it never compiled in any RakNet
 release, so no build can ever have had it set to `1` — nothing you were doing stops working.
 
+**`RakAlloca.h`, `USE_ALLOCA`, `MAX_ALLOCA_STACK_ALLOCATION`.** Source-only, not
+wire-visible. `RakAlloca.h` is gone, and RakNet no longer uses `alloca` anywhere. The public
+`RakMemoryOverride.h` used to include it, which pulled `<malloc.h>` (and `<alloca.h>` outside
+Windows and FreeBSD) into every file that included a RakNet header. Code that called
+`alloca`, `_alloca` or `malloc.h` functions without including the header itself will now fail
+to compile. Fix: include `<malloc.h>`/`<alloca.h>` directly.
+
+`USE_ALLOCA` and `MAX_ALLOCA_STACK_ALLOCATION` are no longer read. A build that defines
+them still compiles, and it loses nothing: the stack buffers they controlled have been
+replaced by code that needs no scratch buffer at all.
+
 The plugins that remain are `NatPunchthroughClient`/`Server`, `NatTypeDetectionClient`/
 `Server`, `Router2`, `RelayPlugin`, `UDPProxyClient`/`Coordinator`/`Server`,
 `UDPForwarder`, `RPC4Plugin`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistory`,
