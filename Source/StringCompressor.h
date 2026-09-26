@@ -16,6 +16,8 @@
 
 #include "Export.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 namespace RakNet {
@@ -64,6 +66,13 @@ public:
     StringCompressor();
 
 private:
+    /// Reads a compressed string's bit length, and fails if \a input holds fewer unread bits.
+    bool ReadStringBitLength( uint32_t& stringBitLength, BitStream* input );
+
+    /// Decodes \a stringBitLength bits into \a output, which holds \a outputSize bytes
+    /// (at least one), truncating to \a outputSize - 1 characters plus the terminator.
+    void DecodeStringBits( char* output, size_t outputSize, uint32_t stringBitLength, BitStream* input );
+
     /// Singleton instance
     static StringCompressor* instance;
 

@@ -114,20 +114,29 @@ bool StringCompressor::DecodeString( char* output, int maxCharsToWrite, BitStrea
 
     output[0] = 0;
 
+    if( ReadStringBitLength( stringBitLength, input ) == false )
+        return false;
+
+    DecodeStringBits( output, (size_t)maxCharsToWrite, stringBitLength, input );
+    return true;
+}
+
+bool StringCompressor::ReadStringBitLength( uint32_t& stringBitLength, BitStream* input )
+{
     if( input->ReadCompressed( stringBitLength ) == false )
         return false;
 
-    if( (unsigned)input->GetNumberOfUnreadBits() < stringBitLength )
-        return false;
+    return (unsigned)input->GetNumberOfUnreadBits() >= stringBitLength;
+}
 
-    int bytesInStream = m_pHuffmanEncodingTree->DecodeArray( input, stringBitLength, maxCharsToWrite, (unsigned char*)output );
+void StringCompressor::DecodeStringBits( char* output, size_t outputSize, uint32_t stringBitLength, BitStream* input )
+{
+    size_t bytesInStream = m_pHuffmanEncodingTree->DecodeArray( input, stringBitLength, outputSize, (unsigned char*)output );
 
-    if( bytesInStream < maxCharsToWrite )
+    if( bytesInStream < outputSize )
         output[bytesInStream] = 0;
     else
-        output[maxCharsToWrite - 1] = 0;
-
-    return true;
+        output[outputSize - 1] = 0;
 }
 
 void StringCompressor::EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output )
@@ -142,25 +151,23 @@ bool StringCompressor::DecodeString( std::string& output, int maxCharsToWrite, B
         return true;
     }
 
-    bool out;
+    uint32_t stringBitLength;
 
-#if USE_ALLOCA == 1
-    if( maxCharsToWrite < MAX_ALLOCA_STACK_ALLOCATION )
+    if( ReadStringBitLength( stringBitLength, input ) == false )
     {
-        char* destinationBlock = (char*)alloca( maxCharsToWrite );
-        out = DecodeString( destinationBlock, maxCharsToWrite, input );
-        output = destinationBlock;
-    }
-    else
-#endif
-    {
-        char* destinationBlock = (char*)rakMalloc_Ex( maxCharsToWrite, _FILE_AND_LINE_ );
-        out = DecodeString( destinationBlock, maxCharsToWrite, input );
-        output = destinationBlock;
-        rakFree_Ex( destinationBlock, _FILE_AND_LINE_ );
+        output.clear();
+        return false;
     }
 
-    return out;
+    // Every Huffman code is at least one bit, so stringBitLength bits decode to at most
+    // stringBitLength characters. The buffer is therefore bounded by what this Peer has
+    // already received, whatever maxCharsToWrite says. Comparing before adding keeps the
+    // + 1 from wrapping.
+    size_t outputSize = stringBitLength < (uint32_t)maxCharsToWrite ? (size_t)stringBitLength + 1 : (size_t)maxCharsToWrite;
+    output.resize( outputSize );
+    DecodeStringBits( &output[0], outputSize, stringBitLength, input );
+    output.resize( strlen( output.c_str() ) );
+    return true;
 }
 
 } // namespace RakNet
