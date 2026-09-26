@@ -109,10 +109,9 @@ public:
             return false;
         }
 
-        // rakMalloc_Ex rather than OP_NEW_ARRAY: OP_NEW_ARRAY takes an int, so a count
-        // at or above 0x80000000 would arrive negative, and it allocates with a throwing
-        // new either way. ADR-0002 rules both out in Source/ - failure here has to be a
-        // return value, not a terminate().
+        // rakMalloc_Ex rather than OP_NEW_ARRAY: a remote System drives this size, even
+        // capped, so failure here has to be a return value the caller can act on.
+        // OP_NEW_ARRAY's allocation failure is fatal (ADR-0004), and a null check is not.
         data = (InternalPacket**)rakMalloc_Ex( sizeof( InternalPacket* ) * (size_t)count, file, line );
         if( data == NULL )
         {

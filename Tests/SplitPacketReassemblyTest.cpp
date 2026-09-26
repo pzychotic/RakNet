@@ -18,7 +18,7 @@ SortedSplittedPackets::Preallocate sizes from it is filled with NULL, so every p
 is touched, and the wire minimum for a split message is 14 bytes - so one datagram
 buys an allocation of up to 16 GiB per channel and 105 channels fit in an MTU. Four
 cases pin the bound (MAXIMUM_SPLIT_PACKET_COUNT), the rejection of a count above it,
-the rejection of a count that would arrive negative through OP_NEW_ARRAY's int
+the rejection of a count that once arrived negative through OP_NEW_ARRAY's former int
 parameter, and what happens when the capped allocation still fails.
 
 A fifth pins what the cap does *not* close. A channel is sized once, from the first
@@ -402,11 +402,11 @@ TEST_CASE( "A split packet count above the cap is dropped without allocating", "
 
 TEST_CASE( "An enormous split packet count is dropped rather than allocated", "[network]" )
 {
-    // 0x7FFFFFFF is the largest count that survives OP_NEW_ARRAY's int parameter, so it
-    // is the worst case that reaches the allocator as a positive size: 16 GiB from a
-    // 14-byte message. 0x80000000 is the smallest that arrives negative, where the
-    // allocation throws std::bad_array_new_length instead - uncaught, so a remote kill.
-    // 0xFFFFFFFF is the top of the field. All three must be refused at the same gate.
+    // All three are refused at the MAXIMUM_SPLIT_PACKET_COUNT gate before any allocator
+    // sees them. They date from when OP_NEW_ARRAY took an int: 0x7FFFFFFF was the largest
+    // count that reached it as a positive size, 16 GiB from a 14-byte message, and
+    // 0x80000000 the smallest that arrived negative, throwing std::bad_array_new_length
+    // uncaught, so a remote kill. 0xFFFFFFFF is the top of the field.
     const SplitPacketIndexType hostileCount = GENERATE( (SplitPacketIndexType)0x7FFFFFFF,
                                                         (SplitPacketIndexType)0x80000000,
                                                         (SplitPacketIndexType)0xFFFFFFFF );
