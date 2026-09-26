@@ -101,6 +101,26 @@ void ( *GetFree_Ex() )( void* p, const char* file, unsigned int line )
 {
     return rakFree_Ex;
 }
+void* RakAllocateOrAbort( size_t size, const char* file, unsigned int line )
+{
+    // operator new's own contract: on failure call the new handler and retry, and end
+    // the process when there is none. ADR-0004 makes std::set_new_handler the embedder's
+    // OOM hook, so it has to run under the override too, not only under operator new.
+    // abort rather than throw keeps this usable when Source/ builds without exceptions.
+    for( ;; )
+    {
+        void* buffer = rakMalloc_Ex( size, file, line );
+        if( buffer != 0 )
+            return buffer;
+
+        notifyOutOfMemory( file, line );
+        std::new_handler handler = std::get_new_handler();
+        if( handler == 0 )
+            std::abort();
+        handler();
+    }
+}
+
 void* _RakMalloc( size_t size )
 {
     return malloc( size );

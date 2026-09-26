@@ -16,6 +16,7 @@
 
 #include "Export.h"
 #include "RakNetDefines.h"
+#include <cstdlib>
 #include <new>
 
 #include "RakAlloca.h"
@@ -59,11 +60,18 @@ extern RAK_DLL_EXPORT void* ( *GetMalloc_Ex() )( size_t size, const char* file, 
 extern RAK_DLL_EXPORT void* ( *GetRealloc_Ex() )( void* p, size_t size, const char* file, unsigned int line );
 extern RAK_DLL_EXPORT void  ( *GetFree_Ex() )( void* p, const char* file, unsigned int line );
 
+// Allocates through rakMalloc_Ex for the _USE_RAK_MEMORY_OVERRIDE==1 templates below, and
+// never returns null. Other rakMalloc sites notify and return failure (ADR-0004), but the
+// OP_NEW family has no failure value and its callers assume success, so this fails the way
+// operator new does in the ==0 branch. Exported because the templates instantiate in the
+// embedder's code.
+void RAK_DLL_EXPORT* RakAllocateOrAbort( size_t size, const char* file, unsigned int line );
+
 template<class Type>
 RAK_DLL_EXPORT Type* OP_NEW( const char* file, unsigned int line )
 {
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    char* buffer = (char*)( GetMalloc_Ex() )( sizeof( Type ), file, line );
+    char* buffer = (char*)RakAllocateOrAbort( sizeof( Type ), file, line );
     Type* t = new( buffer ) Type;
     return t;
 #else
@@ -77,7 +85,7 @@ template<class Type, class P1>
 RAK_DLL_EXPORT Type* OP_NEW_1( const char* file, unsigned int line, const P1& p1 )
 {
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    char* buffer = (char*)( GetMalloc_Ex() )( sizeof( Type ), file, line );
+    char* buffer = (char*)RakAllocateOrAbort( sizeof( Type ), file, line );
     Type* t = new( buffer ) Type( p1 );
     return t;
 #else
@@ -91,7 +99,7 @@ template<class Type, class P1, class P2>
 RAK_DLL_EXPORT Type* OP_NEW_2( const char* file, unsigned int line, const P1& p1, const P2& p2 )
 {
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    char* buffer = (char*)( GetMalloc_Ex() )( sizeof( Type ), file, line );
+    char* buffer = (char*)RakAllocateOrAbort( sizeof( Type ), file, line );
     Type* t = new( buffer ) Type( p1, p2 );
     return t;
 #else
@@ -105,7 +113,7 @@ template<class Type, class P1, class P2, class P3>
 RAK_DLL_EXPORT Type* OP_NEW_3( const char* file, unsigned int line, const P1& p1, const P2& p2, const P3& p3 )
 {
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    char* buffer = (char*)( GetMalloc_Ex() )( sizeof( Type ), file, line );
+    char* buffer = (char*)RakAllocateOrAbort( sizeof( Type ), file, line );
     Type* t = new( buffer ) Type( p1, p2, p3 );
     return t;
 #else
@@ -119,7 +127,7 @@ template<class Type, class P1, class P2, class P3, class P4>
 RAK_DLL_EXPORT Type* OP_NEW_4( const char* file, unsigned int line, const P1& p1, const P2& p2, const P3& p3, const P4& p4 )
 {
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    char* buffer = (char*)( GetMalloc_Ex() )( sizeof( Type ), file, line );
+    char* buffer = (char*)RakAllocateOrAbort( sizeof( Type ), file, line );
     Type* t = new( buffer ) Type( p1, p2, p3, p4 );
     return t;
 #else
@@ -130,22 +138,28 @@ RAK_DLL_EXPORT Type* OP_NEW_4( const char* file, unsigned int line, const P1& p1
 }
 
 
+// count is unsigned so an unsigned caller's value cannot arrive negative: new Type[negative]
+// throws std::bad_array_new_length, which is bad input rather than allocation failure.
 template<class Type>
-RAK_DLL_EXPORT Type* OP_NEW_ARRAY( const int count, const char* file, unsigned int line )
+RAK_DLL_EXPORT Type* OP_NEW_ARRAY( const size_t count, const char* file, unsigned int line )
 {
     if( count == 0 )
         return 0;
 
 #if _USE_RAK_MEMORY_OVERRIDE == 1
-    //      Type *t;
-    char* buffer = (char*)( GetMalloc_Ex() )( sizeof( int ) + sizeof( Type ) * count, file, line );
-    ( (int*)buffer )[0] = count;
-    for( int i = 0; i < count; i++ )
+    // A byte size that does not fit in size_t is bad input, which callers bound (ADR-0004),
+    // not memory exhaustion, so it skips notifyOutOfMemory and the new handler. This is
+    // only the backstop: new[] ends the ==0 branch with std::bad_array_new_length, and
+    // letting the size wrap would construct past the end of a short buffer.
+    if( count > ( ( size_t )-1 - sizeof( size_t ) ) / sizeof( Type ) )
+        std::abort();
+    char* buffer = (char*)RakAllocateOrAbort( sizeof( size_t ) + sizeof( Type ) * count, file, line );
+    ( (size_t*)buffer )[0] = count;
+    for( size_t i = 0; i < count; i++ )
     {
-        //t =
-        new( buffer + sizeof( int ) + i * sizeof( Type ) ) Type;
+        new( buffer + sizeof( size_t ) + i * sizeof( Type ) ) Type;
     }
-    return (Type*)( buffer + sizeof( int ) );
+    return (Type*)( buffer + sizeof( size_t ) );
 #else
     (void)file;
     (void)line;
@@ -175,14 +189,14 @@ RAK_DLL_EXPORT void OP_DELETE_ARRAY( Type* buff, const char* file, unsigned int 
     if( buff == 0 )
         return;
 
-    int count = ( (int*)( (char*)buff - sizeof( int ) ) )[0];
+    size_t count = ( (size_t*)( (char*)buff - sizeof( size_t ) ) )[0];
     Type* t;
-    for( int i = 0; i < count; i++ )
+    for( size_t i = 0; i < count; i++ )
     {
         t = buff + i;
         t->~Type();
     }
-    ( GetFree_Ex() )( (char*)buff - sizeof( int ), file, line );
+    ( GetFree_Ex() )( (char*)buff - sizeof( size_t ), file, line );
 #else
     (void)file;
     (void)line;
