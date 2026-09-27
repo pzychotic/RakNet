@@ -227,7 +227,6 @@ void TwoWayAuthentication::OnClosedConnection( const SystemAddress& systemAddres
     (void)lostConnectionReason;
 
     // Remove from pending challenges
-    outgoingChallenges.erase( outgoingChallenges .end());
     for( auto it = outgoingChallenges.begin(); it != outgoingChallenges.end(); )
     {
         if( ( rakNetGUID != UNASSIGNED_RAKNET_GUID && (*it).remoteSystem.rakNetGuid == rakNetGUID ) ||

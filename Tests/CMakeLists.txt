@@ -83,6 +83,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceCloseConnectionByAddressTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceFullClientTableTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TruncatedConnectionRequestTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TwoWayAuthenticationClosedConnectionTest.cpp
 )
 
 # Support code shared by the tests.
