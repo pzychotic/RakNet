@@ -457,3 +457,26 @@ including the first. An undesignated router's `ID_ROUTER_2_REROUTED` no longer r
 A Designated router may announce at most 16 forwarded connections that have not yet
 connected. `Router2::SetMaxPendingForwardsPerIntermediary` changes the cap, and
 `GetPendingForwardsRefused` counts what it dropped.
+
+**`UDPProxyClient`.** Stock took every `ID_UDP_PROXY_GENERAL` message from any connected
+System. A request to ping the proxy servers made the Peer ping every address it listed, a
+forwarding notification made it ping an address of the sender's choosing and fire
+`OnForwardingNotification`, and any System could fire any of the requester's result
+callbacks with a proxy address of its choosing.
+
+- As the requester, a Peer now takes a result only from the coordinator it asked, for a
+  source and target it asked about, while that request is outstanding. A final result
+  retires the request; so do `timeoutOnNoDataMS` and the coordinator's connection closing.
+  At most `UDPProxyClient::MAX_OUTSTANDING_REQUESTS` (64) may be outstanding, and
+  `RequestForwarding` returns `false` at the cap. A result later than `timeoutOnNoDataMS`
+  fires no callback, so pass comfortably more than the coordinator's three-second ping wait.
+- As the target, a Peer takes a forwarding notification only from a coordinator designated
+  with `UDPProxyClient::AddCoordinator( SystemAddress )`. The same goes for the request to
+  ping the proxy servers, which both ends receive. A designation lapses when the
+  coordinator's connection closes, and must be made again if it reconnects.
+
+**Call `AddCoordinator` on every Peer that may be a forwarding target.** Without it the
+target never pings the proxy server, so a target behind NAT never opens its router to it and
+is unreachable, and `OnForwardingNotification` never fires. The requester's own results need
+no designation. An undesignated requester ignores the ping request, and the coordinator
+goes on without its pings after its three-second ping timeout.

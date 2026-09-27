@@ -103,6 +103,16 @@ struct UDPProxyClientResultHandler
 /// \details When NAT Punchthrough fails, it is possible to use a non-NAT system to forward messages from us to the recipient, and vice-versa.<BR>
 /// The class to forward messages is UDPForwarder, and it is triggered over the network via the UDPProxyServer plugin.<BR>
 /// The UDPProxyClient connects to UDPProxyCoordinator to get a list of servers running UDPProxyServer, and the coordinator will relay our forwarding request
+///
+/// A Peer acts on a coordinator's message only if it asked for it or the coordinator is one it designated.
+/// A result of RequestForwarding() is taken only from the coordinator it went to, while that request is outstanding.
+/// A request to ping the proxy servers, and a notification that another System set up forwarding to this Peer, are taken
+/// only from a coordinator designated with AddCoordinator(), since a forwarding target has asked for nothing.
+/// Anything else is consumed and dropped.
+///
+/// Residual risk: a proxy server's pong is an offline datagram, matched to its ping only by the server's address.
+/// A System that can spoof that address can report a low ping and so steer which proxy server is chosen.
+/// Closing that needs a nonce in the ping, which would change the core ping layout.
 /// \sa NatPunchthroughServer
 /// \sa NatPunchthroughClient
 /// \ingroup UDP_PROXY_GROUP
@@ -112,6 +122,9 @@ public:
     // GetInstance() and DestroyInstance(instance*)
     STATIC_FACTORY_DECLARATIONS( UDPProxyClient )
 
+    /// How many RequestForwarding() calls may await their final result at once. At the cap, RequestForwarding() returns false.
+    static constexpr unsigned int MAX_OUTSTANDING_REQUESTS = 64;
+
     UDPProxyClient();
     ~UDPProxyClient();
 
@@ -119,6 +132,21 @@ public:
     /// Set before calling RequestForwarding or you won't know what happened
     /// \param[in] resultHandler
     void SetResultHandler( UDPProxyClientResultHandler* rh );
+
+    /// \brief Designates the System connected at \a systemAddress as a UDPProxyCoordinator this Peer takes unrequested messages from.
+    /// \details Call it on every Peer that may be a forwarding target. Only a Designated coordinator can make this Peer ping a
+    /// proxy server, which is how a target behind NAT opens its router to the proxy, and only its notifications reach
+    /// UDPProxyClientResultHandler::OnForwardingNotification(). The coordinator also asks the requester to ping the proxy servers;
+    /// an undesignated requester ignores that, and the coordinator goes on without its pings once its ping timeout passes.
+    ///
+    /// The designation is by address. It may be made before the coordinator connects, and lapses when the connection at that
+    /// address closes: a System that connects from the same address after that is not Designated until AddCoordinator() is
+    /// called again. Shutting the Peer down drops every designation.
+    /// \param[in] systemAddress The coordinator's address, as this Peer sees its connection.
+    void AddCoordinator( const SystemAddress& systemAddress );
+
+    /// Withdraws a designation made with AddCoordinator().
+    void RemoveCoordinator( const SystemAddress& systemAddress );
 
     /// Sends a request to proxyCoordinator to find a server and have that server setup UDPForwarder::StartForwarding() on our address to \a targetAddressAsSeenFromCoordinator
     /// The forwarded datagrams can be from any UDP source, not just RakNet
@@ -131,7 +159,12 @@ public:
     /// \param[in] targetAddressAsSeenFromCoordinator External IP address of the system we want to forward messages to. If this system is connected to UDPProxyCoordinator at this address using RakNet, that system will ping the server and thus open the router for incoming communication. In any other case, you are responsible for doing your own network communication to have that system ping the server. See also targetGuid in the other version of RequestForwarding(), to avoid the need to know the IP address to the coordinator of the destination.
     /// \param[in] timeoutOnNoData If no data is sent by the forwarded systems, how long before removing the forward entry from UDPForwarder? UDP_FORWARDER_MAXIMUM_TIMEOUT is the maximum value. Recommended 10 seconds.
     /// \param[in] serverSelectionBitstream If you want to send data to UDPProxyCoordinator::GetBestServer(), write it here
-    /// \return true if the request was sent, false if we are not connected to proxyCoordinator
+    /// \note The request stays outstanding until its final result arrives, the connection to \a proxyCoordinator closes, or \a timeoutOnNoDataMS passes.
+    /// Only a result that matches an outstanding request reaches the result handler. At most MAX_OUTSTANDING_REQUESTS may be outstanding;
+    /// asking again for a source and target already outstanding with \a proxyCoordinator restarts its timeout and takes no new entry.
+    /// A result that arrives after \a timeoutOnNoDataMS is dropped without a callback. With more than one proxy server the coordinator
+    /// may wait about three seconds for pings before it answers, so pass comfortably more than that.
+    /// \return true if the request was sent, false if we are not connected to proxyCoordinator, no result handler is set, or MAX_OUTSTANDING_REQUESTS are outstanding
     bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
 
     /// Same as above, but specify the target with a GUID, in case you don't know what its address is to the coordinator
@@ -142,6 +175,7 @@ public:
     virtual void Update( void );
     virtual PluginReceiveResult OnReceive( Packet* packet );
     virtual void OnRakPeerShutdown( void );
+    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
 
     struct ServerWithPing
     {
@@ -165,9 +199,27 @@ public:
     std::vector<PingServerGroup*> pingServerGroups;
 
 protected:
+    // A RequestForwarding() call awaiting its final result
+    struct OutstandingRequest
+    {
+        SystemAddress coordinatorAddress;
+        // As passed. UNASSIGNED_SYSTEM_ADDRESS matches whatever the coordinator writes in its place.
+        SystemAddress sourceAddress;
+        bool usesAddress;
+        SystemAddress targetAddress;
+        RakNetGUID targetGuid;
+        RakNet::TimeMS requestTime;
+        RakNet::TimeMS timeoutOnNoDataMS;
+    };
+
     void OnPingServers( Packet* packet );
+    bool IsDesignatedCoordinator( const SystemAddress& systemAddress ) const;
+    bool AddOutstandingRequest( const OutstandingRequest& request );
+    std::vector<OutstandingRequest>::iterator FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& sourceAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid );
     void Clear( void );
     UDPProxyClientResultHandler* resultHandler;
+    std::vector<SystemAddress> coordinators;
+    std::vector<OutstandingRequest> outstandingRequests;
 };
 
 } // namespace RakNet

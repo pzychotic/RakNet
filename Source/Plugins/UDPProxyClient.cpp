@@ -18,6 +18,7 @@
 #include "MessageIdentifiers.h"
 #include "GetTime.h"
 
+#include <algorithm>
 #include <string>
 
 namespace RakNet {
@@ -42,6 +43,48 @@ void UDPProxyClient::SetResultHandler( UDPProxyClientResultHandler* rh )
 {
     resultHandler = rh;
 }
+void UDPProxyClient::AddCoordinator( const SystemAddress& systemAddress )
+{
+    if( !IsDesignatedCoordinator( systemAddress ) )
+        coordinators.push_back( systemAddress );
+}
+void UDPProxyClient::RemoveCoordinator( const SystemAddress& systemAddress )
+{
+    coordinators.erase( std::remove( coordinators.begin(), coordinators.end(), systemAddress ), coordinators.end() );
+}
+bool UDPProxyClient::IsDesignatedCoordinator( const SystemAddress& systemAddress ) const
+{
+    return std::find( coordinators.begin(), coordinators.end(), systemAddress ) != coordinators.end();
+}
+bool UDPProxyClient::AddOutstandingRequest( const OutstandingRequest& request )
+{
+    for( OutstandingRequest& existing : outstandingRequests )
+    {
+        if( existing.coordinatorAddress == request.coordinatorAddress &&
+            existing.sourceAddress == request.sourceAddress &&
+            existing.usesAddress == request.usesAddress &&
+            ( request.usesAddress ? existing.targetAddress == request.targetAddress : existing.targetGuid == request.targetGuid ) )
+        {
+            // The coordinator answers a repeat with ID_UDP_PROXY_IN_PROGRESS, and the first request's final result retires both
+            existing.requestTime = request.requestTime;
+            existing.timeoutOnNoDataMS = request.timeoutOnNoDataMS;
+            return true;
+        }
+    }
+    if( outstandingRequests.size() >= MAX_OUTSTANDING_REQUESTS )
+        return false;
+    outstandingRequests.push_back( request );
+    return true;
+}
+std::vector<UDPProxyClient::OutstandingRequest>::iterator UDPProxyClient::FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& sourceAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid )
+{
+    return std::find_if( outstandingRequests.begin(), outstandingRequests.end(), [&]( const OutstandingRequest& request ) {
+        // The coordinator resolves the target the request did not name, so match only the one it did
+        return request.coordinatorAddress == coordinatorAddress &&
+               ( request.sourceAddress == UNASSIGNED_SYSTEM_ADDRESS || request.sourceAddress == sourceAddress ) &&
+               ( request.usesAddress ? request.targetAddress == targetAddress : request.targetGuid == targetGuid );
+    } );
+}
 bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, RakNetGUID targetGuid, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream )
 {
     // Return false if not connected
@@ -52,6 +95,17 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
     // Pretty much a bug not to set the result handler, as otherwise you won't know if the operation succeeed or not
     RakAssert( resultHandler != 0 );
     if( resultHandler == 0 )
+        return false;
+
+    OutstandingRequest request;
+    request.coordinatorAddress = proxyCoordinator;
+    request.sourceAddress = sourceAddress;
+    request.usesAddress = false;
+    request.targetAddress = UNASSIGNED_SYSTEM_ADDRESS;
+    request.targetGuid = targetGuid;
+    request.requestTime = RakNet::GetTimeMS();
+    request.timeoutOnNoDataMS = timeoutOnNoDataMS;
+    if( !AddOutstandingRequest( request ) )
         return false;
 
     BitStream outgoingBs;
@@ -86,6 +140,17 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
     if( resultHandler == 0 )
         return false;
 
+    OutstandingRequest request;
+    request.coordinatorAddress = proxyCoordinator;
+    request.sourceAddress = sourceAddress;
+    request.usesAddress = true;
+    request.targetAddress = targetAddressAsSeenFromCoordinator;
+    request.targetGuid = UNASSIGNED_RAKNET_GUID;
+    request.requestTime = RakNet::GetTimeMS();
+    request.timeoutOnNoDataMS = timeoutOnNoDataMS;
+    if( !AddOutstandingRequest( request ) )
+        return false;
+
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_FORWARDING_REQUEST_FROM_CLIENT_TO_COORDINATOR );
@@ -108,6 +173,12 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
 }
 void UDPProxyClient::Update( void )
 {
+    const RakNet::TimeMS curTime = RakNet::GetTimeMS();
+    outstandingRequests.erase( std::remove_if( outstandingRequests.begin(), outstandingRequests.end(), [curTime]( const OutstandingRequest& request ) {
+                                   return (RakNet::TimeMS)( curTime - request.requestTime ) > request.timeoutOnNoDataMS;
+                               } ),
+                               outstandingRequests.end() );
+
     for( auto it = pingServerGroups.begin(); it != pingServerGroups.end(); /**/ )
     {
         PingServerGroup* psg = *it;
@@ -165,7 +236,8 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
         switch( packet->data[1] )
         {
         case ID_UDP_PROXY_PING_SERVERS_FROM_COORDINATOR_TO_CLIENT: {
-            OnPingServers( packet );
+            if( IsDesignatedCoordinator( packet->systemAddress ) )
+                OnPingServers( packet );
         }
         break;
         case ID_UDP_PROXY_FORWARDING_SUCCEEDED:
@@ -178,9 +250,24 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
             SystemAddress senderAddress, targetAddress;
             BitStream incomingBs( packet->data, packet->length, false );
             incomingBs.IgnoreBytes( sizeof( MessageID ) * 2 );
-            incomingBs.Read( senderAddress );
-            incomingBs.Read( targetAddress );
-            incomingBs.Read( targetGuid );
+            if( !incomingBs.Read( senderAddress ) || !incomingBs.Read( targetAddress ) || !incomingBs.Read( targetGuid ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
+
+            if( packet->data[1] == ID_UDP_PROXY_FORWARDING_NOTIFICATION )
+            {
+                // This Peer is the target and asked for nothing, so only a Designated coordinator may say forwarding is set up
+                if( !IsDesignatedCoordinator( packet->systemAddress ) )
+                    return RR_STOP_PROCESSING_AND_DEALLOCATE;
+            }
+            else
+            {
+                auto request = FindOutstandingRequest( packet->systemAddress, senderAddress, targetAddress, targetGuid );
+                if( request == outstandingRequests.end() )
+                    return RR_STOP_PROCESSING_AND_DEALLOCATE;
+                // Retired before the callback, which may call RequestForwarding() again
+                if( packet->data[1] != ID_UDP_PROXY_IN_PROGRESS )
+                    outstandingRequests.erase( request );
+            }
 
             switch( packet->data[1] )
             {
@@ -236,6 +323,18 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
 void UDPProxyClient::OnRakPeerShutdown( void )
 {
     Clear();
+}
+void UDPProxyClient::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
+{
+    (void)rakNetGUID;
+    (void)lostConnectionReason;
+
+    // A System that later connects from the same address inherits neither the designation nor the requests
+    RemoveCoordinator( systemAddress );
+    outstandingRequests.erase( std::remove_if( outstandingRequests.begin(), outstandingRequests.end(), [&systemAddress]( const OutstandingRequest& request ) {
+                                   return request.coordinatorAddress == systemAddress;
+                               } ),
+                               outstandingRequests.end() );
 }
 void UDPProxyClient::OnPingServers( Packet* packet )
 {
@@ -297,6 +396,8 @@ void UDPProxyClient::Clear( void )
         RakNet::OP_DELETE( pGroup, _FILE_AND_LINE_ );
     }
     pingServerGroups.clear();
+    coordinators.clear();
+    outstandingRequests.clear();
 }
 
 } // namespace RakNet
