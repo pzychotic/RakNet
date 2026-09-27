@@ -35,6 +35,7 @@ struct Packet;
 /// \details See NatTypeDetectionServer.h for algorithm
 /// To use, just connect to the server, and call DetectNAT
 /// You will get back ID_NAT_TYPE_DETECTION_RESULT with one of the enumerated values of NATTypeDetectionResult found in NATTypeDetectionCommon.h
+/// IPv4 only.
 /// See also http://www.jenkinssoftware.com/raknet/manual/natpunchthrough.html
 /// \sa NatPunchthroughClient
 /// \sa NatTypeDetectionServer
@@ -54,6 +55,8 @@ public:
     /// Send the message to the server to detect the nat type
     /// Server must be running NatTypeDetectionServer
     /// We must already be connected to the server
+    /// If the socket it needs for the test fails to bind, it sends nothing and pushes
+    /// ID_NAT_TYPE_DETECTION_RESULT with NAT_TYPE_UNKNOWN.
     /// \param[in] serverAddress address of the server
     void DetectNATType( SystemAddress _serverAddress );
 
@@ -76,6 +79,11 @@ protected:
     std::mutex bufferedPacketsMutex;
 
     RakNetSocket2* c2;
+
+    /// Creates c2, the socket the server sends its NAT_TYPE_NONE test to. Returns 0 if it fails
+    /// to bind. By default an ephemeral port on the same host as the peer's first socket.
+    virtual RakNetSocket2* CreateC2Socket( void );
+
     void Shutdown( void );
     void OnCompletion( NATTypeDetectionResult result );
     bool IsInProgress( void ) const;

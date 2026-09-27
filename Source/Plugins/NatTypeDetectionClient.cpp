@@ -38,20 +38,30 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
         return;
 
     if( c2 == 0 )
-    {
-        std::vector<RakNetSocket2*> sockets;
-        rakPeerInterface->GetSockets( sockets );
-        RakAssert( !sockets.empty() );
-        c2 = CreateNonblockingSocketOnSameHost( sockets.front(), this );
-    }
+        c2 = CreateC2Socket();
 
     serverAddress = _serverAddress;
+
+    if( c2 == 0 )
+    {
+        // Without c2 the server's first test has nowhere to go
+        OnCompletion( NAT_TYPE_UNKNOWN );
+        return;
+    }
 
     BitStream bs;
     bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_REQUEST );
     bs.Write( true ); // IsRequest
     bs.Write( c2->GetBoundAddress().GetPort() );
     rakPeerInterface->Send( &bs, MEDIUM_PRIORITY, RELIABLE, 0, serverAddress, false );
+}
+
+RakNetSocket2* NatTypeDetectionClient::CreateC2Socket( void )
+{
+    std::vector<RakNetSocket2*> sockets;
+    rakPeerInterface->GetSockets( sockets );
+    RakAssert( !sockets.empty() );
+    return CreateNonblockingSocketOnSameHost( sockets.front(), this );
 }
 
 void NatTypeDetectionClient::OnCompletion( NATTypeDetectionResult result )

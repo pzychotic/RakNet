@@ -281,8 +281,15 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
     {
         if( it != natDetectionAttempts.end() )
             return; // Already in progress
-        if( s1p2 == 0 )
-            return; // Not started, or shut down: Update would have no sockets to test with
+        if( s1p2 == 0 || s2p3 == 0 || s3p4 == 0 || s4p5 == 0 )
+        {
+            // Not started, shut down, or a socket failed to bind: Update has nothing to test with
+            BitStream bsOut;
+            bsOut.Write( (unsigned char)ID_NAT_TYPE_DETECTION_RESULT );
+            bsOut.Write( (unsigned char)NAT_TYPE_UNKNOWN );
+            rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, false );
+            return;
+        }
 
         NATDetectionAttempt nda;
         nda.detectionState = STATE_NONE;

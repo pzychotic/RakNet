@@ -36,7 +36,7 @@ struct Packet;
 /// \brief Server code for NatTypeDetection
 /// \details
 /// Sends to a remote system on certain ports and addresses to determine what type of router, if any, that client is behind
-/// Requires that the server have 4 external IP addresses
+/// Requires that the server have 4 external IP addresses. IPv4 only.
 /// <OL>
 /// <LI>Server has 1 instance of RakNet. Server has four external ip addresses S1 to S4. Five ports are used in total P1 to P5. RakNet is bound to S1P1. Sockets are bound to S1P2, S2P3, S3P4, S4P5
 /// <LI>Client with one port using RakNet (C1). Another port not using anything (C2).
@@ -63,7 +63,9 @@ public:
     // Destructor
     virtual ~NatTypeDetectionServer();
 
-    /// Start the system, binding to 3 external IPs not already in useS
+    /// Start the system, binding to 3 external IPs not already in use
+    /// nonRakNetIP2 to nonRakNetIP4 must be IPv4 addresses on this host. If any of the sockets
+    /// fails to bind, detection requests are answered with NAT_TYPE_UNKNOWN.
     /// \param[in] nonRakNetIP2 First unused external IP
     /// \param[in] nonRakNetIP3 Second unused external IP
     /// \param[in] nonRakNetIP4 Third unused external IP
