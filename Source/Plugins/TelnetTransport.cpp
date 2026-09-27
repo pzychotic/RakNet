@@ -266,9 +266,8 @@ SystemAddress TelnetTransport::HasNewIncomingConnection( void )
 #ifdef _PRINTF_DEBUG
             memset( remoteClient->textInput, 0, REMOTE_MAX_TEXT_INPUT );
 #endif
+            remoteClients.push_back( remoteClient );
         }
-
-        remoteClients.push_back( remoteClient );
     }
     return newConnection;
 }
