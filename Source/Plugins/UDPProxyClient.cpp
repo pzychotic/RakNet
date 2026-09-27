@@ -61,7 +61,6 @@ bool UDPProxyClient::AddOutstandingRequest( const OutstandingRequest& request )
     for( OutstandingRequest& existing : outstandingRequests )
     {
         if( existing.coordinatorAddress == request.coordinatorAddress &&
-            existing.sourceAddress == request.sourceAddress &&
             existing.usesAddress == request.usesAddress &&
             ( request.usesAddress ? existing.targetAddress == request.targetAddress : existing.targetGuid == request.targetGuid ) )
         {
@@ -76,12 +75,11 @@ bool UDPProxyClient::AddOutstandingRequest( const OutstandingRequest& request )
     outstandingRequests.push_back( request );
     return true;
 }
-std::vector<UDPProxyClient::OutstandingRequest>::iterator UDPProxyClient::FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& sourceAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid )
+std::vector<UDPProxyClient::OutstandingRequest>::iterator UDPProxyClient::FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid )
 {
     return std::find_if( outstandingRequests.begin(), outstandingRequests.end(), [&]( const OutstandingRequest& request ) {
         // The coordinator resolves the target the request did not name, so match only the one it did
         return request.coordinatorAddress == coordinatorAddress &&
-               ( request.sourceAddress == UNASSIGNED_SYSTEM_ADDRESS || request.sourceAddress == sourceAddress ) &&
                ( request.usesAddress ? request.targetAddress == targetAddress : request.targetGuid == targetGuid );
     } );
 }
@@ -99,7 +97,6 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
 
     OutstandingRequest request;
     request.coordinatorAddress = proxyCoordinator;
-    request.sourceAddress = sourceAddress;
     request.usesAddress = false;
     request.targetAddress = UNASSIGNED_SYSTEM_ADDRESS;
     request.targetGuid = targetGuid;
@@ -142,7 +139,6 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
 
     OutstandingRequest request;
     request.coordinatorAddress = proxyCoordinator;
-    request.sourceAddress = sourceAddress;
     request.usesAddress = true;
     request.targetAddress = targetAddressAsSeenFromCoordinator;
     request.targetGuid = UNASSIGNED_RAKNET_GUID;
@@ -261,7 +257,7 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
             }
             else
             {
-                auto request = FindOutstandingRequest( packet->systemAddress, senderAddress, targetAddress, targetGuid );
+                auto request = FindOutstandingRequest( packet->systemAddress, targetAddress, targetGuid );
                 if( request == outstandingRequests.end() )
                     return RR_STOP_PROCESSING_AND_DEALLOCATE;
                 // Retired before the callback, which may call RequestForwarding() again

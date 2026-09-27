@@ -465,8 +465,8 @@ forwarding notification made it ping an address of the sender's choosing and fir
 callbacks with a proxy address of its choosing.
 
 - As the requester, a Peer now takes a result only from the coordinator it asked, for a
-  source and target it asked about, while that request is outstanding. A final result
-  retires the request; so do `timeoutOnNoDataMS` and the coordinator's connection closing.
+  target it asked about, while that request is outstanding. A final result retires the
+  request; so do `timeoutOnNoDataMS` and the coordinator's connection closing.
   At most `UDPProxyClient::MAX_OUTSTANDING_REQUESTS` (64) may be outstanding, and
   `RequestForwarding` returns `false` at the cap. A result later than `timeoutOnNoDataMS`
   fires no callback, so pass comfortably more than the coordinator's three-second ping wait.
@@ -480,3 +480,17 @@ target never pings the proxy server, so a target behind NAT never opens its rout
 is unreachable, and `OnForwardingNotification` never fires. The requester's own results need
 no designation. An undesignated requester ignores the ping request, and the coordinator
 goes on without its pings after its three-second ping timeout.
+
+**`UDPProxyCoordinator`.** Stock forwarded from whatever source address a forwarding
+request named, so any connected System could have a proxy server forward from an address
+that was not its own. It also filed a ping reply under the `(source, target)` pair the reply
+named, taking any sender other than the source as the target, so any connected System could
+choose which proxy server another pair was given.
+
+- The source is now always the requester, at its address as the coordinator sees it. The
+  `sourceAddress` argument of `UDPProxyClient::RequestForwarding` is still sent and ignored,
+  and every result names the requester's address as its source. Nothing to do, unless you
+  requested forwarding *on behalf of* another System: that System now has to request it
+  itself. A target named by address still need not be connected to the coordinator.
+- A ping reply counts only from one of the pair's own ends, the two Systems the coordinator
+  asked. Anything else is dropped. Nothing to do.

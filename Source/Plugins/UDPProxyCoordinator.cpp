@@ -168,10 +168,11 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
 {
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( 2 );
-    SystemAddress sourceAddress;
-    incomingBs.Read( sourceAddress );
-    if( sourceAddress == UNASSIGNED_SYSTEM_ADDRESS )
-        sourceAddress = packet->systemAddress;
+    // A System may open forwarding only from its own address, so the source is always the requester.
+    // The claimed source is still read, since the layout is fixed, and ignored.
+    SystemAddress claimedSourceAddress;
+    incomingBs.Read( claimedSourceAddress );
+    const SystemAddress sourceAddress = packet->systemAddress;
     SystemAddress targetAddress;
     RakNetGUID targetGuid;
     bool usesAddress = false;
@@ -445,7 +446,14 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
 
     if( !incomingBs.Read( serversToPingSize ) )
         return;
-    std::vector<ServerWithPing>& pings = packet->systemAddress == sata.senderClientAddress ? fw->sourceServerPings : fw->targetServerPings;
+    // The coordinator asked only the pair's own ends, so a reply from any other System is dropped
+    std::vector<ServerWithPing>* pings;
+    if( packet->systemAddress == sata.senderClientAddress )
+        pings = &fw->sourceServerPings;
+    else if( packet->systemAddress == sata.targetClientAddress )
+        pings = &fw->targetServerPings;
+    else
+        return;
     for( unsigned short idx = 0; idx < serversToPingSize; idx++ )
     {
         if( !incomingBs.Read( swp.serverAddress ) || !incomingBs.Read( swp.ping ) )
@@ -454,11 +462,11 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
         // Only servers we asked about, once each, so the list stays no longer than remainingServersToTry
         if( std::find( fw->remainingServersToTry.begin(), fw->remainingServersToTry.end(), swp.serverAddress ) == fw->remainingServersToTry.end() )
             continue;
-        auto it = FindServerPing( pings, swp.serverAddress );
-        if( it != pings.end() )
+        auto it = FindServerPing( *pings, swp.serverAddress );
+        if( it != pings->end() )
             it->ping = swp.ping;
         else
-            pings.push_back( swp );
+            pings->push_back( swp );
     }
 
     // Both systems have to give us pings to progress here. Otherwise will timeout in Update()

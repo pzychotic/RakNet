@@ -339,7 +339,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
     Connect( coordinator, client );
     Connect( other, client );
     const SystemAddress coordinatorAddress = client->GetSystemAddressFromGuid( coordinator->GetMyGUID() );
-    // What the coordinator writes for a source passed as UNASSIGNED_SYSTEM_ADDRESS.
+    // What the coordinator writes as the source, whatever source was passed.
     const SystemAddress requester = coordinator->GetSystemAddressFromGuid( client->GetMyGUID() );
 
     SECTION( "A result nothing asked for fires nothing" )
@@ -380,18 +380,13 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
         CHECK( handler.Total() == 0 );
     }
 
-    SECTION( "A result for a different source fires nothing" )
+    SECTION( "A request naming another source takes the result the coordinator writes for the requester" )
     {
-        const SystemAddress source( "10.0.2.1", 3001 );
-        REQUIRE( proxyClient.RequestForwarding( coordinatorAddress, source, kTargetGuid, kRequestTimeoutMs ) );
-
-        BitStream otherSource;
-        WriteResult( otherSource, ID_UDP_PROXY_FORWARDING_SUCCEEDED, SystemAddress( "10.0.2.2", 3002 ), kTargetAddress, kTargetGuid );
-        Inject( coordinator, client, otherSource );
-        CHECK( handler.Total() == 0 );
+        // The coordinator ignores the source passed and writes the requester's own address.
+        REQUIRE( proxyClient.RequestForwarding( coordinatorAddress, SystemAddress( "10.0.2.1", 3001 ), kTargetGuid, kRequestTimeoutMs ) );
 
         BitStream genuine;
-        WriteResult( genuine, ID_UDP_PROXY_FORWARDING_SUCCEEDED, source, kTargetAddress, kTargetGuid );
+        WriteResult( genuine, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
         Inject( coordinator, client, genuine );
         CHECK( handler.successes == 1 );
     }

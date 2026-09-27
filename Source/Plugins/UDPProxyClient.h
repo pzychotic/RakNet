@@ -42,7 +42,7 @@ struct UDPProxyClientResultHandler
     /// \param[out] proxyIPAddress IP Address of the proxy server, which will forward messages to targetAddress
     /// \param[out] proxyPort Remote port to use on the proxy server, which will forward messages to targetAddress
     /// \param[out] proxyCoordinator \a proxyCoordinator parameter originally passed to UDPProxyClient::RequestForwarding
-    /// \param[out] sourceAddress \a sourceAddress parameter passed to UDPProxyClient::RequestForwarding. If it was UNASSIGNED_SYSTEM_ADDRESS, it is now our external IP address.
+    /// \param[out] sourceAddress Our address as the coordinator sees it. The \a sourceAddress passed to UDPProxyClient::RequestForwarding is ignored.
     /// \param[out] targetAddress \a targetAddress parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] targetGuid \a targetGuid parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] proxyClient The plugin that is calling this callback
@@ -54,7 +54,7 @@ struct UDPProxyClientResultHandler
     /// \param[out] proxyIPAddress IP Address of the proxy server, which will forward messages to targetAddress
     /// \param[out] proxyPort Remote port to use on the proxy server, which will forward messages to targetAddress
     /// \param[out] proxyCoordinator \a proxyCoordinator parameter originally passed to UDPProxyClient::RequestForwarding
-    /// \param[out] sourceAddress \a sourceAddress parameter passed to UDPProxyClient::RequestForwarding. This is originating source IP address of the remote system that will be sending to us.
+    /// \param[out] sourceAddress Address of the remote system that requested forwarding and will be sending to us, as the coordinator sees it.
     /// \param[out] targetAddress \a targetAddress parameter originally passed to UDPProxyClient::RequestForwarding. This is our external IP address.
     /// \param[out] targetGuid \a targetGuid parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] proxyClient The plugin that is calling this callback
@@ -63,7 +63,7 @@ struct UDPProxyClientResultHandler
 
     /// Called when our forwarding request failed, because no UDPProxyServers are connected to UDPProxyCoordinator
     /// \param[out] proxyCoordinator \a proxyCoordinator parameter originally passed to UDPProxyClient::RequestForwarding
-    /// \param[out] sourceAddress \a sourceAddress parameter passed to UDPProxyClient::RequestForwarding. If it was UNASSIGNED_SYSTEM_ADDRESS, it is now our external IP address.
+    /// \param[out] sourceAddress Our address as the coordinator sees it. The \a sourceAddress passed to UDPProxyClient::RequestForwarding is ignored.
     /// \param[out] targetAddress \a targetAddress parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] targetGuid \a targetGuid parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] proxyClient The plugin that is calling this callback
@@ -71,7 +71,7 @@ struct UDPProxyClientResultHandler
 
     /// Called when our forwarding request failed, because no UDPProxyServers are connected to UDPProxyCoordinator
     /// \param[out] proxyCoordinator \a proxyCoordinator parameter originally passed to UDPProxyClient::RequestForwarding
-    /// \param[out] sourceAddress \a sourceAddress parameter passed to UDPProxyClient::RequestForwarding. If it was UNASSIGNED_SYSTEM_ADDRESS, it is now our external IP address.
+    /// \param[out] sourceAddress Our address as the coordinator sees it. The \a sourceAddress passed to UDPProxyClient::RequestForwarding is ignored.
     /// \param[out] targetAddress \a targetAddress parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] targetGuid \a targetGuid parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] proxyClient The plugin that is calling this callback
@@ -80,7 +80,7 @@ struct UDPProxyClientResultHandler
     /// Called when our forwarding request failed, because all UDPProxyServers that are connected to UDPProxyCoordinator are at their capacity
     /// Either add more servers, or increase capacity via UDPForwarder::SetMaxForwardEntries()
     /// \param[out] proxyCoordinator \a proxyCoordinator parameter originally passed to UDPProxyClient::RequestForwarding
-    /// \param[out] sourceAddress \a sourceAddress parameter passed to UDPProxyClient::RequestForwarding. If it was UNASSIGNED_SYSTEM_ADDRESS, it is now our external IP address.
+    /// \param[out] sourceAddress Our address as the coordinator sees it. The \a sourceAddress passed to UDPProxyClient::RequestForwarding is ignored.
     /// \param[out] targetAddress \a targetAddress parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] targetGuid \a targetGuid parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] proxyClient The plugin that is calling this callback
@@ -91,7 +91,7 @@ struct UDPProxyClientResultHandler
     /// \param[out] proxyIPAddress IP Address of the proxy server, which is forwarding messages to targetAddress
     /// \param[out] proxyPort Remote port to use on the proxy server, which is forwarding messages to targetAddress
     /// \param[out] proxyCoordinator \a proxyCoordinator parameter originally passed to UDPProxyClient::RequestForwarding
-    /// \param[out] sourceAddress \a sourceAddress parameter passed to UDPProxyClient::RequestForwarding. If it was UNASSIGNED_SYSTEM_ADDRESS, it is now our external IP address.
+    /// \param[out] sourceAddress Our address as the coordinator sees it. The \a sourceAddress passed to UDPProxyClient::RequestForwarding is ignored.
     /// \param[out] targetAddress \a targetAddress parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] targetGuid \a targetGuid parameter originally passed to UDPProxyClient::RequestForwarding
     /// \param[out] proxyClient The plugin that is calling this callback
@@ -155,13 +155,14 @@ public:
     /// \note May still fail, if all proxy servers have no open connections.
     /// \note RakNet's protocol will ensure a message is sent at least every 5 seconds, so if routing RakNet messages, it is a reasonable value for timeoutOnNoDataMS, plus an extra few seconds for latency.
     /// \param[in] proxyCoordinator System we are connected to that is running the UDPProxyCoordinator plugin
-    /// \param[in] sourceAddress External IP address of the system we want to forward messages from. This does not have to be our own system. To specify our own system, you can pass UNASSIGNED_SYSTEM_ADDRESS which the coordinator will treat as our external IP address.
+    /// \param[in] sourceAddress Ignored, and kept for the frozen message layout: the coordinator forwards only from the requester, at its address as
+    /// the coordinator sees it. Pass UNASSIGNED_SYSTEM_ADDRESS. To forward from another system, that system has to request it itself.
     /// \param[in] targetAddressAsSeenFromCoordinator External IP address of the system we want to forward messages to. If this system is connected to UDPProxyCoordinator at this address using RakNet, that system will ping the server and thus open the router for incoming communication. In any other case, you are responsible for doing your own network communication to have that system ping the server. See also targetGuid in the other version of RequestForwarding(), to avoid the need to know the IP address to the coordinator of the destination.
     /// \param[in] timeoutOnNoData If no data is sent by the forwarded systems, how long before removing the forward entry from UDPForwarder? UDP_FORWARDER_MAXIMUM_TIMEOUT is the maximum value. Recommended 10 seconds.
     /// \param[in] serverSelectionBitstream If you want to send data to UDPProxyCoordinator::GetBestServer(), write it here
     /// \note The request stays outstanding until its final result arrives, the connection to \a proxyCoordinator closes, or \a timeoutOnNoDataMS passes.
     /// Only a result that matches an outstanding request reaches the result handler. At most MAX_OUTSTANDING_REQUESTS may be outstanding;
-    /// asking again for a source and target already outstanding with \a proxyCoordinator restarts its timeout and takes no new entry.
+    /// asking again for a target already outstanding with \a proxyCoordinator restarts its timeout and takes no new entry.
     /// A result that arrives after \a timeoutOnNoDataMS is dropped without a callback. With more than one proxy server the coordinator
     /// may wait about three seconds for pings before it answers, so pass comfortably more than that.
     /// \return true if the request was sent, false if we are not connected to proxyCoordinator, no result handler is set, or MAX_OUTSTANDING_REQUESTS are outstanding
@@ -199,12 +200,10 @@ public:
     std::vector<PingServerGroup*> pingServerGroups;
 
 protected:
-    // A RequestForwarding() call awaiting its final result
+    // A RequestForwarding() call awaiting its final result. It has no source: the coordinator ignores the one passed and forwards from this Peer.
     struct OutstandingRequest
     {
         SystemAddress coordinatorAddress;
-        // As passed. UNASSIGNED_SYSTEM_ADDRESS matches whatever the coordinator writes in its place.
-        SystemAddress sourceAddress;
         bool usesAddress;
         SystemAddress targetAddress;
         RakNetGUID targetGuid;
@@ -215,7 +214,7 @@ protected:
     void OnPingServers( Packet* packet );
     bool IsDesignatedCoordinator( const SystemAddress& systemAddress ) const;
     bool AddOutstandingRequest( const OutstandingRequest& request );
-    std::vector<OutstandingRequest>::iterator FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& sourceAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid );
+    std::vector<OutstandingRequest>::iterator FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid );
     void Clear( void );
     UDPProxyClientResultHandler* resultHandler;
     std::vector<SystemAddress> coordinators;
