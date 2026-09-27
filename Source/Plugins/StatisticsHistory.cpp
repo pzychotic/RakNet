@@ -160,6 +160,9 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& 
         queue->longTermLowest = tav.val;
     if( queue->longTermHighest < tav.val )
         queue->longTermHighest = tav.val;
+
+    // Without this, a queue nobody reads holds every sample it was ever given.
+    queue->CullExpiredValues( curTime );
 }
 
 StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t objectId, const std::string& key, StatisticsHistory::TimeAndValueQueue** values, Time curTime ) const
@@ -626,7 +629,10 @@ void StatisticsHistory::TimeAndValueQueue::CullExpiredValues( Time curTime )
     while( !values.empty() )
     {
         StatisticsHistory::TimeAndValue tav = values.front();
-        if( curTime - tav.time > timeToTrackValues )
+        // Time is unsigned and a 32-bit Time rolls over, so an age past half the range is a value
+        // newer than curTime, not an expired one.
+        const Time age = curTime - tav.time;
+        if( age > timeToTrackValues && age <= static_cast<Time>( -1 ) / 2 )
         {
             recentSum -= tav.val;
             recentSumOfSquares -= tav.val * tav.val;
