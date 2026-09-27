@@ -166,6 +166,8 @@ void NatTypeDetectionServer::Update( void )
             recvStruct = bufferedPackets.front();
             bufferedPackets.pop_front();
         }
+        else
+            recvStruct = nullptr;
     }
 
     int i = 0;
