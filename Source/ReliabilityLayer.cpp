@@ -1962,9 +1962,6 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
         dat->s = s;
         dat->length = length;
         dat->sendTime = 0;
-        // DataAndTime::extraSocketOptions is left unset: there is no such variable in this
-        // scope (upstream assigned one that never existed), the delay branch below does not
-        // set it either, and the drain never reads it. The field is dead.
         delayList.push_front( dat );
         // Returning here is deliberate. Queueing the datagram and then also sending it
         // below would put it on the wire twice - that is a duplication harness, not a

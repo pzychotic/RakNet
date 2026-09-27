@@ -575,7 +575,6 @@ private:
         char data[MAXIMUM_MTU_SIZE];
         unsigned int length;
         RakNet::TimeMS sendTime;
-        unsigned int extraSocketOptions;
     };
     std::deque<DataAndTime*> delayList;
 

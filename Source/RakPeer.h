@@ -854,7 +854,6 @@ protected:
         char* data;
         bool haveRakNetCloseSocket;
         unsigned connectionSocketIndex;
-        unsigned int extraSocketOptions;
         RakNetSocket2* socket;
         unsigned short port;
         uint32_t receipt;
