@@ -14,12 +14,11 @@ namespace RakNet {
 /// Fills a buffer from the operating system's cryptographically secure random
 /// number generator: BCryptGenRandom on Windows, /dev/urandom elsewhere.
 ///
-/// This is the only entropy source for values that must be unique - see
-/// docs/adr/0001-identifiers-draw-from-the-platform-csprng.md. Clock readings are
-/// not an entropy source, and <random> engines are for simulation, not for naming a Peer.
+/// This is the only entropy source for values that must be unique - see ADR-0001.
+/// Clock readings are not an entropy source, and <random> engines are for
+/// simulation, not for naming a Peer.
 ///
-/// Reports failure by return value and never throws, per
-/// docs/adr/0002-raknet-does-not-use-exceptions.md. Note this rules out
+/// Reports failure by return value and never throws, per ADR-0004. Note this rules out
 /// std::random_device, whose only failure channel is an exception.
 ///
 /// \param[out] buffer Buffer to fill. Its contents are unspecified when this returns

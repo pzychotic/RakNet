@@ -15,8 +15,7 @@
 Guards RakNetGUID generation, which until this file existed harvested its entropy
 from sixteen 1 ms sleeps and cost ~240 ms per RakPeerInterface::GetInstance() -
 about half the suite's wall clock. See CONTEXT.md for what a RakNetGUID promises
-and docs/adr/0001-identifiers-draw-from-the-platform-csprng.md for why the entropy
-now comes from the operating system.
+and ADR-0001 for why the entropy now comes from the operating system.
 
 Deliberately tagged [guid] and NOT [network]: only the last two cases create peers,
 none of them binds a socket, and `ctest -L guid` is meant to stay the fast check

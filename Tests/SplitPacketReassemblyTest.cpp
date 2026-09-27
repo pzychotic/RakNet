@@ -505,9 +505,10 @@ TEST_CASE( "A chunk disagreeing with its channel's split packet count is dropped
 TEST_CASE( "A failed channel allocation drops the datagram instead of the process", "[network]" )
 {
     // The cap alone is not enough: a memory-pressured process can still be killed by a
-    // large-but-legal split message, because the allocation itself is a throw site.
-    // ADR-0002 rules that out in Source/, so this drives the failure and asserts the
-    // layer returns normally and keeps working.
+    // large-but-legal split message, because the allocation itself can fail. A remote
+    // System drives its size, so Source/ makes it through the null-returning rakMalloc_Ex
+    // and reports the failure (ADR-0004). This drives the failure and asserts the layer
+    // returns normally and keeps working.
     //
     // The chunk is at the cap, so its channel array is exactly kCapCost bytes, and the
     // probe fails that one exact size - not everything above a threshold, which a Peer's

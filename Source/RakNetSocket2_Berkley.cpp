@@ -155,7 +155,7 @@ static int GetDontFragmentOptionName( const SystemAddress& systemAddress )
 #endif
 
 // Sends one datagram. Returns the number of bytes sent, or a negative value on failure -
-// per ADR-0002 that return value is the only failure channel.
+// per ADR-0004 that return value is the only failure channel.
 //
 // There is deliberately no retry loop. The one this replaced spun on `while( len == 0 )`,
 // which is the single outcome a sendto__ of a non-empty datagram cannot produce, while

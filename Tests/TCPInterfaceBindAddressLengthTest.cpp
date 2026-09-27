@@ -20,7 +20,7 @@ heap block's own metadata.
 
 The fix rejects an over-long argument at the top of Connect rather than truncating it:
 truncation would bind to an address the caller did not ask for, and Connect already has a
-failure return, so per ADR-0002 that is the channel. The check sits ahead of the
+failure return, so per ADR-0004 that is the channel. The check sits ahead of the
 remoteClients slot loop, so a rejected call does not strand a slot.
 
 Only the first case can catch the original overflow. The other two are the boundary either

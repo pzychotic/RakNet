@@ -9,7 +9,29 @@
  */
 
 /// \file
-/// \brief If _USE_RAK_MEMORY_OVERRIDE is defined, memory allocations go through rakMalloc, rakRealloc, and rakFree
+/// \brief The rakMalloc family of allocation hooks, and the OP_NEW templates that use it
+/// when _USE_RAK_MEMORY_OVERRIDE is 1.
+///
+/// These hooks reach less than their names suggest. Out-of-memory and allocator control
+/// for the whole library go through the standard hooks instead (ADR-0004):
+///
+/// - **The library-wide OOM hook is std::set_new_handler.** Allocation failure through
+///   operator new, std containers and std::string is fatal. The runtime calls the new
+///   handler before it throws std::bad_alloc, whether or not RakNet was built with
+///   exceptions, so that is where to log, release a reserve, or abort deliberately. Do not rely on
+///   std::set_terminate: on MSVC the failure is a fail-fast, which skips it. Catching
+///   std::bad_alloc, or any exception, thrown through RakNet is unsupported.
+/// - **SetNotifyOutOfMemory covers only the null-returning rakMalloc paths.** It fires
+///   when rakMalloc or one of its friends returns null: at the sites that call them
+///   directly and report the failure by return value, and, under _USE_RAK_MEMORY_OVERRIDE,
+///   in the OP_NEW templates before the new handler runs. Every other allocation, std
+///   containers and std::string included, fails through std::bad_alloc and never calls it.
+/// - **SetMalloc and friends redirect only the rakMalloc family.** To control all of
+///   RakNet's memory, containers included, replace the global operator new and operator
+///   delete.
+/// - **_USE_RAK_MEMORY_OVERRIDE is frozen.** It is kept and correct, but it only routes the
+///   OP_NEW templates through rakMalloc_Ex and cannot reach containers, so it is not the
+///   recommended hook.
 ///
 
 #pragma once
@@ -41,14 +63,17 @@ extern RAK_DLL_EXPORT void* ( *rakRealloc_Ex )( void* p, size_t size, const char
 extern RAK_DLL_EXPORT void  ( *rakFree_Ex )( void* p, const char* file, unsigned int line );
 extern RAK_DLL_EXPORT void  ( *notifyOutOfMemory )( const char* file, const long line );
 
-// Change to a user defined allocation function
+// Change to a user defined allocation function. These redirect only the rakMalloc family,
+// not operator new or the std containers; see the file comment.
 void RAK_DLL_EXPORT SetMalloc( void* ( *userFunction )( size_t size ) );
 void RAK_DLL_EXPORT SetRealloc( void* ( *userFunction )( void* p, size_t size ) );
 void RAK_DLL_EXPORT SetFree( void ( *userFunction )( void* p ) );
 void RAK_DLL_EXPORT SetMalloc_Ex( void* ( *userFunction )( size_t size, const char* file, unsigned int line ) );
 void RAK_DLL_EXPORT SetRealloc_Ex( void* ( *userFunction )( void* p, size_t size, const char* file, unsigned int line ) );
 void RAK_DLL_EXPORT SetFree_Ex( void ( *userFunction )( void* p, const char* file, unsigned int line ) );
-// Change to a user defined out of memory function
+// Change to a user defined out of memory function. It is called only when a rakMalloc-family
+// allocation returns null, not for allocation failure in general: the library-wide OOM hook
+// is std::set_new_handler. See the file comment.
 void RAK_DLL_EXPORT SetNotifyOutOfMemory( void ( *userFunction )( const char* file, const long line ) );
 
 extern RAK_DLL_EXPORT void* ( *GetMalloc() )( size_t size );

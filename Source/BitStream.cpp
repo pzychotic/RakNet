@@ -1209,7 +1209,7 @@ bool BitStream::Deserialize( std::string& str )
     if( readOffset + BYTES_TO_BITS( size ) > numberOfBitsUsed )
         return false;
 
-    // resize can only fail by throwing, which ADR-0002 rules out reporting. No
+    // resize can only fail by throwing, which ADR-0004 rules out reporting. No
     // way of filling a std::string avoids that; the bound above is what keeps the
     // allocation to a size the peer has already sent.
     str.resize( size );

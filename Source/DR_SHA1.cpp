@@ -229,8 +229,8 @@ bool CSHA1::HashFile( const TCHAR* tszFileName )
     if( fpIn == NULL )
         return false;
 
-    // nothrow is what makes the null check below reachable; a plain new reports
-    // failure by throwing, which ADR-0002 rules out.
+    // nothrow is what makes the null check below reachable; a plain new's failure
+    // is fatal under ADR-0004, which keeps existing nothrow sites like this one.
     UINT_8* pbData = new( std::nothrow ) UINT_8[SHA1_MAX_FILE_BUFFER];
     if( pbData == NULL )
     {

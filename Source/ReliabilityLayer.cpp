@@ -2613,7 +2613,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         if( newChannel->splitPacketList.Preallocate( internalPacket, __FILE__, __LINE__ ) == false )
         {
             // Out of memory, or a count this Peer will not honour. Drop the chunk and the
-            // channel with it rather than the process - ADR-0002.
+            // channel with it rather than the process - ADR-0004.
             RakNet::OP_DELETE( newChannel, __FILE__, __LINE__ );
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseToInternalPacketPool( internalPacket );

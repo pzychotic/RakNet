@@ -24,8 +24,8 @@
 
 // Threads are created natively, not through std::thread: its constructor reports failure only
 // by throwing, which a build without exceptions turns into std::terminate. Both native calls
-// report failure by return value, so Create() fails the same way in both modes
-// (see docs/adr/0004-raknet-is-exception-neutral.md). They also take the priority at creation.
+// report failure by return value, so Create() fails the same way in both modes (see
+// ADR-0004). They also take the priority at creation.
 
 namespace RakNet {
 

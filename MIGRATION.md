@@ -16,6 +16,9 @@ Some plugins no longer act on a remote System's word alone. They break no build 
 an integration that relied on them can stop working at runtime, so they are listed in
 [Plugins that act only on Solicited or Designated messages](#plugins-that-act-only-on-solicited-or-designated-messages).
 
+If you hooked out-of-memory with `SetNotifyOutOfMemory`, it now hears about far less. See
+[Exceptions and out-of-memory](#exceptions-and-out-of-memory).
+
 **The short version:** four of the five breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
@@ -494,3 +497,25 @@ choose which proxy server another pair was given.
   itself. A target named by address still need not be connected to the coordinator.
 - A ping reply counts only from one of the pair's own ends, the two Systems the coordinator
   asked. Anything else is dropped. Nothing to do.
+
+## Exceptions and out-of-memory
+
+No signature changed here, but where you hook out-of-memory did. RakNet is
+*exception-neutral* ([ADR-0004](docs/adr/0004-raknet-is-exception-neutral.md)): it builds
+with exceptions disabled, never throws or catches, and fails the same way whether your build
+has exceptions or not. Recoverable failures come back as return values. Allocation failure
+and `std::mutex::lock` failure are fatal, and RakNet promises nothing after one. Catching an
+exception thrown through RakNet is unsupported, including in the mixed build where RakNet is
+compiled without exceptions and your application with them: the catch works but skips
+RakNet's destructors, so its locks stay held. To log before the process dies, install
+`std::set_new_handler`. The runtime calls it before throwing in both modes; on MSVC a
+fail-fast skips `std::set_terminate`, so that is not a reliable hook. To control RakNet's
+memory, replace the global `operator new`/`delete`. `SetMalloc` and friends redirect only
+the `rakMalloc` family, and `_USE_RAK_MEMORY_OVERRIDE` is frozen and not recommended. In
+stock 4.081, `SetNotifyOutOfMemory` fired wherever a `rakMalloc`-family call returned null
+and was checked, and those checks covered every `RakString` and `RakWString` buffer. With
+`_USE_RAK_MEMORY_OVERRIDE` at 1, `SetMalloc` also reached the `DataStructures` containers.
+Here those are `std::string` and standard containers, which fail through `std::bad_alloc`
+and which neither hook reaches, so `SetNotifyOutOfMemory` is left with packet and buffer
+allocations in the core. If you relied on it as your OOM hook, move that code into a new
+handler.
