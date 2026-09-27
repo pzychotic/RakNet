@@ -120,6 +120,22 @@ int GetTTLOptionName( const SystemAddress& systemAddress )
     return IP_TTL;
 }
 
+// See RakNetSocket2.h. The IPv6 half compares sin6_addr itself: all 16 bytes of it, and
+// nothing else. Reading 16 bytes from addr4.sin_addr instead lands on offset 4 of the union,
+// which in a sockaddr_in6 is sin6_flowinfo and only the first 12 bytes of sin6_addr, so every
+// ::a.b.c.d would pass for ::.
+bool IsWildcardAddress( const SystemAddress& systemAddress )
+{
+#if RAKNET_SUPPORT_IPV6 == 1
+    if( systemAddress.address.addr4.sin_family == AF_INET6 )
+    {
+        const unsigned char unspecified[16] = {};
+        return memcmp( &systemAddress.address.addr6.sin6_addr, unspecified, sizeof( unspecified ) ) == 0;
+    }
+#endif
+    return systemAddress.address.addr4.sin_addr.s_addr == INADDR_ANY;
+}
+
 #if defined( IP_DONTFRAGMENT )
 // The same pairing for the don't-fragment flag. Latent rather than live: the only call
 // site is compiled out wherever the two numbers disagree, because glibc has no
@@ -304,8 +320,7 @@ void RNS2_Berkley::GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddres
         memcpy( &systemAddressOut->address.addr4, (sockaddr_in*)&ss, sizeof( sockaddr_in ) );
         systemAddressOut->debugPort = ntohs( systemAddressOut->address.addr4.sin_port );
 
-        uint32_t zero = 0;
-        if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
+        if( IsWildcardAddress( *systemAddressOut ) )
             systemAddressOut->SetToLoopback( 4 );
         //  systemAddressOut->address.addr4.sin_port=ntohs(systemAddressOut->address.addr4.sin_port);
     }
@@ -314,9 +329,7 @@ void RNS2_Berkley::GetSystemAddressIPV4And6( RNS2Socket rns2Socket, SystemAddres
         memcpy( &systemAddressOut->address.addr6, (sockaddr_in6*)&ss, sizeof( sockaddr_in6 ) );
         systemAddressOut->debugPort = ntohs( systemAddressOut->address.addr6.sin6_port );
 
-        char zero[16];
-        memset( zero, 0, sizeof( zero ) );
-        if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
+        if( IsWildcardAddress( *systemAddressOut ) )
             systemAddressOut->SetToLoopback( 6 );
 
         //  systemAddressOut->address.addr6.sin6_port=ntohs(systemAddressOut->address.addr6.sin6_port);

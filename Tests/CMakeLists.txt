@@ -77,6 +77,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityFunctionsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketSendAddressFamilyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketTTLOptionTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SocketWildcardAddressTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SplitPacketReassemblyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressAndGuidTest.cpp

@@ -50,6 +50,15 @@ typedef int RNS2SendResult;
 // half of this that a run on Windows cannot tell apart from the defect.
 int RAK_DLL_EXPORT GetTTLOptionName( const SystemAddress& systemAddress );
 
+// True for the wildcard address of the family systemAddress holds: INADDR_ANY, or in6addr_any
+// (::). GetBoundAddress reports a socket bound to it as loopback. Only the address is read;
+// the port, and for IPv6 the flow info and scope id, do not matter.
+//
+// Declared here rather than kept file-static so the IPv6 half is testable: the addresses that
+// tell a correct check from one reading the wrong bytes, like ::a.b.c.d, cannot be bound on
+// every host.
+bool RAK_DLL_EXPORT IsWildcardAddress( const SystemAddress& systemAddress );
+
 struct RNS2_SendParameters
 {
     RNS2_SendParameters() { ttl = 0; }

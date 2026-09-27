@@ -15,6 +15,7 @@
 
 #include "SocketLayer.h"
 #include "RakAssert.h"
+#include "RakNetSocket2.h"
 #include "RakNetTypes.h"
 #include "RakPeer.h"
 #include "SocketDefines.h"
@@ -351,8 +352,7 @@ void SocketLayer::GetSystemAddress( __UDPSOCKET__ s, SystemAddress* systemAddres
         memcpy( &systemAddressOut->address.addr4, (sockaddr_in*)&ss, sizeof( sockaddr_in ) );
         systemAddressOut->debugPort = ntohs( systemAddressOut->address.addr4.sin_port );
 
-        uint32_t zero = 0;
-        if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
+        if( IsWildcardAddress( *systemAddressOut ) )
             systemAddressOut->SetToLoopback( 4 );
         //  systemAddressOut->address.addr4.sin_port=ntohs(systemAddressOut->address.addr4.sin_port);
     }
@@ -361,9 +361,7 @@ void SocketLayer::GetSystemAddress( __UDPSOCKET__ s, SystemAddress* systemAddres
         memcpy( &systemAddressOut->address.addr6, (sockaddr_in6*)&ss, sizeof( sockaddr_in6 ) );
         systemAddressOut->debugPort = ntohs( systemAddressOut->address.addr6.sin6_port );
 
-        char zero[16];
-        memset( zero, 0, sizeof( zero ) );
-        if( memcmp( &systemAddressOut->address.addr4.sin_addr.s_addr, &zero, sizeof( zero ) ) == 0 )
+        if( IsWildcardAddress( *systemAddressOut ) )
             systemAddressOut->SetToLoopback( 6 );
 
         //  systemAddressOut->address.addr6.sin6_port=ntohs(systemAddressOut->address.addr6.sin6_port);
