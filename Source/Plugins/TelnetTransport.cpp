@@ -140,15 +140,22 @@ Packet* TelnetTransport::Receive( void )
     {
         if( remoteClient->lastSentTextInput[0] )
         {
-            // Up arrow, return last string
-            for( int i = 0; remoteClient->textInput[i]; i++ )
-                remoteClient->textInput[i] = 8;
-            strcat( remoteClient->textInput, remoteClient->lastSentTextInput );
-            tcpInterface->Send( (const char*)remoteClient->textInput, (unsigned int)strlen( remoteClient->textInput ), p->systemAddress, false );
-            strcpy( remoteClient->textInput, remoteClient->lastSentTextInput );
-            remoteClient->cursorPosition = (unsigned int)strlen( remoteClient->textInput );
+            // Up arrow: erase the line being typed, then replace it with the last line sent.
+            // ReassembleLine keeps both lines shorter than REMOTE_MAX_TEXT_INPUT.
+            char backspaces[REMOTE_MAX_TEXT_INPUT];
+            RakAssert( remoteClient->cursorPosition < REMOTE_MAX_TEXT_INPUT );
+            memset( backspaces, 8, remoteClient->cursorPosition );
+            if( remoteClient->cursorPosition > 0 )
+                tcpInterface->Send( backspaces, remoteClient->cursorPosition, p->systemAddress, false );
+
+            const size_t length = strlen( remoteClient->lastSentTextInput );
+            RakAssert( length < REMOTE_MAX_TEXT_INPUT );
+            tcpInterface->Send( remoteClient->lastSentTextInput, (unsigned int)length, p->systemAddress, false );
+            memcpy( remoteClient->textInput, remoteClient->lastSentTextInput, length + 1 );
+            remoteClient->cursorPosition = (unsigned int)length;
         }
 
+        tcpInterface->DeallocatePacket( p );
         return 0;
     }
 
@@ -197,8 +204,8 @@ Packet* TelnetTransport::Receive( void )
 
             Packet* reassembledLine = (Packet*)rakMalloc_Ex( sizeof( Packet ), _FILE_AND_LINE_ );
             reassembledLine->length = (unsigned int)strlen( remoteClient->textInput );
-            memcpy( remoteClient->lastSentTextInput, remoteClient->textInput, reassembledLine->length + 1 );
             RakAssert( reassembledLine->length < REMOTE_MAX_TEXT_INPUT );
+            memcpy( remoteClient->lastSentTextInput, remoteClient->textInput, reassembledLine->length + 1 );
             reassembledLine->data = (unsigned char*)rakMalloc_Ex( reassembledLine->length + 1, _FILE_AND_LINE_ );
             memcpy( reassembledLine->data, remoteClient->textInput, reassembledLine->length );
 #ifdef _PRINTF_DEBUG
@@ -275,9 +282,7 @@ TelnetTransport::TelnetClient* TelnetTransport::CountConnection( const SystemAdd
         remoteClient->cursorPosition = 0;
         remoteClient->systemAddress = systemAddress;
         remoteClient->openConnections = 0;
-#ifdef _PRINTF_DEBUG
         memset( remoteClient->textInput, 0, REMOTE_MAX_TEXT_INPUT );
-#endif
         it = remoteClients.insert( remoteClients.end(), remoteClient );
     }
 
@@ -349,9 +354,11 @@ bool TelnetTransport::ReassembleLine( TelnetTransport::TelnetClient* remoteClien
     }
     else if( c >= 32 && c < 127 )
     {
-        if( remoteClient->cursorPosition < REMOTE_MAX_TEXT_INPUT )
+        // One byte short of the buffer, so the line is always terminated at the cursor.
+        if( remoteClient->cursorPosition < REMOTE_MAX_TEXT_INPUT - 1 )
         {
             remoteClient->textInput[remoteClient->cursorPosition++] = c;
+            remoteClient->textInput[remoteClient->cursorPosition] = 0;
 #ifdef _PRINTF_DEBUG
             RAKNET_DEBUG_PRINTF( "[Norm] %s\n", remoteClient->textInput );
 #endif
