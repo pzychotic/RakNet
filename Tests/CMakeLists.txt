@@ -74,6 +74,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PingTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakThreadTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliableOrderedConvertedTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Router2UnrequestedForwardingSuccessTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RPC4LoopbackTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityFunctionsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketSendAddressFamilyTest.cpp

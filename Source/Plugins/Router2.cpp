@@ -1282,6 +1282,12 @@ bool Router2::OnForwardingSuccess( Packet* packet )
         ForwardedConnection fc;
         connectionRequestsMutex.lock();
         unsigned int connectionRequestIndex = GetConnectionRequestIndex( endpointGuid );
+        if( connectionRequestIndex == ~0u )
+        {
+            // We never asked to reach this endpoint
+            connectionRequestsMutex.unlock();
+            return false;
+        }
         fc.returnConnectionLostOnFailure = connectionRequests[connectionRequestIndex]->returnConnectionLostOnFailure;
         connectionRequests.erase( connectionRequests.begin() + connectionRequestIndex );
         connectionRequestsMutex.unlock();
