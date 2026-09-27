@@ -127,5 +127,13 @@ the tree's only `catch` and makes a failed thread creation return an error in bo
 Stack size and priority can then be set at creation, which `std::thread` cannot do. A
 console port adds its own branch.
 
+Property 2 is a runtime claim, but CI runs the suite only with exceptions on. That is
+enough. If `Source/` throws under a test with exceptions on, nothing in `Source/` catches
+it, so the test fails. With exceptions off, the process terminates. Either way the test is
+red. The modes can diverge only where `Source/` catches, which the `-fno-exceptions`
+compile job rejects, or where it branches on the exception mode, which the lint bans. A
+suite run without exceptions would therefore add nothing. Revisit this if either ban gains
+an exception.
+
 Code comments in `Source/` that cite ADR-0002 remain correct in substance. They are
 repointed here as the files are touched.
