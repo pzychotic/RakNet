@@ -22,6 +22,19 @@ connection record but is not yet connected, and may send nothing but its connect
 request. It is dropped if the handshake does not finish in time.
 _Avoid_: Unverified sender, pending connection
 
+**Designated System**:
+A connected System the application has named as entitled to act in a role for this Peer,
+such as its proxy coordinator or a router it accepts reroutes from. It is named by the
+address its connection was made at, never by its RakNetGUID, and loses the role when that
+connection closes.
+_Avoid_: Trusted system, authorised system
+
+**Solicited**:
+Said of a Message that answers something this Peer started itself, such as a reply to a
+request it sent and has not yet seen answered. A Message that is neither solicited nor
+from a Designated System entitles its sender to nothing.
+_Avoid_: Expected, requested
+
 **RakNetGUID**:
 The 64-bit name a Peer answers to, chosen once at construction and stable across the
 address changes a System may go through. It is:
