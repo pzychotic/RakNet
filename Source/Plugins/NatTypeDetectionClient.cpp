@@ -42,9 +42,7 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
         std::vector<RakNetSocket2*> sockets;
         rakPeerInterface->GetSockets( sockets );
         RakAssert( !sockets.empty() );
-        char str[64];
-        sockets.front()->GetBoundAddress().ToString( false, str );
-        c2 = CreateNonblockingBoundSocket( str, this );
+        c2 = CreateNonblockingSocketOnSameHost( sockets.front(), this );
     }
 
     serverAddress = _serverAddress;

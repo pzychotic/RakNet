@@ -41,9 +41,7 @@ void NatTypeDetectionServer::Startup( const char* nonRakNetIP2, const char* nonR
     std::vector<RakNetSocket2*> sockets;
     rakPeerInterface->GetSockets( sockets );
     RakAssert( !sockets.empty() );
-    char str[64];
-    sockets.front()->GetBoundAddress().ToString( false, str );
-    s1p2 = CreateNonblockingBoundSocket( str, this );
+    s1p2 = CreateNonblockingSocketOnSameHost( sockets.front(), this );
     s2p3 = CreateNonblockingBoundSocket( nonRakNetIP2, this );
     s3p4 = CreateNonblockingBoundSocket( nonRakNetIP3, this );
     s4p5 = CreateNonblockingBoundSocket( nonRakNetIP4, this );

@@ -13,7 +13,10 @@
 #if _RAKNET_SUPPORT_NatTypeDetectionServer == 1 || _RAKNET_SUPPORT_NatTypeDetectionClient == 1
 
 #include "SocketIncludes.h"
+#include "SocketDefines.h"
 #include "RakAssert.h"
+
+#include <cstring>
 
 namespace RakNet {
 
@@ -135,6 +138,30 @@ RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHand
     }
 
     return r2;
+}
+
+RakNetSocket2* CreateNonblockingSocketOnSameHost( RakNetSocket2* peerSocket, RNS2EventHandler* eventHandler )
+{
+    SystemAddress bindAddress = peerSocket->GetBoundAddress();
+    if( peerSocket->IsBerkleySocket() )
+    {
+        sockaddr_storage ss;
+        memset( &ss, 0, sizeof( ss ) );
+        socklen_t len = sizeof( ss );
+        if( getsockname__( ( (RNS2_Berkley*)peerSocket )->GetSocket(), (sockaddr*)&ss, &len ) == 0 && ss.ss_family == AF_INET )
+        {
+            const sockaddr_in* sa = (const sockaddr_in*)&ss;
+            if( sa->sin_addr.s_addr == htonl( INADDR_ANY ) )
+                return CreateNonblockingBoundSocket( "", eventHandler );
+
+            bindAddress = SystemAddress();
+            bindAddress.address.addr4.sin_addr = sa->sin_addr;
+        }
+    }
+
+    char str[64];
+    bindAddress.ToString( false, str );
+    return CreateNonblockingBoundSocket( str, eventHandler );
 }
 
 void DestroyNonblockingBoundSocket( RakNetSocket2*& socket )

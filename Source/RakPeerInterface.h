@@ -379,6 +379,9 @@ public:
     virtual const RakNetGUID GetMyGUID( void ) const = 0;
 
     /// Return the address bound to a socket at the specified index
+    /// \note A socket bound to the wildcard address (the default, a SocketDescriptor with no host
+    /// address) reports loopback, not the wildcard. It is an address to send to yourself on, not the
+    /// address the socket is bound to.
     virtual SystemAddress GetMyBoundAddress( const int socketIndex = 0 ) = 0;
 
     /// Get a random 64-bit number from the operating system's random number source.

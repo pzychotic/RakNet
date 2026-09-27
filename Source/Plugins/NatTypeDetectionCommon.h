@@ -64,6 +64,13 @@ RAK_DLL_EXPORT const char* NATTypeDetectionResultToStringFriendly( NATTypeDetect
 RAK_DLL_EXPORT RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHandler* eventHandler );
 
 /// \internal
+/// CreateNonblockingBoundSocket on an ephemeral port, bound to the address peerSocket is really
+/// bound to. Not GetBoundAddress, which reports loopback for a wildcard-bound socket: that would
+/// bind the new socket to loopback only. Falls back to GetBoundAddress if peerSocket is not a
+/// Berkley IPv4 socket or its address cannot be read.
+RAK_DLL_EXPORT RakNetSocket2* CreateNonblockingSocketOnSameHost( RakNetSocket2* peerSocket, RNS2EventHandler* eventHandler );
+
+/// \internal
 /// Stops the socket's polling thread, deletes it and sets it to 0. Does nothing if it is 0.
 RAK_DLL_EXPORT void DestroyNonblockingBoundSocket( RakNetSocket2*& socket );
 

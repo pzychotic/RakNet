@@ -97,6 +97,8 @@ public:
     void SetRecvEventHandler( RNS2EventHandler* _eventHandler );
     virtual RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line ) = 0;
     bool IsBerkleySocket( void ) const;
+    /// A socket bound to the wildcard address (INADDR_ANY, or in6addr_any) reports loopback here, not
+    /// the wildcard. It is an address to send to yourself on, not the address the socket is bound to.
     SystemAddress GetBoundAddress( void ) const;
     unsigned int GetUserConnectionSocketIndex( void ) const;
     void SetUserConnectionSocketIndex( unsigned int i );
