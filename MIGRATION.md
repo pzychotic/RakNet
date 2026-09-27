@@ -83,8 +83,8 @@ below, which are all about strings, cannot reach the core protocol.
 
 **Source break.** Most of RakNet was already in `namespace RakNet` in stock 4.081. A
 handful of headers were not, and they are now: `MessageIdentifiers.h`, `PacketPriority.h`,
-`DR_SHA1.h`, `SingleProducerConsumer.h`, `SuperFastHash.h`, `ThreadPool.h`,
-`WSAStartupSingleton.h`, and the surviving `DS_*` headers.
+`DR_SHA1.h`, `SingleProducerConsumer.h`, `SuperFastHash.h`, `WSAStartupSingleton.h`, and
+the surviving `DS_*` headers.
 
 The two that matter to ordinary code are `PacketPriority` and `PacketReliability`, which
 were global enums and are now `RakNet::PacketPriority` and `RakNet::PacketReliability`.
@@ -351,16 +351,22 @@ or do without.
 
 **Utilities:** `RakString`, `RakWString`, `RakNetSmartPtr`, `RefCountedObj`, `SimpleMutex`,
 `RakSleep`, `LocklessTypes`, `Base64Encoder`, `CheckSum`, `FormatString`, `Itoa`,
-`EpochTimeToString`, `GridSectorizer`, and the `Gets`/`Getche`/`Kbhit`/`_FindFirst`
-platform shims. `<mutex>`, `<thread>`, `<atomic>` and `<chrono>` replace the threading and
-timing ones.
+`EpochTimeToString`, `GridSectorizer`, `ThreadPool`, and the
+`Gets`/`Getche`/`Kbhit`/`_FindFirst` platform shims. `<mutex>`, `<thread>`, `<atomic>` and
+`<chrono>` replace the threading and timing ones.
 
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 
-**Build switches:** `PREALLOCATE_LARGE_MESSAGES`. The switch selected an alternative
-split-packet reassembly strategy, but the code behind it never compiled in any RakNet
-release, so no build can ever have had it set to `1` — nothing you were doing stops working.
+**Build switches:** `PREALLOCATE_LARGE_MESSAGES` and `USE_THREADED_SEND`. Neither
+compiles in 4.081, so nothing you were doing stops working.
+
+- `PREALLOCATE_LARGE_MESSAGES` selected a different strategy for reassembling split packets.
+  Its code never compiled in any RakNet release, so no build can ever have had it set to `1`.
+- `USE_THREADED_SEND` sent outgoing datagrams from a worker thread, and `SendToThread.h` went
+  with it. Its code stopped compiling when stock moved sends onto `RakNetSocket2`, and it
+  does not compile in 4.081. A build that still defines it now compiles and sends inline
+  from the update cycle.
 
 **`RakAlloca.h`, `USE_ALLOCA`, `MAX_ALLOCA_STACK_ALLOCATION`.** Source-only, not
 wire-visible. `RakAlloca.h` is gone, and RakNet no longer uses `alloca` anywhere. The public

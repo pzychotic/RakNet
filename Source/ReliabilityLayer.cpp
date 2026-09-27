@@ -17,9 +17,6 @@
 #include "RakAssert.h"
 #include "Rand.h"
 #include "MessageIdentifiers.h"
-#ifdef USE_THREADED_SEND
-#include "SendToThread.h"
-#endif
 #include <math.h>
 
 namespace RakNet {
@@ -2022,22 +2019,11 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
 
     RakAssert( length <= congestionManager.GetMTU() );
 
-#ifdef USE_THREADED_SEND
-    SendToThread::SendToThreadBlock* block = SendToThread::AllocateBlock();
-    memcpy( block->data, bitStream->GetData(), length );
-    block->dataWriteOffset = length;
-    block->extraSocketOptions = extraSocketOptions;
-    block->s = s;
-    block->systemAddress = systemAddress;
-    SendToThread::ProcessBlock( block );
-#else
-
     RNS2_SendParameters bsp;
     bsp.data = (char*)bitStream->GetData();
     bsp.length = length;
     bsp.systemAddress = systemAddress;
     s->Send( &bsp, _FILE_AND_LINE_ );
-#endif
 }
 
 //-------------------------------------------------------------------------------------------------------

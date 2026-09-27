@@ -42,10 +42,6 @@
 #include "RakNetVersion.h"
 #include "WSAStartupSingleton.h"
 
-#ifdef USE_THREADED_SEND
-#include "SendToThread.h"
-#endif
-
 #ifdef CAT_AUDIT
 #define CAT_AUDIT_PRINTF( ... ) printf( __VA_ARGS__ )
 #else
@@ -495,10 +491,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         pluginListNTS[i]->OnRakPeerStartup();
     }
 
-#ifdef USE_THREADED_SEND
-    SendToThread::AddRef();
-#endif
-
     return RAKNET_STARTED;
 }
 
@@ -898,10 +890,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     activeSystemList = 0;
 
     ClearRemoteSystemLookup();
-
-#ifdef USE_THREADED_SEND
-    SendToThread::Deref();
-#endif
 
     ResetSendReceipt();
 }
