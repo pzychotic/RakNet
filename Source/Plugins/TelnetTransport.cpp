@@ -120,10 +120,11 @@ Packet* TelnetTransport::Receive( void )
     */
 
     // Get this guy's cursor buffer.  This is real bullcrap that I have to do this.
+    // An entry with no open connection only holds a lost event drained before its new one.
     TelnetClient* remoteClient = 0;
     for( TelnetClient* pClient : remoteClients )
     {
-        if( pClient->systemAddress == p->systemAddress )
+        if( pClient->systemAddress == p->systemAddress && pClient->openConnections > 0 )
         {
             remoteClient = pClient;
         }
@@ -247,27 +248,9 @@ SystemAddress TelnetTransport::HasNewIncomingConnection( void )
 
     */
 
-        TelnetClient* remoteClient = 0;
-        for( TelnetClient* pClient : remoteClients )
-        {
-            if( pClient->systemAddress == newConnection )
-            {
-                remoteClient = pClient;
-                remoteClient->cursorPosition = 0;
-            }
-        }
-
-        if( remoteClient == 0 )
-        {
-            remoteClient = new TelnetClient;
-            remoteClient->lastSentTextInput[0] = 0;
+        TelnetClient* remoteClient = CountConnection( newConnection, 1 );
+        if( remoteClient )
             remoteClient->cursorPosition = 0;
-            remoteClient->systemAddress = newConnection;
-#ifdef _PRINTF_DEBUG
-            memset( remoteClient->textInput, 0, REMOTE_MAX_TEXT_INPUT );
-#endif
-            remoteClients.push_back( remoteClient );
-        }
     }
     return newConnection;
 }
@@ -275,22 +258,38 @@ SystemAddress TelnetTransport::HasLostConnection( void )
 {
     SystemAddress systemAddress = tcpInterface->HasLostConnection();
     if( systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
-    {
-        for( auto it = remoteClients.begin(); it != remoteClients.end(); /**/ )
-        {
-            TelnetClient* pClient = *it;
-            if( pClient->systemAddress == systemAddress )
-            {
-                RakNet::OP_DELETE( pClient, _FILE_AND_LINE_ );
-                it = remoteClients.erase( it );
-            }
-            else
-            {
-                ++it;
-            }
-        }
-    }
+        CountConnection( systemAddress, -1 );
     return systemAddress;
+}
+TelnetTransport::TelnetClient* TelnetTransport::CountConnection( const SystemAddress& systemAddress, int delta )
+{
+    auto it = remoteClients.begin();
+    while( it != remoteClients.end() && ( *it )->systemAddress != systemAddress )
+        ++it;
+
+    if( it == remoteClients.end() )
+    {
+        // Only for an address TCPInterface reported an event for, and one entry per address.
+        TelnetClient* remoteClient = RakNet::OP_NEW<TelnetClient>( _FILE_AND_LINE_ );
+        remoteClient->lastSentTextInput[0] = 0;
+        remoteClient->cursorPosition = 0;
+        remoteClient->systemAddress = systemAddress;
+        remoteClient->openConnections = 0;
+#ifdef _PRINTF_DEBUG
+        memset( remoteClient->textInput, 0, REMOTE_MAX_TEXT_INPUT );
+#endif
+        it = remoteClients.insert( remoteClients.end(), remoteClient );
+    }
+
+    TelnetClient* remoteClient = *it;
+    remoteClient->openConnections += delta;
+    if( remoteClient->openConnections == 0 )
+    {
+        RakNet::OP_DELETE( remoteClient, _FILE_AND_LINE_ );
+        remoteClients.erase( it );
+        return 0;
+    }
+    return remoteClient;
 }
 CommandParserInterface* TelnetTransport::GetCommandParser( void )
 {

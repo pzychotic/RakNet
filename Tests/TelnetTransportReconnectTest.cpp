@@ -2,6 +2,7 @@
 #include "RakNetTypes.h"
 #include "SocketDefines.h"
 #include "SocketIncludes.h"
+#include "TCPInterface.h"
 #include "WSAStartupSingleton.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -11,25 +12,30 @@
 #include <thread>
 
 /*
-Pins that a telnet client reconnecting from the address it last connected from is listed
-once, and freed once.
+Pins how TelnetTransport accounts for connections that share an address: a client
+reconnecting from the address it last connected from, and a connection whose lost event is
+drained before its new one.
 
-TelnetTransport keeps a TelnetClient per remote address for line reassembly.
-HasNewIncomingConnection looked for an existing entry with the new connection's address and
-reused it - and then pushed the pointer onto remoteClients unconditionally, so a reused client
-went in a second time. HasLostConnection deletes every entry whose address matches, which then
-deleted that one object twice. Upstream's swap-remove loop skipped the second copy and left it
-dangling instead; the fork's erase loop visits both, so it was a double free on the spot.
+TelnetTransport keeps a TelnetClient per remote address for line reassembly, and TCPInterface
+gives it nothing better to key on. New and lost events come from two separate queues, so
+their relative order is lost, and a reconnect accepted after the old connection's loss was
+detected usually takes the same slot, so even systemIndex repeats. What does hold is that
+every connection reported new is reported lost once. So each entry counts the connections
+still open at its address - new events drained minus lost events drained - and goes when
+that reaches zero.
 
-An address repeats only when the source port does, so the client here is a raw socket bound
-to a fixed local port. It closes abortively - SO_LINGER with a zero timeout sends a RST - which
-leaves no TIME_WAIT behind and lets the reconnect bind the same port again. Both connections'
-new events are drained before either lost event: that is the ordering that puts one client in
-the list twice, and it is ordinary for any application that polls the three queues at its own
-pace.
+Three defects came before that:
 
-Unfixed, the entry count after the second connection is 2, and the first lost event frees the
-same TelnetClient twice, which the MSVC debug heap or ASan stops right there.
+- HasNewIncomingConnection pushed a reused entry onto remoteClients a second time, and
+  HasLostConnection then freed it twice.
+- The old connection's lost event freed the entry the reconnect was using, and Receive
+  dropped the live connection's input from then on.
+- A lost event drained before its new one found no entry and freed nothing, and the new
+  event then created an entry that nothing would free.
+
+An address repeats only when the source port does, so the clients here are raw sockets bound
+to fixed local ports. They close abortively - SO_LINGER with a zero timeout sends a RST -
+which leaves no TIME_WAIT behind and lets a reconnect bind the same port again.
 */
 
 using namespace RakNet;
@@ -38,9 +44,12 @@ namespace {
 
 // TCP, so these share no space with the UDP ports the rest of the suite hardcodes, and
 // distinct from the TCPInterface tests' ports so a stray listener is never ambiguous about
-// which test left it.
-constexpr unsigned short kListenPort = 61030;
-constexpr unsigned short kClientPort = 61031;
+// which test left it. CreateListenSocket does not set SO_REUSEADDR before it binds, so no
+// port is shared between cases.
+constexpr unsigned short kReconnectListenPort = 61030;
+constexpr unsigned short kReconnectClientPort = 61031;
+constexpr unsigned short kLostFirstListenPort = 61032;
+constexpr unsigned short kLostFirstClientPort = 61033;
 
 // Loopback, so every wait here is over as soon as the threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.
@@ -71,11 +80,14 @@ struct WinsockScope
     ~WinsockScope() { WSAStartupSingleton::Deref(); }
 };
 
-// remoteClients is protected; the count is the only thing the test needs from it.
+// remoteClients and tcpInterface are protected; the test needs a count from each.
 class InspectableTelnetTransport : public TelnetTransport
 {
 public:
     size_t ClientCount() const { return remoteClients.size(); }
+
+    // Connections TCPInterface has accepted, whether or not their new event was drained.
+    unsigned short AcceptedCount() const { return tcpInterface->GetConnectionCount(); }
 };
 
 sockaddr_in LoopbackAddress( unsigned short port )
@@ -88,8 +100,8 @@ sockaddr_in LoopbackAddress( unsigned short port )
     return address;
 }
 
-// A blocking TCP connection to the listener, made from kClientPort every time.
-__TCPSOCKET__ ConnectFromFixedPort()
+// A blocking TCP connection to the listener, made from the same local port every time.
+__TCPSOCKET__ ConnectFromFixedPort( unsigned short listenPort, unsigned short clientPort )
 {
     const __TCPSOCKET__ s = socket__( AF_INET, SOCK_STREAM, IPPROTO_TCP );
     REQUIRE( s != (__TCPSOCKET__)-1 );
@@ -97,10 +109,10 @@ __TCPSOCKET__ ConnectFromFixedPort()
     const int reuse = 1;
     REQUIRE( setsockopt__( s, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof( reuse ) ) == 0 );
 
-    const sockaddr_in local = LoopbackAddress( kClientPort );
+    const sockaddr_in local = LoopbackAddress( clientPort );
     REQUIRE( bind__( s, (const sockaddr*)&local, sizeof( local ) ) == 0 );
 
-    const sockaddr_in remote = LoopbackAddress( kListenPort );
+    const sockaddr_in remote = LoopbackAddress( listenPort );
     REQUIRE( connect__( s, (const sockaddr*)&remote, sizeof( remote ) ) == 0 );
     return s;
 }
@@ -117,15 +129,15 @@ void Abort( __TCPSOCKET__ s )
 
 } // namespace
 
-TEST_CASE( "TelnetTransport lists a client reconnecting from the same address once", "[telnettransport][network]" )
+TEST_CASE( "TelnetTransport keeps a client reconnecting from the same address", "[telnettransport][network]" )
 {
     WinsockScope winsock;
 
     InspectableTelnetTransport telnet;
-    REQUIRE( telnet.Start( kListenPort, true ) );
+    REQUIRE( telnet.Start( kReconnectListenPort, true ) );
 
     SystemAddress firstAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    const __TCPSOCKET__ first = ConnectFromFixedPort();
+    const __TCPSOCKET__ first = ConnectFromFixedPort( kReconnectListenPort, kReconnectClientPort );
     REQUIRE( WaitFor( [&] { return ( firstAddress = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
     REQUIRE( telnet.ClientCount() == 1 );
 
@@ -134,26 +146,60 @@ TEST_CASE( "TelnetTransport lists a client reconnecting from the same address on
     // The lost event for the first connection is queued, or soon will be; it is deliberately
     // not drained until the reconnect's new event has been.
     SystemAddress secondAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    const __TCPSOCKET__ second = ConnectFromFixedPort();
+    const __TCPSOCKET__ second = ConnectFromFixedPort( kReconnectListenPort, kReconnectClientPort );
     REQUIRE( WaitFor( [&] { return ( secondAddress = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
     REQUIRE( secondAddress == firstAddress );
 
-    // The reused TelnetClient is already listed. Unfixed, it is listed twice.
+    // The reused TelnetClient is already listed, so it is not listed again.
     CHECK( telnet.ClientCount() == 1 );
 
-    // The load-bearing call. Unfixed, it deletes the same TelnetClient twice.
-    //
-    // Zero, not one, even though the second connection is still open: the first connection's
-    // lost event matches by address, so it frees the client the reconnect is reusing, and
-    // the live connection's input is dropped from here on. That is the behaviour upstream
-    // has too, and it is not what this test is about; what it pins is that nothing
-    // dangling stays listed. A fix that tells the two connections apart changes this line.
+    // The first connection's lost event. It frees the TelnetClient once at most, and - the
+    // second connection being open at the same address - not at all.
     REQUIRE( WaitFor( [&] { return telnet.HasLostConnection() == firstAddress; } ) );
-    CHECK( telnet.ClientCount() == 0 );
+    CHECK( telnet.ClientCount() == 1 );
 
-    // The second connection's own lost event finds nothing left to free.
+    // The live connection's input still reassembles into a line.
+    const char line[] = "hello\n";
+    REQUIRE( send__( second, line, (int)strlen( line ), 0 ) == (int)strlen( line ) );
+    Packet* received = 0;
+    CHECK( WaitFor( [&] { return ( received = telnet.Receive() ) != 0; } ) );
+    if( received )
+    {
+        CHECK( received->systemAddress == secondAddress );
+        CHECK( strcmp( (const char*)received->data, "hello" ) == 0 );
+        telnet.DeallocatePacket( received );
+    }
+
+    // The second connection's own lost event frees it.
     Abort( second );
     CHECK( WaitFor( [&] { return telnet.HasLostConnection() == secondAddress; } ) );
+    CHECK( telnet.ClientCount() == 0 );
+
+    telnet.Stop();
+}
+
+TEST_CASE( "TelnetTransport frees nothing twice and keeps nothing when a lost event comes first", "[telnettransport][network]" )
+{
+    WinsockScope winsock;
+
+    InspectableTelnetTransport telnet;
+    REQUIRE( telnet.Start( kLostFirstListenPort, true ) );
+
+    SystemAddress address;
+    REQUIRE( address.FromStringExplicitPort( "127.0.0.1", kLostFirstClientPort ) );
+
+    // Accepted, but its new event left in the queue. Aborting before the accept could lose
+    // the connection before TCPInterface ever reports it.
+    const __TCPSOCKET__ client = ConnectFromFixedPort( kLostFirstListenPort, kLostFirstClientPort );
+    REQUIRE( WaitFor( [&] { return telnet.AcceptedCount() == 1; } ) );
+    Abort( client );
+
+    // What ConsoleServer::Update does to a short-lived connection queued behind another: it
+    // takes the lost event on one tick and the new event on a later one.
+    REQUIRE( WaitFor( [&] { return telnet.HasLostConnection() == address; } ) );
+    REQUIRE( telnet.HasNewIncomingConnection() == address );
+
+    // Unfixed, the lost event found no entry and the new one created an entry nothing frees.
     CHECK( telnet.ClientCount() == 0 );
 
     telnet.Stop();

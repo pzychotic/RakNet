@@ -59,10 +59,20 @@ protected:
         char textInput[REMOTE_MAX_TEXT_INPUT];
         char lastSentTextInput[REMOTE_MAX_TEXT_INPUT];
         unsigned cursorPosition;
+
+        // Connections open at systemAddress: new events drained minus lost events drained.
+        // TCPInterface cannot tell two connections from one address apart, and drains new
+        // and lost events from separate queues, so this goes negative when a lost event is
+        // drained before its new one. The entry is deleted when it reaches zero.
+        int openConnections;
     };
 
     TCPInterface* tcpInterface;
     void AutoAllocate( void );
+
+    // The entry for systemAddress, created if there is none, after adding delta to its
+    // openConnections. Returns 0 if that deleted it.
+    TelnetClient* CountConnection( const SystemAddress& systemAddress, int delta );
     bool ReassembleLine( TelnetTransport::TelnetClient* telnetClient, unsigned char c );
 
     // Crap this sucks but because windows telnet won't send line at a time, I have to reconstruct the lines at the server per player
