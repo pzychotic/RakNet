@@ -58,15 +58,18 @@ what happens when a System reaches it.
 
 ## What is off-limits in `Source/`
 
-These are APIs that report a recoverable failure by throwing:
+These are APIs that report a recoverable failure by throwing. CI enforces this list, and
+the `throw`/`try`/`catch` ban, with `tools/lint-banned-apis.pl`. Change the two together.
+A safe call is marked on its line with `// ADR-0004-allow(<rule>): <reason>`.
 
 - `std::stoi` and relatives. Use `std::from_chars`.
 - `std::filesystem`'s throwing overloads. Use the `std::error_code` ones.
 - `std::random_device`. ADR-0001's reasoning is unchanged.
 - `std::regex`, and `.at()` on any container.
 - `std::string`'s position-taking members: `substr`, `erase(pos, …)`, `compare(pos, …)`,
-  `insert(pos, …)`, `replace(pos, …)`. Bound the position first, or use an iterator or
-  `std::string_view` form.
+  `insert(pos, …)`, `replace(pos, …)`, `copy(…, pos)`. Bound the position first, or use an
+  iterator or `std::string_view` form. The lint cannot see types, so it flags every
+  `compare`, `replace` and `copy` member call.
 - `std::expected::value()`, if `std::expected` is ever adopted. Check `has_value()` and
   use `*`/`->`.
 - The `std::thread` constructor. It throws `std::system_error` for a failure the caller can

@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Source/ must not call the APIs ADR-0004 bans. The compiler cannot catch these:
+  # -fno-exceptions rejects only throw/try/catch. Tests/ is exempt and not linted.
+  banned-api-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the lint
+        run: perl tools/lint-banned-apis.t
+      - name: Lint Source/
+        run: perl tools/lint-banned-apis.pl Source
