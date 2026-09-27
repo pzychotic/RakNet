@@ -23,6 +23,8 @@
 #include "UDPForwarder.h"
 #include "MessageIdentifiers.h"
 
+#include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <vector>
 
@@ -45,7 +47,12 @@ struct Router2DebugInterface
 
 /// \ingroup ROUTER_2_GROUP
 /// \brief Class interface for the Router2 system
-/// \details
+/// \details A Peer acts on a claim that forwarding is set up only if it asked for it or the
+/// claim comes from a System it designated. As the source, it takes ID_ROUTER_2_FORWARDING_ESTABLISHED
+/// only from the router it asked, while its request is outstanding. As the endpoint, it takes
+/// ID_ROUTER_2_REROUTED only from a router designated with AddIntermediary(), and moves a live
+/// connection only if that connection is already forwarded. A direct connection is never
+/// rerouted. Anything else is consumed and dropped.
 class RAK_DLL_EXPORT Router2 : public PluginInterface2
 {
 public:
@@ -82,6 +89,35 @@ public:
     /// Set the maximum number of bidirectional connections this system will support
     /// Defaults to 0
     void SetMaximumForwardingRequests( int max );
+
+    /// \brief Designates the System connected at \a systemAddress as a router this Peer, as an endpoint, accepts ID_ROUTER_2_REROUTED from.
+    /// \details A new forwarded connection needs no designation. It matters when a connection
+    /// forwarded to this Peer loses its router, and the source re-routes it through another:
+    /// only a Designated router can move that connection to its new address. Designate every
+    /// System that may route to this Peer, including the first router, since the move checks the
+    /// connection against what that router announced.
+    ///
+    /// The designation is by address. It may be made before the router connects, and lapses when
+    /// the connection at that address closes: a System that connects from the same address after
+    /// that is not Designated until AddIntermediary() is called again.
+    /// \param[in] systemAddress The router's address, as this Peer sees its connection.
+    void AddIntermediary( const SystemAddress& systemAddress );
+
+    /// Withdraws a designation made with AddIntermediary().
+    void RemoveIntermediary( const SystemAddress& systemAddress );
+
+    /// \brief Caps how many forwarded connections one Designated router may announce to this Peer ahead of their connection.
+    /// \details Each ID_ROUTER_2_REROUTED for an endpoint not yet connected records an entry,
+    /// freed when that endpoint's connection closes or the router's does. At the cap a further
+    /// announcement is dropped and counted in GetPendingForwardsRefused().
+    /// Defaults to 16.
+    void SetMaxPendingForwardsPerIntermediary( unsigned int max );
+
+    /// \return The value passed to SetMaxPendingForwardsPerIntermediary(), or the default.
+    unsigned int GetMaxPendingForwardsPerIntermediary( void ) const;
+
+    /// \return How many announcements SetMaxPendingForwardsPerIntermediary()'s cap has dropped.
+    uint64_t GetPendingForwardsRefused( void ) const;
 
     /// For testing and debugging
     void SetDebugInterface( Router2DebugInterface* _debugInterface );
@@ -159,7 +195,7 @@ protected:
     void OnQueryForwarding( Packet* packet );
     void OnQueryForwardingReply( Packet* packet );
     void OnRequestForwarding( Packet* packet );
-    void OnRerouted( Packet* packet );
+    bool OnRerouted( Packet* packet );
     void OnMiniPunchReply( Packet* packet );
     void OnMiniPunchReplyBounce( Packet* packet );
     bool OnForwardingSuccess( Packet* packet );
@@ -172,14 +208,19 @@ protected:
     std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
     std::vector<ConnnectRequest*> connectionRequests;
     std::vector<MiniPunchRequest> miniPunchesInProgress;
-    // Forwarding we have initiated
+    // Forwarding we have initiated, and forwarding a Designated intermediary announced to us as endpoint
     std::vector<ForwardedConnection> forwardedConnectionList;
+    // Guarded by forwardedConnectionListMutex
+    std::vector<SystemAddress> intermediaries;
+    std::atomic<unsigned int> maxPendingForwardsPerIntermediary;
+    std::atomic<uint64_t> pendingForwardsRefused;
 
     void ClearConnectionRequests( void );
     void ClearMinipunches( void );
     void ClearForwardedConnections( void );
     void ClearAll( void );
     int ReturnFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid );
+    bool IsPendingForward( const ForwardedConnection& forwardedConnection, RakNetGUID intermediaryGuid );
     void SendFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid );
     void SendForwardingSuccess( MessageID messageId, RakNetGUID sourceGuid, RakNetGUID endpointGuid, unsigned short sourceToDstPort );
     void SendOOBFromRakNetPort( OutOfBandIdentifiers oob, BitStream* extraData, SystemAddress sa );

@@ -12,6 +12,10 @@ Two hardening limits sit outside that count. They break no API and stop no build
 reject inputs stock accepted, so they have a section of their own at the end:
 [Limits that stock did not have](#limits-that-stock-did-not-have).
 
+Some plugins no longer act on a remote System's word alone. They break no build either, but
+an integration that relied on them can stop working at runtime, so they are listed in
+[Plugins that act only on Solicited or Designated messages](#plugins-that-act-only-on-solicited-or-designated-messages).
+
 **The short version:** four of the five breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
@@ -422,3 +426,34 @@ practice: a real sender's chunk count is bounded by its own message size and MTU
 application does move messages above 33.8 MiB, it has to chunk them itself — which it was
 already doing implicitly, and now finds out synchronously instead of by having the far end
 drop every piece.
+
+## Plugins that act only on Solicited or Designated messages
+
+Stock plugins believed any connected System that claimed to have set something up for
+them. This fork acts on such a claim only if it answers a request the Peer made itself
+(*Solicited*), or comes from a System the application named for that role (*Designated*).
+Nothing is designated by default, and an undesignated System's claim is consumed and
+dropped. No signature changed, so nothing here stops a build. The reasoning is
+[ADR-0006](docs/adr/0006-entitlement-comes-from-solicitation-or-designation.md).
+
+**`Router2`.** Stock moved a connection to `<sender's IP>:<any port>` for any connected
+System that sent `ID_ROUTER_2_FORWARDING_ESTABLISHED` or `ID_ROUTER_2_REROUTED` naming
+it. Any System could put itself in the middle of any other connection.
+
+- As the source, a Peer now takes `ID_ROUTER_2_FORWARDING_ESTABLISHED` only from the
+  router it asked, while that request is outstanding. Nothing to do.
+- As the endpoint, a Peer takes `ID_ROUTER_2_REROUTED` only from a router designated with
+  `Router2::AddIntermediary( SystemAddress )`, and moves a live connection only if it is
+  already forwarded. A direct connection is never moved. A designation lapses when the
+  router's connection closes, and must be made again if it reconnects.
+
+New forwarded connections work without any designation, since the endpoint has nothing to
+move until the source connects. What needs it is the endpoint surviving the loss of its
+router: if your endpoints must stay connected when the source re-routes through another
+System, call `AddIntermediary` on the endpoint for **every** System that may route to it,
+including the first. An undesignated router's `ID_ROUTER_2_REROUTED` no longer reaches
+`Receive`.
+
+A Designated router may announce at most 16 forwarded connections that have not yet
+connected. `Router2::SetMaxPendingForwardsPerIntermediary` changes the cap, and
+`GetPendingForwardsRefused` counts what it dropped.

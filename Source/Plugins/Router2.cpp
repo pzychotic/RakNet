@@ -93,6 +93,8 @@ Router2::Router2()
     maximumForwardingRequests = 0;
     debugInterface = 0;
     socketFamily = AF_INET;
+    maxPendingForwardsPerIntermediary = 16;
+    pendingForwardsRefused = 0;
 }
 
 Router2::~Router2()
@@ -349,7 +351,8 @@ PluginReceiveResult Router2::OnReceive( Packet* packet )
     }
     else if( packet->data[0] == ID_ROUTER_2_REROUTED )
     {
-        OnRerouted( packet );
+        if( OnRerouted( packet ) == false )
+            return RR_STOP_PROCESSING_AND_DEALLOCATE;
     }
     else if( packet->data[0] == ID_CONNECTION_REQUEST_ACCEPTED )
     {
@@ -475,11 +478,11 @@ void Router2::Update( void )
 void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason )
 {
     (void)lostConnectionReason;
-    (void)systemAddress;
-
 
     unsigned int forwardedConnectionIndex = 0;
     forwardedConnectionListMutex.lock();
+    // The designation lapses with the connection it was made for
+    intermediaries.erase( std::remove( intermediaries.begin(), intermediaries.end(), systemAddress ), intermediaries.end() );
     while( forwardedConnectionIndex < forwardedConnectionList.size() )
     {
         if( forwardedConnectionList[forwardedConnectionIndex].endpointGuid == rakNetGUID )
@@ -517,6 +520,11 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
 
             // This should not be removed - the connection is still forwarded, but perhaps through another system
             //          forwardedConnectionList.RemoveAtIndexFast(forwardedConnectionIndex);
+        }
+        else if( IsPendingForward( forwardedConnectionList[forwardedConnectionIndex], rakNetGUID ) )
+        {
+            // Announced by the closed intermediary for an endpoint that never connected through it
+            forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
         }
         else
         {
@@ -810,6 +818,13 @@ int Router2::ReturnFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID end
         return -1;
     }
     return pingToEndpoint;
+}
+
+// An entry intermediaryGuid announced to us as endpoint, whose connection has not arrived
+bool Router2::IsPendingForward( const ForwardedConnection& forwardedConnection, RakNetGUID intermediaryGuid )
+{
+    return forwardedConnection.intermediaryGuid == intermediaryGuid && forwardedConnection.weInitiatedForwarding == false &&
+           rakPeerInterface->GetConnectionState( forwardedConnection.endpointGuid ) != IS_CONNECTED;
 }
 
 void Router2::OnQueryForwarding( Packet* packet )
@@ -1177,63 +1192,111 @@ void Router2::OnMiniPunchReply( Packet* packet )
     }
 }
 
-void Router2::OnRerouted( Packet* packet )
+// Returns false to consume the Message
+bool Router2::OnRerouted( Packet* packet )
 {
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) );
     RakNetGUID endpointGuid;
-    bs.Read( endpointGuid );
     unsigned short sourceToDestPort;
-    bs.Read( sourceToDestPort );
+    if( bs.Read( endpointGuid ) == false || bs.Read( sourceToDestPort ) == false )
+        return false;
 
-    // Return rerouted notice
     SystemAddress intermediaryAddress = packet->systemAddress;
     intermediaryAddress.SetPortHostOrder( sourceToDestPort );
-    rakPeerInterface->ChangeSystemAddress( endpointGuid, intermediaryAddress );
 
-    forwardedConnectionListMutex.lock();
+    // Read before the lock. A connection that completes in between is treated as not yet connected, which only records or updates its entry
+    const bool isLive = rakPeerInterface->GetConnectionState( endpointGuid ) == IS_CONNECTED;
+    const SystemAddress currentAddress = rakPeerInterface->GetSystemAddressFromGuid( endpointGuid );
+
+    std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
+
+    // Designated only: we asked for nothing, so there is no request to check against
+    if( std::find( intermediaries.begin(), intermediaries.end(), packet->systemAddress ) == intermediaries.end() )
+    {
+        char buff[512];
+        if( debugInterface )
+            debugInterface->ShowFailure( FormatStringTS( buff, "Router2 dropped ID_ROUTER_2_REROUTED from undesignated %I64d at %s:%i\n", packet->guid.g, _FILE_AND_LINE_ ) );
+        return false;
+    }
+
     auto it = std::find_if( forwardedConnectionList.begin(), forwardedConnectionList.end(),
                             [&endpointGuid]( const ForwardedConnection& rConnection ) { return rConnection.endpointGuid == endpointGuid; } );
 
-    if( it != forwardedConnectionList.end() )
-    {
-        ForwardedConnection& ref_fc = *it;
-        forwardedConnectionListMutex.unlock();
+    // Our own forwarding moves only on a forwarding success we asked for
+    if( it != forwardedConnectionList.end() && it->weInitiatedForwarding )
+        return false;
 
-        ref_fc.intermediaryAddress = packet->systemAddress;
-        ref_fc.intermediaryAddress.SetPortHostOrder( sourceToDestPort );
-        ref_fc.intermediaryGuid = packet->guid;
-
-        rakPeerInterface->ChangeSystemAddress( endpointGuid, intermediaryAddress );
-
-        if( debugInterface )
-        {
-            char buff[512];
-            debugInterface->ShowDiagnostic( FormatStringTS( buff, "FIX: Got ID_ROUTER_2_REROUTE, returning ID_ROUTER_2_REROUTED,"
-                                                                  " Calling RakPeer::ChangeSystemAddress(%I64d, %s) at %s:%i\n",
-                                                            endpointGuid.g, intermediaryAddress.ToString( true ), __FILE__, __LINE__ ) );
-        }
-    }
-    else
+    // Announced after its connection arrived: it is already at the announced address, so record it and move nothing
+    if( isLive && it == forwardedConnectionList.end() && currentAddress == intermediaryAddress )
     {
         ForwardedConnection fc;
         fc.endpointGuid = endpointGuid;
-        fc.intermediaryAddress = packet->systemAddress;
-        fc.intermediaryAddress.SetPortHostOrder( sourceToDestPort );
+        fc.intermediaryAddress = intermediaryAddress;
         fc.intermediaryGuid = packet->guid;
+        fc.returnConnectionLostOnFailure = false;
         fc.weInitiatedForwarding = false;
-        // add to forwarding list. This is only here to avoid reporting direct connections in Router2::ReturnFailureOnCannotForward
         forwardedConnectionList.emplace_back( fc );
-        forwardedConnectionListMutex.unlock();
+        return true;
+    }
 
+    if( isLive )
+    {
+        // Only a connection that is already forwarded moves. A direct connection never does, and neither does one whose entry is stale
+        if( it == forwardedConnectionList.end() || it->intermediaryAddress != currentAddress )
+        {
+            char buff[512];
+            if( debugInterface )
+                debugInterface->ShowFailure( FormatStringTS( buff, "Router2 dropped ID_ROUTER_2_REROUTED for unforwarded %I64d at %s:%i\n", endpointGuid.g, _FILE_AND_LINE_ ) );
+            return false;
+        }
+
+        it->intermediaryAddress = intermediaryAddress;
+        it->intermediaryGuid = packet->guid;
         rakPeerInterface->ChangeSystemAddress( endpointGuid, intermediaryAddress );
 
         if( debugInterface )
         {
             char buff[512];
-            debugInterface->ShowDiagnostic( FormatStringTS( buff, "Got ID_ROUTER_2_REROUTE, returning ID_ROUTER_2_REROUTED, Calling RakPeer::ChangeSystemAddress at %s:%i\n", __FILE__, __LINE__ ) );
+            debugInterface->ShowDiagnostic( FormatStringTS( buff, "Got ID_ROUTER_2_REROUTED, calling RakPeer::ChangeSystemAddress(%I64d, %s) at %s:%i\n",
+                                                            endpointGuid.g, intermediaryAddress.ToString( true ), _FILE_AND_LINE_ ) );
         }
+        return true;
     }
+
+    // No connection yet, so nothing to move. The entry is only here to avoid reporting forwarded connections in Router2::ReturnFailureOnCannotForward, and to recognise the connection if it is re-routed later
+    if( it != forwardedConnectionList.end() )
+    {
+        it->intermediaryAddress = intermediaryAddress;
+        it->intermediaryGuid = packet->guid;
+        return true;
+    }
+
+    const RakNetGUID intermediaryGuid = packet->guid;
+    const size_t pending = std::count_if( forwardedConnectionList.begin(), forwardedConnectionList.end(),
+                                          [this, &intermediaryGuid]( const ForwardedConnection& rConnection ) { return IsPendingForward( rConnection, intermediaryGuid ); } );
+    if( pending >= maxPendingForwardsPerIntermediary )
+    {
+        pendingForwardsRefused++;
+        RAKNET_DEBUG_PRINTF( "Router2: dropped ID_ROUTER_2_REROUTED from %" PRINTF_64_BIT_MODIFIER "u, which has %u forwarded connections pending\n",
+                             (unsigned long long)intermediaryGuid.g, (unsigned int)pending );
+        return false;
+    }
+
+    ForwardedConnection fc;
+    fc.endpointGuid = endpointGuid;
+    fc.intermediaryAddress = intermediaryAddress;
+    fc.intermediaryGuid = intermediaryGuid;
+    fc.returnConnectionLostOnFailure = false;
+    fc.weInitiatedForwarding = false;
+    forwardedConnectionList.emplace_back( fc );
+
+    if( debugInterface )
+    {
+        char buff[512];
+        debugInterface->ShowDiagnostic( FormatStringTS( buff, "Got ID_ROUTER_2_REROUTED for new connection %I64d at %s:%i\n", endpointGuid.g, _FILE_AND_LINE_ ) );
+    }
+    return true;
 }
 
 bool Router2::OnForwardingSuccess( Packet* packet )
@@ -1241,27 +1304,41 @@ bool Router2::OnForwardingSuccess( Packet* packet )
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) );
     RakNetGUID endpointGuid;
-    bs.Read( endpointGuid );
     unsigned short sourceToDestPort;
-    bs.Read( sourceToDestPort );
+    if( bs.Read( endpointGuid ) == false || bs.Read( sourceToDestPort ) == false )
+        return false;
 
-    forwardedConnectionListMutex.lock();
+    // Solicited only: a request for this endpoint is outstanding, and the sender is the router it asked. A re-route after losing a router goes through ConnectInternal too, so this holds for a live connection as well
+    bool returnConnectionLostOnFailure;
+    {
+        std::lock_guard<std::mutex> guard( connectionRequestsMutex );
+        unsigned int connectionRequestIndex = GetConnectionRequestIndex( endpointGuid );
+        if( connectionRequestIndex == ~0u ||
+            connectionRequests[connectionRequestIndex]->requestState != REQUEST_STATE_REQUEST_FORWARDING ||
+            connectionRequests[connectionRequestIndex]->lastRequestedForwardingSystem != packet->guid )
+        {
+            char buff[512];
+            if( debugInterface )
+                debugInterface->ShowFailure( FormatStringTS( buff, "Router2 dropped unsolicited ID_ROUTER_2_FORWARDING_ESTABLISHED from %I64d at %s:%i\n", packet->guid.g, _FILE_AND_LINE_ ) );
+            return false;
+        }
+        returnConnectionLostOnFailure = connectionRequests[connectionRequestIndex]->returnConnectionLostOnFailure;
+        RemoveConnectionRequest( connectionRequestIndex );
+    }
+
+    SystemAddress intermediaryAddress = packet->systemAddress;
+    intermediaryAddress.SetPortHostOrder( sourceToDestPort );
+
+    std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
     auto it = std::find_if( forwardedConnectionList.begin(), forwardedConnectionList.end(),
                             [&endpointGuid]( const ForwardedConnection& rConnection ) { return rConnection.endpointGuid == endpointGuid; } );
 
     if( it != forwardedConnectionList.end() )
     {
-        // Return rerouted notice
-        SystemAddress intermediaryAddress = packet->systemAddress;
-        intermediaryAddress.SetPortHostOrder( sourceToDestPort );
+        // Re-routed through another router: move the connection and tell the user
+        it->intermediaryAddress = intermediaryAddress;
+        it->intermediaryGuid = packet->guid;
         rakPeerInterface->ChangeSystemAddress( endpointGuid, intermediaryAddress );
-
-        ////////////////////////////////////////////////////////////////////////////
-        ForwardedConnection& ref_fc = *it;
-        ref_fc.intermediaryAddress = packet->systemAddress;
-        ref_fc.intermediaryAddress.SetPortHostOrder( sourceToDestPort );
-        ref_fc.intermediaryGuid = packet->guid;
-        ////////////////////////////////////////////////////////////////////////////
 
         if( debugInterface )
         {
@@ -1270,43 +1347,21 @@ bool Router2::OnForwardingSuccess( Packet* packet )
         }
 
         packet->data[0] = ID_ROUTER_2_REROUTED;
-
-        forwardedConnectionListMutex.unlock();
         return true; // Return packet to user
     }
-    else
+
+    ForwardedConnection fc;
+    fc.endpointGuid = endpointGuid;
+    fc.intermediaryAddress = intermediaryAddress;
+    fc.intermediaryGuid = packet->guid;
+    fc.returnConnectionLostOnFailure = returnConnectionLostOnFailure;
+    fc.weInitiatedForwarding = true;
+    forwardedConnectionList.emplace_back( fc );
+
+    if( debugInterface )
     {
-        forwardedConnectionListMutex.unlock();
-
-        // removeFrom connectionRequests;
-        ForwardedConnection fc;
-        connectionRequestsMutex.lock();
-        unsigned int connectionRequestIndex = GetConnectionRequestIndex( endpointGuid );
-        if( connectionRequestIndex == ~0u )
-        {
-            // We never asked to reach this endpoint
-            connectionRequestsMutex.unlock();
-            return false;
-        }
-        fc.returnConnectionLostOnFailure = connectionRequests[connectionRequestIndex]->returnConnectionLostOnFailure;
-        connectionRequests.erase( connectionRequests.begin() + connectionRequestIndex );
-        connectionRequestsMutex.unlock();
-        fc.endpointGuid = endpointGuid;
-        fc.intermediaryAddress = packet->systemAddress;
-        fc.intermediaryAddress.SetPortHostOrder( sourceToDestPort );
-        fc.intermediaryGuid = packet->guid;
-        fc.weInitiatedForwarding = true;
-
-        // add to forwarding list
-        forwardedConnectionListMutex.lock();
-        forwardedConnectionList.emplace_back( fc );
-        forwardedConnectionListMutex.unlock();
-
-        if( debugInterface )
-        {
-            char buff[512];
-            debugInterface->ShowDiagnostic( FormatStringTS( buff, "Got and returning to user ID_ROUTER_2_FORWARDING_ESTABLISHED at %s:%i\n", _FILE_AND_LINE_ ) );
-        }
+        char buff[512];
+        debugInterface->ShowDiagnostic( FormatStringTS( buff, "Got and returning to user ID_ROUTER_2_FORWARDING_ESTABLISHED at %s:%i\n", _FILE_AND_LINE_ ) );
     }
     return true; // Return packet to user
 }
@@ -1367,6 +1422,8 @@ void Router2::ClearForwardedConnections( void )
 {
     std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
     forwardedConnectionList.clear();
+    // Every connection a designation was made for is gone
+    intermediaries.clear();
 }
 
 void Router2::ClearAll( void )
@@ -1374,6 +1431,34 @@ void Router2::ClearAll( void )
     ClearConnectionRequests();
     ClearMinipunches();
     ClearForwardedConnections();
+}
+
+void Router2::AddIntermediary( const SystemAddress& systemAddress )
+{
+    std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
+    if( std::find( intermediaries.begin(), intermediaries.end(), systemAddress ) == intermediaries.end() )
+        intermediaries.push_back( systemAddress );
+}
+
+void Router2::RemoveIntermediary( const SystemAddress& systemAddress )
+{
+    std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
+    intermediaries.erase( std::remove( intermediaries.begin(), intermediaries.end(), systemAddress ), intermediaries.end() );
+}
+
+void Router2::SetMaxPendingForwardsPerIntermediary( unsigned int max )
+{
+    maxPendingForwardsPerIntermediary = max;
+}
+
+unsigned int Router2::GetMaxPendingForwardsPerIntermediary( void ) const
+{
+    return maxPendingForwardsPerIntermediary;
+}
+
+uint64_t Router2::GetPendingForwardsRefused( void ) const
+{
+    return pendingForwardsRefused;
 }
 
 void Router2::SetDebugInterface( Router2DebugInterface* _debugInterface )
