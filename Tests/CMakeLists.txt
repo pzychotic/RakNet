@@ -119,6 +119,17 @@ add_executable( RakNetTests
 )
 target_link_libraries( RakNetTests PRIVATE RakNetStatic Catch2::Catch2WithMain )
 
+# RakNetStringMakers.h is force-included into every TU, not left to each test to
+# include. Catch::StringMaker<RakNetGUID> is the same symbol whether it is our
+# specialization or the primary template, so one TU that compares a guid without
+# the header emits a "{?}" convert, and the linker keeps whichever copy it meets
+# first - for every test in the binary. Forcing it makes forgetting impossible.
+if( MSVC )
+    target_compile_options( RakNetTests PRIVATE "/FI${CMAKE_CURRENT_SOURCE_DIR}/RakNetStringMakers.h" )
+else()
+    target_compile_options( RakNetTests PRIVATE "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/RakNetStringMakers.h" )
+endif()
+
 # ---------------------------------------------------------------------------
 # ctest registration
 #

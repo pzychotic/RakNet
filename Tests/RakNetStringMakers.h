@@ -16,7 +16,11 @@
  *  fails with "{?} == {?}". With it the same failure reads
  *  "127.0.0.1|60002 == 127.0.0.1|60000" and the bug is on the screen.
  *
- *  Include this in any test that compares these types.
+ *  Tests/CMakeLists.txt force-includes this into every RakNetTests TU, and it has
+ *  to: a specialization is the same symbol as the primary template's
+ *  instantiation, so a single TU that compared a guid without it would emit a
+ *  "{?}" convert under that name, and the linker keeps one copy for the whole
+ *  binary. Including it explicitly as well is harmless.
  *
  *  Both types also expose a const char* ToString() returning a static buffer,
  *  documented NOT THREADSAFE; the char* dest overloads used here are the
