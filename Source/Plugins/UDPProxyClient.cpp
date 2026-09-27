@@ -343,6 +343,9 @@ void UDPProxyClient::OnPingServers( Packet* packet )
     incomingBs.Read( psg->sata.targetClientAddress );
     psg->startPingTime = RakNet::GetTimeMS();
     psg->coordinatorAddressForPings = packet->systemAddress;
+    // Read only to stay aligned with what the coordinator writes; nothing here uses it
+    RakNetGUID targetGuid;
+    incomingBs.Read( targetGuid );
     unsigned short serverListSize;
     incomingBs.Read( serverListSize );
     SystemAddress serverAddress;

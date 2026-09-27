@@ -12,6 +12,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <string>
@@ -26,9 +27,12 @@ The source's result is Solicited and needs nothing designated. The target's noti
 reaches it only if it designated the coordinator, and without it the target never pings the
 proxy, which is what opens a NAT in front of it.
 
-One proxy server, so the coordinator skips its ping step. With more than one, the client
-misreads the coordinator's ping request (ticket 32 in .scratch/upstream-defects), so that
-step cannot run end to end yet; UDPProxyClientEntitlementTest covers who may start it.
+With one proxy server the coordinator skips its ping step. With two, it first has both ends
+ping every server and chooses by their replies. Stock's client never read the target's
+RakNetGUID in the ping request, so it took part of the GUID as the server count and pinged
+the wrong addresses; the coordinator dropped every reply and fell back to list order after
+DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR. UDPProxyClientEntitlementTest covers who may
+start the ping step.
 */
 
 using namespace RakNet;
@@ -39,6 +43,7 @@ constexpr unsigned short kCoordinatorPort = 60000;
 constexpr unsigned short kProxyServerPort = 60001;
 constexpr unsigned short kSourcePort = 60002;
 constexpr unsigned short kTargetPort = 60003;
+constexpr unsigned short kSecondProxyServerPort = 60004;
 
 // Hang guard for each step. On loopback each takes a few update cycles, tens of
 // milliseconds.
@@ -120,6 +125,39 @@ bool PongFrom( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* pi
     return false;
 }
 
+// Records which servers each end's ping reply named, right after the coordinator takes it.
+// The forwarding request is gone once forwarding succeeds, so it cannot be looked at later.
+class CoordinatorProbe : public UDPProxyCoordinator
+{
+public:
+    std::vector<SystemAddress> sourcePinged, targetPinged;
+
+    PluginReceiveResult OnReceive( Packet* packet ) override
+    {
+        const bool pingReply = packet->length > 1 && packet->data[0] == ID_UDP_PROXY_GENERAL &&
+                               packet->data[1] == ID_UDP_PROXY_PING_SERVERS_REPLY_FROM_CLIENT_TO_COORDINATOR;
+        const PluginReceiveResult result = UDPProxyCoordinator::OnReceive( packet );
+        // The test makes one request
+        if( pingReply && forwardingRequestList.Size() == 1 )
+        {
+            sourcePinged = Addresses( forwardingRequestList[0]->sourceServerPings );
+            targetPinged = Addresses( forwardingRequestList[0]->targetServerPings );
+        }
+        return result;
+    }
+
+private:
+    static std::vector<SystemAddress> Addresses( const std::vector<ServerWithPing>& pings )
+    {
+        std::vector<SystemAddress> addresses;
+        for( const ServerWithPing& swp : pings )
+            addresses.push_back( swp.serverAddress );
+        // Every server is on loopback, so the port alone orders them
+        std::sort( addresses.begin(), addresses.end(), []( const SystemAddress& a, const SystemAddress& b ) { return a.GetPort() < b.GetPort(); } );
+        return addresses;
+    }
+};
+
 void Connect( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* client )
 {
     REQUIRE( client->Connect( "127.0.0.1", kCoordinatorPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
@@ -186,5 +224,60 @@ TEST_CASE( "UDPProxyClient's forwarding flow reaches a target that designated it
     source->DetachPlugin( &sourcePlugin );
     target->DetachPlugin( &targetPlugin );
     proxyServer->DetachPlugin( &proxyServerPlugin );
+    coordinator->DetachPlugin( &coordinatorPlugin );
+}
+
+TEST_CASE( "UDPProxyClient's ping replies reach the coordinator when two proxy servers are logged in", "[udpproxy][network]" )
+{
+    CoordinatorProbe coordinatorPlugin;
+    UDPProxyServer firstServerPlugin, secondServerPlugin;
+    UDPProxyClient sourcePlugin, targetPlugin;
+    LoginHandler firstLogin, secondLogin;
+    ForwardingHandler sourceHandler, targetHandler;
+    coordinatorPlugin.SetRemoteLoginPassword( kPassword );
+    firstServerPlugin.SetResultHandler( &firstLogin );
+    secondServerPlugin.SetResultHandler( &secondLogin );
+    sourcePlugin.SetResultHandler( &sourceHandler );
+    targetPlugin.SetResultHandler( &targetHandler );
+
+    PeerScope scope;
+    RakPeerInterface* coordinator = scope.Server( kCoordinatorPort, 5 );
+    RakPeerInterface* firstServer = scope.Client( kProxyServerPort );
+    RakPeerInterface* secondServer = scope.Client( kSecondProxyServerPort );
+    RakPeerInterface* source = scope.Client( kSourcePort );
+    RakPeerInterface* target = scope.Client( kTargetPort );
+    coordinator->AttachPlugin( &coordinatorPlugin );
+    firstServer->AttachPlugin( &firstServerPlugin );
+    secondServer->AttachPlugin( &secondServerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    target->AttachPlugin( &targetPlugin );
+    const std::vector<RakPeerInterface*> peers{ coordinator, firstServer, secondServer, source, target };
+
+    const SystemAddress coordinatorAddress( "127.0.0.1", kCoordinatorPort );
+    Connect( peers, firstServer );
+    Connect( peers, secondServer );
+    Connect( peers, source );
+    Connect( peers, target );
+
+    REQUIRE( firstServerPlugin.LoginToCoordinator( kPassword, coordinatorAddress ) );
+    REQUIRE( secondServerPlugin.LoginToCoordinator( kPassword, coordinatorAddress ) );
+    REQUIRE( PumpUntil( peers, [&]() { return firstLogin.loggedIn && secondLogin.loggedIn; } ) );
+
+    sourcePlugin.AddCoordinator( coordinatorAddress );
+    targetPlugin.AddCoordinator( coordinatorAddress );
+
+    REQUIRE( sourcePlugin.RequestForwarding( coordinatorAddress, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID(), kForwardingTimeoutMs ) );
+    REQUIRE( PumpUntil( peers, [&]() { return sourceHandler.successes == 1 && targetHandler.notifications == 1; } ) );
+    CHECK( sourceHandler.failures == 0 );
+
+    // Which server wins is not asserted: loopback pings give no meaningful order.
+    const std::vector<SystemAddress> bothServers{ SystemAddress( "127.0.0.1", kProxyServerPort ), SystemAddress( "127.0.0.1", kSecondProxyServerPort ) };
+    CHECK( coordinatorPlugin.sourcePinged == bothServers );
+    CHECK( coordinatorPlugin.targetPinged == bothServers );
+
+    source->DetachPlugin( &sourcePlugin );
+    target->DetachPlugin( &targetPlugin );
+    secondServer->DetachPlugin( &secondServerPlugin );
+    firstServer->DetachPlugin( &firstServerPlugin );
     coordinator->DetachPlugin( &coordinatorPlugin );
 }

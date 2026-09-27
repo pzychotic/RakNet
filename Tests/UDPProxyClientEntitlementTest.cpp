@@ -38,6 +38,8 @@ namespace {
 constexpr unsigned short kClientPort = 60000;
 constexpr unsigned short kCoordinatorPort = 60001;
 constexpr unsigned short kListenerPort = 60003;
+// Nothing listens here or on the port after it.
+constexpr unsigned short kSilentPort = 60010;
 
 // Hang guard for the marker Message and for a pong. On loopback each arrives a few update
 // cycles after the send, tens of milliseconds.
@@ -171,15 +173,16 @@ bool Inject( RakPeerInterface* sender, RakPeerInterface* target, BitStream& mess
 
 // ID_UDP_PROXY_PING_SERVERS_FROM_COORDINATOR_TO_CLIENT, laid out as UDPProxyCoordinator
 // writes it.
-void WritePingServers( BitStream& bs, const SystemAddress& server )
+void WritePingServers( BitStream& bs, const std::vector<SystemAddress>& servers, RakNetGUID targetGuid = kTargetGuid )
 {
     bs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
     bs.Write( (MessageID)ID_UDP_PROXY_PING_SERVERS_FROM_COORDINATOR_TO_CLIENT );
     bs.Write( UNASSIGNED_SYSTEM_ADDRESS );
     bs.Write( kTargetAddress );
-    bs.Write( kTargetGuid );
-    bs.Write( (unsigned short)1 );
-    bs.Write( server );
+    bs.Write( targetGuid );
+    bs.Write( (unsigned short)servers.size() );
+    for( const SystemAddress& server : servers )
+        bs.Write( server );
 }
 
 // A result or notification, laid out as UDPProxyCoordinator writes it. Only the ones that
@@ -242,7 +245,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
     SECTION( "With nothing designated, nothing is acted on" )
     {
         BitStream pingServers;
-        WritePingServers( pingServers, Loopback( kListenerPort ) );
+        WritePingServers( pingServers, { Loopback( kListenerPort ) } );
         Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
@@ -259,12 +262,12 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         proxyClient.AddCoordinator( coordinatorAddress );
 
         BitStream forgedPingServers;
-        WritePingServers( forgedPingServers, Loopback( kListenerPort ) );
+        WritePingServers( forgedPingServers, { Loopback( kListenerPort ) } );
         Inject( other, client, forgedPingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
         BitStream pingServers;
-        WritePingServers( pingServers, Loopback( kListenerPort ) );
+        WritePingServers( pingServers, { Loopback( kListenerPort ) } );
         Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.size() == 1 );
 
@@ -288,7 +291,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         proxyClient.RemoveCoordinator( coordinatorAddress );
 
         BitStream pingServers;
-        WritePingServers( pingServers, Loopback( kListenerPort ) );
+        WritePingServers( pingServers, { Loopback( kListenerPort ) } );
         Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
@@ -311,7 +314,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         REQUIRE( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) == coordinatorAddress );
 
         BitStream pingServers;
-        WritePingServers( pingServers, Loopback( kListenerPort ) );
+        WritePingServers( pingServers, { Loopback( kListenerPort ) } );
         Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
@@ -320,6 +323,34 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         Inject( coordinator, client, notification );
         CHECK( handler.notifications == 0 );
     }
+
+    client->DetachPlugin( &proxyClient );
+}
+
+TEST_CASE( "UDPProxyClient pings exactly the servers a ping-servers Message lists", "[udpproxy][network]" )
+{
+    UDPProxyClient proxyClient;
+
+    PeerScope peers;
+    RakPeerInterface* client = peers.Server( kClientPort, 4 );
+    RakPeerInterface* coordinator = peers.Client( kCoordinatorPort );
+    client->AttachPlugin( &proxyClient );
+
+    Connect( coordinator, client );
+    proxyClient.AddCoordinator( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) );
+
+    // Nothing listens on either, so no pong completes the group before it is looked at.
+    const std::vector<SystemAddress> servers{ Loopback( kSilentPort ), Loopback( kSilentPort + 1 ) };
+    // A reader that skips the GUID takes its top 16 bits as the server count.
+    BitStream pingServers;
+    WritePingServers( pingServers, servers, RakNetGUID( 0xFFFF000000000001ull ) );
+    Inject( coordinator, client, pingServers );
+
+    REQUIRE( proxyClient.pingServerGroups.size() == 1 );
+    std::vector<SystemAddress> pinged;
+    for( const UDPProxyClient::ServerWithPing& server : proxyClient.pingServerGroups.front()->serversToPing )
+        pinged.push_back( server.serverAddress );
+    CHECK( pinged == servers );
 
     client->DetachPlugin( &proxyClient );
 }
