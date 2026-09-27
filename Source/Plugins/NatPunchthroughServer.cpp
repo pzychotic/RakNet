@@ -20,6 +20,8 @@
 #include "MTUSize.h"
 #include "GetTime.h"
 
+#include <algorithm>
+
 namespace RakNet {
 
 void NatPunchthroughServerDebugInterface_Printf::OnServerMessage( const char* msg )
@@ -53,6 +55,22 @@ void NatPunchthroughServer::User::DerefConnectionAttempt( NatPunchthroughServer:
     {
         connectionAttempts.erase( it );
     }
+}
+
+std::vector<NatPunchthroughServer::ConnectionAttempt*> NatPunchthroughServer::User::TakeConnectionAttempts()
+{
+    std::vector<ConnectionAttempt*> attempts;
+    attempts.swap( connectionAttempts );
+
+    // An attempt from this User to itself is on its list twice. OnNATPunchthroughRequest no
+    // longer creates one, but a second entry would be deleted twice.
+    for( auto it = attempts.begin(); it != attempts.end(); ++it )
+    {
+        if( *it != nullptr && ( *it )->sender == ( *it )->recipient )
+            std::replace( it + 1, attempts.end(), *it, static_cast<ConnectionAttempt*>( nullptr ) );
+    }
+    attempts.erase( std::remove( attempts.begin(), attempts.end(), nullptr ), attempts.end() );
+    return attempts;
 }
 
 bool NatPunchthroughServer::User::HasConnectionAttemptToUser( User* user )
@@ -114,10 +132,11 @@ NatPunchthroughServer::~NatPunchthroughServer()
     while( users.Size() )
     {
         User* user = users[0];
-        for( ConnectionAttempt* pConnectionAttempt : user->connectionAttempts )
+        for( ConnectionAttempt* pConnectionAttempt : user->TakeConnectionAttempts() )
         {
             User* otherUser = pConnectionAttempt->sender == user ? pConnectionAttempt->recipient : pConnectionAttempt->sender;
-            otherUser->DeleteConnectionAttempt( pConnectionAttempt );
+            otherUser->DerefConnectionAttempt( pConnectionAttempt );
+            RakNet::OP_DELETE( pConnectionAttempt, _FILE_AND_LINE_ );
         }
         RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
         users[0] = users[users.Size() - 1];
@@ -267,10 +286,17 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
         BitStream outgoingBs;
         std::vector<User*> freedUpInProgressUsers;
         User* user = users[i];
-        for( ConnectionAttempt* connectionAttempt : user->connectionAttempts )
+        for( ConnectionAttempt* connectionAttempt : user->TakeConnectionAttempts() )
         {
             outgoingBs.Reset();
             User* otherUser = connectionAttempt->recipient == user ? connectionAttempt->sender : connectionAttempt->recipient;
+
+            // An attempt to itself has no one else to tell, and user is about to be deleted.
+            if( otherUser == user )
+            {
+                RakNet::OP_DELETE( connectionAttempt, _FILE_AND_LINE_ );
+                continue;
+            }
 
             // 05/28/09 Previously only told sender about ID_NAT_CONNECTION_TO_TARGET_LOST
             // However, recipient may be expecting it due to external code
@@ -287,7 +313,8 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
                 freedUpInProgressUsers.push_back( otherUser );
             }
 
-            otherUser->DeleteConnectionAttempt( connectionAttempt );
+            otherUser->DerefConnectionAttempt( connectionAttempt );
+            RakNet::OP_DELETE( connectionAttempt, _FILE_AND_LINE_ );
         }
 
         RakNet::OP_DELETE( users[i], _FILE_AND_LINE_ );
@@ -326,34 +353,34 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
     senderGuid = packet->guid;
     bool objectExists;
     unsigned int i = users.GetIndexFromKey( senderGuid, &objectExists );
-    RakAssert( objectExists );
+    // A sender that connected before this plugin was attached has no User.
+    if( objectExists == false )
+        return;
+    User* sender = users[i];
 
-    ConnectionAttempt* ca = RakNet::OP_NEW<ConnectionAttempt>( _FILE_AND_LINE_ );
-    ca->sender = users[i];
-    ca->sessionId = sessionId++;
     i = users.GetIndexFromKey( recipientGuid, &objectExists );
-    if( objectExists == false || ca->sender == ca->recipient )
+    // A request to the sender's own guid is refused too: its attempt would be listed twice on
+    // one User.
+    if( objectExists == false || recipientGuid == senderGuid )
     {
-        //      printf("DEBUG %i\n", __LINE__);
-        //      printf("DEBUG recipientGuid=%s\n", recipientGuid.ToString());
-        //      printf("DEBUG users[0] guid=%s\n", users[0]->guid.ToString());
-
         outgoingBs.Write( (MessageID)ID_NAT_TARGET_NOT_CONNECTED );
         outgoingBs.Write( recipientGuid );
         rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
-        RakNet::OP_DELETE( ca, _FILE_AND_LINE_ );
         return;
     }
-    ca->recipient = users[i];
-    if( ca->recipient->HasConnectionAttemptToUser( ca->sender ) )
+    User* recipient = users[i];
+    if( recipient->HasConnectionAttemptToUser( sender ) )
     {
         outgoingBs.Write( (MessageID)ID_NAT_ALREADY_IN_PROGRESS );
         outgoingBs.Write( recipientGuid );
         rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
-        RakNet::OP_DELETE( ca, _FILE_AND_LINE_ );
         return;
     }
 
+    ConnectionAttempt* ca = RakNet::OP_NEW<ConnectionAttempt>( _FILE_AND_LINE_ );
+    ca->sender = sender;
+    ca->recipient = recipient;
+    ca->sessionId = sessionId++;
     ca->sender->connectionAttempts.push_back( ca );
     ca->recipient->connectionAttempts.push_back( ca );
 

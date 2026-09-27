@@ -130,6 +130,9 @@ public:
         void DerefConnectionAttempt( ConnectionAttempt* ca );
         void DeleteConnectionAttempt( ConnectionAttempt* ca );
         void LogConnectionAttempts( std::string& rs );
+        // Empties connectionAttempts and returns what it held, each attempt once, so the
+        // caller can delete them without erasing from a list it is walking.
+        std::vector<ConnectionAttempt*> TakeConnectionAttempts();
     };
     RakNet::Time lastUpdate;
     static int NatPunchthroughUserComp( const RakNetGUID& key, User* const& data );
