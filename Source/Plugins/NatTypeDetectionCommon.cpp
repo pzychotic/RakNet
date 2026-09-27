@@ -137,6 +137,19 @@ RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHand
     return r2;
 }
 
+void DestroyNonblockingBoundSocket( RakNetSocket2*& socket )
+{
+    if( socket == 0 )
+        return;
+
+    // The thread uses the socket and calls into its event handler, so it must be gone first.
+    if( socket->IsBerkleySocket() )
+        ( (RNS2_Berkley*)socket )->BlockOnStopRecvPollingThread();
+
+    RakNetSocket2Allocator::DeallocRNS2( socket );
+    socket = 0;
+}
+
 } // namespace RakNet
 
 #endif // #if _RAKNET_SUPPORT_NatTypeDetectionServer==1 || _RAKNET_SUPPORT_NatTypeDetectionClient==1

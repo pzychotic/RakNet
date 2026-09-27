@@ -60,7 +60,12 @@ RAK_DLL_EXPORT const char* NATTypeDetectionResultToString( NATTypeDetectionResul
 RAK_DLL_EXPORT const char* NATTypeDetectionResultToStringFriendly( NATTypeDetectionResult type );
 
 /// \internal
+/// Binds a socket and starts its one recv polling thread, which calls into eventHandler.
 RAK_DLL_EXPORT RakNetSocket2* CreateNonblockingBoundSocket( const char* bindAddr, RNS2EventHandler* eventHandler );
+
+/// \internal
+/// Stops the socket's polling thread, deletes it and sets it to 0. Does nothing if it is 0.
+RAK_DLL_EXPORT void DestroyNonblockingBoundSocket( RakNetSocket2*& socket );
 
 } // namespace RakNet
 

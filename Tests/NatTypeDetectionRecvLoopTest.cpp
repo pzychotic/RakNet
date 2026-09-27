@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -33,10 +34,12 @@ The datagrams are sent from the peer's own socket straight to the plugin's, and 
 RakNet messages. The payload byte is none of the NATTypeDetectionResult values either plugin
 acts on, so the drain loop only has to pop and free.
 
-The peer is bound to 127.0.0.1, not the wildcard address PeerScope uses. Both plugins bind a
-socket to the peer's own address, and a polling thread is stopped by sending its socket a
-datagram, which cannot be sent to 0.0.0.0. Bound there, the threads outlive their sockets
-and the plugin, and the test crashes in teardown.
+Every socket either plugin creates gets one recv polling thread, and the plugin must stop it
+before deleting the socket, or the thread goes on calling into a deleted socket and into the
+plugin. The ledger also records which threads poll which socket, and any call into the
+plugin once it has been detached. The peers bind the wildcard address, as PeerScope does:
+both plugins bind a socket to the peer's own address, and a thread is stopped by sending its
+socket a datagram, which has to reach a wildcard-bound socket too.
 */
 
 using namespace RakNet;
@@ -47,6 +50,9 @@ namespace
 const unsigned char kPayload = 0xFF;
 const std::chrono::seconds kBufferDeadline( 5 );
 
+// Long enough for a spinning polling thread to have called into the plugin many times over.
+const std::chrono::milliseconds kSettle( 100 );
+
 /// The alloc/free bookkeeping both subclasses share. Called from the plugin's polling
 /// threads and from Update, so everything is under one mutex.
 class RecvStructLedger
@@ -56,12 +62,20 @@ public:
     {
         std::lock_guard<std::mutex> guard( m_mutex );
         m_live.insert( s );
+        if( m_closed )
+            ++m_callsAfterClose;
     }
 
     // Aborts on a struct that is not live.
     void Freed( RNS2RecvStruct* s )
     {
         std::lock_guard<std::mutex> guard( m_mutex );
+        if( m_closed )
+            ++m_callsAfterClose;
+        // A polling thread frees the struct itself when its recvfrom read nothing, which on
+        // these non-blocking sockets is nearly every pass of its loop.
+        if( s->bytesRead <= 0 )
+            m_pollers[s->socket].insert( std::this_thread::get_id() );
         if( m_live.erase( s ) == 0 )
         {
             std::fprintf( stderr, "RNS2RecvStruct %p freed twice: the drain loop reused a freed struct\n", (void*)s );
@@ -105,9 +119,32 @@ public:
         return m_bufferedLive.size();
     }
 
+    // The threads seen polling each socket so far.
+    std::map<RakNetSocket2*, std::set<std::thread::id>> Pollers()
+    {
+        std::lock_guard<std::mutex> guard( m_mutex );
+        return m_pollers;
+    }
+
+    // From here on, every call into the plugin's struct pool is counted.
+    void Close()
+    {
+        std::lock_guard<std::mutex> guard( m_mutex );
+        m_closed = true;
+    }
+
+    size_t CallsAfterClose()
+    {
+        std::lock_guard<std::mutex> guard( m_mutex );
+        return m_callsAfterClose;
+    }
+
 private:
     std::mutex m_mutex;
     std::set<RNS2RecvStruct*> m_live;
+    std::map<RakNetSocket2*, std::set<std::thread::id>> m_pollers;
+    bool m_closed = false;
+    size_t m_callsAfterClose = 0;
 
     // Its own set rather than a lookup of buffered addresses in m_live: a polling thread's
     // next allocation can reuse the address of a struct Update has just freed.
@@ -147,46 +184,54 @@ public:
 };
 
 // Declared before the PeerScope in each test, so the plugin outlives the peer it is attached to.
+// Detaching it, or the peer shutting down, which a failing REQUIRE's unwinding does, stops its
+// polling threads while the ledger they call into still exists.
 class LedgerServer : public Ledgered<NatTypeDetectionServer>
 {
 public:
-    ~LedgerServer() override
-    {
-        // NatTypeDetectionServer::Shutdown stops only s3p4's polling thread before deleting
-        // its sockets, and the other three threads go on using their deleted socket and this
-        // plugin. Stop them here, and then the rest while this subclass and its ledger, which
-        // the threads call into, still exist.
-        for( RakNetSocket2* s : { s1p2, s2p3, s4p5 } )
-        {
-            if( s != nullptr && s->IsBerkleySocket() )
-                static_cast<RNS2_Berkley*>( s )->BlockOnStopRecvPollingThread();
-        }
-        Shutdown();
-    }
-
     unsigned short S3P4Port() const { return s3p4->GetBoundAddress().GetPort(); }
+    std::vector<RakNetSocket2*> Sockets() const { return { s1p2, s2p3, s3p4, s4p5 }; }
 };
 
 class LedgerClient : public Ledgered<NatTypeDetectionClient>
 {
 public:
-    ~LedgerClient() override
-    {
-        // Normally a no-op: detaching the plugin, or the peer shutting down, has already run
-        // it. Here for a test that fails before either, while the ledger still exists.
-        Shutdown();
-    }
-
     bool InProgress() const { return IsInProgress(); }
     unsigned short C2Port() const { return c2->GetBoundAddress().GetPort(); }
+    RakNetSocket2* C2() const { return c2; }
 };
 
-RakPeerInterface* StartLoopbackPeer( PeerScope& peers )
+// Until every one of sockets has been seen polling, then long enough for any second thread
+// on one of them to have shown itself too.
+std::map<RakNetSocket2*, std::set<std::thread::id>> WaitForPollers( RecvStructLedger& ledger, const std::vector<RakNetSocket2*>& sockets )
 {
-    RakPeerInterface* peer = peers.Create();
-    SocketDescriptor socketDescriptor( 0, "127.0.0.1" );
-    REQUIRE( peer->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
-    return peer;
+    const auto allPolling = [&]
+    {
+        const auto pollers = ledger.Pollers();
+        for( RakNetSocket2* s : sockets )
+        {
+            if( pollers.count( s ) == 0 )
+                return false;
+        }
+        return true;
+    };
+
+    const auto deadline = std::chrono::steady_clock::now() + kBufferDeadline;
+    while( !allPolling() && std::chrono::steady_clock::now() < deadline )
+        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+    REQUIRE( allPolling() );
+
+    std::this_thread::sleep_for( kSettle );
+    return ledger.Pollers();
+}
+
+// Detaches plugin, and fails if any polling thread calls into it afterwards.
+void DetachAndExpectSilence( RakPeerInterface* peer, PluginInterface2* plugin, RecvStructLedger& ledger )
+{
+    peer->DetachPlugin( plugin );
+    ledger.Close();
+    std::this_thread::sleep_for( kSettle );
+    CHECK( ledger.CallsAfterClose() == 0 );
 }
 
 void SendRawDatagrams( RakPeerInterface* peer, unsigned short port, int count )
@@ -231,7 +276,7 @@ TEST_CASE( "NatTypeDetectionServer Update drains its datagram buffer and returns
     LedgerServer server;
 
     PeerScope peers;
-    RakPeerInterface* peer = StartLoopbackPeer( peers );
+    RakPeerInterface* peer = peers.Client();
     peer->AttachPlugin( &server );
     server.Startup( "127.0.0.1", "127.0.0.1", "127.0.0.1" );
 
@@ -252,7 +297,7 @@ TEST_CASE( "NatTypeDetectionClient Update drains its datagram buffer and returns
     LedgerClient client;
 
     PeerScope peers;
-    RakPeerInterface* peer = StartLoopbackPeer( peers );
+    RakPeerInterface* peer = peers.Client();
     peer->AttachPlugin( &client );
 
     // Nothing listens there. Update only drains while a detection is in progress, and
@@ -269,4 +314,41 @@ TEST_CASE( "NatTypeDetectionClient Update drains its datagram buffer and returns
     CHECK( client.InProgress() );
 
     peer->DetachPlugin( &client );
+}
+
+TEST_CASE( "NatTypeDetectionServer polls each socket with one thread and stops them all on detach", "[nattypedetection][network]" )
+{
+    LedgerServer server;
+
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Client();
+    peer->AttachPlugin( &server );
+    server.Startup( "127.0.0.1", "127.0.0.1", "127.0.0.1" );
+
+    const std::vector<RakNetSocket2*> sockets = server.Sockets();
+    const auto pollers = WaitForPollers( server.ledger, sockets );
+    for( RakNetSocket2* s : sockets )
+    {
+        INFO( "socket bound to port " << s->GetBoundAddress().GetPort() );
+        CHECK( pollers.at( s ).size() == 1 );
+    }
+
+    DetachAndExpectSilence( peer, &server, server.ledger );
+}
+
+TEST_CASE( "NatTypeDetectionClient polls its socket with one thread and stops it on detach", "[nattypedetection][network]" )
+{
+    LedgerClient client;
+
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Client();
+    peer->AttachPlugin( &client );
+
+    client.DetectNATType( SystemAddress( "127.0.0.1", 1 ) );
+    REQUIRE( client.InProgress() );
+
+    const auto pollers = WaitForPollers( client.ledger, { client.C2() } );
+    CHECK( pollers.at( client.C2() ).size() == 1 );
+
+    DetachAndExpectSilence( peer, &client, client.ledger );
 }

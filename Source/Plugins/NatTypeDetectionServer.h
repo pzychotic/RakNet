@@ -69,11 +69,14 @@ public:
     /// \param[in] nonRakNetIP4 Third unused external IP
     void Startup( const char* nonRakNetIP2, const char* nonRakNetIP3, const char* nonRakNetIP4 );
 
-    // Releases the sockets created in Startup();
+    // Releases the sockets created in Startup(). Detaching the plugin, or shutting down the
+    // peer it is attached to, calls it too: call Startup() again after either.
     void Shutdown( void );
 
     /// \internal For plugin handling
     virtual void Update( void );
+    virtual void OnRakPeerShutdown( void );
+    virtual void OnDetach( void );
 
     /// \internal For plugin handling
     virtual PluginReceiveResult OnReceive( Packet* packet );

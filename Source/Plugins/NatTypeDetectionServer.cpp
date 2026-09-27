@@ -49,46 +49,32 @@ void NatTypeDetectionServer::Startup( const char* nonRakNetIP2, const char* nonR
     s4p5 = CreateNonblockingBoundSocket( nonRakNetIP4, this );
 
     s3p4Address = nonRakNetIP3;
-
-    if( s3p4->IsBerkleySocket() )
-    {
-        ( (RNS2_Berkley*)s3p4 )->CreateRecvPollingThread( 0 );
-    }
 }
 
 void NatTypeDetectionServer::Shutdown()
 {
-    if( s1p2 != 0 )
-    {
-        RakNet::OP_DELETE( s1p2, _FILE_AND_LINE_ );
-        s1p2 = 0;
-    }
-    if( s2p3 != 0 )
-    {
-        RakNet::OP_DELETE( s2p3, _FILE_AND_LINE_ );
-        s2p3 = 0;
-    }
-    if( s3p4 != 0 )
-    {
-        if( s3p4->IsBerkleySocket() )
-        {
-            ( (RNS2_Berkley*)s3p4 )->BlockOnStopRecvPollingThread();
-        }
+    DestroyNonblockingBoundSocket( s1p2 );
+    DestroyNonblockingBoundSocket( s2p3 );
+    DestroyNonblockingBoundSocket( s3p4 );
+    DestroyNonblockingBoundSocket( s4p5 );
+    natDetectionAttempts.clear();
 
-        RakNet::OP_DELETE( s3p4, _FILE_AND_LINE_ );
-        s3p4 = 0;
-    }
-    if( s4p5 != 0 )
-    {
-        RakNet::OP_DELETE( s4p5, _FILE_AND_LINE_ );
-        s4p5 = 0;
-    }
     std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
     for( RNS2RecvStruct* pPacket : bufferedPackets )
     {
         RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
     }
     bufferedPackets.clear();
+}
+
+void NatTypeDetectionServer::OnRakPeerShutdown( void )
+{
+    Shutdown();
+}
+
+void NatTypeDetectionServer::OnDetach( void )
+{
+    Shutdown();
 }
 
 void NatTypeDetectionServer::Update( void )
@@ -297,6 +283,8 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
     {
         if( it != natDetectionAttempts.end() )
             return; // Already in progress
+        if( s1p2 == 0 )
+            return; // Not started, or shut down: Update would have no sockets to test with
 
         NATDetectionAttempt nda;
         nda.detectionState = STATE_NONE;

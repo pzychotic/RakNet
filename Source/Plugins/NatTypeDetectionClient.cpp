@@ -29,10 +29,7 @@ NatTypeDetectionClient::NatTypeDetectionClient()
 }
 NatTypeDetectionClient::~NatTypeDetectionClient()
 {
-    if( c2 != 0 )
-    {
-        RakNet::OP_DELETE( c2, _FILE_AND_LINE_ );
-    }
+    Shutdown();
 }
 
 void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
@@ -48,11 +45,6 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
         char str[64];
         sockets.front()->GetBoundAddress().ToString( false, str );
         c2 = CreateNonblockingBoundSocket( str, this );
-    }
-
-    if( c2->IsBerkleySocket() )
-    {
-        ( (RNS2_Berkley*)c2 )->CreateRecvPollingThread( 0 );
     }
 
     serverAddress = _serverAddress;
@@ -203,16 +195,7 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
 void NatTypeDetectionClient::Shutdown( void )
 {
     serverAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    if( c2 != 0 )
-    {
-        if( c2->IsBerkleySocket() )
-        {
-            ( (RNS2_Berkley*)c2 )->BlockOnStopRecvPollingThread();
-        }
-
-        RakNet::OP_DELETE( c2, _FILE_AND_LINE_ );
-        c2 = 0;
-    }
+    DestroyNonblockingBoundSocket( c2 );
 
     std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
     for( RNS2RecvStruct* pPacket : bufferedPackets )

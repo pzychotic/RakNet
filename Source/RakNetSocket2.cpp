@@ -128,8 +128,7 @@ void RNS2_Berkley::RecvFromLoop( void* arg )
 }
 unsigned RNS2_Berkley::RecvFromLoopInt( void )
 {
-    isRecvFromLoopThreadActive++;
-
+    // Counted active by CreateRecvPollingThread already.
     while( endThreads == false )
     {
         RNS2RecvStruct* recvFromStruct;
@@ -159,6 +158,8 @@ RNS2_Berkley::RNS2_Berkley()
 {
     rns2Socket = (RNS2Socket)INVALID_SOCKET;
     slo = 0;
+    isRecvFromLoopThreadActive = 0;
+    endThreads = true;
 }
 RNS2_Berkley::~RNS2_Berkley()
 {
@@ -171,7 +172,12 @@ int RNS2_Berkley::CreateRecvPollingThread( int threadPriority )
 {
     endThreads = false;
 
+    // Counted before the thread exists, not when it first runs, so a BlockOnStopRecvPollingThread
+    // that gets in first still waits for it.
+    isRecvFromLoopThreadActive++;
     int errorCode = RakThread::Create( RecvFromLoop, this, threadPriority );
+    if( errorCode != 0 )
+        isRecvFromLoopThreadActive--;
 
     return errorCode;
 }
