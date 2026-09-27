@@ -850,7 +850,7 @@ void NatPunchthroughClient::SendQueuedOpenNAT( void )
     while( !queuedOpenNat.empty() )
     {
         DSTAndFac daf = queuedOpenNat.front();
-        queuedOpenNat.pop_back(),
+        queuedOpenNat.pop_front();
         SendPunchthrough( daf.destination, daf.facilitator );
     }
 }
