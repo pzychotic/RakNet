@@ -77,6 +77,7 @@ public:
         std::deque<SystemAddress> remainingServersToTry;
         BitStream serverSelectionBitstream;
 
+        // What each client reported, at most one entry per server in remainingServersToTry, in no particular order
         std::vector<ServerWithPing> sourceServerPings, targetServerPings;
         RakNet::TimeMS timeRequestedPings;
         // Order based on sourceServerPings and targetServerPings

@@ -28,6 +28,19 @@ namespace RakNet {
 static const int DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME = 2000;
 static const int DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR = DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME + 1000;
 
+template<class ServerWithPingVector>
+static auto FindServerPing( ServerWithPingVector& pings, const SystemAddress& serverAddress )
+{
+    return std::find_if( pings.begin(), pings.end(), [&]( const UDPProxyCoordinator::ServerWithPing& swp ) { return swp.serverAddress == serverAddress; } );
+}
+
+// The ping a client reported for serverAddress, or DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME if it reported none
+static unsigned int ReportedPingOrUnresponsive( const std::vector<UDPProxyCoordinator::ServerWithPing>& pings, const SystemAddress& serverAddress )
+{
+    auto it = FindServerPing( pings, serverAddress );
+    return it != pings.end() ? it->ping : DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME;
+}
+
 int UDPProxyCoordinator::ServerWithPingComp( const unsigned short& key, const UDPProxyCoordinator::ServerWithPing& data )
 {
     if( key < data.ping )
@@ -430,36 +443,22 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
     if( fw->timeRequestedPings == 0 )
         return;
 
-    incomingBs.Read( serversToPingSize );
-    if( packet->systemAddress == sata.senderClientAddress )
+    if( !incomingBs.Read( serversToPingSize ) )
+        return;
+    std::vector<ServerWithPing>& pings = packet->systemAddress == sata.senderClientAddress ? fw->sourceServerPings : fw->targetServerPings;
+    for( unsigned short idx = 0; idx < serversToPingSize; idx++ )
     {
-        for( unsigned short idx = 0; idx < serversToPingSize; idx++ )
-        {
-            incomingBs.Read( swp.serverAddress );
-            incomingBs.Read( swp.ping );
+        if( !incomingBs.Read( swp.serverAddress ) || !incomingBs.Read( swp.ping ) )
+            break;
 
-            auto it = fw->sourceServerPings.begin();
-            while( it != fw->sourceServerPings.end() && it->ping < swp.ping )
-            {
-                ++it;
-            }
-            fw->sourceServerPings.insert( it, swp );
-        }
-    }
-    else
-    {
-        for( unsigned short idx = 0; idx < serversToPingSize; idx++ )
-        {
-            incomingBs.Read( swp.serverAddress );
-            incomingBs.Read( swp.ping );
-
-            auto it = fw->targetServerPings.begin();
-            while( it != fw->targetServerPings.end() && it->ping < swp.ping )
-            {
-                ++it;
-            }
-            fw->targetServerPings.insert( it, swp );
-        }
+        // Only servers we asked about, once each, so the list stays no longer than remainingServersToTry
+        if( std::find( fw->remainingServersToTry.begin(), fw->remainingServersToTry.end(), swp.serverAddress ) == fw->remainingServersToTry.end() )
+            continue;
+        auto it = FindServerPing( pings, swp.serverAddress );
+        if( it != pings.end() )
+            it->ping = swp.ping;
+        else
+            pings.push_back( swp );
     }
 
     // Both systems have to give us pings to progress here. Otherwise will timeout in Update()
@@ -521,18 +520,11 @@ void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )
         return;
 
     ServerWithPing swp;
-    for( uint32_t idx = 0; idx < remainingServersToTry.size(); idx++ )
+    for( const SystemAddress& serverAddress : remainingServersToTry )
     {
-        swp.serverAddress = remainingServersToTry[idx];
-        swp.ping = 0;
-        if( !sourceServerPings.empty() )
-            swp.ping += (unsigned short)( sourceServerPings[idx].ping );
-        else
-            swp.ping += (unsigned short)( DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME );
-        if( !targetServerPings.empty() )
-            swp.ping += (unsigned short)( targetServerPings[idx].ping );
-        else
-            swp.ping += (unsigned short)( DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME );
+        swp.serverAddress = serverAddress;
+        unsigned int ping = ReportedPingOrUnresponsive( sourceServerPings, serverAddress ) + ReportedPingOrUnresponsive( targetServerPings, serverAddress );
+        swp.ping = ping > 0xFFFF ? (unsigned short)0xFFFF : (unsigned short)ping;
         swpList.Insert( swp.ping, swp, false, _FILE_AND_LINE_ );
     }
     remainingServersToTry.clear();
