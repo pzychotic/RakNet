@@ -60,7 +60,8 @@ protected:
         char lastSentTextInput[REMOTE_MAX_TEXT_INPUT];
         unsigned cursorPosition;
 
-        // Connections open at systemAddress: new events drained minus lost events drained.
+        // Connections open at systemAddress: new events drained minus lost events drained,
+        // minus connections CloseConnection closed, for which no lost event comes.
         // TCPInterface cannot tell two connections from one address apart, and drains new
         // and lost events from separate queues, so this goes negative when a lost event is
         // drained before its new one. The entry is deleted when it reaches zero.

@@ -95,7 +95,13 @@ void TelnetTransport::Send( SystemAddress systemAddress, const char* data, ... )
 }
 void TelnetTransport::CloseConnection( SystemAddress systemAddress )
 {
-    tcpInterface->CloseConnection( systemAddress );
+    if( tcpInterface == 0 )
+        return;
+
+    // No lost event follows a connection this closes, so it is counted closed here. One whose
+    // loss TCPInterface already detected is counted when its lost event is drained.
+    if( tcpInterface->CloseConnection( systemAddress ) )
+        CountConnection( systemAddress, -1 );
 }
 Packet* TelnetTransport::Receive( void )
 {

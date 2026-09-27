@@ -103,7 +103,10 @@ public:
     virtual Packet* Receive( void );
 
     /// Disconnects a player/address
-    void CloseConnection( SystemAddress systemAddress );
+    /// \return True if this call closed an open connection. False if there was none at
+    /// \a systemAddress, including one whose loss was already detected: that one is, or
+    /// will be, reported by HasLostConnection instead. No lost event follows a true.
+    bool CloseConnection( SystemAddress systemAddress );
 
     /// Deallocates a packet returned by Receive
     void DeallocatePacket( Packet* packet );
@@ -184,10 +187,23 @@ protected:
     };
 
     /// The one lock / SetActive( false ) / unlock that frees the entry at \a index. Called
-    /// by RemoteClientSlot, by the connect thread and the update loop - which release a
-    /// slot claimed elsewhere and so hold an index rather than a handle - and by
-    /// CloseConnection.
+    /// by RemoteClientSlot and by the connect thread, which releases a slot claimed
+    /// elsewhere and so holds an index rather than a handle. The update loop and
+    /// CloseConnection free a connection through ReportLostRemoteClient and
+    /// CloseRemoteClientAt instead.
     void ReleaseRemoteClient( int index );
+
+    /// CloseConnection's release: frees the entry at \a index if it is active at
+    /// \a systemAddress, testing and freeing under its isActiveMutex. Returns whether it
+    /// freed it.
+    bool CloseRemoteClientAt( int index, const SystemAddress& systemAddress );
+
+    /// The update loop's release: if the entry at \a index is still active on \a socket,
+    /// queues its lost event and frees it, all under its isActiveMutex. So a connection
+    /// CloseConnection closed first is not reported lost as well. The socket check keeps a
+    /// connection the connect thread activated in the freed entry from being taken for the
+    /// lost one, unless the new socket reuses the old handle.
+    void ReportLostRemoteClient( int index, __TCPSOCKET__ socket );
 
     /// \internal
     /// \brief A scoped claim on one remoteClients entry.

@@ -47,7 +47,8 @@ public:
     Packet* Receive( void );
 
     /// Disconnects a player/address
-    void CloseConnection( SystemAddress systemAddress );
+    /// \return As TCPInterface::CloseConnection.
+    bool CloseConnection( SystemAddress systemAddress );
 
     /// Has a previous call to connect succeeded?
     /// \return UNASSIGNED_SYSTEM_ADDRESS = no. Anything else means yes.

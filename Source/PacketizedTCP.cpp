@@ -277,10 +277,10 @@ Packet* PacketizedTCP::ReturnOutgoingPacket( void )
 
     return outgoingPacket;
 }
-void PacketizedTCP::CloseConnection( SystemAddress systemAddress )
+bool PacketizedTCP::CloseConnection( SystemAddress systemAddress )
 {
     RemoveFromConnectionList( systemAddress );
-    TCPInterface::CloseConnection( systemAddress );
+    return TCPInterface::CloseConnection( systemAddress );
 }
 
 void PacketizedTCP::RemoveFromConnectionList( const SystemAddress& sa )

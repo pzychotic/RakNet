@@ -285,6 +285,24 @@ void TCPInterface::ReleaseRemoteClient( int index )
     std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
     remoteClients[index].SetActive( false );
 }
+bool TCPInterface::CloseRemoteClientAt( int index, const SystemAddress& systemAddress )
+{
+    std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
+    if( remoteClients[index].isActive == false || remoteClients[index].systemAddress != systemAddress )
+        return false;
+    remoteClients[index].SetActive( false );
+    return true;
+}
+void TCPInterface::ReportLostRemoteClient( int index, __TCPSOCKET__ socket )
+{
+    std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
+    if( remoteClients[index].isActive == false || remoteClients[index].socket != socket )
+        return;
+    SystemAddress* lostConnectionSystemAddress = lostConnections.Allocate( _FILE_AND_LINE_ );
+    *lostConnectionSystemAddress = remoteClients[index].systemAddress;
+    lostConnections.Push( lostConnectionSystemAddress );
+    remoteClients[index].SetActive( false );
+}
 TCPInterface::RemoteClientSlot::RemoteClientSlot( TCPInterface& owner )
 : tcpInterface( owner )
 , index( owner.remoteClientsLength )
@@ -629,46 +647,28 @@ void TCPInterface::DetachPlugin( PluginInterface2* plugin )
         plugin->SetTCPInterface( 0 );
     }
 }
-void TCPInterface::CloseConnection( SystemAddress systemAddress )
+bool TCPInterface::CloseConnection( SystemAddress systemAddress )
 {
     if( isStarted == 0 )
-        return;
+        return false;
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
-        return;
+        return false;
 
     for( PluginInterface2* pPlugin : messageHandlerList )
     {
         pPlugin->OnClosedConnection( systemAddress, UNASSIGNED_RAKNET_GUID, LCR_CLOSED_BY_USER );
     }
 
-    if( systemAddress.systemIndex < remoteClientsLength && remoteClients[systemAddress.systemIndex].systemAddress == systemAddress )
-    {
-        ReleaseRemoteClient( systemAddress.systemIndex );
-    }
-    else
-    {
-        // Reached when systemIndex does not name the connection - it is stale, unset, or
-        // out of range - so nothing in here may index with it. The entry to close is the
-        // one this loop matches, i, which is in range by construction.
-        for( int i = 0; i < remoteClientsLength; i++ )
-        {
-            bool isMatch;
-            {
-                std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
-                isMatch = remoteClients[i].isActive && remoteClients[i].systemAddress == systemAddress;
-            }
-
-            // The lock is dropped before ReleaseRemoteClient, which takes the same one.
-            // Anything that frees the entry in between only makes SetActive( false )
-            // redundant, and the fast path above compares an entry's address with no lock
-            // at all, so this window is the narrower of the two already here.
-            if( isMatch )
-            {
-                ReleaseRemoteClient( i );
-                break;
-            }
-        }
-    }
+    // The fast path tries the entry systemIndex names. The search is for when it does not
+    // name the connection - it is stale, unset, or out of range - so nothing in there may
+    // index with it. The entry to close is the one the loop matches, i, which is in range
+    // by construction. Each test and release is one step under the entry's lock, so an
+    // entry the update loop has reported lost is never closed, or reported, a second time.
+    bool isClosed = false;
+    if( systemAddress.systemIndex < remoteClientsLength )
+        isClosed = CloseRemoteClientAt( systemAddress.systemIndex, systemAddress );
+    for( int i = 0; isClosed == false && i < remoteClientsLength; i++ )
+        isClosed = CloseRemoteClientAt( i, systemAddress );
 
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
@@ -678,6 +678,8 @@ void TCPInterface::CloseConnection( SystemAddress systemAddress )
         activeSSLConnections.erase( it );
     }
 #endif
+
+    return isClosed;
 }
 void TCPInterface::DeallocatePacket( Packet* packet )
 {
@@ -1188,11 +1190,9 @@ void UpdateTCPInterfaceLoop( void* arg )
                         //                      }
                         //
                         // #endif
-                        // Connection lost abruptly
-                        SystemAddress* lostConnectionSystemAddress = sts->lostConnections.Allocate( _FILE_AND_LINE_ );
-                        *lostConnectionSystemAddress = sts->remoteClients[i].systemAddress;
-                        sts->lostConnections.Push( lostConnectionSystemAddress );
-                        sts->ReleaseRemoteClient( i );
+                        // Connection lost abruptly, unless CloseConnection has closed it since
+                        // select, in which case that call accounted for it.
+                        sts->ReportLostRemoteClient( i, socketCopy );
                     }
                     else
                     {
@@ -1226,11 +1226,9 @@ void UpdateTCPInterfaceLoop( void* arg )
                             }
                             else
                             {
-                                // Connection lost gracefully
-                                SystemAddress* lostConnectionSystemAddress = sts->lostConnections.Allocate( _FILE_AND_LINE_ );
-                                *lostConnectionSystemAddress = sts->remoteClients[i].systemAddress;
-                                sts->lostConnections.Push( lostConnectionSystemAddress );
-                                sts->ReleaseRemoteClient( i );
+                                // Connection lost gracefully, or closed by CloseConnection
+                                // since select, in which case that call accounted for it.
+                                sts->ReportLostRemoteClient( i, socketCopy );
                                 continue;
                             }
                         }
