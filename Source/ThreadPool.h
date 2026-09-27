@@ -416,7 +416,7 @@ OutputType ThreadPool<InputType, OutputType>::GetOutput( void )
     // Real output check
     std::lock_guard<std::mutex> guard( outputQueueMutex );
     OutputType output = outputQueue.front();
-    outputQueue.pop_front()
+    outputQueue.pop_front();
     return output;
 }
 template<class InputType, class OutputType>
