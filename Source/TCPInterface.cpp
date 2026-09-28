@@ -58,6 +58,10 @@ TCPInterface::TCPInterface()
     listenSocket = 0;
     remoteClients = 0;
     remoteClientsLength = 0;
+    maxIncomingBytesPerClient = DEFAULT_MAXIMUM_INCOMING_BYTES_PER_CLIENT;
+    maxOutgoingBytesPerClient = DEFAULT_MAXIMUM_OUTGOING_BYTES_PER_CLIENT;
+    incomingBytesCapStallCount = 0;
+    outgoingBytesCapCloseCount = 0;
 
     StringCompressor::AddReference();
 
@@ -293,15 +297,44 @@ bool TCPInterface::CloseRemoteClientAt( int index, const SystemAddress& systemAd
     remoteClients[index].SetActive( false );
     return true;
 }
+void TCPInterface::ReportLostRemoteClientLocked( RemoteClient& remoteClient )
+{
+    SystemAddress* lostConnectionSystemAddress = lostConnections.Allocate( _FILE_AND_LINE_ );
+    *lostConnectionSystemAddress = remoteClient.systemAddress;
+    lostConnections.Push( lostConnectionSystemAddress );
+    remoteClient.SetActive( false );
+}
+void TCPInterface::CloseRemoteClientOverOutgoingCap( int index )
+{
+    std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
+    if( remoteClients[index].isActive == false || remoteClients[index].isOverOutgoingCap == false )
+        return;
+    ReportLostRemoteClientLocked( remoteClients[index] );
+}
+void TCPInterface::ReleaseIncomingBytes( const Packet& packet )
+{
+    const SystemIndex index = packet.systemAddress.systemIndex;
+    if( index >= remoteClientsLength )
+        return;
+
+    // A packet read from a connection since closed is charged to nobody: the entry's count
+    // was reset when it was freed. Only a reconnect from the same address into the same
+    // entry takes the old connection's bytes as its own, and never below 0.
+    RemoteClient& remoteClient = remoteClients[index];
+    std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+    if( remoteClient.isActive == false || remoteClient.systemAddress != packet.systemAddress )
+        return;
+    unsigned int queued = remoteClient.incomingBytesQueued;
+    while( remoteClient.incomingBytesQueued.compare_exchange_weak( queued, queued > packet.length ? queued - packet.length : 0 ) == false )
+    {
+    }
+}
 void TCPInterface::ReportLostRemoteClient( int index, __TCPSOCKET__ socket )
 {
     std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
     if( remoteClients[index].isActive == false || remoteClients[index].socket != socket )
         return;
-    SystemAddress* lostConnectionSystemAddress = lostConnections.Allocate( _FILE_AND_LINE_ );
-    *lostConnectionSystemAddress = remoteClients[index].systemAddress;
-    lostConnections.Push( lostConnectionSystemAddress );
-    remoteClients[index].SetActive( false );
+    ReportLostRemoteClientLocked( remoteClients[index] );
 }
 TCPInterface::RemoteClientSlot::RemoteClientSlot( TCPInterface& owner )
 : tcpInterface( owner )
@@ -533,6 +566,24 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
     if( totalLength == 0 )
         return false;
 
+    const unsigned int maxOutgoingBytes = maxOutgoingBytesPerClient;
+    auto bufferFor = [&]( RemoteClient& remoteClient ) {
+        // The address was matched without the entry's lock. Matched again under it, so an
+        // entry freed and taken by another client since is neither sent to nor, at the
+        // outgoing cap, closed.
+        std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+        if( ( remoteClient.systemAddress == systemAddress ) == broadcast )
+            return;
+        if( remoteClient.SendOrBuffer( data, lengths, numParameters, maxOutgoingBytes ) == false )
+            return;
+
+        // Once per interface: a flood of closes should not flood the console too.
+        if( outgoingBytesCapCloseCount.fetch_add( 1 ) == 0 )
+        {
+            RAKNET_DEBUG_PRINTF( "TCPInterface: closing a connection with %u bytes waiting to be sent to it (SetMaxOutgoingBytesPerClient). See GetOutgoingBytesCapCloseCount.\n", maxOutgoingBytes );
+        }
+    };
+
     if( broadcast )
     {
         // Send to all, possible exception system
@@ -540,7 +591,7 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
         {
             if( remoteClients[i].systemAddress != systemAddress )
             {
-                remoteClients[i].SendOrBuffer( data, lengths, numParameters );
+                bufferFor( remoteClients[i] );
             }
         }
     }
@@ -550,7 +601,7 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
         if( systemAddress.systemIndex < remoteClientsLength &&
             remoteClients[systemAddress.systemIndex].systemAddress == systemAddress )
         {
-            remoteClients[systemAddress.systemIndex].SendOrBuffer( data, lengths, numParameters );
+            bufferFor( remoteClients[systemAddress.systemIndex] );
         }
         else
         {
@@ -558,7 +609,7 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
             {
                 if( remoteClients[i].systemAddress == systemAddress )
                 {
-                    remoteClients[i].SendOrBuffer( data, lengths, numParameters );
+                    bufferFor( remoteClients[i] );
                 }
             }
         }
@@ -566,6 +617,30 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
 
 
     return true;
+}
+void TCPInterface::SetMaxIncomingBytesPerClient( unsigned int maxBytes )
+{
+    maxIncomingBytesPerClient = maxBytes == 0 ? 1 : maxBytes;
+}
+unsigned int TCPInterface::GetMaxIncomingBytesPerClient( void ) const
+{
+    return maxIncomingBytesPerClient;
+}
+void TCPInterface::SetMaxOutgoingBytesPerClient( unsigned int maxBytes )
+{
+    maxOutgoingBytesPerClient = maxBytes;
+}
+unsigned int TCPInterface::GetMaxOutgoingBytesPerClient( void ) const
+{
+    return maxOutgoingBytesPerClient;
+}
+uint64_t TCPInterface::GetIncomingBytesCapStallCount( void ) const
+{
+    return incomingBytesCapStallCount;
+}
+uint64_t TCPInterface::GetOutgoingBytesCapCloseCount( void ) const
+{
+    return outgoingBytesCapCloseCount;
 }
 bool TCPInterface::ReceiveHasPackets( void )
 {
@@ -613,7 +688,10 @@ Packet* TCPInterface::ReceiveInt( void )
     }
     Packet* p = incomingMessages.PopInaccurate();
     if( p )
+    {
+        ReleaseIncomingBytes( *p );
         return p;
+    }
     if( !tailPush.empty() )
     {
         Packet* p = tailPush.front();
@@ -649,6 +727,10 @@ void TCPInterface::DetachPlugin( PluginInterface2* plugin )
 }
 bool TCPInterface::CloseConnection( SystemAddress systemAddress )
 {
+    return CloseConnection( systemAddress, LCR_CLOSED_BY_USER );
+}
+bool TCPInterface::CloseConnection( const SystemAddress& systemAddress, PI2_LostConnectionReason reason )
+{
     if( isStarted == 0 )
         return false;
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
@@ -656,7 +738,7 @@ bool TCPInterface::CloseConnection( SystemAddress systemAddress )
 
     for( PluginInterface2* pPlugin : messageHandlerList )
     {
-        pPlugin->OnClosedConnection( systemAddress, UNASSIGNED_RAKNET_GUID, LCR_CLOSED_BY_USER );
+        pPlugin->OnClosedConnection( systemAddress, UNASSIGNED_RAKNET_GUID, reason );
     }
 
     // The fast path tries the entry systemIndex names. The search is for when it does not
@@ -1053,6 +1135,14 @@ void UpdateTCPInterfaceLoop( void* arg )
 
         while( 1 )
         {
+            // Clients SendOrBuffer flagged at the outgoing cap. Not left to the select below,
+            // which a client that does not read may never make writable.
+            for( int i = 0; i < sts->remoteClientsLength; i++ )
+            {
+                if( sts->remoteClients[i].isOverOutgoingCap )
+                    sts->CloseRemoteClientOverOutgoingCap( i );
+            }
+
             // Reset readFD, writeFD, and exceptionFD since select seems to clear it
             FD_ZERO( &readFD );
             FD_ZERO( &exceptionFD );
@@ -1075,7 +1165,10 @@ void UpdateTCPInterfaceLoop( void* arg )
                     __TCPSOCKET__ socketCopy = sts->remoteClients[i].socket;
                     if( socketCopy != 0 )
                     {
-                        FD_SET( socketCopy, &readFD );
+                        // At the incoming cap the socket is not read, so TCP flow control
+                        // holds the client back until Receive drains what it sent.
+                        if( sts->remoteClients[i].incomingBytesQueued < sts->maxIncomingBytesPerClient )
+                            FD_SET( socketCopy, &readFD );
                         FD_SET( socketCopy, &exceptionFD );
                         if( sts->remoteClients[i].outgoingData.GetBytesWritten() > 0 )
                             FD_SET( socketCopy, &writeFD );
@@ -1110,7 +1203,6 @@ void UpdateTCPInterfaceLoop( void* arg )
 #if RAKNET_SUPPORT_IPV6 != 1
                         newRemoteClient.systemAddress.address.addr4.sin_addr.s_addr = sockAddr.sin_addr.s_addr;
                         newRemoteClient.systemAddress.SetPortNetworkOrder( sockAddr.sin_port );
-                        newRemoteClient.systemAddress.systemIndex = (SystemIndex)slot.GetIndex();
 #else
                         if( sockAddr.ss_family == AF_INET )
                         {
@@ -1124,6 +1216,9 @@ void UpdateTCPInterfaceLoop( void* arg )
                         }
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
+                        // Both families: Receive finds the entry a packet's bytes are
+                        // charged to by this index.
+                        newRemoteClient.systemAddress.systemIndex = (SystemIndex)slot.GetIndex();
                         slot.Activate();
 
                         // The entry belongs to the connection now; this loop gives it back
@@ -1196,10 +1291,15 @@ void UpdateTCPInterfaceLoop( void* arg )
                     }
                     else
                     {
-                        if( FD_ISSET( socketCopy, &readFD ) )
+                        // Read no more than takes the client to the incoming cap, which may
+                        // have been lowered since select.
+                        const unsigned int maxIncomingBytes = sts->maxIncomingBytesPerClient;
+                        const unsigned int incomingBytesQueued = sts->remoteClients[i].incomingBytesQueued;
+                        const unsigned int incomingRoom = incomingBytesQueued < maxIncomingBytes ? ( std::min )( maxIncomingBytes - incomingBytesQueued, BUFF_SIZE ) : 0;
+                        if( FD_ISSET( socketCopy, &readFD ) && incomingRoom > 0 )
                         {
                             // if recv returns 0 this was a graceful close
-                            len = sts->remoteClients[i].Recv( data, BUFF_SIZE );
+                            len = sts->remoteClients[i].Recv( data, (int)incomingRoom );
 
                             if( len > 0 )
                             {
@@ -1222,6 +1322,17 @@ void UpdateTCPInterfaceLoop( void* arg )
                                 incomingMessage->length = len;
                                 incomingMessage->deleteData = true; // actually means came from SPSC, rather than AllocatePacket
                                 incomingMessage->systemAddress = sts->remoteClients[i].systemAddress;
+
+                                // Charged before it can be received, so Receive never gives
+                                // back bytes that were not yet counted.
+                                if( sts->remoteClients[i].incomingBytesQueued.fetch_add( (unsigned int)len ) + (unsigned int)len >= maxIncomingBytes )
+                                {
+                                    // Once per interface: every slow poll would print otherwise.
+                                    if( sts->incomingBytesCapStallCount.fetch_add( 1 ) == 0 )
+                                    {
+                                        RAKNET_DEBUG_PRINTF( "TCPInterface: stopped reading a client with %u bytes from it waiting for Receive (SetMaxIncomingBytesPerClient). See GetIncomingBytesCapStallCount.\n", maxIncomingBytes );
+                                    }
+                                }
                                 sts->incomingMessages.Push( incomingMessage );
                             }
                             else
@@ -1291,36 +1402,28 @@ void RemoteClient::SetActive( bool a )
         }
     }
 }
-void RemoteClient::SendOrBuffer( const char** data, const unsigned int* lengths, const int numParameters )
+bool RemoteClient::SendOrBuffer( const char** data, const unsigned int* lengths, const int numParameters, unsigned int maxOutgoingBytes )
 {
-    // True can save memory and buffer copies, but gives worse performance overall
-    const bool ALLOW_SEND_FROM_USER_THREAD = false;
-
-    int parameterIndex;
     if( isActive == false )
-        return;
-    parameterIndex = 0;
-    for( ; parameterIndex < numParameters; parameterIndex++ )
+        return false;
+
+    uint64_t totalLength = 0;
+    for( int parameterIndex = 0; parameterIndex < numParameters; parameterIndex++ )
+        totalLength += lengths[parameterIndex];
+
+    // All or nothing, under one lock, so the check and the writes agree.
+    std::lock_guard<std::mutex> guard( outgoingDataMutex );
+    if( isOverOutgoingCap )
+        return false;
+    if( outgoingData.GetBytesWritten() + totalLength > maxOutgoingBytes )
     {
-        outgoingDataMutex.lock();
-        if( ALLOW_SEND_FROM_USER_THREAD && outgoingData.GetBytesWritten() == 0 )
-        {
-            outgoingDataMutex.unlock();
-            int bytesSent = Send( data[parameterIndex], lengths[parameterIndex] );
-            if( bytesSent < (int)lengths[parameterIndex] )
-            {
-                // Push remainder
-                outgoingDataMutex.lock();
-                outgoingData.WriteBytes( data[parameterIndex] + bytesSent, lengths[parameterIndex] - bytesSent, _FILE_AND_LINE_ );
-                outgoingDataMutex.unlock();
-            }
-        }
-        else
-        {
-            outgoingData.WriteBytes( data[parameterIndex], lengths[parameterIndex], _FILE_AND_LINE_ );
-            outgoingDataMutex.unlock();
-        }
+        // Buffered no further: the far end is not reading. The update loop closes it.
+        isOverOutgoingCap = true;
+        return true;
     }
+    for( int parameterIndex = 0; parameterIndex < numParameters; parameterIndex++ )
+        outgoingData.WriteBytes( data[parameterIndex], lengths[parameterIndex], _FILE_AND_LINE_ );
+    return false;
 }
 #if OPEN_SSL_CLIENT_SUPPORT == 1
 bool RemoteClient::InitSSL( SSL_CTX* ctx, SSL_METHOD* meth )

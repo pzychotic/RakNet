@@ -21,10 +21,28 @@ namespace RakNet {
 
 typedef uint32_t PTCPHeader;
 
+namespace {
+
+// Reads the header at the front of \a bq without consuming it. False if fewer bytes than a
+// header are buffered: ReadBytes would read what there is and leave the rest unset.
+bool PeekHeader( DataStructures::ByteQueue& bq, PTCPHeader& dataLength )
+{
+    if( bq.GetBytesWritten() < sizeof( PTCPHeader ) )
+        return false;
+    bq.ReadBytes( (char*)&dataLength, sizeof( PTCPHeader ), true );
+    if( BitStream::DoEndianSwap() )
+        BitStream::ReverseBytesInPlace( (unsigned char*)&dataLength, sizeof( dataLength ) );
+    return true;
+}
+
+} // namespace
+
 STATIC_FACTORY_DEFINITIONS( PacketizedTCP, PacketizedTCP );
 
 PacketizedTCP::PacketizedTCP()
 {
+    maxMessageLength = MAXIMUM_MESSAGE_SIZE;
+    messageLengthCapCloseCount = 0;
 }
 PacketizedTCP::~PacketizedTCP()
 {
@@ -36,7 +54,21 @@ void PacketizedTCP::Stop( void )
     TCPInterface::Stop();
     for( Packet* pPacket : waitingPackets )
         DeallocatePacket( pPacket );
+    waitingPackets.clear();
     ClearAllConnections();
+}
+
+void PacketizedTCP::SetMaxMessageLength( unsigned int maxLength )
+{
+    maxMessageLength = maxLength;
+}
+unsigned int PacketizedTCP::GetMaxMessageLength( void ) const
+{
+    return maxMessageLength;
+}
+uint64_t PacketizedTCP::GetMessageLengthCapCloseCount( void ) const
+{
+    return messageLengthCapCloseCount;
 }
 
 void PacketizedTCP::Send( const char* data, unsigned length, const SystemAddress& systemAddress, bool broadcast )
@@ -98,32 +130,30 @@ bool PacketizedTCP::SendList( const char** data, const unsigned int* lengths, co
 }
 void PacketizedTCP::PushNotificationsToQueues( void )
 {
+    // All of them, not one of each: a connection whose new event still waits here has no
+    // entry, and what it sends before the event is taken is dropped.
     SystemAddress sa;
-    sa = TCPInterface::HasNewIncomingConnection();
-    if( sa != UNASSIGNED_SYSTEM_ADDRESS )
+    while( ( sa = TCPInterface::HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS )
     {
         _newIncomingConnections.push_back( sa );
-        AddToConnectionList( sa );
+        CountConnection( sa, 1 );
     }
 
-    sa = TCPInterface::HasFailedConnectionAttempt();
-    if( sa != UNASSIGNED_SYSTEM_ADDRESS )
+    while( ( sa = TCPInterface::HasFailedConnectionAttempt() ) != UNASSIGNED_SYSTEM_ADDRESS )
     {
         _failedConnectionAttempts.push_back( sa );
     }
 
-    sa = TCPInterface::HasLostConnection();
-    if( sa != UNASSIGNED_SYSTEM_ADDRESS )
+    while( ( sa = TCPInterface::HasLostConnection() ) != UNASSIGNED_SYSTEM_ADDRESS )
     {
         _lostConnections.push_back( sa );
-        RemoveFromConnectionList( sa );
+        CountConnection( sa, -1 );
     }
 
-    sa = TCPInterface::HasCompletedConnectionAttempt();
-    if( sa != UNASSIGNED_SYSTEM_ADDRESS )
+    while( ( sa = TCPInterface::HasCompletedConnectionAttempt() ) != UNASSIGNED_SYSTEM_ADDRESS )
     {
         _completedConnectionAttempts.push_back( sa );
-        AddToConnectionList( sa );
+        CountConnection( sa, 1 );
     }
 }
 Packet* PacketizedTCP::Receive( void )
@@ -139,116 +169,139 @@ Packet* PacketizedTCP::Receive( void )
     if( outgoingPacket )
         return outgoingPacket;
 
-    Packet* incomingPacket = TCPInterface::ReceiveInt();
-
-    while( incomingPacket )
+    // One read at a time, and only while nothing waits: what one read frames is delivered
+    // before the next is taken. So a client whose messages the application has not taken
+    // stays at TCPInterface's incoming cap, and zero-length frames make at most one read's
+    // worth of Packets.
+    Packet* incomingPacket;
+    while( waitingPackets.empty() && ( incomingPacket = TCPInterface::ReceiveInt() ) != 0 )
     {
         const auto it = connections.find( incomingPacket->systemAddress );
         if( it == connections.end() )
         {
             DeallocatePacket( incomingPacket );
-            incomingPacket = TCPInterface::ReceiveInt();
             continue;
         }
 
         if( incomingPacket->deleteData == true )
         {
-            // Came from network
-            DataStructures::ByteQueue* bq = it->second;
-            // Buffer data
-            bq->WriteBytes( (const char*)incomingPacket->data, incomingPacket->length, _FILE_AND_LINE_ );
-            SystemAddress systemAddressFromPacket = incomingPacket->systemAddress;
-            PTCPHeader dataLength;
-
-            // Peek the header to see if a full message is waiting
-            bq->ReadBytes( (char*)&dataLength, sizeof( PTCPHeader ), true );
-            if( BitStream::DoEndianSwap() )
-                BitStream::ReverseBytesInPlace( (unsigned char*)&dataLength, sizeof( dataLength ) );
-            // Header indicates packet length. If enough data is available, read out and return one packet
-            if( bq->GetBytesWritten() >= dataLength + sizeof( PTCPHeader ) )
-            {
-                do
-                {
-                    bq->IncrementReadOffset( sizeof( PTCPHeader ) );
-                    outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
-                    outgoingPacket->length = dataLength;
-                    outgoingPacket->bitSize = BYTES_TO_BITS( dataLength );
-                    outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
-                    outgoingPacket->systemAddress = systemAddressFromPacket;
-                    outgoingPacket->deleteData = false; // Did not come from the network
-                    outgoingPacket->data = (unsigned char*)rakMalloc_Ex( dataLength, _FILE_AND_LINE_ );
-                    if( outgoingPacket->data == 0 )
-                    {
-                        notifyOutOfMemory( _FILE_AND_LINE_ );
-                        RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
-                        return 0;
-                    }
-                    bq->ReadBytes( (char*)outgoingPacket->data, dataLength, false );
-
-                    waitingPackets.push_back( outgoingPacket );
-
-                    // Peek the header to see if a full message is waiting
-                    if( bq->ReadBytes( (char*)&dataLength, sizeof( PTCPHeader ), true ) )
-                    {
-                        if( BitStream::DoEndianSwap() )
-                            BitStream::ReverseBytesInPlace( (unsigned char*)&dataLength, sizeof( dataLength ) );
-                    }
-                    else
-                        break;
-                } while( bq->GetBytesWritten() >= dataLength + sizeof( PTCPHeader ) );
-            }
-            else
-            {
-                unsigned int oldWritten = bq->GetBytesWritten() - incomingPacket->length;
-                unsigned int newWritten = bq->GetBytesWritten();
-
-                // Return ID_DOWNLOAD_PROGRESS
-                if( newWritten / 65536 != oldWritten / 65536 )
-                {
-                    outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
-                    outgoingPacket->length = sizeof( MessageID ) +
-                                                sizeof( unsigned int ) * 2 +
-                                                sizeof( unsigned int ) +
-                                                65536;
-                    outgoingPacket->bitSize = BYTES_TO_BITS( incomingPacket->length );
-                    outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
-                    outgoingPacket->systemAddress = incomingPacket->systemAddress;
-                    outgoingPacket->deleteData = false;
-                    outgoingPacket->data = (unsigned char*)rakMalloc_Ex( outgoingPacket->length, _FILE_AND_LINE_ );
-                    if( outgoingPacket->data == 0 )
-                    {
-                        notifyOutOfMemory( _FILE_AND_LINE_ );
-                        RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
-                        return 0;
-                    }
-
-                    outgoingPacket->data[0] = (MessageID)ID_DOWNLOAD_PROGRESS;
-                    unsigned int totalParts = dataLength / 65536;
-                    unsigned int partIndex = newWritten / 65536;
-                    unsigned int oneChunkSize = 65536;
-                    memcpy( outgoingPacket->data + sizeof( MessageID ), &partIndex, sizeof( unsigned int ) );
-                    memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &totalParts, sizeof( unsigned int ) );
-                    memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &oneChunkSize, sizeof( unsigned int ) );
-                    bq->IncrementReadOffset( sizeof( PTCPHeader ) );
-                    bq->ReadBytes( (char*)outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, oneChunkSize, true );
-                    bq->DecrementReadOffset( sizeof( PTCPHeader ) );
-
-                    waitingPackets.push_back( outgoingPacket );
-                }
-            }
-
+            // Came from network. Nothing from a connection closed at the message length cap
+            // is framed: the stream lost its framing there.
+            Connection* connection = it->second;
+            if( connection->openConnections > 0 && connection->isClosed == false )
+                FrameMessages( *incomingPacket, *connection );
             DeallocatePacket( incomingPacket );
-            incomingPacket = nullptr;
         }
         else
         {
             waitingPackets.push_back( incomingPacket );
         }
-
-        incomingPacket = TCPInterface::ReceiveInt();
     }
 
     return ReturnOutgoingPacket();
+}
+void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& connection )
+{
+    DataStructures::ByteQueue* bq = &connection.bytes;
+    // Buffer data
+    bq->WriteBytes( (const char*)incomingPacket.data, incomingPacket.length, _FILE_AND_LINE_ );
+    const SystemAddress systemAddressFromPacket = incomingPacket.systemAddress;
+
+    // Header indicates packet length. Read out every message that is complete, checking
+    // each header against the maximum before its message is buffered any further.
+    PTCPHeader dataLength;
+    bool isAnyFramed = false;
+    while( PeekHeader( *bq, dataLength ) )
+    {
+        if( dataLength > maxMessageLength )
+        {
+            CloseOverlongSender( systemAddressFromPacket, connection );
+            return;
+        }
+
+        if( bq->GetBytesWritten() < (uint64_t)dataLength + sizeof( PTCPHeader ) )
+            break;
+
+        bq->IncrementReadOffset( sizeof( PTCPHeader ) );
+        Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+        outgoingPacket->length = dataLength;
+        outgoingPacket->bitSize = BYTES_TO_BITS( dataLength );
+        outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
+        outgoingPacket->systemAddress = systemAddressFromPacket;
+        outgoingPacket->deleteData = false; // Did not come from the network
+        outgoingPacket->data = (unsigned char*)rakMalloc_Ex( dataLength, _FILE_AND_LINE_ );
+        if( outgoingPacket->data == 0 )
+        {
+            notifyOutOfMemory( _FILE_AND_LINE_ );
+            RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
+            return;
+        }
+        bq->ReadBytes( (char*)outgoingPacket->data, dataLength, false );
+
+        waitingPackets.push_back( outgoingPacket );
+        isAnyFramed = true;
+    }
+
+    // A message still arriving, with nothing framed out of this read
+    if( isAnyFramed || bq->GetBytesWritten() < sizeof( PTCPHeader ) )
+        return;
+
+    unsigned int oldWritten = bq->GetBytesWritten() - incomingPacket.length;
+    unsigned int newWritten = bq->GetBytesWritten();
+
+    // Return ID_DOWNLOAD_PROGRESS
+    if( newWritten / 65536 != oldWritten / 65536 )
+    {
+        Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+        outgoingPacket->length = sizeof( MessageID ) +
+                                    sizeof( unsigned int ) * 2 +
+                                    sizeof( unsigned int ) +
+                                    65536;
+        outgoingPacket->bitSize = BYTES_TO_BITS( incomingPacket.length );
+        outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
+        outgoingPacket->systemAddress = incomingPacket.systemAddress;
+        outgoingPacket->deleteData = false;
+        outgoingPacket->data = (unsigned char*)rakMalloc_Ex( outgoingPacket->length, _FILE_AND_LINE_ );
+        if( outgoingPacket->data == 0 )
+        {
+            notifyOutOfMemory( _FILE_AND_LINE_ );
+            RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
+            return;
+        }
+
+        outgoingPacket->data[0] = (MessageID)ID_DOWNLOAD_PROGRESS;
+        unsigned int totalParts = dataLength / 65536;
+        unsigned int partIndex = newWritten / 65536;
+        unsigned int oneChunkSize = 65536;
+        memcpy( outgoingPacket->data + sizeof( MessageID ), &partIndex, sizeof( unsigned int ) );
+        memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &totalParts, sizeof( unsigned int ) );
+        memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &oneChunkSize, sizeof( unsigned int ) );
+        bq->IncrementReadOffset( sizeof( PTCPHeader ) );
+        bq->ReadBytes( (char*)outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, oneChunkSize, true );
+        bq->DecrementReadOffset( sizeof( PTCPHeader ) );
+
+        waitingPackets.push_back( outgoingPacket );
+    }
+}
+void PacketizedTCP::CloseOverlongSender( const SystemAddress& sa, Connection& connection )
+{
+    // Once per interface: a client repeating it should not flood the console too.
+    if( messageLengthCapCloseCount++ == 0 )
+    {
+        RAKNET_DEBUG_PRINTF( "PacketizedTCP: closing a connection that announced a message longer than %u bytes (SetMaxMessageLength). See GetMessageLengthCapCloseCount.\n", maxMessageLength );
+    }
+
+    // What it sent is discarded, and so is anything still queued from it.
+    connection.bytes.Clear( _FILE_AND_LINE_ );
+    connection.isClosed = true;
+
+    // Reported like any lost connection. If TCPInterface found it already lost, its lost
+    // event is on the way and does both of these instead.
+    if( TCPInterface::CloseConnection( sa, LCR_CONNECTION_LOST ) )
+    {
+        _lostConnections.push_back( sa );
+        CountConnection( sa, -1 );
+    }
 }
 Packet* PacketizedTCP::ReturnOutgoingPacket( void )
 {
@@ -279,30 +332,38 @@ Packet* PacketizedTCP::ReturnOutgoingPacket( void )
 }
 bool PacketizedTCP::CloseConnection( SystemAddress systemAddress )
 {
-    RemoveFromConnectionList( systemAddress );
-    return TCPInterface::CloseConnection( systemAddress );
+    // A connection TCPInterface found already lost keeps its entry until its lost event.
+    if( TCPInterface::CloseConnection( systemAddress ) == false )
+        return false;
+    CountConnection( systemAddress, -1 );
+    return true;
 }
 
-void PacketizedTCP::RemoveFromConnectionList( const SystemAddress& sa )
+void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
 {
     if( sa == UNASSIGNED_SYSTEM_ADDRESS )
         return;
 
-    const auto it = connections.find( sa );
-    if( it != connections.end() )
+    // One entry per address, so a reconnect from the same address shares the entry of the
+    // connection it replaces rather than failing to insert its own.
+    auto it = connections.find( sa );
+    if( it == connections.end() )
+        it = connections.insert( std::make_pair( sa, RakNet::OP_NEW<Connection>( _FILE_AND_LINE_ ) ) ).first;
+
+    Connection* connection = it->second;
+    if( delta > 0 )
     {
-        RakNet::OP_DELETE( it->second, _FILE_AND_LINE_ );
+        // A new stream: whatever the old connection left unframed is not part of it.
+        connection->bytes.Clear( _FILE_AND_LINE_ );
+        connection->isClosed = false;
+    }
+
+    connection->openConnections += delta;
+    if( connection->openConnections == 0 )
+    {
+        RakNet::OP_DELETE( connection, _FILE_AND_LINE_ );
         connections.erase( it );
     }
-}
-
-void PacketizedTCP::AddToConnectionList( const SystemAddress& sa )
-{
-    if( sa == UNASSIGNED_SYSTEM_ADDRESS )
-        return;
-
-    RakAssert( connections.find( sa ) == connections.end() );
-    connections.insert( std::make_pair( sa, RakNet::OP_NEW<DataStructures::ByteQueue>( _FILE_AND_LINE_ ) ) );
 }
 
 void PacketizedTCP::ClearAllConnections( void )

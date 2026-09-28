@@ -24,6 +24,7 @@
 #include "SocketIncludes.h"
 #include "DS_ByteQueue.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
+#include "MTUSize.h"
 #include "PluginInterface2.h"
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
@@ -35,6 +36,7 @@
 #endif
 
 #include <atomic>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <vector>
@@ -95,11 +97,49 @@ public:
     // Get how many bytes are waiting to be sent. If too many, you may want to skip sending
     unsigned int GetOutgoingDataBufferSize( SystemAddress systemAddress ) const;
 
+    /// Default for SetMaxIncomingBytesPerClient.
+    static constexpr unsigned int DEFAULT_MAXIMUM_INCOMING_BYTES_PER_CLIENT = 1024 * 1024;
+
+    /// Default for SetMaxOutgoingBytesPerClient: one largest RakNet Message and room beside
+    /// it, so PacketizedTCP can send anything RakPeer could.
+    static constexpr unsigned int DEFAULT_MAXIMUM_OUTGOING_BYTES_PER_CLIENT = 2 * MAXIMUM_MESSAGE_SIZE;
+
+    /// The most bytes received from one client that may wait for Receive. At the cap the
+    /// receive thread stops reading that client's socket until Receive drains it below the
+    /// cap, so TCP flow control slows the sender. Nothing is dropped and nothing is closed.
+    /// So a client cannot make this interface hold more than the cap for it however slowly
+    /// the application polls, and every client's cap times maxConnections bounds the whole.
+    /// Reading resumes on the receive thread's next pass, up to about 60 ms after the drain,
+    /// so a client held at the cap gets about one cap per pass through. A stalled client's
+    /// socket is not read at all, so its disconnect too is seen only after the drain. Default
+    /// DEFAULT_MAXIMUM_INCOMING_BYTES_PER_CLIENT; 0 is taken as 1. May be changed while
+    /// started. Counted by GetIncomingBytesCapStallCount.
+    void SetMaxIncomingBytesPerClient( unsigned int maxBytes );
+    unsigned int GetMaxIncomingBytesPerClient( void ) const;
+
+    /// The most bytes Send may buffer for one client, waiting for it to read them. A Send
+    /// that would pass the cap closes the connection instead, since the far end is not
+    /// reading: that Send and every later one to it are discarded, and the connection is
+    /// reported by HasLostConnection. A single Send larger than the cap closes it too, so a
+    /// cap of 0 closes every connection on its next Send.
+    /// Default DEFAULT_MAXIMUM_OUTGOING_BYTES_PER_CLIENT; may be changed while started.
+    /// Counted by GetOutgoingBytesCapCloseCount.
+    void SetMaxOutgoingBytesPerClient( unsigned int maxBytes );
+    unsigned int GetMaxOutgoingBytesPerClient( void ) const;
+
+    /// How many times a client's reads were paused at SetMaxIncomingBytesPerClient's cap.
+    uint64_t GetIncomingBytesCapStallCount( void ) const;
+
+    /// How many connections SetMaxOutgoingBytesPerClient's cap closed.
+    uint64_t GetOutgoingBytesCapCloseCount( void ) const;
+
     /// Returns if Receive() will return data
     /// Do not use on PacketizedTCP
     virtual bool ReceiveHasPackets( void );
 
-    /// Returns data received
+    /// Returns data received. Draining it is what lets the receive thread read a client past
+    /// SetMaxIncomingBytesPerClient's cap again. Connection events wait in their own queues,
+    /// which only the Has... calls drain, so an application polls those every tick too.
     virtual Packet* Receive( void );
 
     /// Disconnects a player/address
@@ -167,6 +207,24 @@ protected:
     std::deque<SystemAddress> completedConnectionAttempts, failedConnectionAttempts;
 
     int threadPriority;
+
+    std::atomic<unsigned int> maxIncomingBytesPerClient, maxOutgoingBytesPerClient;
+    std::atomic<uint64_t> incomingBytesCapStallCount, outgoingBytesCapCloseCount;
+
+    /// CloseConnection, telling plugins \a reason: a close at a cap is a lost connection to
+    /// them, not one the application closed.
+    bool CloseConnection( const SystemAddress& systemAddress, PI2_LostConnectionReason reason );
+
+    /// Queues \a remoteClient's lost event and frees it. Its isActiveMutex is held.
+    void ReportLostRemoteClientLocked( RemoteClient& remoteClient );
+
+    /// Gives back the incoming bytes \a packet held against its client's cap, if the client
+    /// it came from is still the one in its entry. Called as Receive hands a packet on.
+    void ReleaseIncomingBytes( const Packet& packet );
+
+    /// The update loop's close for a client flagged at the outgoing cap: queues its lost
+    /// event and frees the entry, under its isActiveMutex, if it is still active and flagged.
+    void CloseRemoteClientOverOutgoingCap( int index );
 
     std::vector<__TCPSOCKET__> blockingSocketList;
     std::mutex blockingSocketListMutex;
@@ -295,11 +353,21 @@ struct RemoteClient
 #endif
         isActive = false;
         socket = 0;
+        incomingBytesQueued = 0;
+        isOverOutgoingCap = false;
     }
     __TCPSOCKET__ socket;
     SystemAddress systemAddress;
     DataStructures::ByteQueue outgoingData;
     bool isActive;
+
+    /// Bytes read from this client and not yet handed on by Receive. Only the receive
+    /// thread adds to it, so a read never takes it past the cap.
+    std::atomic<unsigned int> incomingBytesQueued;
+
+    /// Set by SendOrBuffer at the outgoing cap; the update loop then closes the connection.
+    /// Written under outgoingDataMutex.
+    std::atomic<bool> isOverOutgoingCap;
     std::mutex outgoingDataMutex;
     std::mutex isActiveMutex;
 
@@ -318,9 +386,15 @@ struct RemoteClient
     {
         std::lock_guard<std::mutex> guard( outgoingDataMutex );
         outgoingData.Clear( _FILE_AND_LINE_ );
+        isOverOutgoingCap = false;
+        incomingBytesQueued = 0;
     }
     void SetActive( bool a );
-    void SendOrBuffer( const char** data, const unsigned int* lengths, const int numParameters );
+
+    /// Buffers the data for the update loop to send, unless that would take outgoingData
+    /// past \a maxOutgoingBytes. Then it buffers nothing, flags the client for the update
+    /// loop to close, and returns true, once per connection.
+    bool SendOrBuffer( const char** data, const unsigned int* lengths, const int numParameters, unsigned int maxOutgoingBytes );
 };
 
 } // namespace RakNet

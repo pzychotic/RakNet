@@ -19,7 +19,9 @@
 
 #include "TCPInterface.h"
 #include "DS_ByteQueue.h"
+#include "MTUSize.h"
 
+#include <cstdint>
 #include <deque>
 #include <map>
 
@@ -61,19 +63,67 @@ public:
     /// Queued events of new incoming connections
     SystemAddress HasNewIncomingConnection( void );
 
-    /// Queued events of lost connections
+    /// Queued events of lost connections. Also reports a connection closed at
+    /// SetMaxMessageLength's cap.
     SystemAddress HasLostConnection( void );
 
+    /// The longest message a connection may announce. Its header is read before the message
+    /// is buffered, so a header announcing more closes the connection at once: the stream
+    /// cannot be re-framed after skipping a frame. The close is reported by
+    /// HasLostConnection. So a connection holds at most about this much while a message
+    /// arrives, where the 32-bit header let it make this interface buffer up to 4 GiB.
+    /// Default MAXIMUM_MESSAGE_SIZE, what RakPeer delivers; may be changed while started.
+    /// Counted by GetMessageLengthCapCloseCount. The incoming and outgoing byte caps of
+    /// TCPInterface apply as well.
+    void SetMaxMessageLength( unsigned int maxLength );
+    unsigned int GetMaxMessageLength( void ) const;
+
+    /// How many connections SetMaxMessageLength's cap closed.
+    uint64_t GetMessageLengthCapCloseCount( void ) const;
+
 protected:
+    /// What is buffered for one remote address.
+    struct Connection
+    {
+        /// Bytes received and not yet framed into a message.
+        DataStructures::ByteQueue bytes;
+
+        /// Connections at this address reported new and not yet lost. A reconnect from the
+        /// same address can be reported new before the old connection is reported lost, so
+        /// the entry goes only when this reaches 0. It can go below 0 if a lost event is
+        /// drained first.
+        int openConnections = 0;
+
+        /// Closed at the message length cap: what is still queued from it is dropped.
+        bool isClosed = false;
+    };
+
     void ClearAllConnections( void );
-    void RemoveFromConnectionList( const SystemAddress& sa );
-    void AddToConnectionList( const SystemAddress& sa );
+
+    /// Adds \a delta to the entry for \a sa, creating it if missing and deleting it at 0.
+    /// A new connection (delta 1) starts a new stream, so the entry's bytes are discarded.
+    /// Received data carries only an address, so bytes the old connection sent that are
+    /// still queued behind the reconnect's new event are framed as the reconnect's: a
+    /// reconnect from the same source port can find its stream starting mid-message.
+    void CountConnection( const SystemAddress& sa, int delta );
+
+    /// Appends bytes read from \a sa to its entry and frames every complete message out of
+    /// them onto waitingPackets. May close the connection, and so delete \a connection.
+    void FrameMessages( const Packet& incomingPacket, Connection& connection );
+
+    /// Closes the connection at \a sa for announcing a message longer than the maximum.
+    /// May delete \a connection.
+    void CloseOverlongSender( const SystemAddress& sa, Connection& connection );
+
     void PushNotificationsToQueues( void );
     Packet* ReturnOutgoingPacket( void );
 
     // A single TCP recieve may generate multiple split packets. They are stored in the waitingPackets list until Receive is called
     std::deque<Packet*> waitingPackets;
-    std::map<SystemAddress, DataStructures::ByteQueue*> connections;
+    std::map<SystemAddress, Connection*> connections;
+
+    unsigned int maxMessageLength;
+    uint64_t messageLengthCapCloseCount;
 
     // Mirrors single producer / consumer, but processes them in Receive() before returning to user
     std::deque<SystemAddress> _newIncomingConnections, _lostConnections, _failedConnectionAttempts, _completedConnectionAttempts;

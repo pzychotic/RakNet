@@ -72,6 +72,20 @@ reason and no new callback API.
 - *Point 7.* Dropping an offline datagram drops it whole, so a dropped unconnected ping is
   not answered, just as it would not be if a full socket buffer had dropped it.
 
+**Clarified in applying it** (TCP):
+
+- *Point 7.* TCP has flow control, so a queue the application drains can be capped without
+  losing anything: at the cap `TCPInterface` stops reading the client's socket, and the
+  sender stalls. That is neither refusing nor closing, and it is the reason TCP's incoming
+  queue is capped where `Receive`'s Message queue is not.
+- *Point 3.* Bytes waiting to go to a client that does not read are the other end's doing,
+  and dropping part of a TCP stream breaks it, so at that cap the connection is closed.
+- *Configuration.* `TCPInterface` and `PacketizedTCP` are not the core's reliability layer:
+  their caps are runtime setters with a documented default, like a plugin's, and their
+  counters are getters on the class.
+- *Close reporting.* A cap-driven close is the TCP close itself, which the remote end sees
+  as its connection ending; locally it is reported by `HasLostConnection`.
+
 ## Considered and rejected
 
 - **Global caps only.** Simpler, but turns every cap into a lock-out lever.

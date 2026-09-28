@@ -507,6 +507,40 @@ A datagram your `SetIncomingDatagramEventHandler` callback rejects is now given 
 receive pool. Stock leaked it, one buffer per rejected datagram; the callback's contract
 already said the struct was valid only for the call, so nothing that honoured it changes.
 
+### What a TCP client can make `TCPInterface` and `PacketizedTCP` hold
+
+Stock read every TCP client as fast as it sent, into a queue only `Receive` drains; buffered
+every `Send` to a client that never read; and let a `PacketizedTCP` client announce a message
+of up to 4 GiB and buffer toward it. Any client, before the application had said a word to
+it, could grow any of these without limit.
+
+Now, each set at runtime on the interface:
+
+- **`SetMaxIncomingBytesPerClient`, default 1 MiB.** At the cap the receive thread stops
+  reading that client's socket until `Receive` drains it, so TCP flow control slows the
+  sender. Nothing is dropped and nothing is closed; a client your application polls slowly
+  just sends slowly. Counted by `GetIncomingBytesCapStallCount`.
+- **`SetMaxOutgoingBytesPerClient`, default 2 × `MAXIMUM_MESSAGE_SIZE`.** A `Send` that would
+  take a client's unsent bytes past the cap closes the connection instead, reported by
+  `HasLostConnection`: the far end is not reading. A single `Send` larger than the cap does
+  too. `GetOutgoingDataBufferSize` still tells you how close a client is. Counted by
+  `GetOutgoingBytesCapCloseCount`.
+- **`PacketizedTCP::SetMaxMessageLength`, default `MAXIMUM_MESSAGE_SIZE`.** A header
+  announcing more closes the connection, reported by `HasLostConnection`, since a TCP stream
+  cannot be re-framed after skipping a frame. Plugins see it as `LCR_CONNECTION_LOST`.
+  Counted by `GetMessageLengthCapCloseCount`.
+
+`PacketizedTCP` also stops losing a client that reconnects from the address it last
+connected from before your application saw the old connection's loss. Stock leaked a buffer
+and then dropped everything the reconnect sent. Each `Receive` and `Has...` call now takes
+every pending connection event from `TCPInterface` rather than one of each, so data from a
+connection whose new event was still queued is no longer dropped either.
+
+A subclass of `PacketizedTCP` sees its protected `connections` map hold a `Connection`
+rather than a `ByteQueue`, and `AddToConnectionList` and `RemoveFromConnectionList` are
+replaced by `CountConnection`. `RemoteClient::SendOrBuffer` takes the cap and returns
+whether it hit it.
+
 ## Plugins that act only on Solicited or Designated messages
 
 Stock plugins believed any connected System that claimed to have set something up for
