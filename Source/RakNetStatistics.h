@@ -95,8 +95,38 @@ struct RAK_DLL_EXPORT RakNetStatistics
     /// What is the average total packetloss over the lifetime of the connection?
     float packetlossTotal;
 
+    /// How many bytes this System currently makes the reliability layer hold: chunks of split
+    /// Messages still being reassembled, their channels' pointer arrays, and Messages waiting
+    /// in an ordering channel behind a hole. Charged against
+    /// RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET and RELIABILITY_LAYER_PEER_BYTE_BUDGET
+    /// (RakNetDefines.h).
+    uint64_t bytesHeldForReassemblyAndOrdering;
+
+    /// How many unreliable Messages or split chunks from this System were dropped because
+    /// holding them would have taken it over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET. The
+    /// connection stays open. Reliable data at the same budget closes the connection instead;
+    /// see connectionsClosedOverConnectionBudget.
+    uint64_t messagesDroppedOverConnectionBudget;
+
+    /// How many connections this Peer has closed because reliable or ordered data would have
+    /// taken one over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET. Each was reported as
+    /// ID_CONNECTION_LOST. A closed connection has no statistics left to read, so this is a
+    /// total over the Peer's lifetime, the same in every connection's statistics.
+    uint64_t connectionsClosedOverConnectionBudget;
+
+    /// How many connections this Peer has closed because together the connections would have
+    /// held more than RELIABILITY_LAYER_PEER_BYTE_BUDGET. The one holding the most bytes is
+    /// closed each time, reported as ID_CONNECTION_LOST. A total over the Peer's lifetime,
+    /// like connectionsClosedOverConnectionBudget.
+    uint64_t connectionsClosedOverPeerBudget;
+
     RakNetStatistics& operator+=( const RakNetStatistics& other )
     {
+        // connectionsClosedOverConnectionBudget and connectionsClosedOverPeerBudget are
+        // already Peer-wide totals, the same in both operands, so they are not summed.
+        bytesHeldForReassemblyAndOrdering += other.bytesHeldForReassemblyAndOrdering;
+        messagesDroppedOverConnectionBudget += other.messagesDroppedOverConnectionBudget;
+
         unsigned i;
         for( i = 0; i < NUMBER_OF_PRIORITIES; i++ )
         {

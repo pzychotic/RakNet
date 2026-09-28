@@ -51,6 +51,16 @@ default can find out why. A cap-driven close is reported locally as an ordinary 
 connection and sends the remote end a disconnection notification. No new lost-connection
 reason and no new callback API.
 
+**Clarified in applying it** (reliability layer):
+
+- *Point 3.* `RELIABLE_SEQUENCED` is reliable data for this purpose, so it closes the
+  connection rather than being dropped. It is acknowledged and not resent, so dropping the newest
+  one loses it. "Sequenced" in point 3 means `UNRELIABLE_SEQUENCED`.
+- *Point 6.* "Refused" means refused before reassembly or ordering could hold it. A
+  Half-open System's unsplit, unordered message holds nothing, so it is passed up. There
+  the connection request is parsed, and anything else closes the connection and bans the
+  address, as before.
+
 ## Considered and rejected
 
 - **Global caps only.** Simpler, but turns every cap into a lock-out lever.

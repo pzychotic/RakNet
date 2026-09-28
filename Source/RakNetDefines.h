@@ -86,6 +86,47 @@
 #define RESEND_BUFFER_ARRAY_MASK 511
 #endif
 
+/// The most bytes one System may make its reliability layer hold while Messages are
+/// incomplete: the chunks of split Messages still being reassembled, each split channel's
+/// pointer array, and Messages waiting in an ordering channel behind a hole. Every one of
+/// those is charged before it is allocated. Past the budget, unreliable data is dropped and
+/// counted, and a System sending reliable or ordered data is disconnected - that data was
+/// already acknowledged, so dropping it would break the Message guarantee. See ADR-0005 and
+/// the counters in RakNetStatistics.
+///
+/// Derivation. A conforming Message of MAXIMUM_MESSAGE_SIZE (MTUSize.h) arrives at the
+/// lowest MTU as 65536 chunks. While it is reassembled it costs its own bytes, one
+/// InternalPacket record per chunk and a 512 KiB pointer array: about 1.5 x
+/// MAXIMUM_MESSAGE_SIZE in all, the records being most of the overhead. Twice
+/// MAXIMUM_MESSAGE_SIZE admits that one largest Message with room for ordinary traffic
+/// beside it; a test in ReliabilityLayerByteBudgetTest.cpp keeps that true if
+/// InternalPacket grows. A System that opens split channels and never
+/// finishes them pays for each channel's pointer array, so the number of live channels is
+/// bounded by this too, with no separate cap.
+///
+/// Expands to a reference to RakNet::MAXIMUM_MESSAGE_SIZE, so it is only usable where
+/// MTUSize.h is included. An override may be any integer constant.
+#ifndef RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET
+#define RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET ( 2ull * RakNet::MAXIMUM_MESSAGE_SIZE )
+#endif
+
+/// The most bytes all Systems together may make a Peer's reliability layers hold, over the
+/// same charges as RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET. Past it, the connection holding
+/// the most bytes is disconnected - not the one whose datagram arrived last, which would let
+/// a System sitting at the budget make every legitimate large Message fail.
+///
+/// Derivation. The per-connection budget times the number of connections is not a
+/// survivable bound on its own (ADR-0005, point 2): 64 MiB per System at the default. Eight
+/// times MAXIMUM_MESSAGE_SIZE, about 258 MiB, lets four Systems each reassemble a largest
+/// Message at once, or many more Systems exchange ordinary ones. Embedders running many
+/// connections on constrained hardware lower it; embedders exchanging many large Messages
+/// raise it.
+///
+/// Expands to a reference to RakNet::MAXIMUM_MESSAGE_SIZE, like the one above.
+#ifndef RELIABILITY_LAYER_PEER_BYTE_BUDGET
+#define RELIABILITY_LAYER_PEER_BYTE_BUDGET ( 8ull * RakNet::MAXIMUM_MESSAGE_SIZE )
+#endif
+
 /// Uncomment if you want to link in the DLMalloc library to use with RakMemoryOverride
 // #define _LINK_DL_MALLOC
 

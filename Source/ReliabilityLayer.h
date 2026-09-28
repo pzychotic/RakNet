@@ -38,6 +38,7 @@
 #define INCLUDE_TIMESTAMP_WITH_DATAGRAMS 0
 #endif
 
+#include <atomic>
 #include <deque>
 #include <queue>
 #include <vector>
@@ -96,6 +97,12 @@ public:
         }
     }
 
+    /// Whether Preallocate will size a channel for \a count chunks.
+    static bool IsHonouredCount( SplitPacketIndexType count )
+    {
+        return count != 0 && count <= MAXIMUM_SPLIT_PACKET_COUNT;
+    }
+
     /// Reserve room for every chunk of the split message \a internalPacket belongs to.
     /// \retval false The count is 0 or above MAXIMUM_SPLIT_PACKET_COUNT, or the
     /// allocation failed. The object is left unallocated and must not be used.
@@ -104,7 +111,7 @@ public:
         RakAssert( data == NULL );
 
         const SplitPacketIndexType count = internalPacket->splitPacketCount;
-        if( count == 0 || count > MAXIMUM_SPLIT_PACKET_COUNT )
+        if( !IsHonouredCount( count ) )
         {
             return false;
         }
@@ -123,10 +130,9 @@ public:
         packetId = internalPacket->splitPacketId;
         return true;
     }
-    /// Store \a internalPacket in the slot its splitPacketIndex names.
-    /// \retval false The chunk does not belong in this channel, or its slot is already
-    /// taken. Nothing was stored, and the caller still owns the chunk.
-    bool Add( InternalPacket* internalPacket, const char* file, unsigned int line )
+    /// Whether Add would store \a internalPacket. Lets a caller refuse a chunk that does not
+    /// belong here before charging for it.
+    bool Accepts( const InternalPacket* internalPacket ) const
     {
         RakAssert( data != NULL );
         RakAssert( packetId == internalPacket->splitPacketId );
@@ -158,7 +164,14 @@ public:
         // A duplicate chunk, which is reachable from the wire as well: an UNRELIABLE split
         // message is not deduplicated by message number, so the same index can simply be
         // sent twice.
-        if( data[internalPacket->splitPacketIndex] != NULL )
+        return data[internalPacket->splitPacketIndex] == NULL;
+    }
+    /// Store \a internalPacket in the slot its splitPacketIndex names.
+    /// \retval false Accepts is false for the chunk. Nothing was stored, and the caller still
+    /// owns the chunk.
+    bool Add( InternalPacket* internalPacket, const char* file, unsigned int line )
+    {
+        if( !Accepts( internalPacket ) )
         {
             return false;
         }
@@ -241,6 +254,55 @@ struct BPSTracker
     uint64_t total1, lastSec1;
     std::deque<TimeAndValue2> dataQueue;
     void ClearExpired1( CCTimeType time );
+};
+
+class ReliabilityLayer;
+
+/// The Peer-wide byte budget over what the reliability layers of every connection hold for
+/// their Systems: RELIABILITY_LAYER_PEER_BYTE_BUDGET. See ADR-0005.
+///
+/// A layer charges it after its own per-connection budget, and before allocating. When a
+/// charge would take the total over the limit, the connection holding the most bytes is
+/// closed - which may be the one asking - until the charge fits or the asker is gone.
+///
+/// Charges, releases and the choice of connection to close all happen on the thread that
+/// runs HandleSocketReceiveFromConnectedPlayer and Update, as every other piece of layer
+/// state does. The total and the counters are atomic anyway: a layer releases its charges
+/// when it is reset, and the counters are read by GetStatistics on the application's thread.
+class ReliabilityBufferBudget
+{
+public:
+    explicit ReliabilityBufferBudget( uint64_t limit = RELIABILITY_LAYER_PEER_BYTE_BUDGET );
+
+    /// Attach \a layer, so it charges this budget and may be closed to make room in it.
+    /// RakPeer attaches every slot of remoteSystemList once, when it allocates them.
+    void Attach( ReliabilityLayer* layer );
+
+    /// Detach every layer. Call before the layers or this budget are destroyed.
+    void DetachAll( void );
+
+    /// Bytes currently held across every attached layer.
+    uint64_t GetBytesHeld( void ) const { return bytesHeld.load(); }
+
+    /// Connections closed at their own per-connection budget, over this budget's lifetime.
+    uint64_t GetConnectionBudgetCloses( void ) const { return connectionBudgetCloses.load(); }
+
+    /// Connections closed to keep the total under this budget, over its lifetime.
+    uint64_t GetPeerBudgetCloses( void ) const { return peerBudgetCloses.load(); }
+
+private:
+    friend class ReliabilityLayer;
+
+    /// Charge \a bytes for \a requester, closing the heaviest connection until they fit.
+    /// \retval false \a requester was the one closed, and nothing was charged.
+    bool Reserve( ReliabilityLayer* requester, uint64_t bytes );
+    void Release( uint64_t bytes );
+
+    const uint64_t limit;
+    std::atomic<uint64_t> bytesHeld;
+    std::atomic<uint64_t> connectionBudgetCloses;
+    std::atomic<uint64_t> peerBudgetCloses;
+    std::vector<ReliabilityLayer*> layers;
 };
 
 /// Datagram reliable, ordered, unordered and sequenced sends.  Flow control.  Message splitting, reassembly, and coalescence.
@@ -340,7 +402,57 @@ public:
         return timeLastDatagramArrived;
     }
 
+    /// Whether the far side is a Half-open System, one that has not finished the connection
+    /// handshake. A Half-open System may send only its connection request, which is one
+    /// unsplit RELIABLE message, so while this is set every split chunk and every ordered or
+    /// sequenced message is dropped before reassembly or ordering could hold it (ADR-0005,
+    /// point 6). Anything else is passed up for RakPeer to judge. RakPeer sets this before
+    /// every datagram it hands over.
+    void SetHalfOpen( bool isHalfOpen ) { halfOpen = isHalfOpen; }
+
+    /// The per-connection byte budget. Defaults to RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET,
+    /// which RakPeer never changes; this exists so the budget can be exercised without
+    /// buffering tens of megabytes. Not reset by Reset.
+    void SetConnectionByteBudget( uint64_t bytes ) { connectionByteBudget = bytes; }
+
+    /// Bytes this layer holds against its budgets. See
+    /// RakNetStatistics::bytesHeldForReassemblyAndOrdering.
+    uint64_t GetBytesHeld( void ) const { return heldBytes; }
+
+    /// True once after a byte budget closed this connection, false otherwise. The layer has
+    /// already freed what it held and drops everything the System sends from here on; the
+    /// caller reports the close and tells the System. See ADR-0005.
+    bool TakeClosedOverBudget( void );
+
 private:
+    friend class ReliabilityBufferBudget;
+
+    /// Charge \a bytes against both byte budgets before holding something that size.
+    /// \retval false Not charged; the caller must free what it was about to hold. Either the
+    /// data was dropped as unreliable, or this connection was closed and has already freed
+    /// everything else it held - check closedOverBudget before touching any held state.
+    bool ChargeHeldBytes( uint64_t bytes, PacketReliability reliability );
+    void ReleaseHeldBytes( uint64_t bytes );
+
+    /// Close this connection at a byte budget: free every split channel, ordering heap and
+    /// undelivered Message, and drop what the System sends from now on.
+    void CloseOverBudget( bool atPeerBudget );
+
+    /// Free every split packet channel and ordering heap entry, releasing their charges.
+    void FreeHeldReceiveBuffers( void );
+
+    /// What holding \a internalPacket costs against the budgets: its record and its data.
+    static uint64_t HeldPacketCost( const InternalPacket* internalPacket );
+
+    /// What holding \a internalPacket in an ordering heap costs.
+    static uint64_t OrderingHeapEntryCost( const InternalPacket* internalPacket );
+
+    /// What a split packet channel costs before any chunk lands in it.
+    static uint64_t EmptySplitPacketChannelCost( SplitPacketIndexType splitPacketCount );
+
+    /// What \a splitPacketChannel costs with the chunks it holds.
+    static uint64_t SplitPacketChannelCost( SplitPacketChannel* splitPacketChannel );
+
     /// Send the contents of a bitstream to the socket
     /// \param[in] s The socket used for sending data
     /// \param[in] systemAddress The address and port to send to
@@ -650,6 +762,15 @@ private:
 
     BPSTracker bpsMetrics[RNS_PER_SECOND_METRICS_COUNT];
     CCTimeType lastBpsClear;
+
+    // Byte budgets, ADR-0005. connectionByteBudget and peerBudget are configuration and
+    // survive Reset; the rest is per connection.
+    uint64_t connectionByteBudget;
+    ReliabilityBufferBudget* peerBudget;
+    uint64_t heldBytes;
+    bool halfOpen;
+    bool closedOverBudget;
+    bool closedOverBudgetUnreported;
 
 #if LIBCAT_SECURITY == 1
 public:

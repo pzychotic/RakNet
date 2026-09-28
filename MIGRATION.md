@@ -8,9 +8,10 @@ This document is written for someone who has a working 4.081 integration and wan
 it onto this fork. It is not a changelog. Each entry says what the API was, what it is now,
 and what to do about it.
 
-Two hardening limits sit outside that count. They break no API and stop no build, but they
+Hardening limits sit outside that count. They break no API and stop no build, but they
 reject inputs stock accepted, so they have a section of their own at the end:
-[Limits that stock did not have](#limits-that-stock-did-not-have).
+[Limits that stock did not have](#limits-that-stock-did-not-have). One of them adds fields
+to `RakNetStatistics`, which changes that struct's layout.
 
 Some plugins no longer act on a remote System's word alone. They break no build either, but
 an integration that relied on them can stop working at runtime, so they are listed in
@@ -429,6 +430,54 @@ practice: a real sender's chunk count is bounded by its own message size and MTU
 application does move messages above 33.8 MiB, it has to chunk them itself — which it was
 already doing implicitly, and now finds out synchronously instead of by having the far end
 drop every piece.
+
+### What a System can make a Peer hold while Messages are incomplete
+
+Stock held, for as long as a connection lived, whatever a System sent that could not yet be
+delivered: chunks of split messages still being reassembled, and ordered or sequenced
+messages waiting behind a missing one. Nothing bounded either. One System could open split
+messages under every one of the 65,536 split-packet ids, or send ordered messages past a gap
+it never filled, until the Peer ran out of memory. A System still in the middle of the
+connection handshake could do the same.
+
+Now:
+
+- **A System that has not finished the handshake may send only its connection request.**
+  Split chunks and ordered or sequenced messages from it are dropped before they are held.
+  Stock's own connection request is one unsplit reliable message, so a stock 4.081 peer
+  connects as before.
+- **Each connection may make the Peer hold at most `RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET`
+  bytes**, twice `MAXIMUM_MESSAGE_SIZE` by default: enough to reassemble one largest message
+  with room beside it. Past it, unreliable data is dropped and counted, and the connection
+  stays open. Reliable or ordered data closes the connection instead, since it was already
+  acknowledged and dropping it would lose it silently.
+- **All connections together may make the Peer hold at most
+  `RELIABILITY_LAYER_PEER_BYTE_BUDGET` bytes**, eight times `MAXIMUM_MESSAGE_SIZE` by default.
+  Past it, the connection holding the most is closed.
+
+A connection closed at a budget is reported to your application as `ID_CONNECTION_LOST`,
+exactly as a timed-out one is, and plugins see `LCR_CONNECTION_LOST`. The far end is sent
+`ID_DISCONNECTION_NOTIFICATION`. No new message id or reason was added.
+
+Both budgets are `#ifndef` macros in `Source/RakNetDefines.h`; override them in
+`RakNetDefinesOverrides.h` like any other. Lower them for many connections on constrained
+hardware. Raise them if your application exchanges several near-maximum messages at once over
+one connection, or across many.
+
+**`RakNetStatistics` has four new fields**, appended after `packetlossTotal`, which changes the
+struct's size and layout. Code that copies it field by field or reads it by name is
+unaffected. Rebuild anything that shares the struct across a binary boundary.
+
+| Field | Meaning |
+|---|---|
+| `bytesHeldForReassemblyAndOrdering` | What this connection holds against its budget now |
+| `messagesDroppedOverConnectionBudget` | Unreliable data dropped at this connection's budget |
+| `connectionsClosedOverConnectionBudget` | Connections closed at their own budget, over the Peer's lifetime |
+| `connectionsClosedOverPeerBudget` | Connections closed at the Peer-wide budget, over the Peer's lifetime |
+
+The last two are Peer-wide totals, the same in every connection's statistics, since a closed
+connection has no statistics left to read. If a legitimate System trips a budget, these say
+which one.
 
 ## Plugins that act only on Solicited or Designated messages
 

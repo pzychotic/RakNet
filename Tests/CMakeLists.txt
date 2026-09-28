@@ -73,6 +73,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerConnectDisconnectWithCancelPendingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PingTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakThreadTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayerByteBudgetTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliableOrderedConvertedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2EntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2ForwardingFlowTest.cpp
@@ -110,6 +111,8 @@ set( RAKNET_TEST_SUPPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerScope.h
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerScope.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakNetStringMakers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RawSystem.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayerHarness.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakTimer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakTimer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorScope.h

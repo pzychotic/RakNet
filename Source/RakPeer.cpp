@@ -441,6 +441,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 #ifdef _DEBUG
             remoteSystemList[i].reliabilityLayer.ApplyNetworkSimulator( _packetloss, _minExtraPing, _extraPingVariance );
 #endif
+            reliabilityBufferBudget.Attach( &remoteSystemList[i].reliabilityLayer );
 
             // All entries in activeSystemList have valid pointers all the time.
             activeSystemList[i] = &remoteSystemList[i];
@@ -881,6 +882,9 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
     ClearRequestedConnectionList();
 
+
+    // Every layer was reset above, so none holds anything against the budget any more.
+    reliabilityBufferBudget.DetachAll();
 
     // Clear out the reliability layer list in case we want to reallocate it in a successive call to Init.
     RemoteSystemStruct* temp = remoteSystemList;
@@ -4927,6 +4931,7 @@ void ProcessNetworkPacket( SystemAddress systemAddress, const char* data, const 
         // HandleSocketReceiveFromConnectedPlayer is only safe to be called from the same thread as Update, which is this thread
         if( isOfflineMessage == false )
         {
+            remoteSystem->reliabilityLayer.SetHalfOpen( remoteSystem->connectMode == RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER );
             remoteSystem->reliabilityLayer.HandleSocketReceiveFromConnectedPlayer(
                 data, length, systemAddress, rakPeer->pluginListNTS, remoteSystem->MTUSize,
                 rakNetSocket, &rnr, timeRead, updateBitStream );
@@ -5264,6 +5269,36 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
         }
 
         remoteSystem->reliabilityLayer.Update( remoteSystem->rakNetSocket, systemAddress, remoteSystem->MTUSize, timeNS, maxOutgoingBPS, pluginListNTS, &rnr, updateBitStream ); // systemAddress only used for the internet simulator test
+
+        // A byte budget closed this connection (ADR-0005): the layer has freed what it held
+        // and drops whatever else arrives. Reported locally the way a dead connection is, and
+        // the System is told, so a conforming one that merely hit a small budget does not
+        // wait out its timeout. Silently from here on, since the report has been made. A
+        // connection already closing on the application's request needs nothing more.
+        if( remoteSystem->reliabilityLayer.TakeClosedOverBudget() &&
+            ( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED ||
+              remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION ||
+              remoteSystem->connectMode == RemoteSystemStruct::HANDLING_CONNECTION_REQUEST ||
+              remoteSystem->connectMode == RemoteSystemStruct::UNVERIFIED_SENDER ) )
+        {
+            if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED || remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
+            {
+                packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
+                if( packet != 0 )
+                {
+                    packet->data[0] = remoteSystem->connectMode == RemoteSystemStruct::CONNECTED ? ID_CONNECTION_LOST : ID_CONNECTION_ATTEMPT_FAILED;
+                    packet->guid = remoteSystem->guid;
+                    packet->systemAddress = systemAddress;
+                    packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
+                    packet->guid.systemIndex = packet->systemAddress.systemIndex;
+
+                    AddPacketToProducer( packet );
+                }
+            }
+
+            NotifyAndFlagForShutdown( systemAddress, true, 0, LOW_PRIORITY );
+            remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
+        }
 
         // Check for failure conditions
         if( remoteSystem->reliabilityLayer.IsDeadConnection() ||

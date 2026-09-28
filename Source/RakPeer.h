@@ -769,6 +769,9 @@ protected:
     /// Another benefit is that is lets us add and remove active players simply by setting systemAddress
     /// and moving elements in the list by copying pointers variables without affecting running threads, even if they are in the reliability layer
     RemoteSystemStruct* remoteSystemList;
+    /// The Peer-wide byte budget over what every slot's reliability layer holds for its
+    /// System. Each slot of remoteSystemList is attached to it for as long as the list exists.
+    ReliabilityBufferBudget reliabilityBufferBudget;
     /// activeSystemList holds a list of pointers and is preallocated to be the same size as remoteSystemList. It is updated only by the network thread, but read by both threads
     /// When the isActive member of RemoteSystemStruct is set to true or false, that system is added to this list of pointers
     /// Threadsafe because RemoteSystemStruct is preallocated, and the list is only added to, not removed from

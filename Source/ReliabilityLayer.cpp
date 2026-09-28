@@ -261,6 +261,10 @@ ReliabilityLayer::ReliabilityLayer()
     }
 #endif
 
+    connectionByteBudget = RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET;
+    peerBudget = nullptr;
+    heldBytes = 0;
+
     InitializeVariables();
     datagramHistoryMessagePool.SetPageSize( sizeof( MessageNumberNode ) * 128 );
     internalPacketPool.SetPageSize( sizeof( InternalPacket ) * INTERNAL_PACKET_PAGE_SIZE );
@@ -351,6 +355,14 @@ void ReliabilityLayer::InitializeVariables( void )
 
     nextAllowedThroughputSample = 0;
     deadConnection = cheater = false;
+
+    // Every charge was released when FreeMemory freed what it paid for. Not zeroed here, so
+    // a leak in that accounting shows up as a budget that never drains rather than being
+    // quietly written off.
+    RakAssert( heldBytes == 0 );
+    halfOpen = false;
+    closedOverBudget = false;
+    closedOverBudgetUnreported = false;
     timeOfLastContinualSend = 0;
 
     timeLastDatagramArrived = RakNet::GetTimeMS();
@@ -400,11 +412,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
 {
     ClearPacketsAndDatagrams();
 
-    for( unsigned i = 0; i < splitPacketChannelList.Size(); i++ )
-    {
-        FreeSplitPacketChannel( splitPacketChannelList[i] );
-    }
-    splitPacketChannelList.Clear( false, _FILE_AND_LINE_ );
+    FreeHeldReceiveBuffers();
 
     for( InternalPacket* pPacket : outputQueue )
     {
@@ -412,17 +420,6 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
         ReleaseToInternalPacketPool( pPacket );
     }
     outputQueue.clear();
-
-    for( unsigned i = 0; i < NUMBER_OF_ORDERED_STREAMS; i++ )
-    {
-        while( !orderingHeaps[i].empty() )
-        {
-            InternalPacket* pPacket = orderingHeaps[i].top().pPacket;
-            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
-            ReleaseToInternalPacketPool( pPacket );
-            orderingHeaps[i].pop();
-        }
-    }
 
     memset( resendBuffer, 0, sizeof( resendBuffer ) );
     statistics.messagesInResendBuffer = 0;
@@ -533,7 +530,14 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         return true;
     }
 
-    timeLastDatagramArrived = RakNet::GetTimeMS();
+    // Not after a close at a byte budget. The connection then lives only until the System
+    // acknowledges its disconnection notification, or until AckTimeout gives up on it - and
+    // a System that kept sending without acknowledging would otherwise keep that timeout
+    // from ever arriving, and hold its connection slot forever.
+    if( !closedOverBudget )
+    {
+        timeLastDatagramArrived = RakNet::GetTimeMS();
+    }
 
 #if LIBCAT_SECURITY == 1
     if( useSecurity )
@@ -921,6 +925,33 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                 //if( hasReceivedPacketQueue.AllocationSize() > (unsigned int)DEFAULT_HAS_RECEIVED_PACKET_QUEUE_SIZE && hasReceivedPacketQueue.AllocationSize() > hasReceivedPacketQueue.Size() * 3 )
                 //    hasReceivedPacketQueue.Compress( _FILE_AND_LINE_ );
 
+                // A connection closed at a byte budget has freed what it held and is waiting
+                // for its disconnection notification to be acknowledged. Holding anything new
+                // for it would let the System refill the budget that closed it.
+                //
+                // A Half-open System may send only its connection request: one unsplit RELIABLE
+                // message. A split chunk or an ordered or sequenced message cannot be that, so
+                // it is dropped here, before reassembly or an ordering heap could hold it
+                // (ADR-0005, point 6). An unsplit message of any other kind is passed up, where
+                // RakPeer closes the connection and bans the address for sending nonsense;
+                // dropping it here would lose that.
+                //
+                // Both sit below the reliable-message bookkeeping above, so a dropped message
+                // still counts as received and is not reopened as a hole.
+                if( closedOverBudget ||
+                    ( halfOpen &&
+                      ( internalPacket->splitPacketCount > 0 ||
+                        internalPacket->reliability == RELIABLE_SEQUENCED ||
+                        internalPacket->reliability == UNRELIABLE_SEQUENCED ||
+                        internalPacket->reliability == RELIABLE_ORDERED ) ) )
+                {
+                    bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+
+                    FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+                    ReleaseToInternalPacketPool( internalPacket );
+                    goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
+                }
+
                 // Is this a split packet? If so then reassemble
                 if( internalPacket->splitPacketCount > 0 )
                 {
@@ -1095,6 +1126,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                             {
                                 internalPacket = orderingHeaps[internalPacket->orderingChannel].top().pPacket;
                                 orderingHeaps[internalPacket->orderingChannel].pop();
+                                ReleaseHeldBytes( OrderingHeapEntryCost( internalPacket ) );
 
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
                                 BitStream bitStream2( internalPacket->data, BITS_TO_BYTES( internalPacket->dataBitLength ), false );
@@ -1163,6 +1195,15 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                             weight += internalPacket->sequencingIndex;
                         else
                             weight += ( 1048576 - 1 );
+
+                        // Nothing else bounds this heap: any index ahead of the read index is
+                        // buffered, and a hole the System never fills keeps it all here.
+                        if( ChargeHeldBytes( OrderingHeapEntryCost( internalPacket ), internalPacket->reliability ) == false )
+                        {
+                            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+                            ReleaseToInternalPacketPool( internalPacket );
+                            goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
+                        }
                         orderingHeaps[internalPacket->orderingChannel].emplace( WeightedPacket{ weight, internalPacket } );
 
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
@@ -2597,10 +2638,31 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
 {
     bool objectExists;
     unsigned index;
+    const uint64_t chunkCost = HeldPacketCost( internalPacket );
     // Find in splitPacketChannelList if a SplitPacketChannel with this splitPacketId was already allocated. If not, allocate and insert the channel into the list.
     index = splitPacketChannelList.GetIndexFromKey( internalPacket->splitPacketId, &objectExists );
     if( objectExists == false )
     {
+        // Refused before it is charged, so a count this Peer will not honour costs nothing
+        // and cannot be what pushes a connection over its budget.
+        if( !SortedSplittedPackets::IsHonouredCount( internalPacket->splitPacketCount ) )
+        {
+            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( internalPacket );
+            return false;
+        }
+
+        // The pointer array is charged along with the first chunk. That charge is what
+        // bounds the number of live channels: 65,536 splitPacketIds are available, but each
+        // one opened costs its array against the connection's budget.
+        const uint64_t newChannelCost = EmptySplitPacketChannelCost( internalPacket->splitPacketCount ) + chunkCost;
+        if( ChargeHeldBytes( newChannelCost, internalPacket->reliability ) == false )
+        {
+            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( internalPacket );
+            return false;
+        }
+
         SplitPacketChannel* newChannel = RakNet::OP_NEW<SplitPacketChannel>( __FILE__, __LINE__ );
         newChannel->lastUpdateTime = time;
         newChannel->firstPacket = 0;
@@ -2612,23 +2674,61 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         // unwind than one that did.
         if( newChannel->splitPacketList.Preallocate( internalPacket, __FILE__, __LINE__ ) == false )
         {
-            // Out of memory, or a count this Peer will not honour. Drop the chunk and the
+            // The allocation failed; the count was checked above. Drop the chunk and the
             // channel with it rather than the process - ADR-0004.
             RakNet::OP_DELETE( newChannel, __FILE__, __LINE__ );
+            ReleaseHeldBytes( newChannelCost );
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseToInternalPacketPool( internalPacket );
             return false;
         }
 
         index = splitPacketChannelList.Insert( internalPacket->splitPacketId, newChannel, true, __FILE__, __LINE__ );
-    }
 
-    // Insert the packet into the SplitPacketChannel
-    if( !splitPacketChannelList[index]->splitPacketList.Add( internalPacket, __FILE__, __LINE__ ) )
+        // CreateInternalPacketFromBitStream checked splitPacketIndex < splitPacketCount, and
+        // the channel was just sized from this chunk's own count, so this does not fail
+        // today. If it ever does, the empty channel goes with the chunk.
+        if( !splitPacketChannelList[index]->splitPacketList.Add( internalPacket, __FILE__, __LINE__ ) )
+        {
+            FreeSplitPacketChannel( splitPacketChannelList[index] );
+            splitPacketChannelList.RemoveAtIndex( index );
+            ReleaseHeldBytes( chunkCost );
+            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( internalPacket );
+            return false;
+        }
+    }
+    else
     {
-        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-        ReleaseToInternalPacketPool( internalPacket );
-        return false;
+        // Refused before it is charged, as above: a duplicate or disagreeing chunk would be
+        // dropped anyway, and must not be what closes the connection.
+        if( !splitPacketChannelList[index]->splitPacketList.Accepts( internalPacket ) )
+        {
+            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( internalPacket );
+            return false;
+        }
+
+        if( ChargeHeldBytes( chunkCost, internalPacket->reliability ) == false )
+        {
+            // The Message this chunk belongs to can no longer complete, so its channel is
+            // freed now rather than left for the stall reaper - the refusal returns what the
+            // Message held, not just what this chunk would have. A close has freed every
+            // channel already.
+            if( !closedOverBudget )
+            {
+                FreeSplitPacketChannel( splitPacketChannelList[index] );
+                splitPacketChannelList.RemoveAtIndex( index );
+            }
+            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( internalPacket );
+            return false;
+        }
+
+        // Accepts said yes above, and nothing between there and here touches the channel.
+        const bool added = splitPacketChannelList[index]->splitPacketList.Add( internalPacket, __FILE__, __LINE__ );
+        RakAssert( added );
+        (void)added;
     }
     splitPacketChannelList[index]->lastUpdateTime = time;
 
@@ -2672,6 +2772,8 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::FreeSplitPacketChannel( SplitPacketChannel* splitPacketChannel )
 {
+    ReleaseHeldBytes( SplitPacketChannelCost( splitPacketChannel ) );
+
     for( unsigned int j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
     {
         InternalPacket* pPacket = splitPacketChannel->splitPacketList.Get( j );
@@ -2727,6 +2829,211 @@ void ReliabilityLayer::FreeStalledSplitPacketChannels( CCTimeType time )
 }
 
 //-------------------------------------------------------------------------------------------------------
+// Byte budgets - ADR-0005
+//-------------------------------------------------------------------------------------------------------
+uint64_t ReliabilityLayer::HeldPacketCost( const InternalPacket* internalPacket )
+{
+    // The record as well as the data. Charging the data alone would let a System holding
+    // one-byte chunks keep around a hundred times what the budget says.
+    return sizeof( InternalPacket ) + BITS_TO_BYTES( internalPacket->dataBitLength );
+}
+
+uint64_t ReliabilityLayer::OrderingHeapEntryCost( const InternalPacket* internalPacket )
+{
+    return HeldPacketCost( internalPacket ) + sizeof( WeightedPacket );
+}
+
+uint64_t ReliabilityLayer::EmptySplitPacketChannelCost( SplitPacketIndexType splitPacketCount )
+{
+    return sizeof( SplitPacketChannel ) + sizeof( InternalPacket* ) * (uint64_t)splitPacketCount;
+}
+
+uint64_t ReliabilityLayer::SplitPacketChannelCost( SplitPacketChannel* splitPacketChannel )
+{
+    uint64_t cost = EmptySplitPacketChannelCost( splitPacketChannel->splitPacketList.AllocSize() );
+    for( unsigned int j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
+    {
+        const InternalPacket* chunk = splitPacketChannel->splitPacketList.Get( j );
+        if( chunk != nullptr )
+        {
+            cost += HeldPacketCost( chunk );
+        }
+    }
+    return cost;
+}
+
+bool ReliabilityLayer::ChargeHeldBytes( uint64_t bytes, PacketReliability reliability )
+{
+    if( heldBytes + bytes > connectionByteBudget )
+    {
+        // The same test the receive path uses for "reliable": these three carry a message
+        // number, were deduplicated by it, and the sender will not send them again.
+        // RELIABLE_SEQUENCED is among them - it is sequenced, but dropping the newest one
+        // after acknowledging it loses it for good, which is the guarantee a reliable
+        // sequenced send makes.
+        const bool isReliable = reliability == RELIABLE || reliability == RELIABLE_SEQUENCED || reliability == RELIABLE_ORDERED;
+        if( !isReliable )
+        {
+            // Printed for the first drop only: this is reachable once per datagram, and a
+            // System sitting at the budget should not also be able to flood the console.
+            if( statistics.messagesDroppedOverConnectionBudget == 0 )
+            {
+                RAKNET_DEBUG_PRINTF( "ReliabilityLayer: dropping unreliable data that would take a connection over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::messagesDroppedOverConnectionBudget.\n", heldBytes );
+            }
+            ++statistics.messagesDroppedOverConnectionBudget;
+            return false;
+        }
+
+        RAKNET_DEBUG_PRINTF( "ReliabilityLayer: closing a connection whose reliable data would take it over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::connectionsClosedOverConnectionBudget.\n", heldBytes );
+        CloseOverBudget( false );
+        return false;
+    }
+
+    if( peerBudget != nullptr && peerBudget->Reserve( this, bytes ) == false )
+    {
+        return false;
+    }
+
+    heldBytes += bytes;
+    return true;
+}
+
+void ReliabilityLayer::ReleaseHeldBytes( uint64_t bytes )
+{
+    RakAssert( bytes <= heldBytes );
+    heldBytes -= bytes;
+    if( peerBudget != nullptr )
+    {
+        peerBudget->Release( bytes );
+    }
+}
+
+void ReliabilityLayer::FreeHeldReceiveBuffers( void )
+{
+    for( unsigned i = 0; i < splitPacketChannelList.Size(); i++ )
+    {
+        FreeSplitPacketChannel( splitPacketChannelList[i] );
+    }
+    splitPacketChannelList.Clear( false, _FILE_AND_LINE_ );
+
+    for( unsigned i = 0; i < NUMBER_OF_ORDERED_STREAMS; i++ )
+    {
+        while( !orderingHeaps[i].empty() )
+        {
+            InternalPacket* pPacket = orderingHeaps[i].top().pPacket;
+            orderingHeaps[i].pop();
+            ReleaseHeldBytes( OrderingHeapEntryCost( pPacket ) );
+            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
+            ReleaseToInternalPacketPool( pPacket );
+        }
+    }
+
+    RakAssert( heldBytes == 0 );
+}
+
+void ReliabilityLayer::CloseOverBudget( bool atPeerBudget )
+{
+    if( closedOverBudget )
+    {
+        return;
+    }
+    closedOverBudget = true;
+    closedOverBudgetUnreported = true;
+
+    if( peerBudget != nullptr )
+    {
+        if( atPeerBudget )
+            ++peerBudget->peerBudgetCloses;
+        else
+            ++peerBudget->connectionBudgetCloses;
+    }
+
+    FreeHeldReceiveBuffers();
+
+    // Messages already reassembled and waiting for Receive go too. RakPeer reports the
+    // connection lost before it next drains this queue, and a Message delivered after that
+    // report would arrive from a System the application has been told is gone.
+    for( InternalPacket* pPacket : outputQueue )
+    {
+        FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
+        ReleaseToInternalPacketPool( pPacket );
+    }
+    outputQueue.clear();
+}
+
+bool ReliabilityLayer::TakeClosedOverBudget( void )
+{
+    const bool unreported = closedOverBudgetUnreported;
+    closedOverBudgetUnreported = false;
+    return unreported;
+}
+
+ReliabilityBufferBudget::ReliabilityBufferBudget( uint64_t _limit )
+: limit( _limit )
+, bytesHeld( 0 )
+, connectionBudgetCloses( 0 )
+, peerBudgetCloses( 0 )
+{
+}
+
+void ReliabilityBufferBudget::Attach( ReliabilityLayer* layer )
+{
+    RakAssert( layer->peerBudget == nullptr );
+    RakAssert( layer->heldBytes == 0 );
+    layer->peerBudget = this;
+    layers.push_back( layer );
+}
+
+void ReliabilityBufferBudget::DetachAll( void )
+{
+    for( ReliabilityLayer* layer : layers )
+    {
+        // A layer still holding bytes would release them to a budget that has forgotten it.
+        RakAssert( layer->heldBytes == 0 );
+        layer->peerBudget = nullptr;
+    }
+    layers.clear();
+}
+
+bool ReliabilityBufferBudget::Reserve( ReliabilityLayer* requester, uint64_t bytes )
+{
+    while( bytesHeld.load() + bytes > limit )
+    {
+        RAKNET_DEBUG_PRINTF( "ReliabilityLayer: closing the connection holding the most bytes to stay under RELIABILITY_LAYER_PEER_BYTE_BUDGET. See RakNetStatistics::connectionsClosedOverPeerBudget.\n" );
+
+        // The requester is weighed with what it is asking for, so a System cannot dodge
+        // being the heaviest by asking for all of it at once. Every other layer holds more
+        // than zero if chosen, since the requester weighs at least one byte - so each pass
+        // either frees something or closes the requester, and the loop ends.
+        ReliabilityLayer* heaviest = requester;
+        uint64_t heaviestBytes = requester->heldBytes + bytes;
+        for( ReliabilityLayer* layer : layers )
+        {
+            if( layer != requester && layer->heldBytes > heaviestBytes )
+            {
+                heaviest = layer;
+                heaviestBytes = layer->heldBytes;
+            }
+        }
+
+        heaviest->CloseOverBudget( true );
+        if( heaviest == requester )
+        {
+            return false;
+        }
+    }
+
+    bytesHeld += bytes;
+    return true;
+}
+
+void ReliabilityBufferBudget::Release( uint64_t bytes )
+{
+    RakAssert( bytes <= bytesHeld.load() );
+    bytesHeld -= bytes;
+}
+
+//-------------------------------------------------------------------------------------------------------
 // Take all split chunks with the specified splitPacketId and try to
 //reconstruct a packet.  If we can, allocate and return it.  Otherwise return 0
 // Optimized version
@@ -2736,6 +3043,10 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
     unsigned int j;
     InternalPacket *internalPacket, *splitPacket;
     // int splitPacketPartLength;
+
+    // Released up front: the channel is freed below whatever happens. The reassembled copy is
+    // not charged here - it is the caller's, and is charged if it goes into an ordering heap.
+    ReleaseHeldBytes( SplitPacketChannelCost( splitPacketChannel ) );
 
     // Reconstruct
     internalPacket = CreateInternalPacketCopy( splitPacketChannel->splitPacketList.Get( 0 ), 0, 0, time );
@@ -2872,6 +3183,13 @@ RakNetStatistics* ReliabilityLayer::GetStatistics( RakNetStatistics* rns )
     {
         statistics.valueOverLastSecond[i] = bpsMetrics[i].GetBPS1Threadsafe( time );
         statistics.runningTotal[i] = bpsMetrics[i].GetTotal1();
+    }
+
+    statistics.bytesHeldForReassemblyAndOrdering = heldBytes;
+    if( peerBudget != nullptr )
+    {
+        statistics.connectionsClosedOverConnectionBudget = peerBudget->GetConnectionBudgetCloses();
+        statistics.connectionsClosedOverPeerBudget = peerBudget->GetPeerBudgetCloses();
     }
 
     memcpy( rns, &statistics, sizeof( statistics ) );
