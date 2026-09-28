@@ -26,8 +26,10 @@
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
 
+#include <atomic>
 #include <deque>
 #include <mutex>
+#include <unordered_set>
 #include <vector>
 
 namespace RakNet {
@@ -258,6 +260,12 @@ public:
     /// User-thread functions, such as RPC calls and the plugin function PluginInterface::Update occur here.
     /// \return 0 if no packets are waiting to be handled, otherwise a pointer to a packet.
     /// \note COMMON MISTAKE: Be sure to call this in a loop, once per game tick, until it returns 0. If you only process one packet per game tick they will buffer up.
+    /// \note Draining is the application's job. Messages from connected Systems wait here
+    /// with no limit: they were acknowledged when they arrived, so RakNet cannot drop them
+    /// without breaking delivery, and an application that stops calling Receive grows this
+    /// queue for as long as its Systems keep sending. Only Packets from unconnected Systems
+    /// are capped, at MAX_PENDING_OFFLINE_MESSAGES (RakNetDefines.h); past it they are
+    /// dropped and counted by GetOfflineMessagesDroppedAtCap(). See ADR-0005, point 7.
     /// \sa RakNetTypes.h contains struct Packet.
     Packet* Receive( void );
 
@@ -612,6 +620,14 @@ public:
     /// \Returns how many messages are waiting when you call Receive()
     virtual unsigned int GetReceiveBufferSize( void );
 
+    /// \Returns how many received datagrams this Peer has dropped because
+    /// MAX_BUFFERED_RECEIVED_DATAGRAMS were already waiting for the update thread.
+    virtual uint64_t GetReceivedDatagramsDroppedAtCap( void ) const;
+
+    /// \Returns how many datagrams from unconnected Systems this Peer has dropped because
+    /// MAX_PENDING_OFFLINE_MESSAGES of their Packets were already waiting for Receive().
+    virtual uint64_t GetOfflineMessagesDroppedAtCap( void ) const;
+
     // --------------------------------------------------------------------------------------------EVERYTHING AFTER THIS COMMENT IS FOR INTERNAL USE ONLY--------------------------------------------------------------------------------------------
 
 
@@ -876,11 +892,15 @@ protected:
     std::mutex bufferedPacketsFreePoolMutex;
     std::deque<RNS2RecvStruct*> bufferedPacketsQueue;
     std::mutex bufferedPacketsQueueMutex;
+    /// Datagrams dropped because bufferedPacketsQueue held MAX_BUFFERED_RECEIVED_DATAGRAMS.
+    std::atomic<uint64_t> receivedDatagramsDroppedAtCap;
 
     virtual void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line );
     virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line );
     void SetupBufferedPackets( void );
-    void PushBufferedPacket( RNS2RecvStruct* p );
+    /// Queues \a p for the update thread. False, with \a p untouched, if the queue is at
+    /// MAX_BUFFERED_RECEIVED_DATAGRAMS; the caller gives it back to the pool.
+    bool PushBufferedPacket( RNS2RecvStruct* p );
     RNS2RecvStruct* PopBufferedPacket( void );
 
     struct SocketQueryOutput
@@ -960,6 +980,17 @@ protected:
 
     std::mutex packetReturnMutex;
     std::deque<Packet*> packetReturnQueue;
+    /// The Packets in packetReturnQueue that came from unconnected Systems, capped at
+    /// MAX_PENDING_OFFLINE_MESSAGES. Guarded by packetReturnMutex. By pointer, since a
+    /// connected System can send a Message with any of the same ids.
+    std::unordered_set<Packet*> pendingOfflinePackets;
+    /// Offline datagrams dropped because pendingOfflinePackets was full.
+    std::atomic<uint64_t> offlineMessagesDroppedAtCap;
+    /// True, counting the drop, if pendingOfflinePackets is full, so the caller drops the
+    /// offline datagram before allocating a Packet for it. Only the update thread adds
+    /// offline Packets, so the answer holds until it calls AddOfflinePacketToProducer.
+    bool CountDropIfOfflineQueueFull( void );
+    void AddOfflinePacketToProducer( Packet* p );
     // Both return null after notifyOutOfMemory when an allocation fails; the caller drops
     // the message. The second takes ownership of data either way, freeing it on failure.
     Packet* AllocPacket( unsigned dataSize, const char* file, unsigned int line );

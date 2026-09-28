@@ -11,7 +11,8 @@ and what to do about it.
 Hardening limits sit outside that count. They break no API and stop no build, but they
 reject inputs stock accepted, so they have a section of their own at the end:
 [Limits that stock did not have](#limits-that-stock-did-not-have). One of them adds fields
-to `RakNetStatistics`, which changes that struct's layout.
+to `RakNetStatistics`, which changes that struct's layout, and another adds two pure virtual
+getters to `RakPeerInterface`, which only a class of your own implementing it would notice.
 
 Some plugins no longer act on a remote System's word alone. They break no build either, but
 an integration that relied on them can stop working at runtime, so they are listed in
@@ -478,6 +479,33 @@ unaffected. Rebuild anything that shares the struct across a binary boundary.
 The last two are Peer-wide totals, the same in every connection's statistics, since a closed
 connection has no statistics left to read. If a legitimate System trips a budget, these say
 which one.
+
+### What unconnected senders can make a Peer queue
+
+Stock queued, with no limit, every datagram its receive thread read until the update thread
+got to it, and every unconnected ping, pong, out-of-band message and advertisement until the
+application called `Receive`. A sender that never connected could grow either queue while the
+update thread was busy or the application was not draining.
+
+Now:
+
+- **At most `MAX_BUFFERED_RECEIVED_DATAGRAMS` datagrams (8192) wait for the update thread.**
+  Past that the newest is dropped, as a full socket buffer would drop it, and the reliability
+  layer recovers the same way.
+- **At most `MAX_PENDING_OFFLINE_MESSAGES` Packets from unconnected Systems (1024) wait for
+  `Receive`.** Past that a new unconnected ping, pong, out-of-band message or advertisement is
+  dropped whole; a dropped ping is not answered. Messages from connected Systems are neither
+  counted nor capped, since they were acknowledged on arrival: draining `Receive` every tick
+  remains your application's job, and `Receive`'s header now says so.
+
+Both are `#ifndef` macros in `Source/RakNetDefines.h`. `RakPeerInterface` gains two getters
+that count the drops over the Peer's lifetime, `GetReceivedDatagramsDroppedAtCap` and
+`GetOfflineMessagesDroppedAtCap`. They are pure virtual, so a class of your own that
+implements `RakPeerInterface` has to add them.
+
+A datagram your `SetIncomingDatagramEventHandler` callback rejects is now given back to the
+receive pool. Stock leaked it, one buffer per rejected datagram; the callback's contract
+already said the struct was valid only for the call, so nothing that honoured it changes.
 
 ## Plugins that act only on Solicited or Designated messages
 

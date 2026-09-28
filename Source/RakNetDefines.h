@@ -127,6 +127,28 @@
 #define RELIABILITY_LAYER_PEER_BYTE_BUDGET ( 8ull * RakNet::MAXIMUM_MESSAGE_SIZE )
 #endif
 
+/// The most received datagrams a Peer's receive threads may queue for its update thread.
+/// The update thread empties the queue every cycle, so it only fills while datagrams arrive
+/// faster than the update thread runs. At the cap the newest datagram is dropped, as a full
+/// socket buffer would drop it, and the reliability layer recovers the same way. Counted by
+/// RakPeerInterface::GetReceivedDatagramsDroppedAtCap. See ADR-0005, point 7.
+///
+/// Each queued datagram holds a buffer of MAXIMUM_MTU_SIZE bytes, about 12 MiB at the
+/// default; buffers go back to a pool that keeps its high-water mark until Shutdown, which
+/// this cap also bounds.
+#ifndef MAX_BUFFERED_RECEIVED_DATAGRAMS
+#define MAX_BUFFERED_RECEIVED_DATAGRAMS 8192
+#endif
+
+/// The most Packets from unconnected Systems - unconnected pings and pongs, out-of-band
+/// messages and advertisements - that may wait for Receive at once. At the cap a new offline
+/// datagram of those kinds is dropped before a Packet is allocated for it, and a ping is not
+/// answered. Counted by RakPeerInterface::GetOfflineMessagesDroppedAtCap. Messages from
+/// connected Systems are not counted and not capped. See ADR-0005, point 7.
+#ifndef MAX_PENDING_OFFLINE_MESSAGES
+#define MAX_PENDING_OFFLINE_MESSAGES 1024
+#endif
+
 /// Uncomment if you want to link in the DLMalloc library to use with RakMemoryOverride
 // #define _LINK_DL_MALLOC
 

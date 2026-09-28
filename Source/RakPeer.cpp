@@ -206,6 +206,8 @@ RakPeer::RakPeer()
     endThreads = true;
     isMainLoopThreadActive = false;
     incomingDatagramEventHandler = 0;
+    receivedDatagramsDroppedAtCap = 0;
+    offlineMessagesDroppedAtCap = 0;
 
     occasionalPing = false;
     for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
@@ -869,6 +871,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     for( Packet* pPacket : packetReturnQueue )
         DeallocatePacket( pPacket );
     packetReturnQueue.clear();
+    pendingOfflinePackets.clear();
     packetReturnMutex.unlock();
     packetAllocationPoolMutex.lock();
     packetAllocationPool.Clear( _FILE_AND_LINE_ );
@@ -1208,6 +1211,8 @@ Packet* RakPeer::Receive( void )
         {
             packet = packetReturnQueue.front();
             packetReturnQueue.pop_front();
+            if( !pendingOfflinePackets.empty() )
+                pendingOfflinePackets.erase( packet );
         }
         packetReturnMutex.unlock();
         if( packet == 0 )
@@ -2712,6 +2717,16 @@ unsigned int RakPeer::GetReceiveBufferSize( void )
     return static_cast<uint32_t>( packetReturnQueue.size() );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+uint64_t RakPeer::GetReceivedDatagramsDroppedAtCap( void ) const
+{
+    return receivedDatagramsDroppedAtCap.load();
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+uint64_t RakPeer::GetOfflineMessagesDroppedAtCap( void ) const
+{
+    return offlineMessagesDroppedAtCap.load();
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread ) const
 {
     unsigned i;
@@ -3616,10 +3631,20 @@ void RakPeer::SetupBufferedPackets( void )
 {
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::PushBufferedPacket( RNS2RecvStruct* p )
+bool RakPeer::PushBufferedPacket( RNS2RecvStruct* p )
 {
     std::lock_guard<std::mutex> guard( bufferedPacketsQueueMutex );
+    if( bufferedPacketsQueue.size() >= MAX_BUFFERED_RECEIVED_DATAGRAMS )
+    {
+        // Once per Peer: a flood would otherwise flood the console too.
+        if( receivedDatagramsDroppedAtCap.fetch_add( 1 ) == 0 )
+        {
+            RAKNET_DEBUG_PRINTF( "RakPeer: dropping received datagrams, %d already wait for the update thread (MAX_BUFFERED_RECEIVED_DATAGRAMS). See GetReceivedDatagramsDroppedAtCap.\n", (int)MAX_BUFFERED_RECEIVED_DATAGRAMS );
+        }
+        return false;
+    }
     bufferedPacketsQueue.push_back( p );
+    return true;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RNS2RecvStruct* RakPeer::PopBufferedPacket( void )
@@ -3970,6 +3995,29 @@ inline void RakPeer::AddPacketToProducer( Packet* p )
     packetReturnQueue.push_back( p );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::CountDropIfOfflineQueueFull( void )
+{
+    {
+        std::lock_guard<std::mutex> guard( packetReturnMutex );
+        if( pendingOfflinePackets.size() < MAX_PENDING_OFFLINE_MESSAGES )
+            return false;
+    }
+
+    // Once per Peer: a flood would otherwise flood the console too.
+    if( offlineMessagesDroppedAtCap.fetch_add( 1 ) == 0 )
+    {
+        RAKNET_DEBUG_PRINTF( "RakPeer: dropping offline datagrams, %d of their Packets already wait for Receive (MAX_PENDING_OFFLINE_MESSAGES). See GetOfflineMessagesDroppedAtCap.\n", (int)MAX_PENDING_OFFLINE_MESSAGES );
+    }
+    return true;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::AddOfflinePacketToProducer( Packet* p )
+{
+    std::lock_guard<std::mutex> guard( packetReturnMutex );
+    pendingOfflinePackets.insert( p );
+    packetReturnQueue.push_back( p );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 uint64_t RakPeerInterface::Get64BitUniqueRandomNumber( void )
 {
     uint64_t g = 0;
@@ -4102,6 +4150,10 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             if( (unsigned char)( data )[0] == ID_UNCONNECTED_PING ||
                 rakPeer->AllowIncomingConnections() ) // Open connections with players
             {
+                // Dropped whole, pong and all, as a full socket buffer would drop it.
+                if( rakPeer->CountDropIfOfflineQueueFull() )
+                    return true;
+
                 BitStream inBitStream( (unsigned char*)data, length, false );
                 inBitStream.IgnoreBits( 8 );
                 RakNet::Time sendPingTime;
@@ -4140,12 +4192,15 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                 packet->guid = remoteGuid;
                 packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetIndexFromSystemAddress( systemAddress, true );
                 packet->guid.systemIndex = packet->systemAddress.systemIndex;
-                rakPeer->AddPacketToProducer( packet );
+                rakPeer->AddOfflinePacketToProducer( packet );
             }
         }
         // UNCONNECTED MESSAGE Pong with no data.
         else if( (unsigned char)data[0] == ID_UNCONNECTED_PONG && (size_t)length >= sizeof( unsigned char ) + sizeof( RakNet::Time ) + RakNetGUID::size() + sizeof( OFFLINE_MESSAGE_DATA_ID ) && (size_t)length < sizeof( unsigned char ) + sizeof( RakNet::Time ) + RakNetGUID::size() + sizeof( OFFLINE_MESSAGE_DATA_ID ) + MAX_OFFLINE_DATA_LENGTH )
         {
+            if( rakPeer->CountDropIfOfflineQueueFull() )
+                return true;
+
             Packet* packet = rakPeer->AllocPacket( (unsigned int)( length - sizeof( OFFLINE_MESSAGE_DATA_ID ) - RakNetGUID::size() - sizeof( RakNet::Time ) + sizeof( RakNet::TimeMS ) ), _FILE_AND_LINE_ );
             if( packet == 0 )
                 return true;
@@ -4167,12 +4222,15 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             packet->systemAddress = systemAddress;
             packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetIndexFromSystemAddress( systemAddress, true );
             packet->guid.systemIndex = packet->systemAddress.systemIndex;
-            rakPeer->AddPacketToProducer( packet );
+            rakPeer->AddOfflinePacketToProducer( packet );
         }
         else if( (unsigned char)data[0] == ID_OUT_OF_BAND_INTERNAL &&
                  (size_t)length > sizeof( OFFLINE_MESSAGE_DATA_ID ) + sizeof( MessageID ) + RakNetGUID::size() &&
                  (size_t)length < MAX_OFFLINE_DATA_LENGTH + sizeof( OFFLINE_MESSAGE_DATA_ID ) + sizeof( MessageID ) + RakNetGUID::size() )
         {
+            if( rakPeer->CountDropIfOfflineQueueFull() )
+                return true;
+
             unsigned int dataLength = (unsigned int)( length - sizeof( OFFLINE_MESSAGE_DATA_ID ) - RakNetGUID::size() - sizeof( MessageID ) );
             RakAssert( dataLength < 1024 );
             Packet* packet = rakPeer->AllocPacket( dataLength + 1, _FILE_AND_LINE_ );
@@ -4200,7 +4258,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             packet->systemAddress = systemAddress;
             packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetIndexFromSystemAddress( systemAddress, true );
             packet->guid.systemIndex = packet->systemAddress.systemIndex;
-            rakPeer->AddPacketToProducer( packet );
+            rakPeer->AddOfflinePacketToProducer( packet );
         }
         else if( (unsigned char)( data )[0] == (MessageID)ID_OPEN_CONNECTION_REPLY_1 )
         {
@@ -5724,13 +5782,19 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
 
 void RakPeer::OnRNS2Recv( RNS2RecvStruct* recvStruct )
 {
-    if( incomingDatagramEventHandler )
+    // Either drop gives the buffer back: the handler may not keep it past the call, and a
+    // full queue drops the newest datagram as a full socket buffer would.
+    if( incomingDatagramEventHandler && incomingDatagramEventHandler( recvStruct ) != true )
     {
-        if( incomingDatagramEventHandler( recvStruct ) != true )
-            return;
+        DeallocRNS2RecvStruct( recvStruct, _FILE_AND_LINE_ );
+        return;
     }
 
-    PushBufferedPacket( recvStruct );
+    if( PushBufferedPacket( recvStruct ) == false )
+    {
+        DeallocRNS2RecvStruct( recvStruct, _FILE_AND_LINE_ );
+        return;
+    }
     quitAndDataEvents.SetEvent();
 }
 

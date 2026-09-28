@@ -229,6 +229,12 @@ public:
     /// User-thread functions, such as RPC calls and the plugin function PluginInterface::Update occur here.
     /// \return 0 if no packets are waiting to be handled, otherwise a pointer to a packet.
     /// \note COMMON MISTAKE: Be sure to call this in a loop, once per game tick, until it returns 0. If you only process one packet per game tick they will buffer up.
+    /// \note Draining is the application's job. Messages from connected Systems wait here
+    /// with no limit: they were acknowledged when they arrived, so RakNet cannot drop them
+    /// without breaking delivery, and an application that stops calling Receive grows this
+    /// queue for as long as its Systems keep sending. Only Packets from unconnected Systems
+    /// are capped, at MAX_PENDING_OFFLINE_MESSAGES (RakNetDefines.h); past it they are
+    /// dropped and counted by GetOfflineMessagesDroppedAtCap(). See ADR-0005, point 7.
     /// sa RakNetTypes.h contains struct Packet
     virtual Packet* Receive( void ) = 0;
 
@@ -587,6 +593,17 @@ public:
 
     /// \Returns how many messages are waiting when you call Receive()
     virtual unsigned int GetReceiveBufferSize( void ) = 0;
+
+    /// \Returns how many received datagrams this Peer has dropped, over its lifetime, because
+    /// MAX_BUFFERED_RECEIVED_DATAGRAMS (RakNetDefines.h) were already waiting for the update
+    /// thread. Nonzero means datagrams arrived faster than the update thread ran.
+    virtual uint64_t GetReceivedDatagramsDroppedAtCap( void ) const = 0;
+
+    /// \Returns how many datagrams from unconnected Systems this Peer has dropped, over its
+    /// lifetime, because MAX_PENDING_OFFLINE_MESSAGES (RakNetDefines.h) of their Packets were
+    /// already waiting for Receive(). Nonzero means Receive() was not keeping up, or a sender
+    /// was flooding.
+    virtual uint64_t GetOfflineMessagesDroppedAtCap( void ) const = 0;
 
     // --------------------------------------------------------------------------------------------EVERYTHING AFTER THIS COMMENT IS FOR INTERNAL USE ONLY--------------------------------------------------------------------------------------------
 

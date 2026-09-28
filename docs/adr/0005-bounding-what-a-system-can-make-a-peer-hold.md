@@ -61,6 +61,17 @@ reason and no new callback API.
   the connection request is parsed, and anything else closes the connection and bans the
   address, as before.
 
+**Clarified in applying it** (receive queues):
+
+- *Counters.* A counter for a cap that belongs to no connection is a getter on
+  `RakPeerInterface`, not a field of `RakNetStatistics`. Offline datagrams are dropped
+  while no connection may exist, and then there are no statistics to read.
+- *Debug print.* "A `RAKNET_DEBUG_PRINTF`" means one per cap per Peer, on the first drop,
+  as the reliability layer does. A flood should not flood the console as well; the counter
+  carries the rest.
+- *Point 7.* Dropping an offline datagram drops it whole, so a dropped unconnected ping is
+  not answered, just as it would not be if a full socket buffer had dropped it.
+
 ## Considered and rejected
 
 - **Global caps only.** Simpler, but turns every cap into a lock-out lever.
