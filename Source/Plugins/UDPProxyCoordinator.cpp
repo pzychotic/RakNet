@@ -67,6 +67,10 @@ STATIC_FACTORY_DEFINITIONS( UDPProxyCoordinator, UDPProxyCoordinator );
 
 UDPProxyCoordinator::UDPProxyCoordinator()
 {
+    maxForwardingRequestsPerSystem = 8;
+    maxServerSelectionBitstreamBytes = 1024;
+    forwardingRequestsRefused = 0;
+    serverSelectionBitstreamsRefused = 0;
 }
 UDPProxyCoordinator::~UDPProxyCoordinator()
 {
@@ -75,6 +79,40 @@ UDPProxyCoordinator::~UDPProxyCoordinator()
 void UDPProxyCoordinator::SetRemoteLoginPassword( const std::string& password )
 {
     remoteLoginPassword = password;
+}
+void UDPProxyCoordinator::SetMaxForwardingRequestsPerSystem( unsigned int max )
+{
+    maxForwardingRequestsPerSystem = max;
+}
+unsigned int UDPProxyCoordinator::GetMaxForwardingRequestsPerSystem( void ) const
+{
+    return maxForwardingRequestsPerSystem;
+}
+void UDPProxyCoordinator::SetMaxServerSelectionBitstreamBytes( unsigned int max )
+{
+    maxServerSelectionBitstreamBytes = max;
+}
+unsigned int UDPProxyCoordinator::GetMaxServerSelectionBitstreamBytes( void ) const
+{
+    return maxServerSelectionBitstreamBytes;
+}
+uint64_t UDPProxyCoordinator::GetForwardingRequestsRefused( void ) const
+{
+    return forwardingRequestsRefused;
+}
+uint64_t UDPProxyCoordinator::GetServerSelectionBitstreamsRefused( void ) const
+{
+    return serverSelectionBitstreamsRefused;
+}
+unsigned int UDPProxyCoordinator::CountRequestsFrom( const SystemAddress& requestingAddress ) const
+{
+    unsigned int count = 0;
+    for( unsigned int idx = 0; idx < forwardingRequestList.Size(); idx++ )
+    {
+        if( forwardingRequestList[idx]->requestingAddress == requestingAddress )
+            count++;
+    }
+    return count;
 }
 void UDPProxyCoordinator::Update( void )
 {
@@ -187,13 +225,12 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         incomingBs.Read( targetGuid );
         targetAddress = rakPeerInterface->GetSystemAddressFromGuid( targetGuid );
     }
-    ForwardingRequest* fw = RakNet::OP_NEW<ForwardingRequest>( _FILE_AND_LINE_ );
-    fw->timeoutAfterSuccess = 0;
-    incomingBs.Read( fw->timeoutOnNoDataMS );
+    RakNet::TimeMS timeoutOnNoDataMS = 0;
+    incomingBs.Read( timeoutOnNoDataMS );
     bool hasServerSelectionBitstream = false;
     incomingBs.Read( hasServerSelectionBitstream );
-    if( hasServerSelectionBitstream )
-        incomingBs.Read( &( fw->serverSelectionBitstream ) );
+    // The selection data is the rest of the Message. Rounded down, since the padding to a whole byte is not the sender's
+    const bool serverSelectionTooLong = hasServerSelectionBitstream && incomingBs.GetNumberOfUnreadBits() / 8 > maxServerSelectionBitstreamBytes;
 
     BitStream outgoingBs;
     SenderAndTargetAddress sata;
@@ -225,7 +262,6 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         outgoingBs.Write( serverPublicIp );
         outgoingBs.Write( forwardingPort );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
-        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
         return;
     }
 
@@ -237,7 +273,6 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         outgoingBs.Write( targetAddress );
         outgoingBs.Write( targetGuid );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
-        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
         return;
     }
 
@@ -249,10 +284,32 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         outgoingBs.Write( targetAddress );
         outgoingBs.Write( targetGuid );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
-        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
         return;
     }
 
+    // Each cap prints once per plugin: a flood would otherwise flood the console too
+    if( serverSelectionTooLong )
+    {
+        if( serverSelectionBitstreamsRefused++ == 0 )
+            RAKNET_DEBUG_PRINTF( "UDPProxyCoordinator: refused a forwarding request with more server selection data than SetMaxServerSelectionBitstreamBytes' %u. See GetServerSelectionBitstreamsRefused.\n",
+                                 maxServerSelectionBitstreamBytes );
+        SendAllBusy( sata.senderClientAddress, targetAddress, targetGuid, packet->systemAddress );
+        return;
+    }
+    if( CountRequestsFrom( packet->systemAddress ) >= maxForwardingRequestsPerSystem )
+    {
+        if( forwardingRequestsRefused++ == 0 )
+            RAKNET_DEBUG_PRINTF( "UDPProxyCoordinator: refused a forwarding request from a System with SetMaxForwardingRequestsPerSystem's %u open. See GetForwardingRequestsRefused.\n",
+                                 maxForwardingRequestsPerSystem );
+        SendAllBusy( sata.senderClientAddress, targetAddress, targetGuid, packet->systemAddress );
+        return;
+    }
+
+    ForwardingRequest* fw = RakNet::OP_NEW<ForwardingRequest>( _FILE_AND_LINE_ );
+    fw->timeoutAfterSuccess = 0;
+    fw->timeoutOnNoDataMS = timeoutOnNoDataMS;
+    if( hasServerSelectionBitstream )
+        incomingBs.Read( &( fw->serverSelectionBitstream ) );
     fw->sata = sata;
     fw->requestingAddress = packet->systemAddress;
 

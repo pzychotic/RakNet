@@ -172,6 +172,24 @@ public:
     /// If requesting forwarding to a RakNet enabled system, then it is easier to use targetGuid instead of targetAddressAsSeenFromCoordinator
     bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, RakNetGUID targetGuid, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
 
+    /// \brief Caps how many proxy servers one request from a Designated coordinator makes this Peer ping.
+    /// \details Each request to ping the proxy servers makes a group, which lives until every server
+    /// answers, about a second passes, or the coordinator's connection closes. A coordinator has at most
+    /// one group: a new request replaces its live group, which first reports what it has, and is counted
+    /// in GetPingServerGroupsReplaced(). Servers past the cap are not pinged, and the request is counted
+    /// in GetPingServersTruncated(). A request that lists no server makes no group.
+    /// Defaults to 64. A coordinator lists every proxy server logged in to it.
+    void SetMaxServersPerPingGroup( unsigned int max );
+
+    /// \return The value passed to SetMaxServersPerPingGroup(), or the default.
+    unsigned int GetMaxServersPerPingGroup( void ) const;
+
+    /// \return How many requests to ping the proxy servers SetMaxServersPerPingGroup()'s cap has cut short.
+    uint64_t GetPingServersTruncated( void ) const;
+
+    /// \return How many requests to ping the proxy servers replaced their coordinator's live group.
+    uint64_t GetPingServerGroupsReplaced( void ) const;
+
     /// \internal
     virtual void Update( void );
     virtual PluginReceiveResult OnReceive( Packet* packet );
@@ -219,6 +237,9 @@ protected:
     UDPProxyClientResultHandler* resultHandler;
     std::vector<SystemAddress> coordinators;
     std::vector<OutstandingRequest> outstandingRequests;
+    unsigned int maxServersPerPingGroup;
+    uint64_t pingServersTruncated;
+    uint64_t pingServerGroupsReplaced;
 };
 
 } // namespace RakNet

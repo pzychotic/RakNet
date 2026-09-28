@@ -34,13 +34,39 @@ enum NegotiationIdentifiers
     ID_HASHED_NONCE_AND_PASSWORD,
 };
 
-TwoWayAuthentication::NonceGenerator::NonceGenerator() { nextRequestId = 0; }
+TwoWayAuthentication::NonceGenerator::NonceGenerator()
+{
+    nextRequestId = 0;
+    maxNoncesPerSystem = 4;
+    noncesEvicted = 0;
+}
 TwoWayAuthentication::NonceGenerator::~NonceGenerator()
 {
     Clear();
 }
 void TwoWayAuthentication::NonceGenerator::GetNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short* requestId, AddressOrGUID remoteSystem )
 {
+    // Nonces are in the order they were made, so the first of remoteSystem's is its oldest.
+    // It goes rather than the new request, since a System that retries must not be locked out.
+    unsigned int held = 0;
+    auto oldest = generatedNonces.end();
+    for( auto it = generatedNonces.begin(); it != generatedNonces.end(); ++it )
+    {
+        if( ( *it )->remoteSystem == remoteSystem )
+        {
+            if( held++ == 0 )
+                oldest = it;
+        }
+    }
+    if( held >= maxNoncesPerSystem && oldest != generatedNonces.end() )
+    {
+        // Once per plugin: a flood would otherwise flood the console too
+        if( noncesEvicted++ == 0 )
+            RAKNET_DEBUG_PRINTF( "TwoWayAuthentication: evicted a System's oldest nonce, over SetMaxNoncesPerSystem's %u. See GetNoncesEvicted.\n", maxNoncesPerSystem );
+        RakNet::OP_DELETE( *oldest, _FILE_AND_LINE_ );
+        generatedNonces.erase( oldest );
+    }
+
     TwoWayAuthentication::NonceAndRemoteSystemRequest* narsr = RakNet::OP_NEW<TwoWayAuthentication::NonceAndRemoteSystemRequest>( _FILE_AND_LINE_ );
     narsr->remoteSystem = remoteSystem;
     GenerateNonce( narsr->nonce );
@@ -59,22 +85,16 @@ bool TwoWayAuthentication::NonceGenerator::GetNonceById( char nonce[TWO_WAY_AUTH
     for( auto it = generatedNonces.begin(); it != generatedNonces.end(); ++it )
     {
         TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = *it;
-        if( pNonce->requestId == requestId )
+        // requestId wraps, so another System's nonce may carry the same one
+        if( pNonce->requestId == requestId && remoteSystem == pNonce->remoteSystem )
         {
-            if( remoteSystem == pNonce->remoteSystem )
+            memcpy( nonce, pNonce->nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
+            if( popIfFound )
             {
-                memcpy( nonce, pNonce->nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
-                if( popIfFound )
-                {
-                    RakNet::OP_DELETE( pNonce, _FILE_AND_LINE_ );
-                    generatedNonces.erase( it );
-                }
-                return true;
+                RakNet::OP_DELETE( pNonce, _FILE_AND_LINE_ );
+                generatedNonces.erase( it );
             }
-            else
-            {
-                return false;
-            }
+            return true;
         }
     }
     return false;
@@ -105,11 +125,14 @@ void TwoWayAuthentication::NonceGenerator::ClearByAddress( AddressOrGUID remoteS
 }
 void TwoWayAuthentication::NonceGenerator::Update( RakNet::Time curTime )
 {
-    if( !generatedNonces.empty() && GreaterThan( curTime - 5000, generatedNonces[0]->whenGenerated ) )
+    // Nonces are in the order they were made, so the stale ones are a prefix
+    auto firstFresh = generatedNonces.begin();
+    while( firstFresh != generatedNonces.end() && (RakNet::Time)( curTime - ( *firstFresh )->whenGenerated ) > NONCE_TIMEOUT_MS )
     {
-        RakNet::OP_DELETE( generatedNonces[0], _FILE_AND_LINE_ );
-        generatedNonces.erase( generatedNonces.begin() );
+        RakNet::OP_DELETE( *firstFresh, _FILE_AND_LINE_ );
+        ++firstFresh;
     }
+    generatedNonces.erase( generatedNonces.begin(), firstFresh );
 }
 TwoWayAuthentication::TwoWayAuthentication()
 {
@@ -119,6 +142,20 @@ TwoWayAuthentication::TwoWayAuthentication()
 TwoWayAuthentication::~TwoWayAuthentication()
 {
     Clear();
+}
+
+void TwoWayAuthentication::SetMaxNoncesPerSystem( unsigned int max )
+{
+    // A System must hold the nonce it is answering
+    nonceGenerator.maxNoncesPerSystem = max > 0 ? max : 1;
+}
+unsigned int TwoWayAuthentication::GetMaxNoncesPerSystem( void ) const
+{
+    return nonceGenerator.maxNoncesPerSystem;
+}
+uint64_t TwoWayAuthentication::GetNoncesEvicted( void ) const
+{
+    return nonceGenerator.noncesEvicted;
 }
 
 bool TwoWayAuthentication::AddPassword( const std::string& identifier, const std::string& password )

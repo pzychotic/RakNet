@@ -541,6 +541,43 @@ rather than a `ByteQueue`, and `AddToConnectionList` and `RemoveFromConnectionLi
 replaced by `CountConnection`. `RemoteClient::SendOrBuffer` takes the cap and returns
 whether it hit it.
 
+### What a System can make a plugin hold
+
+Several plugins kept, per remote message, an entry nothing bounded. Now each is capped by a
+runtime setter with a counter getter, and prints once per plugin the first time the cap
+bites:
+
+- **`RelayPlugin::SetMaxNameLength`, default 256 bytes.** An add request with a longer name
+  is answered `RPE_ADD_CLIENT_NOT_ALLOWED`, and a join request with a longer group name
+  `RPE_JOIN_GROUP_FAILURE`. Counted by `GetNamesRefused`. A repeated add request from a
+  participant now takes it out of its group first, so the group's other members see
+  `RPE_USER_LEFT_ROOM`. Stock left its old copy in the group, which then never emptied: an
+  add, join, add, join loop leaked a group per cycle, past the System's disconnect.
+- **`UDPProxyCoordinator::SetMaxForwardingRequestsPerSystem`, default 8**, and
+  **`SetMaxServerSelectionBitstreamBytes`, default 1024.** A forwarding request past either
+  is answered `ID_UDP_PROXY_ALL_SERVERS_BUSY`. A request counts from when it arrives until it
+  is answered, and after a success for its own `timeoutOnNoDataMS`. Counted by
+  `GetForwardingRequestsRefused` and `GetServerSelectionBitstreamsRefused`.
+- **`UDPProxyClient::SetMaxServersPerPingGroup`, default 64.** Servers past the cap are not
+  pinged; counted by `GetPingServersTruncated`. A coordinator now has at most one group of
+  pings in flight: a new request to ping replaces the live one, which first reports what it
+  has, as a timeout would. Counted by `GetPingServerGroupsReplaced`. A request listing no
+  server, or cut short, makes no group or only what it lists, and groups go with the
+  coordinator's connection.
+- **`TwoWayAuthentication::SetMaxNoncesPerSystem`, default 4.** A nonce request past the cap
+  evicts that System's oldest nonce, so a System that retries is never locked out. Counted by
+  `GetNoncesEvicted`. `Update` now frees every nonce older than `NONCE_TIMEOUT_MS` (10 s);
+  stock freed at most one per call, after 5 s, so a flood outgrew it.
+- **`NatTypeDetectionServer` and `NatTypeDetectionClient`** queue at most
+  `MAX_BUFFERED_RECEIVED_DATAGRAMS` datagrams from their own sockets, the core's macro, and
+  drop the newest past it. Counted by `GetReceivedDatagramsDroppedAtCap`.
+
+`StatisticsHistoryPlugin::SetTrackConnections` now documents that tracking new connections
+without removing lost ones grows the statistics on every reconnect.
+
+Each plugin gained protected or `\internal` members, so a subclass or a binary that shares
+the class layout has to be rebuilt.
+
 ## Plugins that act only on Solicited or Designated messages
 
 Stock plugins believed any connected System that claimed to have set something up for

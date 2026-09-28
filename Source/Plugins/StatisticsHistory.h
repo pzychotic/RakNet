@@ -207,6 +207,13 @@ public:
 
     StatisticsHistoryPlugin();
     virtual ~StatisticsHistoryPlugin();
+
+    /// \brief Whether each connection gets a tracked object in \a statistics, keyed by its RakNetGUID.
+    /// \param[in] _addNewConnections Add an object of type \a newConnectionsObjectType for each new connection. Defaults to true.
+    /// \param[in] _removeLostConnections Remove it when the connection closes. Defaults to true.
+    /// \note With \a _addNewConnections true and \a _removeLostConnections false, the objects are never freed. A remote System
+    /// that reconnects under a fresh RakNetGUID, as a restarted Peer does and any System may choose to, gets a new object each
+    /// time, so reconnects grow \a statistics without limit unless the application removes the objects itself.
     void SetTrackConnections( bool _addNewConnections, int newConnectionsObjectType, bool _removeLostConnections );
 
 protected:

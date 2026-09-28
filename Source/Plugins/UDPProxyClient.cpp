@@ -34,6 +34,9 @@ STATIC_FACTORY_DEFINITIONS( UDPProxyClient, UDPProxyClient );
 UDPProxyClient::UDPProxyClient()
 {
     resultHandler = 0;
+    maxServersPerPingGroup = 64;
+    pingServersTruncated = 0;
+    pingServerGroupsReplaced = 0;
 }
 UDPProxyClient::~UDPProxyClient()
 {
@@ -179,11 +182,13 @@ void UDPProxyClient::Update( void )
     {
         PingServerGroup* psg = *it;
 
-        if( !psg->serversToPing.empty() &&
+        if( psg->serversToPing.empty() ||
             RakNet::GetTimeMS() > psg->startPingTime + DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR )
         {
-            // If they didn't reply within DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR, just give up on them
-            psg->SendPingedServersToCoordinator( rakPeerInterface );
+            // If they didn't reply within DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR, just give up on them.
+            // OnPingServers makes no empty group, but one would never be answered, so it goes without a report.
+            if( !psg->serversToPing.empty() )
+                psg->SendPingedServersToCoordinator( rakPeerInterface );
 
             RakNet::OP_DELETE( psg, _FILE_AND_LINE_ );
             it = pingServerGroups.erase( it );
@@ -325,37 +330,97 @@ void UDPProxyClient::OnClosedConnection( const SystemAddress& systemAddress, Rak
     (void)rakNetGUID;
     (void)lostConnectionReason;
 
-    // A System that later connects from the same address inherits neither the designation nor the requests
+    // A System that later connects from the same address inherits neither the designation, the requests nor the pings
     RemoveCoordinator( systemAddress );
     outstandingRequests.erase( std::remove_if( outstandingRequests.begin(), outstandingRequests.end(), [&systemAddress]( const OutstandingRequest& request ) {
                                    return request.coordinatorAddress == systemAddress;
                                } ),
                                outstandingRequests.end() );
+    for( auto it = pingServerGroups.begin(); it != pingServerGroups.end(); /**/ )
+    {
+        if( ( *it )->coordinatorAddressForPings == systemAddress )
+        {
+            RakNet::OP_DELETE( *it, _FILE_AND_LINE_ );
+            it = pingServerGroups.erase( it );
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+void UDPProxyClient::SetMaxServersPerPingGroup( unsigned int max )
+{
+    maxServersPerPingGroup = max;
+}
+unsigned int UDPProxyClient::GetMaxServersPerPingGroup( void ) const
+{
+    return maxServersPerPingGroup;
+}
+uint64_t UDPProxyClient::GetPingServersTruncated( void ) const
+{
+    return pingServersTruncated;
+}
+uint64_t UDPProxyClient::GetPingServerGroupsReplaced( void ) const
+{
+    return pingServerGroupsReplaced;
 }
 void UDPProxyClient::OnPingServers( Packet* packet )
 {
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( 2 );
 
-    PingServerGroup* psg = RakNet::OP_NEW<PingServerGroup>( _FILE_AND_LINE_ );
-
-    incomingBs.Read( psg->sata.senderClientAddress );
-    incomingBs.Read( psg->sata.targetClientAddress );
-    psg->startPingTime = RakNet::GetTimeMS();
-    psg->coordinatorAddressForPings = packet->systemAddress;
-    // Read only to stay aligned with what the coordinator writes; nothing here uses it
+    SenderAndTargetAddress sata;
+    // The GUID is read only to stay aligned with what the coordinator writes; nothing here uses it
     RakNetGUID targetGuid;
-    incomingBs.Read( targetGuid );
     unsigned short serverListSize;
-    incomingBs.Read( serverListSize );
+    if( !incomingBs.Read( sata.senderClientAddress ) || !incomingBs.Read( sata.targetClientAddress ) ||
+        !incomingBs.Read( targetGuid ) || !incomingBs.Read( serverListSize ) )
+        return;
+
+    std::vector<SystemAddress> servers;
     SystemAddress serverAddress;
-    char ipStr[64];
     for( unsigned short serverListIndex = 0; serverListIndex < serverListSize; serverListIndex++ )
     {
-        incomingBs.Read( serverAddress );
-        psg->serversToPing.emplace_back( ServerWithPing{ DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR, serverAddress } );
-        serverAddress.ToString( false, ipStr );
-        rakPeerInterface->Ping( ipStr, serverAddress.GetPort(), false, 0 );
+        if( servers.size() >= maxServersPerPingGroup )
+        {
+            // Once per plugin: a flood would otherwise flood the console too
+            if( pingServersTruncated++ == 0 )
+                RAKNET_DEBUG_PRINTF( "UDPProxyClient: pinging only the first %u of %u proxy servers, SetMaxServersPerPingGroup's cap. See GetPingServersTruncated.\n",
+                                     maxServersPerPingGroup, (unsigned int)serverListSize );
+            break;
+        }
+        if( !incomingBs.Read( serverAddress ) )
+            break;
+        servers.push_back( serverAddress );
+    }
+    // A group with nothing to ping would never be answered or reaped
+    if( servers.empty() )
+        return;
+
+    // One live group per coordinator. The one it replaces reports what it has, as a timeout would.
+    auto existing = std::find_if( pingServerGroups.begin(), pingServerGroups.end(), [&]( const PingServerGroup* group ) {
+        return group->coordinatorAddressForPings == packet->systemAddress;
+    } );
+    if( existing != pingServerGroups.end() )
+    {
+        ( *existing )->SendPingedServersToCoordinator( rakPeerInterface );
+        RakNet::OP_DELETE( *existing, _FILE_AND_LINE_ );
+        pingServerGroups.erase( existing );
+        if( pingServerGroupsReplaced++ == 0 )
+            RAKNET_DEBUG_PRINTF( "UDPProxyClient: a coordinator's request to ping replaced its live one, as each has at most one. See GetPingServerGroupsReplaced.\n" );
+    }
+
+    PingServerGroup* psg = RakNet::OP_NEW<PingServerGroup>( _FILE_AND_LINE_ );
+    psg->sata = sata;
+    psg->startPingTime = RakNet::GetTimeMS();
+    psg->coordinatorAddressForPings = packet->systemAddress;
+    char ipStr[64];
+    for( const SystemAddress& server : servers )
+    {
+        psg->serversToPing.emplace_back( ServerWithPing{ DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR, server } );
+        server.ToString( false, ipStr );
+        rakPeerInterface->Ping( ipStr, server.GetPort(), false, 0 );
     }
     pingServerGroups.push_back( psg );
 }

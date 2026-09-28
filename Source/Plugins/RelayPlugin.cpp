@@ -25,6 +25,8 @@ STATIC_FACTORY_DEFINITIONS( RelayPlugin, RelayPlugin );
 RelayPlugin::RelayPlugin()
 {
     acceptAddParticipantRequests = false;
+    maxNameLength = 256;
+    namesRefused = 0;
 }
 
 RelayPlugin::~RelayPlugin()
@@ -49,10 +51,12 @@ RelayPluginEnums RelayPlugin::AddParticipantOnServer( const std::string& key, co
     if( strToGuidHash.find( key ) != strToGuidHash.end() )
         return RPE_ADD_CLIENT_NAME_ALREADY_IN_USE; // Name already in use
 
-    // If GUID is already in use, remove existing
+    // If GUID is already in use, remove existing. It leaves its room first, or its copy in
+    // usersInRoom keeps the room alive after the System disconnects.
     if( auto it = guidToStrHash.find( guid ); it != guidToStrHash.end() )
     {
         StrAndGuidAndRoom* strAndGuid = it->second;
+        LeaveGroup( strAndGuid );
         strToGuidHash.erase( strAndGuid->str );
         guidToStrHash.erase( it );
         RakNet::OP_DELETE( strAndGuid, _FILE_AND_LINE_ );
@@ -83,6 +87,24 @@ void RelayPlugin::RemoveParticipantOnServer( const RakNetGUID& guid )
 void RelayPlugin::SetAcceptAddParticipantRequests( bool accept )
 {
     acceptAddParticipantRequests = accept;
+}
+void RelayPlugin::SetMaxNameLength( size_t max )
+{
+    maxNameLength = max;
+}
+size_t RelayPlugin::GetMaxNameLength( void ) const
+{
+    return maxNameLength;
+}
+uint64_t RelayPlugin::GetNamesRefused( void ) const
+{
+    return namesRefused;
+}
+void RelayPlugin::CountNameRefused( size_t length )
+{
+    // Once per plugin: a flood would otherwise flood the console too
+    if( namesRefused++ == 0 )
+        RAKNET_DEBUG_PRINTF( "RelayPlugin: refused a name of %u bytes, over SetMaxNameLength's %u. See GetNamesRefused.\n", (unsigned int)length, (unsigned int)maxNameLength );
 }
 void RelayPlugin::AddParticipantRequestFromClient( const std::string& key, const RakNetGUID& relayPluginServerGuid )
 {
@@ -182,10 +204,15 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             bsIn.ReadCompressed( key );
             BitStream bsOut;
             bsOut.WriteCasted<MessageID>( ID_RELAY_PLUGIN );
-            if( acceptAddParticipantRequests )
-                bsOut.WriteCasted<MessageID>( AddParticipantOnServer( key, packet->guid ) );
-            else
+            if( !acceptAddParticipantRequests )
                 bsOut.WriteCasted<MessageID>( RPE_ADD_CLIENT_NOT_ALLOWED );
+            else if( key.size() > maxNameLength )
+            {
+                CountNameRefused( key.size() );
+                bsOut.WriteCasted<MessageID>( RPE_ADD_CLIENT_NOT_ALLOWED );
+            }
+            else
+                bsOut.WriteCasted<MessageID>( AddParticipantOnServer( key, packet->guid ) );
             bsOut.WriteCompressed( key );
             SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
 
@@ -406,7 +433,11 @@ void RelayPlugin::OnJoinGroupRequestFromClient( Packet* packet )
     bsIn.IgnoreBytes( sizeof( MessageID ) * 2 );
     std::string groupName;
     bsIn.ReadCompressed( groupName );
-    RelayPlugin::RP_Group* groupJoined = JoinGroup( packet->guid, groupName );
+    RelayPlugin::RP_Group* groupJoined = 0;
+    if( groupName.size() > maxNameLength )
+        CountNameRefused( groupName.size() );
+    else
+        groupJoined = JoinGroup( packet->guid, groupName );
 
     BitStream bsOut;
     bsOut.WriteCasted<MessageID>( ID_RELAY_PLUGIN );

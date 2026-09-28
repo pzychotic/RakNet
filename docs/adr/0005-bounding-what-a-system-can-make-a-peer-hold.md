@@ -86,6 +86,23 @@ reason and no new callback API.
 - *Close reporting.* A cap-driven close is the TCP close itself, which the remote end sees
   as its connection ending; locally it is reported by `HasLostConnection`.
 
+**Clarified in applying it** (plugins):
+
+- *Point 1.* Where a table is shared, capping what each System may create can mean
+  restoring an invariant rather than adding a number. `RelayPlugin` holds one participant
+  per System in at most one group, and a group lives only while it has a participant, so
+  fixing the replace that left a stale copy behind bounds its groups by the connection count.
+  What is left to cap is the length of the names.
+- *Point 3.* "Refuse" can also mean *replace* or *truncate* when the message is a request for
+  work, not data. `UDPProxyClient` keeps one ping group per coordinator, the newest, and pings
+  at most `SetMaxServersPerPingGroup` of the servers a request lists.
+- *Point 5.* A Designated coordinator can still send malformed ping requests. It gets the
+  same caps as anyone, which is what "a generous cap, not an exemption" means here.
+- *Configuration.* `NatTypeDetectionServer` and `NatTypeDetectionClient` queue raw
+  datagrams, exactly as the core's receive queue does, so they share its
+  `MAX_BUFFERED_RECEIVED_DATAGRAMS` macro rather than get a setter of their own.
+- *Debug print.* Once per plugin instance, on the first time the cap bites, as for the core.
+
 ## Considered and rejected
 
 - **Global caps only.** Simpler, but turns every cap into a lock-out lever.

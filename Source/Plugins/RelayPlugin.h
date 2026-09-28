@@ -81,6 +81,20 @@ public:
     /// \param[in] accept true to accept, false to not.
     void SetAcceptAddParticipantRequests( bool accept );
 
+    /// \brief Caps the length of a participant name or group name a remote System may ask for.
+    /// \details An add request with a longer name is answered with RPE_ADD_CLIENT_NOT_ALLOWED,
+    /// and a join request with a longer group name with RPE_JOIN_GROUP_FAILURE. Either is counted
+    /// in GetNamesRefused(). Each System is one participant, in at most one group, and a group
+    /// lives only while it has a participant, so this bounds what a System can make the plugin hold.
+    /// Defaults to 256 bytes.
+    void SetMaxNameLength( size_t max );
+
+    /// \return The value passed to SetMaxNameLength(), or the default.
+    size_t GetMaxNameLength( void ) const;
+
+    /// \return How many add and join requests SetMaxNameLength()'s cap has refused.
+    uint64_t GetNamesRefused( void ) const;
+
     /// \brief Request from the client for the server to call AddParticipantOnServer()
     /// \pre The server must have called SetAcceptAddParticipantRequests(true) or the request will be ignored
     /// \param[in] key A string to identify out system. Passed to \a key on AddParticipantOnServer()
@@ -138,11 +152,14 @@ protected:
     void OnGroupMessageFromClient( Packet* packet );
     void OnJoinGroupRequestFromClient( Packet* packet );
     void OnLeaveGroupRequestFromClient( Packet* packet );
+    void CountNameRefused( size_t length );
 
     std::unordered_map<std::string, StrAndGuidAndRoom*> strToGuidHash;
     std::unordered_map<RakNetGUID, StrAndGuidAndRoom*> guidToStrHash;
     std::vector<RP_Group*> chatRooms;
     bool acceptAddParticipantRequests;
+    size_t maxNameLength;
+    uint64_t namesRefused;
 };
 
 } // namespace RakNet

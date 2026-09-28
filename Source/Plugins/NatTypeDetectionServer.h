@@ -23,6 +23,7 @@
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
 
+#include <atomic>
 #include <deque>
 #include <mutex>
 #include <string>
@@ -112,9 +113,14 @@ public:
     virtual void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line );
     virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line );
 
+    /// \brief How many datagrams to the plugin's own sockets were dropped because MAX_BUFFERED_RECEIVED_DATAGRAMS already waited for Update.
+    /// \details Any sender can reach those sockets. The cap is the core's, overridable per build in RakNetDefines.h; it defaults to 8192.
+    uint64_t GetReceivedDatagramsDroppedAtCap( void ) const;
+
 protected:
     std::deque<RNS2RecvStruct*> bufferedPackets;
     std::mutex bufferedPacketsMutex;
+    std::atomic<uint64_t> receivedDatagramsDroppedAtCap;
 
     void OnDetectionRequest( Packet* packet );
     std::vector<NATDetectionAttempt> natDetectionAttempts;

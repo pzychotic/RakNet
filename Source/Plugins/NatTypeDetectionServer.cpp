@@ -29,6 +29,7 @@ STATIC_FACTORY_DEFINITIONS( NatTypeDetectionServer, NatTypeDetectionServer );
 NatTypeDetectionServer::NatTypeDetectionServer()
 {
     s1p2 = s2p3 = s3p4 = s4p5 = 0;
+    receivedDatagramsDroppedAtCap = 0;
 }
 
 NatTypeDetectionServer::~NatTypeDetectionServer()
@@ -322,8 +323,23 @@ RNS2RecvStruct* NatTypeDetectionServer::AllocRNS2RecvStruct( const char* file, u
 
 void NatTypeDetectionServer::OnRNS2Recv( RNS2RecvStruct* recvStruct )
 {
-    std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
-    bufferedPackets.push_back( recvStruct );
+    {
+        std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
+        if( bufferedPackets.size() < MAX_BUFFERED_RECEIVED_DATAGRAMS )
+        {
+            bufferedPackets.push_back( recvStruct );
+            return;
+        }
+    }
+    // Any sender can reach these sockets, so the newest is dropped as a full socket buffer would drop it.
+    // Once per plugin: a flood would otherwise flood the console too.
+    if( receivedDatagramsDroppedAtCap.fetch_add( 1 ) == 0 )
+        RAKNET_DEBUG_PRINTF( "NatTypeDetectionServer: dropping received datagrams, %d already wait for Update (MAX_BUFFERED_RECEIVED_DATAGRAMS). See GetReceivedDatagramsDroppedAtCap.\n", (int)MAX_BUFFERED_RECEIVED_DATAGRAMS );
+    DeallocRNS2RecvStruct( recvStruct, _FILE_AND_LINE_ );
+}
+uint64_t NatTypeDetectionServer::GetReceivedDatagramsDroppedAtCap( void ) const
+{
+    return receivedDatagramsDroppedAtCap;
 }
 
 } // namespace RakNet

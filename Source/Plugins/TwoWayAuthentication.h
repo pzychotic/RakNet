@@ -19,7 +19,7 @@
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TwoWayAuthentication == 1
 
-// How often to change the nonce.
+// How long a nonce this Peer handed out stays valid. Update frees every older one.
 #define NONCE_TIMEOUT_MS 10000
 // How often to check for ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, and the minimum timeout time. Maximum is double this value.
 #define CHALLENGE_MINIMUM_TIMEOUT 3000
@@ -79,6 +79,20 @@ public:
     /// \return True on success, false on remote system not connected, or identifier not previously added with AddPassword()
     bool Challenge( const std::string& identifier, AddressOrGUID remoteSystem );
 
+    /// \brief Caps the nonces one remote System may hold at once.
+    /// \details A System that challenges this Peer is handed a nonce, kept until it answers, it
+    /// disconnects, or NONCE_TIMEOUT_MS passes. A request past the cap evicts that System's oldest
+    /// nonce, counted in GetNoncesEvicted(), so a System that retries is never locked out; an answer
+    /// to an evicted nonce fails.
+    /// Defaults to 4. 0 is taken as 1, since a System must hold the nonce it answers.
+    void SetMaxNoncesPerSystem( unsigned int max );
+
+    /// \return The value passed to SetMaxNoncesPerSystem(), or the default.
+    unsigned int GetMaxNoncesPerSystem( void ) const;
+
+    /// \return How many nonces SetMaxNoncesPerSystem()'s cap has evicted.
+    uint64_t GetNoncesEvicted( void ) const;
+
     /// \brief Free all memory
     void Clear( void );
 
@@ -124,6 +138,8 @@ public:
 
         std::vector<TwoWayAuthentication::NonceAndRemoteSystemRequest*> generatedNonces;
         unsigned short nextRequestId;
+        unsigned int maxNoncesPerSystem;
+        uint64_t noncesEvicted;
     };
 
 protected:

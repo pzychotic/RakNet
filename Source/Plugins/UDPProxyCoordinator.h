@@ -52,6 +52,32 @@ public:
     /// By default, no password is set
     void SetRemoteLoginPassword( const std::string& password );
 
+    /// \brief Caps the forwarding requests one System may have open at once.
+    /// \details A request stays open until it is answered, and after a success for its own
+    /// timeoutOnNoDataMS, so duplicates are recognised. Each is freed when the System that sent
+    /// it disconnects. A request past the cap is answered with ID_UDP_PROXY_ALL_SERVERS_BUSY and
+    /// counted in GetForwardingRequestsRefused().
+    /// Defaults to 8.
+    void SetMaxForwardingRequestsPerSystem( unsigned int max );
+
+    /// \return The value passed to SetMaxForwardingRequestsPerSystem(), or the default.
+    unsigned int GetMaxForwardingRequestsPerSystem( void ) const;
+
+    /// \brief Caps the server selection data a forwarding request may carry, which the request keeps.
+    /// \details A request with more is answered with ID_UDP_PROXY_ALL_SERVERS_BUSY and counted in
+    /// GetServerSelectionBitstreamsRefused().
+    /// Defaults to 1024 bytes.
+    void SetMaxServerSelectionBitstreamBytes( unsigned int max );
+
+    /// \return The value passed to SetMaxServerSelectionBitstreamBytes(), or the default.
+    unsigned int GetMaxServerSelectionBitstreamBytes( void ) const;
+
+    /// \return How many forwarding requests SetMaxForwardingRequestsPerSystem()'s cap has refused.
+    uint64_t GetForwardingRequestsRefused( void ) const;
+
+    /// \return How many forwarding requests SetMaxServerSelectionBitstreamBytes()'s cap has refused.
+    uint64_t GetServerSelectionBitstreamsRefused( void ) const;
+
     /// \internal
     virtual void Update( void );
     virtual PluginReceiveResult OnReceive( Packet* packet );
@@ -99,6 +125,7 @@ protected:
     void TryNextServer( SenderAndTargetAddress sata, ForwardingRequest* fw );
     void SendAllBusy( SystemAddress senderClientAddress, SystemAddress targetClientAddress, RakNetGUID targetClientGuid, SystemAddress requestingAddress );
     void Clear( void );
+    unsigned int CountRequestsFrom( const SystemAddress& requestingAddress ) const;
 
     void SendForwardingRequest( SystemAddress sourceAddress, SystemAddress targetAddress, SystemAddress serverAddress, RakNet::TimeMS timeoutOnNoDataMS );
 
@@ -109,6 +136,11 @@ protected:
     DataStructures::OrderedList<SenderAndTargetAddress, ForwardingRequest*, ForwardingRequestComp> forwardingRequestList;
 
     std::string remoteLoginPassword;
+
+    unsigned int maxForwardingRequestsPerSystem;
+    unsigned int maxServerSelectionBitstreamBytes;
+    uint64_t forwardingRequestsRefused;
+    uint64_t serverSelectionBitstreamsRefused;
 };
 
 } // namespace RakNet
