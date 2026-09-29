@@ -31,6 +31,10 @@ authentication:
   of half the buffer or more, then an up arrow, ran off the end of the heap block.
 - That branch returned without deallocating the packet.
 
+It also pins that every line in a segment is delivered. Receive returned the first line a
+packet completed and freed the packet, so the bytes after that newline never reached the
+line buffer: a second line was lost, and a partial one lost its beginning.
+
 The client is a raw socket, as in TelnetTransportReconnectTest.cpp.
 */
 
@@ -43,6 +47,10 @@ namespace {
 constexpr unsigned short kUpArrowListenPort = 61034;
 constexpr unsigned short kFullLineListenPort = 61035;
 constexpr unsigned short kUpArrowLeakListenPort = 61036;
+constexpr unsigned short kTwoLinesListenPort = 61044;
+constexpr unsigned short kSplitLineListenPort = 61045;
+constexpr unsigned short kManyLinesListenPort = 61046;
+constexpr unsigned short kQueuedAtStopListenPort = 61047;
 
 // Loopback, so every wait here is over as soon as the threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.
@@ -111,12 +119,9 @@ __TCPSOCKET__ StartAndConnect( TelnetTransport& telnet, unsigned short port )
     return client;
 }
 
-// Sends text and returns the line Receive reassembles from it, or an empty string if none
-// came before the deadline.
-std::string SendLine( TelnetTransport& telnet, __TCPSOCKET__ client, const std::string& text )
+// Returns the next line Receive gives, or an empty string if none came before the deadline.
+std::string ReceiveLine( TelnetTransport& telnet )
 {
-    SendAll( client, text.data(), text.size() );
-
     Packet* received = 0;
     if( !WaitFor( [&] { return ( received = telnet.Receive() ) != 0; } ) )
         return std::string();
@@ -124,6 +129,14 @@ std::string SendLine( TelnetTransport& telnet, __TCPSOCKET__ client, const std::
     const std::string line( (const char*)received->data, received->length );
     telnet.DeallocatePacket( received );
     return line;
+}
+
+// Sends text and returns the line Receive reassembles from it, or an empty string if none
+// came before the deadline.
+std::string SendLine( TelnetTransport& telnet, __TCPSOCKET__ client, const std::string& text )
+{
+    SendAll( client, text.data(), text.size() );
+    return ReceiveLine( telnet );
 }
 
 // Tracks the rakMalloc_Ex blocks of one exact size that have not been passed to rakFree_Ex.
@@ -280,4 +293,90 @@ TEST_CASE( "TelnetTransport frees an up-arrow packet", "[telnettransport][networ
 
     closesocket__( client );
     telnet.Stop();
+}
+
+TEST_CASE( "TelnetTransport delivers every line in a segment", "[telnettransport][network]" )
+{
+    WinsockScope winsock;
+
+    TelnetTransport telnet;
+    const __TCPSOCKET__ client = StartAndConnect( telnet, kTwoLinesListenPort );
+
+    // One send on loopback, so one segment and one TCPInterface packet.
+    const char twoLines[] = "a\nb\n";
+    SendAll( client, twoLines, sizeof( twoLines ) - 1 );
+
+    CHECK( ReceiveLine( telnet ) == "a" );
+    CHECK( ReceiveLine( telnet ) == "b" );
+    CHECK( telnet.Receive() == 0 );
+
+    closesocket__( client );
+    telnet.Stop();
+}
+
+TEST_CASE( "TelnetTransport keeps the start of a line that follows another in a segment", "[telnettransport][network]" )
+{
+    WinsockScope winsock;
+
+    TelnetTransport telnet;
+    const __TCPSOCKET__ client = StartAndConnect( telnet, kSplitLineListenPort );
+
+    const char lineAndStart[] = "a\nbc";
+    SendAll( client, lineAndStart, sizeof( lineAndStart ) - 1 );
+    CHECK( ReceiveLine( telnet ) == "a" );
+
+    CHECK( SendLine( telnet, client, "d\n" ) == "bcd" );
+
+    closesocket__( client );
+    telnet.Stop();
+}
+
+TEST_CASE( "TelnetTransport delivers a segment full of lines in order", "[telnettransport][network]" )
+{
+    WinsockScope winsock;
+
+    TelnetTransport telnet;
+    const __TCPSOCKET__ client = StartAndConnect( telnet, kManyLinesListenPort );
+
+    // As many one-character lines as fit in an Ethernet-sized segment, each a different
+    // letter from the one before, so a line out of order shows.
+    constexpr size_t kLineCount = 1460 / 2;
+    std::string lines;
+    for( size_t i = 0; i < kLineCount; i++ )
+    {
+        lines += (char)( 'a' + i % 26 );
+        lines += '\n';
+    }
+    SendAll( client, lines.data(), lines.size() );
+
+    for( size_t i = 0; i < kLineCount; i++ )
+        REQUIRE( ReceiveLine( telnet ) == std::string( 1, (char)( 'a' + i % 26 ) ) );
+    CHECK( telnet.Receive() == 0 );
+
+    closesocket__( client );
+    telnet.Stop();
+}
+
+TEST_CASE( "TelnetTransport frees lines still queued when it stops", "[telnettransport][network]" )
+{
+    WinsockScope winsock;
+
+    TelnetTransport telnet;
+    const __TCPSOCKET__ client = StartAndConnect( telnet, kQueuedAtStopListenPort );
+
+    // A queued line's data is its length plus a terminator. Nothing else allocated here is
+    // that size: the TCP packet's data is the whole segment plus a terminator.
+    const std::string queued = "queued";
+    LiveBlocks queuedLineData( queued.size() + 1 );
+
+    const std::string lines = "a\n" + queued + "\n";
+    SendAll( client, lines.data(), lines.size() );
+    REQUIRE( ReceiveLine( telnet ) == "a" );
+
+    // The second line waits for a Receive that never comes.
+    CHECK( LiveBlocks::Count() == 1 );
+
+    closesocket__( client );
+    telnet.Stop();
+    CHECK( LiveBlocks::Count() == 0 );
 }

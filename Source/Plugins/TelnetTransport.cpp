@@ -55,6 +55,10 @@ void TelnetTransport::Stop( void )
     for( TelnetClient* pClient : remoteClients )
         RakNet::OP_DELETE( pClient, _FILE_AND_LINE_ );
     remoteClients.clear();
+    // Before tcpInterface is cleared: DeallocatePacket does nothing without it.
+    for( Packet* line : pendingLines )
+        DeallocatePacket( line );
+    pendingLines.clear();
     RakNet::OP_DELETE( tcpInterface, _FILE_AND_LINE_ );
     tcpInterface = 0;
 }
@@ -107,6 +111,8 @@ Packet* TelnetTransport::Receive( void )
 {
     if( tcpInterface == 0 )
         return 0;
+    if( !pendingLines.empty() )
+        return PopPendingLine();
     Packet* p = tcpInterface->Receive();
     if( p == 0 )
         return 0;
@@ -219,13 +225,18 @@ Packet* TelnetTransport::Receive( void )
 #endif
             reassembledLine->data[reassembledLine->length] = 0;
             reassembledLine->systemAddress = p->systemAddress;
-            tcpInterface->DeallocatePacket( p );
-            return reassembledLine;
+            pendingLines.push_back( reassembledLine );
         }
     }
 
     tcpInterface->DeallocatePacket( p );
-    return 0;
+    return pendingLines.empty() ? 0 : PopPendingLine();
+}
+Packet* TelnetTransport::PopPendingLine( void )
+{
+    Packet* line = pendingLines.front();
+    pendingLines.pop_front();
+    return line;
 }
 void TelnetTransport::DeallocatePacket( Packet* packet )
 {

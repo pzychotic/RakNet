@@ -20,6 +20,7 @@
 #include "TransportInterface.h"
 #include "Export.h"
 
+#include <deque>
 #include <vector>
 
 namespace RakNet {
@@ -75,9 +76,16 @@ protected:
     // openConnections. Returns 0 if that deleted it.
     TelnetClient* CountConnection( const SystemAddress& systemAddress, int delta );
     bool ReassembleLine( TelnetTransport::TelnetClient* telnetClient, unsigned char c );
+    Packet* PopPendingLine( void );
 
     // Crap this sucks but because windows telnet won't send line at a time, I have to reconstruct the lines at the server per player
     std::vector<TelnetClient*> remoteClients;
+
+    // Lines a TCP packet completed that Receive has not returned yet, oldest first. Receive
+    // returns these before it takes another TCP packet, so this only ever holds lines from
+    // one packet: at most half its length, since only non-empty lines are queued and each
+    // needs a character and a terminator.
+    std::deque<Packet*> pendingLines;
 
     char *sendSuffix, *sendPrefix;
 };
