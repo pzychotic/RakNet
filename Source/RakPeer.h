@@ -293,12 +293,14 @@ public:
     /// Returns if a system is connected, disconnected, connecting in progress, or various other states
     /// \param[in] systemIdentifier The system we are referring to
     /// \note This locks a mutex, do not call too frequently during connection attempts or the attempt will take longer and possibly even timeout
+    /// \note Only open connections answer. IS_DISCONNECTED is a hint that may never be
+    /// seen: a closed connection reports IS_NOT_CONNECTED.
     /// \return What state the remote system is in
     ConnectionState GetConnectionState( const AddressOrGUID systemIdentifier );
 
     /// \brief Given \a systemAddress, returns its index into remoteSystemList.
     /// \details Values range from 0 to the maximum number of players allowed - 1.
-    /// This includes systems which were formerly connected, but are now not connected.
+    /// Only open connections have one. A closed connection's index is -1.
     /// \param[in] systemAddress The SystemAddress we are referring to
     /// \return The index of this SystemAddress or -1 on system not found.
     int GetIndexFromSystemAddress( const SystemAddress systemAddress ) const;
@@ -429,7 +431,7 @@ public:
     /// If \a input is UNASSIGNED_SYSTEM_ADDRESS, will return your own GUID
     /// \pre Call Startup() first, or the function will return UNASSIGNED_RAKNET_GUID
     /// \param[in] input The system address of the target system we are connected to.
-    const RakNetGUID& GetGuidFromSystemAddress( const SystemAddress input ) const;
+    RakNetGUID GetGuidFromSystemAddress( const SystemAddress input ) const;
 
     /// \brief Gives the system address of a connected system, given its GUID.
     /// The GUID will be the same on all systems connected to that instance of RakPeer, even if the external system addresses are different.
@@ -720,8 +722,9 @@ protected:
     friend void ProcessNetworkPacket( const SystemAddress systemAddress, const char* data, const int length, RakPeer* rakPeer, RakNet::TimeUS timeRead, BitStream& updateBitStream );
     friend void ProcessNetworkPacket( const SystemAddress systemAddress, const char* data, const int length, RakPeer* rakPeer, RakNetSocket2* rakNetSocket, RakNet::TimeUS timeRead, BitStream& updateBitStream );
 
-    int GetIndexFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread ) const;
-    int GetIndexFromGuid( const RakNetGUID guid );
+    /// Index of the open connection record for \a systemAddress, or -1. Network thread only;
+    /// the user thread calls GetIndexFromSystemAddress, which reads the published view.
+    int GetRecordIndexFromSystemAddress( const SystemAddress systemAddress ) const;
 
     // Two versions needed because some buggy compilers strip the last parameter if unused, and crashes
     ConnectionAttemptResult SendConnectionRequest( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, PublicKey* publicKey, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime, RakNetSocket2* socket );
@@ -911,6 +914,11 @@ protected:
     std::vector<PluginInterface2*> pluginListTS, pluginListNTS;
 
     std::deque<RequestedConnectionStruct*> requestedConnectionQueue;
+    /// Requests the network thread has taken out of requestedConnectionQueue to open a
+    /// connection record since the view was last published. GetConnectionState still reports
+    /// them as IS_PENDING, since the view doesn't show that record yet. PublishView empties
+    /// this after the swap. Guarded by requestedConnectionQueueMutex.
+    std::vector<SystemAddress> requestsHandedToRecords;
     std::deque<SystemAddress> requestedConnectionCancelQueue;
     std::mutex requestedConnectionQueueMutex;
     std::mutex requestedConnectionCancelQueueMutex;

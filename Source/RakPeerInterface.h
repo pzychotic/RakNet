@@ -272,6 +272,8 @@ public:
     /// Returns if a system is connected, disconnected, connecting in progress, or various other states
     /// \param[in] systemIdentifier The system we are referring to
     /// \note This locks a mutex, do not call too frequently during connection attempts or the attempt will take longer and possibly even timeout
+    /// \note Only open connections answer. IS_DISCONNECTED is a hint that may never be
+    /// seen: a closed connection reports IS_NOT_CONNECTED.
     /// \return What state the remote system is in
     virtual ConnectionState GetConnectionState( const AddressOrGUID systemIdentifier ) = 0;
 
@@ -426,7 +428,7 @@ public:
     /// If \a input is UNASSIGNED_SYSTEM_ADDRESS, will return your own GUID
     /// \pre Call Startup() first, or the function will return UNASSIGNED_RAKNET_GUID
     /// \param[in] input The system address of the system we are connected to
-    virtual const RakNetGUID& GetGuidFromSystemAddress( const SystemAddress input ) const = 0;
+    virtual RakNetGUID GetGuidFromSystemAddress( const SystemAddress input ) const = 0;
 
     /// Given the GUID of a connected system, give us the system address of that system.
     /// The GUID will be the same on all systems connected to that instance of RakPeer, even if the external system addresses are different

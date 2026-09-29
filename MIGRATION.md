@@ -21,6 +21,9 @@ an integration that relied on them can stop working at runtime, so they are list
 If you hooked out-of-memory with `SetNotifyOutOfMemory`, it now hears about far less. See
 [Exceptions and out-of-memory](#exceptions-and-out-of-memory).
 
+`RakPeer`'s getters now answer from a snapshot, and a closed connection no longer answers
+at all. See [Getters answer only for open connections](#getters-answer-only-for-open-connections).
+
 **The short version:** four of the five breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
@@ -645,6 +648,48 @@ choose which proxy server another pair was given.
   itself. A target named by address still need not be connected to the coordinator.
 - A ping reply counts only from one of the pair's own ends, the two Systems the coordinator
   asked. Anything else is dropped. Nothing to do.
+
+## Getters answer only for open connections
+
+Stock read the connection records from your thread while the network thread was changing
+them, with no lock. Here the network thread publishes a snapshot of the open connections at
+the end of every update cycle, and the getters read that
+([ADR-0007](docs/adr/0007-the-user-thread-reads-a-published-view.md)). An answer can be up
+to one cycle old. The identity and state getters have moved so far:
+`GetConnectionState`, `GetIndexFromSystemAddress`, `GetSystemAddressFromIndex`,
+`GetGUIDFromIndex`, `GetSystemList`, `NumberOfConnections`, `GetConnectionList`,
+`GetGuidFromSystemAddress`, `GetSystemAddressFromGuid`, `GetInternalID`, `GetExternalID`,
+`GetMTUSize` and `GetTimeoutTime`. Two things change at runtime. One return type changed,
+which stops a build only in the narrow cases in the last paragraph.
+
+**`GetConnectionState` reports a closed connection as `IS_NOT_CONNECTED`.** Stock returned
+`IS_DISCONNECTED` for as long as the closed connection's storage still held its address or
+RakNetGUID, until a new connection reused it. That's gone: nothing returns `IS_DISCONNECTED`
+any more. The enumerator stays, as a hint you may never see. If you wait for a connection to
+end, wait for "not `IS_CONNECTED` and not `IS_DISCONNECTING`", or for `IS_NOT_CONNECTED`, and
+not for `IS_DISCONNECTED`.
+
+**A closed connection has no index, address, RakNetGUID or per-connection value.** Stock
+fell back to the leftovers of a closed connection when no open one matched, so these getters
+went on answering for it after it closed. Now, once a connection is closed:
+
+- `GetIndexFromSystemAddress` returns -1.
+- `GetSystemAddressFromGuid` returns `UNASSIGNED_SYSTEM_ADDRESS`, and
+  `GetGuidFromSystemAddress` returns `UNASSIGNED_RAKNET_GUID`.
+- `GetInternalID` and `GetExternalID` return `UNASSIGNED_SYSTEM_ADDRESS`.
+- `GetMTUSize` and `GetTimeoutTime` return the defaults, as for an address never connected.
+- `GetStatistics( SystemAddress )` returns 0, and `GetAveragePing`, `GetLastPing` and
+  `GetLowestPing` by address return -1.
+
+If you need one of these after the connection closes, read it while the connection is open,
+or when `ID_DISCONNECTION_NOTIFICATION` or `ID_CONNECTION_LOST` arrives, since
+`Packet::systemAddress` and `Packet::guid` carry the identity.
+
+**`GetGuidFromSystemAddress` returns `RakNetGUID`, not `const RakNetGUID&`.** The answer is a
+copy out of the snapshot, so there's nothing for a reference to point at. Code that copies
+the result, or binds it to a `const RakNetGUID&`, compiles unchanged. Code that takes its
+address, or binds it to `auto&`, doesn't: copy it into a `RakNetGUID` instead. A class of
+your own that implements `RakPeerInterface` has to change the return type of its override.
 
 ## Exceptions and out-of-memory
 

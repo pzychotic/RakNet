@@ -935,7 +935,7 @@ bool RakPeer::GetConnectionList( SystemAddress* remoteSystems, unsigned short* n
     if( numberOfSystems == 0 )
         return false;
 
-    if( remoteSystemList == 0 || endThreads == true )
+    if( endThreads == true )
     {
         if( numberOfSystems )
             *numberOfSystems = 0;
@@ -1418,25 +1418,25 @@ ConnectionState RakPeer::GetConnectionState( const AddressOrGUID systemIdentifie
                 return IS_PENDING;
             }
         }
+        for( const SystemAddress& address : requestsHandedToRecords )
+        {
+            if( address == systemIdentifier.systemAddress )
+                return IS_PENDING;
+        }
     }
 
-    int index;
+    // The view holds open connection records only, so nothing here answers IS_DISCONNECTED.
+    PublishedRemoteSystem entry;
+    bool found;
     if( systemIdentifier.systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
-    {
-        index = GetIndexFromSystemAddress( systemIdentifier.systemAddress, false );
-    }
+        found = GetPublishedByAddress( systemIdentifier.systemAddress, entry );
     else
-    {
-        index = GetIndexFromGuid( systemIdentifier.rakNetGuid );
-    }
+        found = GetPublishedByGuid( systemIdentifier.rakNetGuid, entry );
 
-    if( index == -1 )
+    if( found == false )
         return IS_NOT_CONNECTED;
 
-    if( remoteSystemList[index].isActive == false )
-        return IS_DISCONNECTED;
-
-    switch( remoteSystemList[index].connectMode )
+    switch( entry.connectMode )
     {
     case RemoteSystemStruct::DISCONNECT_ASAP:
         return IS_DISCONNECTING;
@@ -1472,7 +1472,10 @@ ConnectionState RakPeer::GetConnectionState( const AddressOrGUID systemIdentifie
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress ) const
 {
-    return GetIndexFromSystemAddress( systemAddress, false );
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( systemAddress, entry ) == false )
+        return -1;
+    return (int)entry.index;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1487,10 +1490,10 @@ int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress ) cons
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetSystemAddressFromIndex( unsigned int index )
 {
-    // remoteSystemList in user thread
-    if( index < maximumNumberOfPeers )
-        if( remoteSystemList[index].isActive && remoteSystemList[index].connectMode == RakPeer::RemoteSystemStruct::CONNECTED ) // Don't give the user players that aren't fully connected, since sends will fail
-            return remoteSystemList[index].systemAddress;
+    // Don't give the user players that aren't fully connected, since sends will fail
+    PublishedRemoteSystem entry;
+    if( GetPublishedByIndex( index, entry ) && entry.connectMode == RakPeer::RemoteSystemStruct::CONNECTED )
+        return entry.systemAddress;
 
     return UNASSIGNED_SYSTEM_ADDRESS;
 }
@@ -1502,10 +1505,10 @@ SystemAddress RakPeer::GetSystemAddressFromIndex( unsigned int index )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakNetGUID RakPeer::GetGUIDFromIndex( unsigned int index )
 {
-    // remoteSystemList in user thread
-    if( index < maximumNumberOfPeers )
-        if( remoteSystemList[index].isActive && remoteSystemList[index].connectMode == RakPeer::RemoteSystemStruct::CONNECTED ) // Don't give the user players that aren't fully connected, since sends will fail
-            return remoteSystemList[index].guid;
+    // Don't give the user players that aren't fully connected, since sends will fail
+    PublishedRemoteSystem entry;
+    if( GetPublishedByIndex( index, entry ) && entry.connectMode == RakPeer::RemoteSystemStruct::CONNECTED )
+        return entry.guid;
 
     return UNASSIGNED_RAKNET_GUID;
 }
@@ -1521,16 +1524,16 @@ void RakPeer::GetSystemList( std::vector<SystemAddress>& addresses, std::vector<
     addresses.clear();
     guids.clear();
 
-    if( remoteSystemList == 0 || endThreads == true )
+    if( endThreads == true )
         return;
 
-    for( unsigned int i = 0; i < activeSystemListSize; i++ )
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    for( const PublishedRemoteSystem& entry : publishedView )
     {
-        if( ( activeSystemList[i] )->isActive &&
-            ( activeSystemList[i] )->connectMode == RakPeer::RemoteSystemStruct::CONNECTED )
+        if( entry.connectMode == RakPeer::RemoteSystemStruct::CONNECTED )
         {
-            addresses.emplace_back( ( activeSystemList[i] )->systemAddress );
-            guids.emplace_back( ( activeSystemList[i] )->guid );
+            addresses.emplace_back( entry.systemAddress );
+            guids.emplace_back( entry.guid );
         }
     }
 }
@@ -1962,11 +1965,11 @@ SystemAddress RakPeer::GetInternalID( const SystemAddress systemAddress, const i
     }
     else
     {
-        RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( systemAddress, false, true );
-        if( remoteSystem == 0 )
+        PublishedRemoteSystem entry;
+        if( GetPublishedByAddress( systemAddress, entry ) == false )
             return UNASSIGNED_SYSTEM_ADDRESS;
 
-        return remoteSystem->theirInternalSystemAddress[index];
+        return entry.theirInternalSystemAddress[index];
     }
 }
 
@@ -1992,27 +1995,14 @@ void RakPeer::SetInternalID( SystemAddress systemAddress, int index )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetExternalID( const SystemAddress target ) const
 {
-    unsigned i;
-    SystemAddress inactiveExternalId;
-
-    inactiveExternalId = UNASSIGNED_SYSTEM_ADDRESS;
-
     if( target == UNASSIGNED_SYSTEM_ADDRESS )
         return firstExternalID;
 
-    // First check for active connection with this systemAddress
-    for( i = 0; i < maximumNumberOfPeers; i++ )
-    {
-        if( remoteSystemList[i].systemAddress == target )
-        {
-            if( remoteSystemList[i].isActive )
-                return remoteSystemList[i].myExternalSystemAddress;
-            else if( remoteSystemList[i].myExternalSystemAddress != UNASSIGNED_SYSTEM_ADDRESS )
-                inactiveExternalId = remoteSystemList[i].myExternalSystemAddress;
-        }
-    }
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( target, entry ) == false )
+        return UNASSIGNED_SYSTEM_ADDRESS;
 
-    return inactiveExternalId;
+    return entry.myExternalSystemAddress;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2033,27 +2023,16 @@ SystemAddress RakPeer::GetMyBoundAddress( const int socketIndex )
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const RakNetGUID& RakPeer::GetGuidFromSystemAddress( const SystemAddress input ) const
+RakNetGUID RakPeer::GetGuidFromSystemAddress( const SystemAddress input ) const
 {
     if( input == UNASSIGNED_SYSTEM_ADDRESS )
         return myGuid;
 
-    if( input.systemIndex != (SystemIndex)-1 && input.systemIndex < maximumNumberOfPeers && remoteSystemList[input.systemIndex].systemAddress == input )
-        return remoteSystemList[input.systemIndex].guid;
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( input, entry ) == false )
+        return UNASSIGNED_RAKNET_GUID;
 
-    unsigned int i;
-    for( i = 0; i < maximumNumberOfPeers; i++ )
-    {
-        if( remoteSystemList[i].systemAddress == input )
-        {
-            // Set the systemIndex so future lookups will be fast
-            remoteSystemList[i].guid.systemIndex = (SystemIndex)i;
-
-            return remoteSystemList[i].guid;
-        }
-    }
-
-    return UNASSIGNED_RAKNET_GUID;
+    return entry.guid;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2094,22 +2073,11 @@ SystemAddress RakPeer::GetSystemAddressFromGuid( const RakNetGUID input ) const
     if( input == myGuid )
         return GetInternalID( UNASSIGNED_SYSTEM_ADDRESS );
 
-    if( input.systemIndex != (SystemIndex)-1 && input.systemIndex < maximumNumberOfPeers && remoteSystemList[input.systemIndex].guid == input )
-        return remoteSystemList[input.systemIndex].systemAddress;
+    PublishedRemoteSystem entry;
+    if( GetPublishedByGuid( input, entry ) == false )
+        return UNASSIGNED_SYSTEM_ADDRESS;
 
-    unsigned int i;
-    for( i = 0; i < maximumNumberOfPeers; i++ )
-    {
-        if( remoteSystemList[i].guid == input )
-        {
-            // Set the systemIndex so future lookups will be fast
-            remoteSystemList[i].guid.systemIndex = (SystemIndex)i;
-
-            return remoteSystemList[i].systemAddress;
-        }
-    }
-
-    return UNASSIGNED_SYSTEM_ADDRESS;
+    return entry.systemAddress;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2198,10 +2166,9 @@ RakNet::TimeMS RakPeer::GetTimeoutTime( const SystemAddress target )
     }
     else
     {
-        RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( target, false, true );
-
-        if( remoteSystem != 0 )
-            return remoteSystem->reliabilityLayer.GetTimeoutTime();
+        PublishedRemoteSystem entry;
+        if( GetPublishedByAddress( target, entry ) )
+            return entry.timeoutTime;
     }
     return defaultTimeoutTime;
 }
@@ -2213,12 +2180,9 @@ RakNet::TimeMS RakPeer::GetTimeoutTime( const SystemAddress target )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 int RakPeer::GetMTUSize( const SystemAddress target ) const
 {
-    if( target != UNASSIGNED_SYSTEM_ADDRESS )
-    {
-        RemoteSystemStruct* rss = GetRemoteSystemFromSystemAddress( target, false, true );
-        if( rss )
-            return rss->MTUSize;
-    }
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( target, entry ) )
+        return entry.MTUSize;
     return defaultMTUSize;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2748,12 +2712,9 @@ uint64_t RakPeer::GetOfflineMessagesDroppedAtCap( void ) const
     return offlineMessagesDroppedAtCap.load();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread ) const
+int RakPeer::GetRecordIndexFromSystemAddress( const SystemAddress systemAddress ) const
 {
-    unsigned i;
-
-    if( calledFromNetworkThread )
-        AssertInsideUpdateCycle();
+    AssertInsideUpdateCycle();
 
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         return -1;
@@ -2761,47 +2722,7 @@ int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress, bool 
     if( systemAddress.systemIndex != (SystemIndex)-1 && systemAddress.systemIndex < maximumNumberOfPeers && remoteSystemList[systemAddress.systemIndex].systemAddress == systemAddress && remoteSystemList[systemAddress.systemIndex].isActive )
         return systemAddress.systemIndex;
 
-    if( calledFromNetworkThread )
-    {
-        return GetRemoteSystemIndex( systemAddress );
-    }
-    else
-    {
-        // remoteSystemList in user and network thread
-        for( i = 0; i < maximumNumberOfPeers; i++ )
-            if( remoteSystemList[i].isActive && remoteSystemList[i].systemAddress == systemAddress )
-                return i;
-
-        // If no active results found, try previously active results.
-        for( i = 0; i < maximumNumberOfPeers; i++ )
-            if( remoteSystemList[i].systemAddress == systemAddress )
-                return i;
-    }
-
-    return -1;
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-int RakPeer::GetIndexFromGuid( const RakNetGUID guid )
-{
-    unsigned i;
-
-    if( guid == UNASSIGNED_RAKNET_GUID )
-        return -1;
-
-    if( guid.systemIndex != (SystemIndex)-1 && guid.systemIndex < maximumNumberOfPeers && remoteSystemList[guid.systemIndex].guid == guid && remoteSystemList[guid.systemIndex].isActive )
-        return guid.systemIndex;
-
-    // remoteSystemList in user and network thread
-    for( i = 0; i < maximumNumberOfPeers; i++ )
-        if( remoteSystemList[i].isActive && remoteSystemList[i].guid == guid )
-            return i;
-
-    // If no active results found, try previously active results.
-    for( i = 0; i < maximumNumberOfPeers; i++ )
-        if( remoteSystemList[i].guid == guid )
-            return i;
-
-    return -1;
+    return GetRemoteSystemIndex( systemAddress );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #if LIBCAT_SECURITY == 1
@@ -3018,22 +2939,12 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const Sy
     }
     else
     {
-        int deadConnectionIndex = -1;
-
-        // Active connections take priority.  But if there are no active connections, return the first systemAddress match found
+        // Only an open connection record answers (ADR-0007), whatever onlyActive says.
         for( i = 0; i < maximumNumberOfPeers; i++ )
         {
-            if( remoteSystemList[i].systemAddress == systemAddress )
-            {
-                if( remoteSystemList[i].isActive )
-                    return remoteSystemList + i;
-                else if( deadConnectionIndex == -1 )
-                    deadConnectionIndex = i;
-            }
+            if( remoteSystemList[i].isActive && remoteSystemList[i].systemAddress == systemAddress )
+                return remoteSystemList + i;
         }
-
-        if( deadConnectionIndex != -1 && onlyActive == false )
-            return remoteSystemList + deadConnectionIndex;
     }
 
     return 0;
@@ -3204,7 +3115,7 @@ void RakPeer::OnConnectionRequest( RakPeer::RemoteSystemStruct* remoteSystem, Ra
     BitStream bitStream;
     bitStream.Write( (MessageID)ID_CONNECTION_REQUEST_ACCEPTED );
     bitStream.Write( remoteSystem->systemAddress );
-    SystemIndex systemIndex = (SystemIndex)GetIndexFromSystemAddress( remoteSystem->systemAddress, true );
+    SystemIndex systemIndex = (SystemIndex)GetRecordIndexFromSystemAddress( remoteSystem->systemAddress );
     RakAssert( systemIndex != 65535 );
     bitStream.Write( systemIndex );
     for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
@@ -3374,7 +3285,7 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
             remoteSystem->lastReliableSend = time;
 
 #ifdef _DEBUG
-            int indexLoopupCheck = GetIndexFromSystemAddress( systemAddress, true );
+            int indexLoopupCheck = GetRecordIndexFromSystemAddress( systemAddress );
             if( (int)indexLoopupCheck != (int)assignedIndex )
             {
                 RakAssert( (int)indexLoopupCheck == (int)assignedIndex );
@@ -3621,7 +3532,9 @@ void RakPeer::PublishView( void )
         PublishedRemoteSystem entry;
         entry.index = i;
         entry.systemAddress = remoteSystem.systemAddress;
+        entry.systemAddress.systemIndex = (SystemIndex)i;
         entry.guid = remoteSystem.guid;
+        entry.guid.systemIndex = (SystemIndex)i;
         entry.connectMode = remoteSystem.connectMode;
         for( int j = 0; j < MAXIMUM_NUMBER_OF_INTERNAL_IDS; j++ )
             entry.theirInternalSystemAddress[j] = remoteSystem.theirInternalSystemAddress[j];
@@ -3635,8 +3548,15 @@ void RakPeer::PublishView( void )
         publishedViewBuilding.push_back( entry );
     }
 
-    std::lock_guard<std::mutex> guard( publishedViewMutex );
-    publishedView.swap( publishedViewBuilding );
+    {
+        std::lock_guard<std::mutex> guard( publishedViewMutex );
+        publishedView.swap( publishedViewBuilding );
+    }
+
+    // Only after the swap, so GetConnectionState finds each of these either here or in
+    // the view.
+    std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
+    requestsHandedToRecords.clear();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearPublishedView( void )
@@ -3992,7 +3912,7 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
     };
 
     if( systemIdentifier.systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
-        remoteSystemIndex = GetIndexFromSystemAddress( systemIdentifier.systemAddress, true );
+        remoteSystemIndex = GetRecordIndexFromSystemAddress( systemIdentifier.systemAddress );
     else if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
         remoteSystemIndex = GetSystemIndexFromGuid( systemIdentifier.rakNetGuid );
     else
@@ -4097,6 +4017,7 @@ void RakPeer::ClearRequestedConnectionList( void )
     requestedConnectionQueueMutex.lock();
     std::deque<RequestedConnectionStruct*> freeQueue( requestedConnectionQueue );
     requestedConnectionQueue.clear();
+    requestsHandedToRecords.clear();
     requestedConnectionQueueMutex.unlock();
 
     for( RequestedConnectionStruct* pConnection : freeQueue )
@@ -4309,7 +4230,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                 packet->data[0] = data[0];
                 packet->systemAddress = systemAddress;
                 packet->guid = remoteGuid;
-                packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetIndexFromSystemAddress( systemAddress, true );
+                packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetRecordIndexFromSystemAddress( systemAddress );
                 packet->guid.systemIndex = packet->systemAddress.systemIndex;
                 rakPeer->AddOfflinePacketToProducer( packet );
             }
@@ -4339,7 +4260,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                 length - sizeof( unsigned char ) - sizeof( RakNet::Time ) - RakNetGUID::size() - sizeof( OFFLINE_MESSAGE_DATA_ID ) );
 
             packet->systemAddress = systemAddress;
-            packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetIndexFromSystemAddress( systemAddress, true );
+            packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetRecordIndexFromSystemAddress( systemAddress );
             packet->guid.systemIndex = packet->systemAddress.systemIndex;
             rakPeer->AddOfflinePacketToProducer( packet );
         }
@@ -4375,7 +4296,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             }
 
             packet->systemAddress = systemAddress;
-            packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetIndexFromSystemAddress( systemAddress, true );
+            packet->systemAddress.systemIndex = (SystemIndex)rakPeer->GetRecordIndexFromSystemAddress( systemAddress );
             packet->guid.systemIndex = packet->systemAddress.systemIndex;
             rakPeer->AddOfflinePacketToProducer( packet );
         }
@@ -4698,6 +4619,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                         if( (*it)->systemAddress == systemAddress )
                         {
                             rakPeer->requestedConnectionQueue.erase( it );
+                            rakPeer->requestsHandedToRecords.push_back( systemAddress );
                             break;
                         }
                     }
@@ -5839,7 +5761,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                             {
                                 packet->bitSize = byteSize * 8;
                                 packet->systemAddress = systemAddress;
-                                packet->systemAddress.systemIndex = (SystemIndex)GetIndexFromSystemAddress( systemAddress, true );
+                                packet->systemAddress.systemIndex = (SystemIndex)GetRecordIndexFromSystemAddress( systemAddress );
                                 packet->guid = remoteSystem->guid;
                                 packet->guid.systemIndex = packet->systemAddress.systemIndex;
                                 AddPacketToProducer( packet );

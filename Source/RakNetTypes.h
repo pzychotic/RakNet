@@ -68,7 +68,8 @@ enum ConnectionState
     IS_DISCONNECTING,
     /// A connection attempt failed and will be aborted
     IS_SILENTLY_DISCONNECTING,
-    /// No longer connected
+    /// No longer connected. A hint that may never be seen: RakPeer reports a closed
+    /// connection as IS_NOT_CONNECTED.
     IS_DISCONNECTED,
     /// Was never connected, or else was disconnected long enough ago that the entry has been discarded
     IS_NOT_CONNECTED
