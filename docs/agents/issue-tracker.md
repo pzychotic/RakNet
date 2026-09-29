@@ -2,6 +2,10 @@
 
 Issues and specs for this repo live as markdown files in `.scratch/`.
 
+`.scratch/` is git-ignored and never committed. Move or rename ticket files with plain `mv`,
+not `git mv`, and don't `git add` them. Committed files (code, comments, ADRs, `CONTEXT.md`,
+commit messages) never reference `.scratch/` paths or ticket numbers.
+
 ## Conventions
 
 - One feature per directory: `.scratch/<feature-slug>/`

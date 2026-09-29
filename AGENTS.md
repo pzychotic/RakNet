@@ -22,3 +22,10 @@ objects created per remote message, is bounded before allocating. APIs that thro
 recoverable failure are off-limits: `std::stoi`, throwing `std::filesystem` overloads,
 `std::random_device`, `.at()`, `std::string`'s position-taking members, and the
 `std::thread` constructor. Tests are exempt. See `docs/adr/0004-raknet-is-exception-neutral.md`.
+
+### Conventions
+
+- In code comments, docs and commit messages, cite an ADR by number only ("ADR-0004"), not by file path.
+- Code comments state the settled fact. The reasoning behind a change goes in the commit
+  message, not the code. Don't reference tickets or `.scratch/`.
+- New files don't carry the Oculus VR copyright header. It belongs only to files inherited from upstream.
