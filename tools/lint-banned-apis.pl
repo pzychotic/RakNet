@@ -17,6 +17,8 @@
 #     not flagged at all.
 #   - `.value()` is flagged on every receiver, not only std::expected.
 #   - `std::thread` is flagged wherever it is named, not only where constructed.
+#   - the exception-mode macros are flagged wherever they are named, not only
+#     where a branch tests them.
 #   - a std::filesystem call or constructor passes when its last argument is a
 #     name declared as a std::error_code anywhere in the same file. Members of
 #     directory_entry and a directory iterator's `++` also throw, and are not
@@ -84,6 +86,12 @@ my @RULES = (
         id      => 'thread',
         re      => qr/\bstd::j?thread\b(?!\s*::\s*(?:id|hardware_concurrency)\b)/,
         message => 'The std::thread constructor throws. Create threads through RakThread',
+    },
+    {
+        id      => 'exception-mode',
+        re      => qr/\b(?:__cpp_exceptions|__EXCEPTIONS|__GXX_EXCEPTIONS|_CPPUNWIND|_HAS_EXCEPTIONS|cxx_exceptions)\b/,
+        message => 'A branch on the exception mode runs in only one mode, and CI tests only one. '
+                 . 'A suppression reopens exception-neutral issue 06',
     },
 );
 my %RULE_BY_ID = map { $_->{id} => $_ } @RULES;

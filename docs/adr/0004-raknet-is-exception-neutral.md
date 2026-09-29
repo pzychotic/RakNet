@@ -58,8 +58,9 @@ what happens when a System reaches it.
 
 ## What is off-limits in `Source/`
 
-These are APIs that report a recoverable failure by throwing. CI enforces this list, and
-the `throw`/`try`/`catch` ban, with `tools/lint-banned-apis.pl`. Change the two together.
+These are APIs that report a recoverable failure by throwing, and code that would behave
+differently in the two modes. CI enforces this list, and the `throw`/`try`/`catch` ban,
+with `tools/lint-banned-apis.pl`. Change the two together.
 A safe call is marked on its line with `// ADR-0004-allow(<rule>): <reason>`.
 
 - `std::stoi` and relatives. Use `std::from_chars`.
@@ -74,6 +75,11 @@ A safe call is marked on its line with `// ADR-0004-allow(<rule>): <reason>`.
   use `*`/`->`.
 - The `std::thread` constructor. It throws `std::system_error` for a failure the caller can
   handle, so thread creation goes through the native API.
+- Branching on the exception mode (rule `exception-mode`): `__cpp_exceptions`,
+  `__EXCEPTIONS`, `__GXX_EXCEPTIONS`, `_CPPUNWIND`, `_HAS_EXCEPTIONS` and
+  `__has_feature(cxx_exceptions)`. Such a branch creates a path that only one mode runs,
+  and CI runs the suite only with exceptions on. "Consequences" below depends on this ban,
+  so a suppression reopens the question of running the suite without exceptions.
 
 ## Null-returning allocators
 

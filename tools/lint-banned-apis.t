@@ -104,6 +104,22 @@ passes( "std::filesystem::path p( \"a\" );\n",     'filesystem::path is a type' 
 flags( "namespace fs = std::filesystem;\n",        'filesystem', 'namespace alias' );
 flags( "using namespace std::filesystem;\n",       'filesystem', 'using-directive' );
 
+# --- exception-mode ---------------------------------------------------------
+flags( "#if __cpp_exceptions\n#endif\n",           'exception-mode', '__cpp_exceptions' );
+flags( "#ifdef __EXCEPTIONS\n#endif\n",            'exception-mode', '__EXCEPTIONS' );
+flags( "#if defined( _CPPUNWIND )\n#endif\n",      'exception-mode', '_CPPUNWIND' );
+flags( "#if _HAS_EXCEPTIONS == 0\n#endif\n",       'exception-mode', '_HAS_EXCEPTIONS' );
+flags( "#ifdef __GXX_EXCEPTIONS\n#endif\n",        'exception-mode', '__GXX_EXCEPTIONS' );
+flags( "#if __has_feature( cxx_exceptions )\n#endif\n", 'exception-mode', '__has_feature( cxx_exceptions )' );
+passes( "// never test __cpp_exceptions or _CPPUNWIND here\n", 'exception-mode macro in a comment' );
+passes( "int MY__EXCEPTIONS = 0; int X_HAS_EXCEPTIONS_Y = 0;\n", 'identifiers containing the macro names' );
+passes( "#if __cpp_exceptions // ADR-0004-allow(exception-mode): both branches fail the same way\n#endif\n",
+        'suppressed exception-mode' );
+{
+    my ( $exit, $output ) = lint( 'a.cpp' => "#ifdef _CPPUNWIND\n#endif\n" );
+    like( $output, qr/\[exception-mode\] .*reopens exception-neutral issue 06/, 'exception-mode message says to reopen 06' );
+}
+
 # --- suppressions -----------------------------------------------------------
 passes( "int x = v.at( 3 ); // ADR-0004-allow(at): 3 < v.size() by construction\n",
         'suppression naming the rule' );
