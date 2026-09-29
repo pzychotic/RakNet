@@ -16,6 +16,12 @@ A Peer as seen from another Peer — the far side of a connection, held in a con
 record. The same running program is a Peer to itself and a System to everyone else.
 _Avoid_: Remote peer, host, endpoint
 
+**Connection record**:
+What a Peer holds about one System for the life of one connection to it, from the first
+handshake step until the connection closes. When a later connection is made, even to the
+same System, it gets a new connection record. A Peer holds a bounded number of them.
+_Avoid_: Slot, remote system entry
+
 **Half-open System**:
 A System that has begun the connection handshake but not completed it. It has a
 connection record but is not yet connected, and may send nothing but its connection
