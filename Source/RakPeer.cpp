@@ -2764,8 +2764,9 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     if( !systemAddress.FromStringExplicitPort( host, remotePort, socketList[connectionSocketIndex]->GetBoundAddress().GetIPVersion() ) )
         return CANNOT_RESOLVE_DOMAIN_NAME;
 
-    // Already connected?
-    if( GetRemoteSystemFromSystemAddress( systemAddress, false, true ) )
+    // Already connected? Advisory (ADR-0007): the network thread checks again when it acts.
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( systemAddress, entry ) )
         return ALREADY_CONNECTED_TO_ENDPOINT;
 
     RequestedConnectionStruct* rcs = RakNet::OP_NEW<RequestedConnectionStruct>( _FILE_AND_LINE_ );
@@ -2814,8 +2815,9 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     SystemAddress systemAddress;
     systemAddress.FromStringExplicitPort( host, remotePort );
 
-    // Already connected?
-    if( GetRemoteSystemFromSystemAddress( systemAddress, false, true ) )
+    // Already connected? Advisory (ADR-0007): the network thread checks again when it acts.
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( systemAddress, entry ) )
         return ALREADY_CONNECTED_TO_ENDPOINT;
 
     RequestedConnectionStruct* rcs = RakNet::OP_NEW<RequestedConnectionStruct>( _FILE_AND_LINE_ );

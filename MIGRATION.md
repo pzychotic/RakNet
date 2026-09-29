@@ -662,8 +662,10 @@ to one cycle old. The identity, state, ping and clock getters have moved so far:
 `GetMTUSize`, `GetTimeoutTime`, `GetAveragePing`, `GetLastPing`, `GetLowestPing` and
 `GetClockDifferential`, as has the clock differential `Receive` subtracts from an
 `ID_TIMESTAMP`. The statistics functions and `GetClientPublicKeyFromSystemAddress` ask
-the network thread instead, and wait for its answer. Three things change at runtime. One
-return type changed, which stops a build only in the narrow cases in the last paragraph.
+the network thread instead, and wait for its answer. `Connect` and `ConnectWithSocket`
+take their "already connected" answer from the snapshot too. Four things change at
+runtime. One return type changed, which stops a build only in the narrow cases in the last
+paragraph.
 
 **`GetConnectionState` reports a closed connection as `IS_NOT_CONNECTED`.** Stock returned
 `IS_DISCONNECTED` for as long as the closed connection's storage still held its address or
@@ -703,6 +705,12 @@ once too. If the answer takes longer than `BLOCKING_QUERY_TIMEOUT_MS`
 `GetStatistics( UNASSIGNED_SYSTEM_ADDRESS )`, which stock answered even after `Shutdown`.
 Under `RAKPEER_USER_THREADED`, and from the callback `SetUserUpdateThread` installs, they
 answer at once, since the calling thread is the one that runs the cycle.
+
+**`ALREADY_CONNECTED_TO_ENDPOINT` is best-effort.** `Connect` and `ConnectWithSocket` check
+the snapshot, so for up to one cycle the answer can lag. Just after a connection closes they
+can still return `ALREADY_CONNECTED_TO_ENDPOINT`. Call again on a later cycle. Just after one
+opens they can return `CONNECTION_ATTEMPT_STARTED`. The open connection carries on, and
+`Receive` may get `ID_ALREADY_CONNECTED` for the redundant attempt.
 
 **`GetGuidFromSystemAddress` returns `RakNetGUID`, not `const RakNetGUID&`.** The answer is a
 copy out of the snapshot, so there's nothing for a reference to point at. Code that copies

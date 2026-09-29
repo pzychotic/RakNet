@@ -143,6 +143,7 @@ public:
     /// \param[in] timeoutTime How long to keep the connection alive before dropping it on unable to send a reliable message. 0 to use the default from SetTimeoutTime(UNASSIGNED_SYSTEM_ADDRESS);
     /// \return CONNECTION_ATTEMPT_STARTED on successful initiation. Otherwise, an appropriate enumeration indicating failure.
     /// \note CONNECTION_ATTEMPT_STARTED does not mean you are already connected!
+    /// \note ALREADY_CONNECTED_TO_ENDPOINT is best-effort: it comes from a snapshot up to one update cycle old (ADR-0007). Just after a connection closes it can still be returned, so call again later. Just after one opens, CONNECTION_ATTEMPT_STARTED can be returned instead. The existing connection carries on, and Receive() may get ID_ALREADY_CONNECTED for the redundant attempt.
     /// \note It is possible to immediately get back ID_CONNECTION_ATTEMPT_FAILED if you exceed the maxConnections parameter passed to Startup(). This could happen if you call CloseConnection() with sendDisconnectionNotificaiton true, then immediately call Connect() before the connection has closed.
     virtual ConnectionAttemptResult Connect( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, PublicKey* publicKey = 0, unsigned connectionSocketIndex = 0, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = 0;
 
@@ -157,6 +158,7 @@ public:
     /// \param[in] timeoutTime How long to keep the connection alive before dropping it on unable to send a reliable message. 0 to use the default from SetTimeoutTime(UNASSIGNED_SYSTEM_ADDRESS);
     /// \return CONNECTION_ATTEMPT_STARTED on successful initiation. Otherwise, an appropriate enumeration indicating failure.
     /// \note CONNECTION_ATTEMPT_STARTED does not mean you are already connected!
+    /// \note ALREADY_CONNECTED_TO_ENDPOINT is best-effort, as for Connect().
     virtual ConnectionAttemptResult ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey = 0, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = 0;
 
     /// \brief Stops the network threads and closes all connections.

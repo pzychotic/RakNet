@@ -45,6 +45,7 @@ include( Catch )
 set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ComprehensiveConvertTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ConnectAlreadyConnectedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectWithSocketTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectionGettersViewTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectionRequestEchoTest.cpp

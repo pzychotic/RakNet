@@ -157,6 +157,7 @@ public:
     /// \param[in] timeoutTime Time to elapse before dropping the connection if a reliable message could not be sent. 0 to use the default value from SetTimeoutTime(UNASSIGNED_SYSTEM_ADDRESS);
     /// \return CONNECTION_ATTEMPT_STARTED on successful initiation. Otherwise, an appropriate enumeration indicating failure.
     /// \note CONNECTION_ATTEMPT_STARTED does not mean you are already connected!
+    /// \note ALREADY_CONNECTED_TO_ENDPOINT is best-effort: it comes from a snapshot up to one update cycle old (ADR-0007). Just after a connection closes it can still be returned, so call again later. Just after one opens, CONNECTION_ATTEMPT_STARTED can be returned instead. The existing connection carries on, and Receive() may get ID_ALREADY_CONNECTED for the redundant attempt.
     /// \note It is possible to immediately get back ID_CONNECTION_ATTEMPT_FAILED if you exceed the maxConnections parameter passed to Startup(). This could happen if you call CloseConnection() with sendDisconnectionNotificaiton true, then immediately call Connect() before the connection has closed.
     ConnectionAttemptResult Connect( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, PublicKey* publicKey = 0, unsigned connectionSocketIndex = 0, unsigned sendConnectionAttemptCount = 6, unsigned timeBetweenSendConnectionAttemptsMS = 1000, RakNet::TimeMS timeoutTime = 0 );
 
@@ -171,6 +172,7 @@ public:
     /// \param[in] timeoutTime Time to elapse before dropping the connection if a reliable message could not be sent. 0 to use the default from SetTimeoutTime(UNASSIGNED_SYSTEM_ADDRESS);
     /// \return CONNECTION_ATTEMPT_STARTED on successful initiation. Otherwise, an appropriate enumeration indicating failure.
     /// \note CONNECTION_ATTEMPT_STARTED does not mean you are already connected!
+    /// \note ALREADY_CONNECTED_TO_ENDPOINT is best-effort, as for Connect().
     virtual ConnectionAttemptResult ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey = 0, unsigned sendConnectionAttemptCount = 6, unsigned timeBetweenSendConnectionAttemptsMS = 1000, RakNet::TimeMS timeoutTime = 0 );
 
     /// \brief Stops the network threads and closes all connections.
@@ -902,9 +904,8 @@ protected:
     unsigned char incomingPasswordLength;
 
     /// The connection records. Network thread only: nothing guards them, so the user thread
-    /// reads the published view instead (ADR-0007). The getters that take the
-    /// `calledFromNetworkThread == false` branches still read it from the user thread, and
-    /// are yet to move onto the view.
+    /// reads the published view instead (ADR-0007). SetTimeoutTime still reads them
+    /// from the user thread, through the `calledFromNetworkThread == false` branch.
     ///
     /// This is an array of pointers to RemoteSystemStruct
     /// This allows us to preallocate the list when starting, so we don't have to allocate or delete at runtime.
