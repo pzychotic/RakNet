@@ -208,6 +208,7 @@ RakPeer::RakPeer()
     incomingDatagramEventHandler = 0;
     receivedDatagramsDroppedAtCap = 0;
     offlineMessagesDroppedAtCap = 0;
+    insideUpdateCycle = false;
 
     occasionalPing = false;
     for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
@@ -453,6 +454,13 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         {
             remoteSystemLookup[i] = 0;
         }
+
+        // Empty, and big enough that PublishView never allocates.
+        std::lock_guard<std::mutex> guard( publishedViewMutex );
+        publishedView.clear();
+        publishedView.reserve( maximumNumberOfPeers );
+        publishedViewBuilding.clear();
+        publishedViewBuilding.reserve( maximumNumberOfPeers );
     }
 
     if( endThreads )
@@ -849,6 +857,9 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     }
 
 #endif // RAKPEER_USER_THREADED!=1
+
+    // No cycle publishes again, so this empties the view before the records it copies go.
+    ClearPublishedView();
 
     // remoteSystemList in Single thread
     for( unsigned int i = 0; i < systemListSize; i++ )
@@ -1784,26 +1795,39 @@ bool RakPeer::Ping( const char* host, unsigned short remotePort, bool onlyReplyO
 // Parameters:
 // target - whose time to read
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// The ping summary as GetAveragePing and GetLastPing report it. PublishView computes the
+// published view's copy with the same two functions.
+static int AveragePingOf( const RakPeer::RemoteSystemStruct& remoteSystem )
+{
+    int sum = 0;
+    int quantity;
+    for( quantity = 0; quantity < PING_TIMES_ARRAY_SIZE; quantity++ )
+    {
+        if( remoteSystem.pingAndClockDifferential[quantity].pingTime == 65535 )
+            break;
+        sum += remoteSystem.pingAndClockDifferential[quantity].pingTime;
+    }
+
+    if( quantity > 0 )
+        return sum / quantity;
+    return -1;
+}
+
+static int LastPingOf( const RakPeer::RemoteSystemStruct& remoteSystem )
+{
+    if( remoteSystem.pingAndClockDifferentialWriteIndex == 0 )
+        return remoteSystem.pingAndClockDifferential[PING_TIMES_ARRAY_SIZE - 1].pingTime;
+    return remoteSystem.pingAndClockDifferential[remoteSystem.pingAndClockDifferentialWriteIndex - 1].pingTime;
+}
+
 int RakPeer::GetAveragePing( const AddressOrGUID systemIdentifier )
 {
-    int sum, quantity;
     RemoteSystemStruct* remoteSystem = GetRemoteSystem( systemIdentifier, false, false );
 
     if( remoteSystem == 0 )
         return -1;
 
-    for( sum = 0, quantity = 0; quantity < PING_TIMES_ARRAY_SIZE; quantity++ )
-    {
-        if( remoteSystem->pingAndClockDifferential[quantity].pingTime == 65535 )
-            break;
-        else
-            sum += remoteSystem->pingAndClockDifferential[quantity].pingTime;
-    }
-
-    if( quantity > 0 )
-        return sum / quantity;
-    else
-        return -1;
+    return AveragePingOf( *remoteSystem );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1822,10 +1846,7 @@ int RakPeer::GetLastPing( const AddressOrGUID systemIdentifier ) const
 
     //  return (int)(remoteSystem->reliabilityLayer.GetAckPing()/(RakNet::TimeUS)1000);
 
-    if( remoteSystem->pingAndClockDifferentialWriteIndex == 0 )
-        return remoteSystem->pingAndClockDifferential[PING_TIMES_ARRAY_SIZE - 1].pingTime;
-    else
-        return remoteSystem->pingAndClockDifferential[remoteSystem->pingAndClockDifferentialWriteIndex - 1].pingTime;
+    return LastPingOf( *remoteSystem );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2731,6 +2752,9 @@ int RakPeer::GetIndexFromSystemAddress( const SystemAddress systemAddress, bool 
 {
     unsigned i;
 
+    if( calledFromNetworkThread )
+        AssertInsideUpdateCycle();
+
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         return -1;
 
@@ -2973,6 +2997,9 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const AddressOrGUID syste
 RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread, bool onlyActive ) const
 {
     unsigned i;
+
+    if( calledFromNetworkThread )
+        AssertInsideUpdateCycle();
 
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         return 0;
@@ -3385,7 +3412,8 @@ void RakPeer::ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& 
 // Thanks to Chris Taylor (cat02e@fsu.edu) for the improved timestamping algorithm
 RakNet::Time RakPeer::GetBestClockDifferential( const SystemAddress systemAddress ) const
 {
-    RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( systemAddress, true, true );
+    // Receive calls this, on the user's thread, so it may not take the network-thread path.
+    RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( systemAddress, false, true );
 
     if( remoteSystem == 0 )
         return 0;
@@ -3400,6 +3428,8 @@ unsigned int RakPeer::RemoteSystemLookupHashIndex( const SystemAddress& sa ) con
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remoteSystemListIndex )
 {
+    AssertInsideUpdateCycle();
+
     // #ifdef _DEBUG
     //  for ( int remoteSystemIndex = 0; remoteSystemIndex < maximumNumberOfPeers; ++remoteSystemIndex )
     //  {
@@ -3481,6 +3511,8 @@ void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remot
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::DereferenceRemoteSystem( const SystemAddress& sa )
 {
+    AssertInsideUpdateCycle();
+
     unsigned int hashIndex = RemoteSystemLookupHashIndex( sa );
     RemoteSystemIndex* cur = remoteSystemLookup[hashIndex];
     RemoteSystemIndex* last = 0;
@@ -3506,6 +3538,8 @@ void RakPeer::DereferenceRemoteSystem( const SystemAddress& sa )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::GetRemoteSystemIndex( const SystemAddress& sa ) const
 {
+    AssertInsideUpdateCycle();
+
     unsigned int hashIndex = RemoteSystemLookupHashIndex( sa );
     RemoteSystemIndex* cur = remoteSystemLookup[hashIndex];
     while( cur != 0 )
@@ -3530,6 +3564,91 @@ void RakPeer::ClearRemoteSystemLookup( void )
     remoteSystemIndexPool.Clear( _FILE_AND_LINE_ );
     RakNet::OP_DELETE_ARRAY( remoteSystemLookup, _FILE_AND_LINE_ );
     remoteSystemLookup = 0;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Copies the first entry of \a view that \a matches into \a out. The caller holds the view's mutex.
+template<class Entry, class Matches>
+static bool CopyFirstMatch( const std::vector<Entry>& view, Matches matches, Entry& out )
+{
+    for( const Entry& entry : view )
+    {
+        if( matches( entry ) )
+        {
+            out = entry;
+            return true;
+        }
+    }
+    return false;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::GetPublishedByAddress( const SystemAddress& systemAddress, PublishedRemoteSystem& out ) const
+{
+    if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
+        return false;
+
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    return CopyFirstMatch( publishedView, [&]( const PublishedRemoteSystem& entry ) { return entry.systemAddress == systemAddress; }, out );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::GetPublishedByGuid( const RakNetGUID& guid, PublishedRemoteSystem& out ) const
+{
+    if( guid == UNASSIGNED_RAKNET_GUID )
+        return false;
+
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    return CopyFirstMatch( publishedView, [&]( const PublishedRemoteSystem& entry ) { return entry.guid == guid; }, out );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::GetPublishedByIndex( unsigned int index, PublishedRemoteSystem& out ) const
+{
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    return CopyFirstMatch( publishedView, [&]( const PublishedRemoteSystem& entry ) { return entry.index == index; }, out );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::PublishView( void )
+{
+    // Built without the mutex, since only this thread touches the records or this vector,
+    // and swapped in under it, so a reader waits for a swap rather than a copy. Both
+    // vectors were reserved to maximumNumberOfPeers in Startup, and a swap keeps capacity,
+    // so nothing here allocates.
+    publishedViewBuilding.clear();
+    for( unsigned int i = 0; remoteSystemList != 0 && i < maximumNumberOfPeers; i++ )
+    {
+        RemoteSystemStruct& remoteSystem = remoteSystemList[i];
+        if( remoteSystem.isActive == false )
+            continue;
+
+        PublishedRemoteSystem entry;
+        entry.index = i;
+        entry.systemAddress = remoteSystem.systemAddress;
+        entry.guid = remoteSystem.guid;
+        entry.connectMode = remoteSystem.connectMode;
+        for( int j = 0; j < MAXIMUM_NUMBER_OF_INTERNAL_IDS; j++ )
+            entry.theirInternalSystemAddress[j] = remoteSystem.theirInternalSystemAddress[j];
+        entry.myExternalSystemAddress = remoteSystem.myExternalSystemAddress;
+        entry.MTUSize = remoteSystem.MTUSize;
+        entry.timeoutTime = remoteSystem.reliabilityLayer.GetTimeoutTime();
+        entry.averagePing = AveragePingOf( remoteSystem );
+        entry.lastPing = LastPingOf( remoteSystem );
+        entry.lowestPing = remoteSystem.lowestPing;
+        entry.clockDifferential = GetClockDifferentialInt( &remoteSystem );
+        publishedViewBuilding.push_back( entry );
+    }
+
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    publishedView.swap( publishedViewBuilding );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::ClearPublishedView( void )
+{
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    publishedView.clear();
+    publishedViewBuilding.clear();
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::AssertInsideUpdateCycle( void ) const
+{
+    RakAssert( insideUpdateCycle.load() );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::AddToActiveSystemList( unsigned int remoteSystemListIndex )
@@ -5047,6 +5166,17 @@ unsigned int RakPeer::GetRakNetSocketFromUserConnectionSocketIndex( unsigned int
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
+{
+    insideUpdateCycle = true;
+    const bool result = RunUpdateCycleBody( updateBitStream );
+    PublishView();
+    insideUpdateCycle = false;
+    return result;
+}
+
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 {
     RakPeer::RemoteSystemStruct* remoteSystem;
     unsigned int activeSystemListIndex;

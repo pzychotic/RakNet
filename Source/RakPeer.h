@@ -760,6 +760,45 @@ protected:
     /// \returns The clock differential for a certain player.
     RakNet::Time GetBestClockDifferential( const SystemAddress systemAddress ) const;
 
+    /// \internal
+    /// What the user thread may know about one open connection record, meaning one whose
+    /// isActive is set, half-open ones included. The network thread copies it out of the
+    /// record at the end of every RunUpdateCycle (ADR-0007, point 4). It points at nothing in
+    /// the connection records.
+    struct PublishedRemoteSystem
+    {
+        unsigned int index; ///< Into remoteSystemList
+        SystemAddress systemAddress;
+        RakNetGUID guid;
+        RemoteSystemStruct::ConnectMode connectMode;
+        SystemAddress theirInternalSystemAddress[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
+        SystemAddress myExternalSystemAddress;
+        int MTUSize;
+        RakNet::TimeMS timeoutTime;
+        int averagePing;                ///< As GetAveragePing computes it
+        int lastPing;                   ///< As GetLastPing computes it
+        int lowestPing;                 ///< As GetLowestPing computes it
+        RakNet::Time clockDifferential; ///< As GetClockDifferential and GetBestClockDifferential, which compute the same value
+    };
+
+    /// Copy the entry for \a systemAddress, \a guid or remoteSystemList \a index out of the
+    /// published view. False, leaving \a out alone, if the view has no such entry. Callable
+    /// from any thread.
+    bool GetPublishedByAddress( const SystemAddress& systemAddress, PublishedRemoteSystem& out ) const;
+    bool GetPublishedByGuid( const RakNetGUID& guid, PublishedRemoteSystem& out ) const;
+    bool GetPublishedByIndex( unsigned int index, PublishedRemoteSystem& out ) const;
+
+    /// The body of RunUpdateCycle, which wraps it in insideUpdateCycle and PublishView.
+    bool RunUpdateCycleBody( BitStream& updateBitStream );
+    /// Rebuild the published view from the open connection records and swap it in.
+    /// Network thread only.
+    void PublishView( void );
+    /// Empty the published view, for Shutdown.
+    void ClearPublishedView( void );
+    /// In debug builds, assert the caller is inside RunUpdateCycle. Every lookup that goes
+    /// straight to the connection records calls it (ADR-0007, point 6).
+    void AssertInsideUpdateCycle( void ) const;
+
     bool IsLoopbackAddress( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
     SystemAddress GetLoopbackAddress( void ) const;
 
@@ -780,6 +819,11 @@ protected:
     char incomingPassword[256];
     unsigned char incomingPasswordLength;
 
+    /// The connection records. Network thread only: nothing guards them, so the user thread
+    /// reads the published view instead (ADR-0007). The getters that take the
+    /// `calledFromNetworkThread == false` branches still read it from the user thread, and
+    /// are yet to move onto the view.
+    ///
     /// This is an array of pointers to RemoteSystemStruct
     /// This allows us to preallocate the list when starting, so we don't have to allocate or delete at runtime.
     /// Another benefit is that is lets us add and remove active players simply by setting systemAddress
@@ -806,6 +850,18 @@ protected:
 
     void AddToActiveSystemList( unsigned int remoteSystemListIndex );
     void RemoveFromActiveSystemList( const SystemAddress& sa );
+
+    /// The published view: one PublishedRemoteSystem per open connection record, in index
+    /// order. Guarded by publishedViewMutex. Both vectors are reserved to
+    /// maximumNumberOfPeers in Startup, so publishing never allocates.
+    std::vector<PublishedRemoteSystem> publishedView;
+    /// PublishView builds the next view here without the mutex, then swaps it in. Network
+    /// thread only.
+    std::vector<PublishedRemoteSystem> publishedViewBuilding;
+    mutable std::mutex publishedViewMutex;
+    /// Set while RunUpdateCycle runs. A flag rather than a thread id, so it holds under
+    /// RAKPEER_USER_THREADED too.
+    std::atomic<bool> insideUpdateCycle;
 
     std::mutex offlinePingResponseMutex;
     ///RunUpdateCycle is not thread safe but we don't need to mutex calls. Just skip calls if it is running already

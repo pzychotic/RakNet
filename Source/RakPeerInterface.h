@@ -31,6 +31,22 @@ struct RakNetStatistics;
 
 /// The primary interface for RakNet, RakPeer contains all major functions for the library.
 /// See the individual functions for what the class can do.
+///
+/// \par Threading
+/// A Peer runs a network thread of its own, which does the sending, receiving and
+/// connection handling; plugins run on your thread, inside Receive(). What that means for
+/// calls made from your thread (ADR-0007):
+/// - You may call any getter from any thread. Each answer is a snapshot taken by the
+///   network thread, and may be up to one update cycle old. It can describe a connection
+///   that closes right after the call returns.
+/// - Connect(), CloseConnection() and the per-connection setters are queued for the network
+///   thread. A getter called straight after one of them may still answer from the state
+///   before it, until the network thread's next cycle has run.
+/// - Only open connections are authoritative. IS_DISCONNECTED is a hint that may never
+///   appear: a closed connection can go straight to IS_NOT_CONNECTED.
+///
+/// That is the contract. Some getters still read the connection records directly, and are
+/// being moved onto the network thread's snapshot.
 /// \brief The main interface for network communications
 class RAK_DLL_EXPORT RakPeerInterface
 {
