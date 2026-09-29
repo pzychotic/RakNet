@@ -655,11 +655,13 @@ Stock read the connection records from your thread while the network thread was 
 them, with no lock. Here the network thread publishes a snapshot of the open connections at
 the end of every update cycle, and the getters read that
 ([ADR-0007](docs/adr/0007-the-user-thread-reads-a-published-view.md)). An answer can be up
-to one cycle old. The identity and state getters have moved so far:
+to one cycle old. The identity, state, ping and clock getters have moved so far:
 `GetConnectionState`, `GetIndexFromSystemAddress`, `GetSystemAddressFromIndex`,
 `GetGUIDFromIndex`, `GetSystemList`, `NumberOfConnections`, `GetConnectionList`,
 `GetGuidFromSystemAddress`, `GetSystemAddressFromGuid`, `GetInternalID`, `GetExternalID`,
-`GetMTUSize` and `GetTimeoutTime`. Two things change at runtime. One return type changed,
+`GetMTUSize`, `GetTimeoutTime`, `GetAveragePing`, `GetLastPing`, `GetLowestPing` and
+`GetClockDifferential`, as has the clock differential `Receive` subtracts from an
+`ID_TIMESTAMP`. Two things change at runtime. One return type changed,
 which stops a build only in the narrow cases in the last paragraph.
 
 **`GetConnectionState` reports a closed connection as `IS_NOT_CONNECTED`.** Stock returned
@@ -678,8 +680,9 @@ went on answering for it after it closed. Now, once a connection is closed:
   `GetGuidFromSystemAddress` returns `UNASSIGNED_RAKNET_GUID`.
 - `GetInternalID` and `GetExternalID` return `UNASSIGNED_SYSTEM_ADDRESS`.
 - `GetMTUSize` and `GetTimeoutTime` return the defaults, as for an address never connected.
-- `GetStatistics( SystemAddress )` returns 0, and `GetAveragePing`, `GetLastPing` and
-  `GetLowestPing` by address return -1.
+- `GetStatistics( SystemAddress )` returns 0.
+- `GetAveragePing`, `GetLastPing` and `GetLowestPing` return -1, and `GetClockDifferential`
+  returns 0, whether you ask by address or by RakNetGUID.
 
 If you need one of these after the connection closes, read it while the connection is open,
 or when `ID_DISCONNECTION_NOTIFICATION` or `ID_CONNECTION_LOST` arrives, since

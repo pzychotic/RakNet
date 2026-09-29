@@ -1,6 +1,7 @@
 #include "ConnectionWaits.h"
 #include "GetTime.h"
 #include "RakNetStringMakers.h"
+#include "RakPeer.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -8,6 +9,8 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -15,8 +18,8 @@
 #include <vector>
 
 /*
-Pins the identity and state getters to the published view that RakPeer's network thread
-copies out of its connection records (ADR-0007).
+Pins the identity, state, ping and clock getters to the published view that RakPeer's
+network thread copies out of its connection records (ADR-0007).
 
 The shapes pinned here:
 
@@ -24,9 +27,12 @@ The shapes pinned here:
 - Once it closes, none of them answers for it: GetConnectionState says IS_NOT_CONNECTED,
   never IS_DISCONNECTED, and the index, address, RakNetGUID and per-connection values are
   the "not found" ones. Only open connection records answer (ADR-0007, point 3).
+- Once pings have settled, the ping and clock getters answer on the user thread, by address
+  and by RakNetGUID, what the network thread works out from its connection records.
 - Under churn, with clients connecting and disconnecting while other threads call every
   getter, each answer is coherent: an address and a RakNetGUID returned together belong to
-  one client, and within one connection the state never moves backwards.
+  one client, within one connection the state never moves backwards, and every ping is
+  either "none" or one loopback allows.
 
 RakPeerInterface functions explicitly tested:
 
@@ -43,6 +49,10 @@ RakPeerInterface functions explicitly tested:
     GetExternalID
     GetMTUSize
     GetTimeoutTime
+    GetAveragePing
+    GetLastPing
+    GetLowestPing
+    GetClockDifferential
 */
 
 using namespace RakNet;
@@ -54,6 +64,14 @@ constexpr unsigned short kClosedServerPort = 62000;
 constexpr unsigned short kClosedClientPort = 62001;
 constexpr unsigned short kChurnServerPort = 62010;
 constexpr unsigned short kChurnClientBasePort = 62011;
+constexpr unsigned short kPingServerPort = 62020;
+constexpr unsigned short kPingClientPort = 62021;
+
+// What GetLastPing and GetLowestPing answer for a connection no pong has reached yet.
+constexpr int kNoPingYet = 65535;
+// The churn applies no network simulator, so a loopback ping is a few milliseconds. This
+// is a stuck-somewhere ceiling, loose enough for a loaded machine.
+constexpr int kMaxLoopbackPingMs = 1000;
 
 constexpr int kChurnClients = 4;
 constexpr int kReaderThreads = 2;
@@ -63,13 +81,67 @@ constexpr TimeMS kChurnBudgetMs = 60000;
 // Hang guard for each wait below.
 constexpr TimeMS kWaitBudgetMs = 10000;
 
+/// Everything the ping and clock getters answer for one remote system.
+struct PingSummary
+{
+    int average;
+    int last;
+    int lowest;
+    Time clockDifferential;
+};
+
+bool operator==( const PingSummary& a, const PingSummary& b )
+{
+    return a.average == b.average && a.last == b.last && a.lowest == b.lowest && a.clockDifferential == b.clockDifferential;
+}
+
+/// A RakPeer that can work out the ping summary straight from its connection records, which
+/// are protected in RakPeer. Built directly rather than through GetInstance, so it can be
+/// this subclass.
+class RecordReadingPeer : public RakPeer
+{
+public:
+    /// Network thread only. The formulas are the ones the stock getters used on the records:
+    /// the mean of the filled ping slots, the slot before the write index, the lowest ping
+    /// seen, and the clock differential of the lowest-ping slot.
+    bool PingSummaryFromRecords( const SystemAddress& address, PingSummary& out ) const
+    {
+        for( unsigned int i = 0; i < GetMaximumNumberOfPeers(); i++ )
+        {
+            const RemoteSystemStruct& record = remoteSystemList[i];
+            if( record.isActive == false || record.systemAddress != address )
+                continue;
+
+            int sum = 0;
+            int filled = 0;
+            int lowestSlot = kNoPingYet;
+            out.clockDifferential = 0;
+            for( ; filled < PING_TIMES_ARRAY_SIZE && record.pingAndClockDifferential[filled].pingTime != kNoPingYet; filled++ )
+            {
+                sum += record.pingAndClockDifferential[filled].pingTime;
+                if( record.pingAndClockDifferential[filled].pingTime < lowestSlot )
+                {
+                    lowestSlot = record.pingAndClockDifferential[filled].pingTime;
+                    out.clockDifferential = record.pingAndClockDifferential[filled].clockDifferential;
+                }
+            }
+            out.average = filled > 0 ? sum / filled : -1;
+            const unsigned int lastSlot = ( (unsigned int)record.pingAndClockDifferentialWriteIndex + PING_TIMES_ARRAY_SIZE - 1 ) % PING_TIMES_ARRAY_SIZE;
+            out.last = record.pingAndClockDifferential[lastSlot].pingTime;
+            out.lowest = record.lowestPing;
+            return true;
+        }
+        return false;
+    }
+};
+
 /// A Peer bound to 127.0.0.1 on a fixed port, that counts its update cycles and is shut
 /// down before it is destroyed.
 class CountedPeer
 {
 public:
     CountedPeer( unsigned short port, unsigned int maxConnections )
-    : peer( RakPeerInterface::GetInstance() )
+    : peer( new RecordReadingPeer )
     {
         SocketDescriptor socketDescriptor( port, "127.0.0.1" );
         REQUIRE( peer->Startup( maxConnections, &socketDescriptor, 1 ) == RAKNET_STARTED );
@@ -82,14 +154,14 @@ public:
     {
         // The network thread calls CountCycle, so it has to be gone before this is.
         peer->Shutdown( 0 );
-        RakPeerInterface::DestroyInstance( peer );
     }
 
     CountedPeer( const CountedPeer& ) = delete;
     CountedPeer& operator=( const CountedPeer& ) = delete;
 
-    RakPeerInterface* operator->() const { return peer; }
-    RakPeerInterface* Get() const { return peer; }
+    RakPeerInterface* operator->() const { return peer.get(); }
+    RakPeerInterface* Get() const { return peer.get(); }
+    const RecordReadingPeer& Records() const { return *peer; }
     const SystemAddress& Address() const { return address; }
     RakNetGUID Guid() const { return peer->GetMyGUID(); }
 
@@ -110,15 +182,51 @@ public:
         return true;
     }
 
+    /// Runs \a work on the network thread, between two update cycles, and blocks until it
+    /// has run. Nothing else touches the connection records while it runs.
+    bool RunOnNetworkThread( std::function<void()> work )
+    {
+        {
+            std::lock_guard<std::mutex> guard( workMutex );
+            pendingWork = std::move( work );
+        }
+        const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
+        for( ;; )
+        {
+            {
+                std::lock_guard<std::mutex> guard( workMutex );
+                if( !pendingWork )
+                    return true;
+                if( ConnectionWaits::Expired( deadline ) )
+                {
+                    pendingWork = nullptr;
+                    return false;
+                }
+            }
+            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+        }
+    }
+
 private:
     static void CountCycle( RakPeerInterface*, void* data )
     {
-        ++static_cast<CountedPeer*>( data )->cycles;
+        CountedPeer* self = static_cast<CountedPeer*>( data );
+        {
+            std::lock_guard<std::mutex> guard( self->workMutex );
+            if( self->pendingWork )
+            {
+                self->pendingWork();
+                self->pendingWork = nullptr;
+            }
+        }
+        ++self->cycles;
     }
 
-    RakPeerInterface* peer;
+    std::unique_ptr<RecordReadingPeer> peer;
     SystemAddress address;
     std::atomic<unsigned long long> cycles{ 0 };
+    std::mutex workMutex;
+    std::function<void()> pendingWork;
 };
 
 /// Polls \a condition, draining both Peers, until it holds or the budget is spent.
@@ -217,6 +325,90 @@ TEST_CASE( "The identity and state getters describe an open connection, and stop
 
 namespace {
 
+PingSummary ReadPingSummary( RakPeerInterface* peer, const AddressOrGUID& systemIdentifier )
+{
+    return PingSummary{ peer->GetAveragePing( systemIdentifier ), peer->GetLastPing( systemIdentifier ), peer->GetLowestPing( systemIdentifier ),
+                        peer->GetClockDifferential( systemIdentifier ) };
+}
+
+/// Drains both Peers for \a milliseconds.
+void DrainFor( CountedPeer& a, CountedPeer& b, TimeMS milliseconds )
+{
+    const TimeMS deadline = GetTimeMS() + milliseconds;
+    while( ConnectionWaits::Expired( deadline ) == false )
+    {
+        ConnectionWaits::Drain( a.Get() );
+        ConnectionWaits::Drain( b.Get() );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+    }
+}
+
+} // namespace
+
+TEST_CASE( "The ping and clock getters answer on the user thread what the network thread computes", "[network]" )
+{
+    CountedPeer server( kPingServerPort, 1 );
+    CountedPeer client( kPingClientPort, 1 );
+    const SystemAddress clientAddress = client.Address();
+    const RakNetGUID clientGuid = client.Guid();
+
+    // Delays the client's pongs, so the server's pings differ from each other and from 0.
+    // The simulator only runs in Debug builds.
+    client->ApplyNetworkSimulator( 0.0f, 10, 20 );
+
+    REQUIRE( client->Connect( "127.0.0.1", kPingServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
+    REQUIRE( WaitFor( client, server, [&] {
+        return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
+               server->GetConnectionState( clientAddress ) == IS_CONNECTED;
+    } ) );
+
+    // Occasional pings are off, so once these pongs are back the server's ping records hold
+    // still.
+    for( int i = 0; i < 6; i++ )
+    {
+        server->Ping( clientAddress );
+        DrainFor( client, server, 40 );
+    }
+    DrainFor( client, server, 500 );
+    REQUIRE( server.WaitForAFullCycle() );
+
+    PingSummary fromRecords{};
+    bool foundInRecords = false;
+    REQUIRE( server.RunOnNetworkThread( [&] { foundInRecords = server.Records().PingSummaryFromRecords( clientAddress, fromRecords ); } ) );
+    REQUIRE( foundInRecords );
+    const PingSummary byAddress = ReadPingSummary( server.Get(), clientAddress );
+    const PingSummary byGuid = ReadPingSummary( server.Get(), clientGuid );
+
+    {
+        INFO( "while the connection is open" );
+        CHECK( fromRecords.last != kNoPingYet );
+        CHECK( fromRecords.average >= 0 );
+        CHECK( fromRecords.lowest <= fromRecords.last );
+        CHECK( fromRecords.lowest <= fromRecords.average );
+        if( client->IsNetworkSimulatorActive() )
+            CHECK( fromRecords.lowest >= 10 );
+
+        CHECK( byAddress.average == fromRecords.average );
+        CHECK( byAddress.last == fromRecords.last );
+        CHECK( byAddress.lowest == fromRecords.lowest );
+        CHECK( byAddress.clockDifferential == fromRecords.clockDifferential );
+        CHECK( byGuid == byAddress );
+    }
+
+    client->CloseConnection( server.Address(), true, 0, LOW_PRIORITY );
+    REQUIRE( WaitFor( client, server, [&] { return server->GetConnectionState( clientAddress ) == IS_NOT_CONNECTED; } ) );
+    REQUIRE( server.WaitForAFullCycle() );
+
+    {
+        INFO( "once the connection has closed" );
+        const PingSummary none{ -1, -1, -1, 0 };
+        CHECK( ReadPingSummary( server.Get(), clientAddress ) == none );
+        CHECK( ReadPingSummary( server.Get(), clientGuid ) == none );
+    }
+}
+
+namespace {
+
 /// What the churn readers found wrong. Catch2's assertions are not thread safe, so readers
 /// record here and the test thread checks afterwards.
 class Failures
@@ -279,6 +471,28 @@ int CheckProgress( int previous, ConnectionState state, const std::string& who, 
     if( now == -1 && ( previous == Progress( IS_PENDING ) || previous == Progress( IS_CONNECTING ) ) )
         failures.Add( who + "state fell from " + std::to_string( previous ) + " to IS_NOT_CONNECTED during the connection attempt" );
     return now;
+}
+
+bool IsLoopbackPing( int ping )
+{
+    return ping >= 0 && ping <= kMaxLoopbackPingMs;
+}
+
+/// Records a failure for any ping or clock getter answering outside what loopback allows.
+/// -1 means not connected, and kNoPingYet means connected with no pong back yet.
+void CheckPings( RakPeerInterface* server, const AddressOrGUID& systemIdentifier, const std::string& who, Failures& failures )
+{
+    const PingSummary pings = ReadPingSummary( server, systemIdentifier );
+    if( pings.average != -1 && IsLoopbackPing( pings.average ) == false )
+        failures.Add( who + "GetAveragePing returned " + std::to_string( pings.average ) );
+    if( pings.last != -1 && pings.last != kNoPingYet && IsLoopbackPing( pings.last ) == false )
+        failures.Add( who + "GetLastPing returned " + std::to_string( pings.last ) );
+    if( pings.lowest != -1 && pings.lowest != kNoPingYet && IsLoopbackPing( pings.lowest ) == false )
+        failures.Add( who + "GetLowestPing returned " + std::to_string( pings.lowest ) );
+    // Both Peers share one clock, so the differential is within a ping of 0.
+    const int64_t clockDifferential = static_cast<int64_t>( pings.clockDifferential );
+    if( clockDifferential < -kMaxLoopbackPingMs || clockDifferential > kMaxLoopbackPingMs )
+        failures.Add( who + "GetClockDifferential returned " + std::to_string( clockDifferential ) );
 }
 
 struct Client
@@ -366,6 +580,9 @@ void ReadGettersUntilStopped( RakPeerInterface* server, const SystemAddress& ser
                 failures.Add( who + "GetMTUSize returned no MTU" );
             if( server->GetTimeoutTime( client.address ) == 0 )
                 failures.Add( who + "GetTimeoutTime returned 0" );
+
+            CheckPings( server, client.address, who + "by address: ", failures );
+            CheckPings( server, client.guid, who + "by RakNetGUID: ", failures );
         }
 
         server->GetSystemList( addresses, guids );

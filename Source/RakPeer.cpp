@@ -1798,8 +1798,8 @@ bool RakPeer::Ping( const char* host, unsigned short remotePort, bool onlyReplyO
 // Parameters:
 // target - whose time to read
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// The ping summary as GetAveragePing and GetLastPing report it. PublishView computes the
-// published view's copy with the same two functions.
+// The ping summary GetAveragePing and GetLastPing report. PublishView computes it into the
+// published view.
 static int AveragePingOf( const RakPeer::RemoteSystemStruct& remoteSystem )
 {
     int sum = 0;
@@ -1825,12 +1825,10 @@ static int LastPingOf( const RakPeer::RemoteSystemStruct& remoteSystem )
 
 int RakPeer::GetAveragePing( const AddressOrGUID systemIdentifier )
 {
-    RemoteSystemStruct* remoteSystem = GetRemoteSystem( systemIdentifier, false, false );
-
-    if( remoteSystem == 0 )
+    PublishedRemoteSystem entry;
+    if( GetPublished( systemIdentifier, entry ) == false )
         return -1;
-
-    return AveragePingOf( *remoteSystem );
+    return entry.averagePing;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1842,14 +1840,10 @@ int RakPeer::GetAveragePing( const AddressOrGUID systemIdentifier )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 int RakPeer::GetLastPing( const AddressOrGUID systemIdentifier ) const
 {
-    RemoteSystemStruct* remoteSystem = GetRemoteSystem( systemIdentifier, false, false );
-
-    if( remoteSystem == 0 )
+    PublishedRemoteSystem entry;
+    if( GetPublished( systemIdentifier, entry ) == false )
         return -1;
-
-    //  return (int)(remoteSystem->reliabilityLayer.GetAckPing()/(RakNet::TimeUS)1000);
-
-    return LastPingOf( *remoteSystem );
+    return entry.lastPing;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1861,12 +1855,10 @@ int RakPeer::GetLastPing( const AddressOrGUID systemIdentifier ) const
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 int RakPeer::GetLowestPing( const AddressOrGUID systemIdentifier ) const
 {
-    RemoteSystemStruct* remoteSystem = GetRemoteSystem( systemIdentifier, false, false );
-
-    if( remoteSystem == 0 )
+    PublishedRemoteSystem entry;
+    if( GetPublished( systemIdentifier, entry ) == false )
         return -1;
-
-    return remoteSystem->lowestPing;
+    return entry.lowestPing;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1889,10 +1881,10 @@ void RakPeer::SetOccasionalPing( bool doPing )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakNet::Time RakPeer::GetClockDifferential( const AddressOrGUID systemIdentifier )
 {
-    RemoteSystemStruct* remoteSystem = GetRemoteSystem( systemIdentifier, false, false );
-    if( remoteSystem == 0 )
+    PublishedRemoteSystem entry;
+    if( GetPublished( systemIdentifier, entry ) == false )
         return 0;
-    return GetClockDifferentialInt( remoteSystem );
+    return entry.clockDifferential;
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2907,12 +2899,12 @@ void RakPeer::ValidateRemoteSystemLookup( void ) const
 {
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const AddressOrGUID systemIdentifier, bool calledFromNetworkThread, bool onlyActive ) const
+RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const AddressOrGUID systemIdentifier, bool onlyActive ) const
 {
     if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
         return GetRemoteSystemFromGUID( systemIdentifier.rakNetGuid, onlyActive );
     else
-        return GetRemoteSystemFromSystemAddress( systemIdentifier.systemAddress, calledFromNetworkThread, onlyActive );
+        return GetRemoteSystemFromSystemAddress( systemIdentifier.systemAddress, true, onlyActive );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread, bool onlyActive ) const
@@ -2952,6 +2944,8 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const Sy
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromGUID( const RakNetGUID guid, bool onlyActive ) const
 {
+    AssertInsideUpdateCycle();
+
     if( guid == UNASSIGNED_RAKNET_GUID )
         return 0;
 
@@ -3323,13 +3317,10 @@ void RakPeer::ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& 
 // Thanks to Chris Taylor (cat02e@fsu.edu) for the improved timestamping algorithm
 RakNet::Time RakPeer::GetBestClockDifferential( const SystemAddress systemAddress ) const
 {
-    // Receive calls this, on the user's thread, so it may not take the network-thread path.
-    RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( systemAddress, false, true );
-
-    if( remoteSystem == 0 )
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( systemAddress, entry ) == false )
         return 0;
-
-    return GetClockDifferentialInt( remoteSystem );
+    return entry.clockDifferential;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::RemoteSystemLookupHashIndex( const SystemAddress& sa ) const
@@ -3508,6 +3499,13 @@ bool RakPeer::GetPublishedByGuid( const RakNetGUID& guid, PublishedRemoteSystem&
 
     std::lock_guard<std::mutex> guard( publishedViewMutex );
     return CopyFirstMatch( publishedView, [&]( const PublishedRemoteSystem& entry ) { return entry.guid == guid; }, out );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::GetPublished( const AddressOrGUID& systemIdentifier, PublishedRemoteSystem& out ) const
+{
+    if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
+        return GetPublishedByGuid( systemIdentifier.rakNetGuid, out );
+    return GetPublishedByAddress( systemIdentifier.systemAddress, out );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::GetPublishedByIndex( unsigned int index, PublishedRemoteSystem& out ) const
@@ -5155,7 +5153,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
             // Set the new connection state AFTER we call sendImmediate in case we are setting it to a disconnection state, which does not allow further sends
             if( bcs->connectionMode != RemoteSystemStruct::NO_ACTION )
             {
-                remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true, true );
+                remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
                 if( remoteSystem )
                     remoteSystem->connectMode = bcs->connectionMode;
             }
@@ -5167,7 +5165,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         else if( bcs->command == BufferedCommandStruct::BCS_CHANGE_SYSTEM_ADDRESS )
         {
             // Reroute
-            RakPeer::RemoteSystemStruct* rssFromGuid = GetRemoteSystem( bcs->systemIdentifier.rakNetGuid, true, true );
+            RakPeer::RemoteSystemStruct* rssFromGuid = GetRemoteSystem( bcs->systemIdentifier.rakNetGuid, true );
             if( rssFromGuid != 0 )
             {
                 unsigned int existingSystemIndex = GetRemoteSystemIndex( rssFromGuid->systemAddress );
@@ -5185,7 +5183,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
             }
             else
             {
-                remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true, true );
+                remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
                 sqo = socketQueryOutput.Allocate( _FILE_AND_LINE_ );
 
                 sqo->sockets.clear();

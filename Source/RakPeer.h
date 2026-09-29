@@ -734,8 +734,10 @@ protected:
     /// \param[in] systemAddress The player identifier
     /// \return 0 if none
     RemoteSystemStruct* GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread, bool onlyActive ) const;
-    RakPeer::RemoteSystemStruct* GetRemoteSystem( const AddressOrGUID systemIdentifier, bool calledFromNetworkThread, bool onlyActive ) const;
+    /// Network thread only, like GetRemoteSystemFromGUID.
+    RakPeer::RemoteSystemStruct* GetRemoteSystem( const AddressOrGUID systemIdentifier, bool onlyActive ) const;
     void ValidateRemoteSystemLookup( void ) const;
+    /// Network thread only.
     RemoteSystemStruct* GetRemoteSystemFromGUID( const RakNetGUID guid, bool onlyActive ) const;
     ///Parse out a connection request packet. False if the header would not parse - see
     ///the definition for what that does and does not cover.
@@ -778,15 +780,17 @@ protected:
         SystemAddress myExternalSystemAddress;
         int MTUSize;
         RakNet::TimeMS timeoutTime;
-        int averagePing;                ///< As GetAveragePing computes it
-        int lastPing;                   ///< As GetLastPing computes it
-        int lowestPing;                 ///< As GetLowestPing computes it
-        RakNet::Time clockDifferential; ///< As GetClockDifferential and GetBestClockDifferential, which compute the same value
+        int averagePing;                ///< What GetAveragePing returns
+        int lastPing;                   ///< What GetLastPing returns
+        int lowestPing;                 ///< What GetLowestPing returns
+        RakNet::Time clockDifferential; ///< What GetClockDifferential and GetBestClockDifferential return
     };
 
-    /// Copy the entry for \a systemAddress, \a guid or remoteSystemList \a index out of the
-    /// published view. False, leaving \a out alone, if the view has no such entry. Callable
-    /// from any thread.
+    /// Copy the entry for \a systemIdentifier, \a systemAddress, \a guid or remoteSystemList
+    /// \a index out of the published view. False, leaving \a out alone, if the view has no
+    /// such entry. Callable from any thread. \a systemIdentifier's RakNetGUID, if assigned,
+    /// wins over its address.
+    bool GetPublished( const AddressOrGUID& systemIdentifier, PublishedRemoteSystem& out ) const;
     bool GetPublishedByAddress( const SystemAddress& systemAddress, PublishedRemoteSystem& out ) const;
     bool GetPublishedByGuid( const RakNetGUID& guid, PublishedRemoteSystem& out ) const;
     bool GetPublishedByIndex( unsigned int index, PublishedRemoteSystem& out ) const;
