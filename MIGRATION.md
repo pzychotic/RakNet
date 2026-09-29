@@ -661,8 +661,9 @@ to one cycle old. The identity, state, ping and clock getters have moved so far:
 `GetGuidFromSystemAddress`, `GetSystemAddressFromGuid`, `GetInternalID`, `GetExternalID`,
 `GetMTUSize`, `GetTimeoutTime`, `GetAveragePing`, `GetLastPing`, `GetLowestPing` and
 `GetClockDifferential`, as has the clock differential `Receive` subtracts from an
-`ID_TIMESTAMP`. Two things change at runtime. One return type changed,
-which stops a build only in the narrow cases in the last paragraph.
+`ID_TIMESTAMP`. The statistics functions and `GetClientPublicKeyFromSystemAddress` ask
+the network thread instead, and wait for its answer. Three things change at runtime. One
+return type changed, which stops a build only in the narrow cases in the last paragraph.
 
 **`GetConnectionState` reports a closed connection as `IS_NOT_CONNECTED`.** Stock returned
 `IS_DISCONNECTED` for as long as the closed connection's storage still held its address or
@@ -687,6 +688,21 @@ went on answering for it after it closed. Now, once a connection is closed:
 If you need one of these after the connection closes, read it while the connection is open,
 or when `ID_DISCONNECTION_NOTIFICATION` or `ID_CONNECTION_LOST` arrives, since
 `Packet::systemAddress` and `Packet::guid` carry the identity.
+
+**`GetStatistics`, `GetStatisticsList` and `GetClientPublicKeyFromSystemAddress` wait up
+to one update cycle.** What they return is too large to copy into the snapshot every cycle,
+so each call wakes the network thread and blocks until it answers, at the end of its current
+cycle. That's up to one cycle per call, usually a few milliseconds. A loop that calls
+`GetStatistics` once per connection waits once per connection, so call `GetStatisticsList`
+once instead: it answers for every connection from one cycle. `StatisticsHistoryPlugin`
+calls `GetStatisticsList` from its `Update`, so with it attached every `Receive` waits
+once too. If the answer takes longer than `BLOCKING_QUERY_TIMEOUT_MS`
+(1000 by default, in `RakNetDefines.h`), or the peer is shut down, the call fails:
+`GetStatistics` returns 0 or `false`, `GetStatisticsList` returns empty lists, and
+`GetClientPublicKeyFromSystemAddress` returns `false`. That includes
+`GetStatistics( UNASSIGNED_SYSTEM_ADDRESS )`, which stock answered even after `Shutdown`.
+Under `RAKPEER_USER_THREADED`, and from the callback `SetUserUpdateThread` installs, they
+answer at once, since the calling thread is the one that runs the cycle.
 
 **`GetGuidFromSystemAddress` returns `RakNetGUID`, not `const RakNetGUID&`.** The answer is a
 copy out of the snapshot, so there's nothing for a reference to point at. Code that copies

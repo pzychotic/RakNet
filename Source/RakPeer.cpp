@@ -103,6 +103,11 @@ bool IPAddressMatch( const char* pszIpToCheck, const char* pszIpToCheckFor )
     return false;
 }
 
+/// The Peer whose network thread this is, if it is one. Set for the life of UpdateNetworkLoop,
+/// so a query asked from inside the loop, including from SetUserUpdateThread's callback, is
+/// answered inline rather than waiting on itself.
+thread_local const RakPeer* networkThreadOf = nullptr;
+
 } // namespace
 
 void UpdateNetworkLoop( void* arg );
@@ -209,6 +214,7 @@ RakPeer::RakPeer()
     receivedDatagramsDroppedAtCap = 0;
     offlineMessagesDroppedAtCap = 0;
     insideUpdateCycle = false;
+    acceptingQueries = false;
 
     occasionalPing = false;
     for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
@@ -490,6 +496,8 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
             std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
         }
 #endif // RAKPEER_USER_THREADED!=1
+
+        SetAcceptingQueries( true );
     }
 
     for( unsigned int i = 0; i < pluginListTS.size(); i++ )
@@ -780,6 +788,8 @@ ConnectionAttemptResult RakPeer::ConnectWithSocket( const char* host, unsigned s
 void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )
 {
     unsigned int systemListSize = maximumNumberOfPeers;
+
+    SetAcceptingQueries( false );
 
     if( blockDuration > 0 )
     {
@@ -2080,43 +2090,18 @@ bool RakPeer::GetClientPublicKeyFromSystemAddress( const SystemAddress input, ch
     if( input == UNASSIGNED_SYSTEM_ADDRESS )
         return false;
 
-    char* copy_source = 0;
+    std::shared_ptr<ConnectionQuery> query = std::make_shared<ConnectionQuery>( ConnectionQuery::CLIENT_PUBLIC_KEY );
+    query->systemAddress = input;
+    if( Ask( query ) == false || query->found == false )
+        return false;
 
-    if( input.systemIndex != (SystemIndex)-1 && input.systemIndex < maximumNumberOfPeers && remoteSystemList[input.systemIndex].systemAddress == input )
-    {
-        copy_source = remoteSystemList[input.systemIndex].client_public_key;
-    }
-    else
-    {
-        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
-        {
-            if( remoteSystemList[i].systemAddress == input )
-            {
-                copy_source = remoteSystemList[i].client_public_key;
-                break;
-            }
-        }
-    }
-
-    if( copy_source )
-    {
-        // Verify that at least one byte in the public key is non-zero to indicate that the key was received
-        for( int ii = 0; ii < cat::EasyHandshake::PUBLIC_KEY_BYTES; ++ii )
-        {
-            if( copy_source[ii] != 0 )
-            {
-                memcpy( client_public_key, copy_source, cat::EasyHandshake::PUBLIC_KEY_BYTES );
-                return true;
-            }
-        }
-    }
-
+    memcpy( client_public_key, query->clientPublicKey, cat::EasyHandshake::PUBLIC_KEY_BYTES );
+    return true;
 #else
     (void)input;
     (void)client_public_key;
-#endif
-
     return false;
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2620,39 +2605,25 @@ RakNetStatistics* RakPeer::GetStatistics( const SystemAddress systemAddress, Rak
     else
         systemStats = rns;
 
-    if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
-    {
-        bool firstWrite = false;
-        // Return a crude sum
-        for( unsigned short i = 0; i < maximumNumberOfPeers; i++ )
-        {
-            if( remoteSystemList[i].isActive )
-            {
-                RakNetStatistics rnsTemp;
-                remoteSystemList[i].reliabilityLayer.GetStatistics( &rnsTemp );
+    // UNASSIGNED_SYSTEM_ADDRESS asks for a crude sum over every connection.
+    std::shared_ptr<ConnectionQuery> query = std::make_shared<ConnectionQuery>( systemAddress == UNASSIGNED_SYSTEM_ADDRESS ? ConnectionQuery::STATISTICS_SUM : ConnectionQuery::STATISTICS_BY_ADDRESS );
+    query->systemAddress = systemAddress;
+    if( Ask( query ) == false )
+        return 0;
 
-                if( firstWrite == false )
-                {
-                    memcpy( systemStats, &rnsTemp, sizeof( RakNetStatistics ) );
-                    firstWrite = true;
-                }
-                else
-                    ( *systemStats ) += rnsTemp;
-            }
-        }
+    if( query->kind == ConnectionQuery::STATISTICS_SUM )
+    {
+        // With no connection open, the sum leaves *systemStats as it was.
+        if( query->found )
+            *systemStats = query->statistics;
         return systemStats;
     }
-    else
-    {
-        RemoteSystemStruct* rss = GetRemoteSystemFromSystemAddress( systemAddress, false, false );
-        if( rss && endThreads == false )
-        {
-            rss->reliabilityLayer.GetStatistics( systemStats );
-            return systemStats;
-        }
-    }
 
-    return 0;
+    if( query->found == false )
+        return 0;
+
+    *systemStats = query->statistics;
+    return systemStats;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::GetStatisticsList( std::vector<SystemAddress>& addresses, std::vector<RakNetGUID>& guids, std::vector<RakNetStatistics>& statistics )
@@ -2661,31 +2632,24 @@ void RakPeer::GetStatisticsList( std::vector<SystemAddress>& addresses, std::vec
     guids.clear();
     statistics.clear();
 
-    if( remoteSystemList == 0 || endThreads == true )
+    std::shared_ptr<ConnectionQuery> query = std::make_shared<ConnectionQuery>( ConnectionQuery::STATISTICS_LIST );
+    if( Ask( query ) == false )
         return;
 
-    for( unsigned int i = 0; i < activeSystemListSize; i++ )
-    {
-        if( ( activeSystemList[i] )->isActive &&
-            ( activeSystemList[i] )->connectMode == RakPeer::RemoteSystemStruct::CONNECTED )
-        {
-            addresses.emplace_back( ( activeSystemList[i] )->systemAddress );
-            guids.emplace_back( ( activeSystemList[i] )->guid );
-            RakNetStatistics rns;
-            ( activeSystemList[i] )->reliabilityLayer.GetStatistics( &rns );
-            statistics.emplace_back( rns );
-        }
-    }
+    addresses.swap( query->addresses );
+    guids.swap( query->guids );
+    statistics.swap( query->statisticsList );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::GetStatistics( const unsigned int index, RakNetStatistics* rns )
 {
-    if( index < maximumNumberOfPeers && remoteSystemList[index].isActive )
-    {
-        remoteSystemList[index].reliabilityLayer.GetStatistics( rns );
-        return true;
-    }
-    return false;
+    std::shared_ptr<ConnectionQuery> query = std::make_shared<ConnectionQuery>( ConnectionQuery::STATISTICS_BY_INDEX );
+    query->index = index;
+    if( Ask( query ) == false || query->found == false )
+        return false;
+
+    *rns = query->statistics;
+    return true;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::GetReceiveBufferSize( void )
@@ -3567,6 +3531,152 @@ void RakPeer::ClearPublishedView( void )
 void RakPeer::AssertInsideUpdateCycle( void ) const
 {
     RakAssert( insideUpdateCycle.load() );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::Ask( const std::shared_ptr<ConnectionQuery>& query ) const
+{
+    {
+        std::unique_lock<std::mutex> guard( queryMutex );
+        if( acceptingQueries == false )
+            return false;
+
+#if RAKPEER_USER_THREADED != 1
+        if( networkThreadOf != this )
+        {
+            pendingQueries.push_back( query );
+            guard.unlock();
+            // Wake the network thread from its wait between cycles.
+            quitAndDataEvents.SetEvent();
+
+            std::unique_lock<std::mutex> answerGuard( query->mutex );
+            query->settledSignal.wait_for( answerGuard, std::chrono::milliseconds( BLOCKING_QUERY_TIMEOUT_MS ), [&] { return query->settled; } );
+            return query->answered;
+        }
+#endif
+
+        // No other thread runs the update cycle while this one asks: under
+        // RAKPEER_USER_THREADED the asker is the one that runs it, and otherwise this is the
+        // network thread between cycles. So answer as the cycle would. queryMutex stays held,
+        // so Shutdown can't start taking the records down meanwhile.
+        const bool wasInsideUpdateCycle = insideUpdateCycle.exchange( true );
+        AnswerQuery( *query );
+        insideUpdateCycle = wasInsideUpdateCycle;
+    }
+    return true;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::AnswerQuery( ConnectionQuery& query ) const
+{
+    AssertInsideUpdateCycle();
+
+    switch( query.kind )
+    {
+    case ConnectionQuery::STATISTICS_BY_ADDRESS: {
+        RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( query.systemAddress, true, true );
+        if( remoteSystem != 0 )
+        {
+            remoteSystem->reliabilityLayer.GetStatistics( &query.statistics );
+            query.found = true;
+        }
+        break;
+    }
+    case ConnectionQuery::STATISTICS_BY_INDEX:
+        if( query.index < maximumNumberOfPeers && remoteSystemList[query.index].isActive )
+        {
+            remoteSystemList[query.index].reliabilityLayer.GetStatistics( &query.statistics );
+            query.found = true;
+        }
+        break;
+    case ConnectionQuery::STATISTICS_SUM:
+        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+        {
+            if( remoteSystemList[i].isActive == false )
+                continue;
+
+            RakNetStatistics statistics;
+            remoteSystemList[i].reliabilityLayer.GetStatistics( &statistics );
+            if( query.found == false )
+                query.statistics = statistics;
+            else
+                query.statistics += statistics;
+            query.found = true;
+        }
+        break;
+    case ConnectionQuery::STATISTICS_LIST:
+        for( unsigned int i = 0; i < activeSystemListSize; i++ )
+        {
+            RemoteSystemStruct* remoteSystem = activeSystemList[i];
+            if( remoteSystem->isActive == false || remoteSystem->connectMode != RemoteSystemStruct::CONNECTED )
+                continue;
+
+            query.addresses.push_back( remoteSystem->systemAddress );
+            query.guids.push_back( remoteSystem->guid );
+            query.statisticsList.emplace_back();
+            remoteSystem->reliabilityLayer.GetStatistics( &query.statisticsList.back() );
+        }
+        query.found = true;
+        break;
+    case ConnectionQuery::CLIENT_PUBLIC_KEY: {
+#if LIBCAT_SECURITY == 1
+        const RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( query.systemAddress, true, true );
+        if( remoteSystem == 0 )
+            break;
+
+        // A key of all zeroes means the client never sent one.
+        for( int i = 0; i < cat::EasyHandshake::PUBLIC_KEY_BYTES; ++i )
+        {
+            if( remoteSystem->client_public_key[i] != 0 )
+            {
+                memcpy( query.clientPublicKey, remoteSystem->client_public_key, cat::EasyHandshake::PUBLIC_KEY_BYTES );
+                query.found = true;
+                break;
+            }
+        }
+#endif
+        break;
+    }
+    }
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::AnswerPendingQueries( void )
+{
+    {
+        std::lock_guard<std::mutex> guard( queryMutex );
+        if( pendingQueries.empty() )
+            return;
+        queriesBeingAnswered.swap( pendingQueries );
+    }
+
+    for( const std::shared_ptr<ConnectionQuery>& query : queriesBeingAnswered )
+    {
+        AnswerQuery( *query );
+
+        std::lock_guard<std::mutex> answerGuard( query->mutex );
+        query->answered = true;
+        query->settled = true;
+        query->settledSignal.notify_all();
+    }
+
+    // The shared_ptrs go here, so a query whose asker gave up is freed now.
+    queriesBeingAnswered.clear();
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::SetAcceptingQueries( bool accepting )
+{
+    std::vector<std::shared_ptr<ConnectionQuery>> dropped;
+    {
+        std::lock_guard<std::mutex> guard( queryMutex );
+        acceptingQueries = accepting;
+        if( accepting == false )
+            dropped.swap( pendingQueries );
+    }
+
+    for( const std::shared_ptr<ConnectionQuery>& query : dropped )
+    {
+        std::lock_guard<std::mutex> answerGuard( query->mutex );
+        query->settled = true;
+        query->settledSignal.notify_all();
+    }
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::AddToActiveSystemList( unsigned int remoteSystemListIndex )
@@ -5090,6 +5200,7 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
     insideUpdateCycle = true;
     const bool result = RunUpdateCycleBody( updateBitStream );
     PublishView();
+    AnswerPendingQueries();
     insideUpdateCycle = false;
     return result;
 }
@@ -5859,6 +5970,7 @@ void UpdateNetworkLoop( void* arg )
 #endif
     );
 
+    networkThreadOf = rakPeer;
     rakPeer->isMainLoopThreadActive = true;
 
     while( rakPeer->endThreads == false )
@@ -5878,6 +5990,7 @@ void UpdateNetworkLoop( void* arg )
         rakPeer->quitAndDataEvents.WaitOnEvent( 10 );
     }
 
+    networkThreadOf = nullptr;
     rakPeer->isMainLoopThreadActive = false;
 }
 

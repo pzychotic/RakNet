@@ -27,7 +27,9 @@
 #include "SecureHandshake.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <unordered_set>
 #include <vector>
@@ -442,6 +444,8 @@ public:
 
     /// Given the SystemAddress of a connected system, get the public key they provided as an identity
     /// Returns false if system address was not found or client public key is not known
+    /// Blocks until the network thread's update cycle ends, and returns false if that takes
+    /// longer than BLOCKING_QUERY_TIMEOUT_MS or the peer is shut down.
     /// \param[in] input The RakNetGUID of the system
     /// \param[in] client_public_key The connected client's public key is copied to this address.  Buffer must be cat::EasyHandshake::PUBLIC_KEY_BYTES bytes in length.
     bool GetClientPublicKeyFromSystemAddress( const SystemAddress input, char* client_public_key ) const;
@@ -607,13 +611,18 @@ public:
     /// \param[in] systemAddress Which connected system to get statistics for.
     /// \param[in] rns If you supply this structure,the network statistics will be written to it. Otherwise the method uses a static struct to write the data, which is not threadsafe.
     /// \return 0 if the specified system can't be found. Otherwise a pointer to the struct containing the specified system's network statistics.
+    /// \note The statistics functions and GetClientPublicKeyFromSystemAddress block until the
+    /// network thread's update cycle ends, since only that thread reads the reliability
+    /// layers. If that takes longer than BLOCKING_QUERY_TIMEOUT_MS, or the peer is shut down,
+    /// they fail as if the system weren't connected.
     /// \sa RakNetStatistics.h
     RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 );
     /// \brief Returns the network statistics of the system at the given index in the remoteSystemList.
     /// \return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
     bool GetStatistics( const unsigned int index, RakNetStatistics* rns );
     /// \brief Returns the list of systems, and statistics for each of those systems
-    /// Each system has one entry in each of the lists, in the same order
+    /// Each system has one entry in each of the lists, in the same order. All of them come
+    /// from one update cycle. The lists are empty on failure.
     /// \param[out] addresses SystemAddress for each connected system
     /// \param[out] guids RakNetGUID for each connected system
     /// \param[out] statistics Calculated RakNetStatistics for each connected system
@@ -806,13 +815,79 @@ protected:
     /// straight to the connection records calls it (ADR-0007, point 6).
     void AssertInsideUpdateCycle( void ) const;
 
+    /// \internal
+    /// A question about the connection records too costly to copy into the published view
+    /// every cycle. The asker posts it with Ask, and the network thread answers it at the end
+    /// of its update cycle (ADR-0007, point 4). The asker and the pending queue share
+    /// ownership, so an answer that comes after the asker gave up is freed with the query.
+    struct ConnectionQuery
+    {
+        enum Kind
+        {
+            STATISTICS_BY_ADDRESS,
+            STATISTICS_BY_INDEX,
+            /// The sum over every open connection record.
+            STATISTICS_SUM,
+            STATISTICS_LIST,
+            CLIENT_PUBLIC_KEY,
+        };
+
+        explicit ConnectionQuery( Kind k )
+        : kind( k )
+        {
+        }
+
+        const Kind kind;
+        SystemAddress systemAddress; ///< For STATISTICS_BY_ADDRESS and CLIENT_PUBLIC_KEY
+        unsigned int index = 0;      ///< For STATISTICS_BY_INDEX
+
+        /// Whether a connection record matched. For STATISTICS_SUM, whether any was open.
+        bool found = false;
+        RakNetStatistics statistics;
+        std::vector<SystemAddress> addresses;
+        std::vector<RakNetGUID> guids;
+        std::vector<RakNetStatistics> statisticsList;
+#if LIBCAT_SECURITY == 1
+        char clientPublicKey[cat::EasyHandshake::PUBLIC_KEY_BYTES];
+#endif
+
+        /// Guards settled and answered.
+        std::mutex mutex;
+        std::condition_variable settledSignal;
+        /// The asker may stop waiting: the query was answered, or Shutdown dropped it.
+        bool settled = false;
+        /// The fields above the mutex hold the answer.
+        bool answered = false;
+    };
+
+    /// Answer \a query, and return whether it was answered. Blocks until the network thread's
+    /// cycle ends, for up to BLOCKING_QUERY_TIMEOUT_MS. Answers inline on the network thread
+    /// itself and under RAKPEER_USER_THREADED, where there is no other thread to wait for.
+    /// False, promptly, if the peer isn't started or is shutting down.
+    bool Ask( const std::shared_ptr<ConnectionQuery>& query ) const;
+    /// Fill in the answer to \a query from the connection records. Inside the update cycle only.
+    void AnswerQuery( ConnectionQuery& query ) const;
+    /// Answer every pending query. Network thread only, at the end of RunUpdateCycle.
+    void AnswerPendingQueries( void );
+    /// Start or stop taking queries. Stopping settles every pending one unanswered.
+    void SetAcceptingQueries( bool accepting );
+
     bool IsLoopbackAddress( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
     SystemAddress GetLoopbackAddress( void ) const;
 
     ///Set this to true to terminate the Peer thread execution
     volatile bool endThreads;
     ///true if the peer thread is active.
-    volatile bool isMainLoopThreadActive;
+    std::atomic<bool> isMainLoopThreadActive;
+
+    /// Queries waiting for the end of the network thread's cycle. Guarded by queryMutex.
+    mutable std::vector<std::shared_ptr<ConnectionQuery>> pendingQueries;
+    /// AnswerPendingQueries swaps pendingQueries in here to answer them outside queryMutex.
+    /// Network thread only.
+    std::vector<std::shared_ptr<ConnectionQuery>> queriesBeingAnswered;
+    /// Whether Ask takes queries: from Startup until Shutdown. Guarded by queryMutex.
+    bool acceptingQueries;
+    mutable std::mutex queryMutex;
 
     bool occasionalPing; /// Do we occasionally ping the other systems?*/
     ///Store the maximum number of peers allowed to connect
@@ -868,7 +943,7 @@ protected:
     mutable std::mutex publishedViewMutex;
     /// Set while RunUpdateCycle runs. A flag rather than a thread id, so it holds under
     /// RAKPEER_USER_THREADED too.
-    std::atomic<bool> insideUpdateCycle;
+    mutable std::atomic<bool> insideUpdateCycle;
 
     std::mutex offlinePingResponseMutex;
     ///RunUpdateCycle is not thread safe but we don't need to mutex calls. Just skip calls if it is running already
@@ -1040,7 +1115,7 @@ protected:
     void* userUpdateThreadData;
 
 
-    SignaledEvent quitAndDataEvents;
+    mutable SignaledEvent quitAndDataEvents;
     bool limitConnectionFrequencyFromTheSameIP;
 
     std::mutex packetAllocationPoolMutex;

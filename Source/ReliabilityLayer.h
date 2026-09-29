@@ -268,7 +268,7 @@ class ReliabilityLayer;
 /// Charges, releases and the choice of connection to close all happen on the thread that
 /// runs HandleSocketReceiveFromConnectedPlayer and Update, as every other piece of layer
 /// state does. The total and the counters are atomic anyway: a layer releases its charges
-/// when it is reset, and the counters are read by GetStatistics on the application's thread.
+/// when it is reset, which Shutdown does on the application's thread.
 class ReliabilityBufferBudget
 {
 public:

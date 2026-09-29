@@ -439,6 +439,8 @@ public:
 
     /// Given the SystemAddress of a connected system, get the public key they provided as an identity
     /// Returns false if system address was not found or client public key is not known
+    /// Blocks until the network thread's update cycle ends, and returns false if that takes
+    /// longer than BLOCKING_QUERY_TIMEOUT_MS or the peer is shut down.
     /// \param[in] input The RakNetGUID of the system
     /// \param[in] client_public_key The connected client's public key is copied to this address.  Buffer must be cat::EasyHandshake::PUBLIC_KEY_BYTES bytes in length.
     virtual bool GetClientPublicKeyFromSystemAddress( const SystemAddress input, char* client_public_key ) const = 0;
@@ -597,13 +599,18 @@ public:
     /// \param[in] systemAddress: Which connected system to get statistics for
     /// \param[in] rns If you supply this structure, it will be written to it.  Otherwise it will use a static struct, which is not threadsafe
     /// \return 0 on can't find the specified system.  A pointer to a set of data otherwise.
+    /// \note The statistics functions and GetClientPublicKeyFromSystemAddress block until the
+    /// network thread's update cycle ends, since only that thread reads the reliability
+    /// layers. If that takes longer than BLOCKING_QUERY_TIMEOUT_MS, or the peer is shut down,
+    /// they fail as if the system weren't connected.
     /// \sa RakNetStatistics.h
     virtual RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 ) = 0;
     /// \brief Returns the network statistics of the system at the given index in the remoteSystemList.
     /// \return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
     virtual bool GetStatistics( const unsigned int index, RakNetStatistics* rns ) = 0;
     /// \brief Returns the list of systems, and statistics for each of those systems
-    /// Each system has one entry in each of the lists, in the same order
+    /// Each system has one entry in each of the lists, in the same order. All of them come
+    /// from one update cycle. The lists are empty on failure.
     /// \param[out] addresses SystemAddress for each connected system
     /// \param[out] guids RakNetGUID for each connected system
     /// \param[out] statistics Calculated RakNetStatistics for each connected system
