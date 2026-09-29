@@ -832,7 +832,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     endThreads = true;
 
 //  RakNet::TimeMS timeout;
-#if RAKPEER_USER_THREADED != 1
 
     for( RakNetSocket2* pSocket : socketList )
     {
@@ -842,11 +841,13 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
         }
     }
 
+#if RAKPEER_USER_THREADED != 1
     while( isMainLoopThreadActive )
     {
         endThreads = true;
         std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
     }
+#endif
 
     for( RakNetSocket2* pSocket : socketList )
     {
@@ -856,7 +857,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
         }
     }
 
-#endif // RAKPEER_USER_THREADED!=1
 
     // No cycle publishes again, so this empties the view before the records it copies go.
     ClearPublishedView();
