@@ -299,10 +299,12 @@ bool TCPInterface::CloseRemoteClientAt( int index, const SystemAddress& systemAd
 }
 void TCPInterface::ReportLostRemoteClientLocked( RemoteClient& remoteClient )
 {
+    // Inactive before the event is queued, so an application that has taken the event from
+    // HasLostConnection no longer counts the connection in GetConnectionCount.
+    remoteClient.SetActive( false );
     SystemAddress* lostConnectionSystemAddress = lostConnections.Allocate( _FILE_AND_LINE_ );
     *lostConnectionSystemAddress = remoteClient.systemAddress;
     lostConnections.Push( lostConnectionSystemAddress );
-    remoteClient.SetActive( false );
 }
 void TCPInterface::CloseRemoteClientOverOutgoingCap( int index )
 {
@@ -868,7 +870,7 @@ SystemAddress TCPInterface::HasNewIncomingConnection( void )
             pPlugin->OnNewConnection( out2, UNASSIGNED_RAKNET_GUID, true );
         }
 
-        return *out;
+        return out2;
     }
     else
     {
@@ -888,7 +890,7 @@ SystemAddress TCPInterface::HasLostConnection( void )
             pPlugin->OnClosedConnection( out2, UNASSIGNED_RAKNET_GUID, LCR_DISCONNECTION_NOTIFICATION );
         }
 
-        return *out;
+        return out2;
     }
     else
     {
