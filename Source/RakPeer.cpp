@@ -3265,7 +3265,7 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// Adjust the first four bytes (treated as unsigned int) of the pointer
+// Shifts the RakNet::Time after a Message's ID_TIMESTAMP byte by the sender's clock differential
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& systemAddress ) const
 {
@@ -3275,7 +3275,6 @@ void RakPeer::ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& 
 #endif
 
     BitStream timeBS( data, sizeof( RakNet::Time ), false );
-    timeBS.EndianSwapBytes( 0, sizeof( RakNet::Time ) );
     RakNet::Time encodedTimestamp;
     timeBS.Read( encodedTimestamp );
 

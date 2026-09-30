@@ -24,6 +24,11 @@ If you hooked out-of-memory with `SetNotifyOutOfMemory`, it now hears about far 
 `RakPeer`'s getters now answer from a snapshot, and a closed connection no longer answers
 at all. See [Getters answer only for open connections](#getters-answer-only-for-open-connections).
 
+On a little-endian host, a Timestamped Message now carries the time its sender wrote, shifted
+to your clock, where stock handed it out with its bytes reversed. Nothing on the wire changed.
+See
+[Timestamped Messages arrive shifted](#timestamped-messages-arrive-shifted).
+
 **The short version:** four of the five breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
@@ -753,6 +758,23 @@ copy out of the snapshot, so there's nothing for a reference to point at. Code t
 the result, or binds it to a `const RakNetGUID&`, compiles unchanged. Code that takes its
 address, or binds it to `auto&`, doesn't: copy it into a `RakNetGUID` instead. A class of
 your own that implements `RakPeerInterface` has to change the return type of its override.
+
+## Timestamped Messages arrive shifted
+
+**`Receive` shifts a Timestamped Message's time instead of byte-swapping it.** For a Message
+that starts with `ID_TIMESTAMP`, `Receive` subtracts the sender's clock differential from the
+`RakNet::Time` after that byte, so the time reads against your clock. Stock 4.081 did too,
+but it reversed that time's bytes before reading it, and `Read`, which converts from network
+order, reversed them again. So on a little-endian host, which covers x86 and nearly all ARM,
+you read the byte-swapped time minus the differential. Big-endian hosts and
+`__BITSTREAM_NATIVE_END` builds were already right. If you worked around the garbage value,
+remove the workaround. The fix is on the receiving side and the wire is unchanged, so a stock
+peer on the other end is unaffected.
+
+**NAT punchthrough's timed attempts now start.** `NatPunchthroughServer` tells each client
+when to start punching in a Timestamped Message. On a little-endian host stock read that time
+as one far in the future, so the attempt never started. It now starts at the time the server
+named, on the client's clock.
 
 ## Exceptions and out-of-memory
 

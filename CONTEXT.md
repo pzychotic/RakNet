@@ -77,6 +77,13 @@ larger than it can guarantee any other Peer will accept.
 _Avoid_: Packet (which is the struct `Receive` returns, and separately a chunk of a split
 Message — it means at least three things in this codebase already)
 
+**Timestamped Message**:
+A Message that begins with `ID_TIMESTAMP` followed by a time on the sender's clock. The
+receiving Peer rewrites that time onto its own clock before the application or any plugin
+sees the Message, so a receiver can compare it directly with its own time. The rest of the
+Message is untouched.
+_Avoid_: Timestamp packet, timed message
+
 **Offline datagram**:
 A single datagram exchanged with a System that has no connection record: a ping, a pong,
 an advertisement or out-of-band data. It is not a Message: it never goes through `Send`,
