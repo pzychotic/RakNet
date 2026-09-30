@@ -664,7 +664,8 @@ to one cycle old. The identity, state, ping and clock getters have moved so far:
 `ID_TIMESTAMP`. The statistics functions and `GetClientPublicKeyFromSystemAddress` ask
 the network thread instead, and wait for its answer. `Connect` and `ConnectWithSocket`
 take their "already connected" answer from the snapshot too, and the setters that change
-open connections queue the change for the network thread. Five things change at runtime.
+open connections queue the change for the network thread. `GetSockets` and `GetSocket`
+answer without asking the network thread. Six things change at runtime.
 One return type changed, which stops a build only in the narrow cases in the last
 paragraph.
 
@@ -723,6 +724,18 @@ away, and a connection opened afterwards gets it too. `GetTimeoutTime` for an op
 connection can return the old value for up to one cycle after `SetTimeoutTime`. If you need
 to see it, poll until it shows. Called before `Startup`, the setters change only the
 Peer-wide value, which is all they need to do.
+
+**`GetSockets` and `GetSocket` don't block.** Stock queued a question for the network
+thread and waited for the answer, which you could lean on to wait out the commands queued
+before it. Now `Startup` publishes the bound sockets once it succeeds and `Shutdown` clears
+them, so both answer at once, the same way under `RAKPEER_USER_THREADED`, where stock always
+returned nothing. To see the effect of a command you queued, such as `ChangeSystemAddress`,
+poll the getter that shows it. `GetSocket( UNASSIGNED_SYSTEM_ADDRESS )` is still the first
+bound socket, and `GetSocket` for a connection answers from the snapshot. The pointers stay
+valid until `Shutdown`, which frees the sockets. Stock's documentation promised a
+reference-counted pointer that outlived `Shutdown`, but it never was one. `ReleaseSockets`
+still only clears the vector. `GetMyBoundAddress` returns `UNASSIGNED_SYSTEM_ADDRESS` for an
+index outside the bound sockets, where stock read past the end of the list.
 
 **`GetGuidFromSystemAddress` returns `RakNetGUID`, not `const RakNetGUID&`.** The answer is a
 copy out of the snapshot, so there's nothing for a reference to point at. Code that copies

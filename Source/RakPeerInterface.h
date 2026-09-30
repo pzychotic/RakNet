@@ -408,6 +408,7 @@ public:
     /// \note A socket bound to the wildcard address (the default, a SocketDescriptor with no host
     /// address) reports loopback, not the wildcard. It is an address to send to yourself on, not the
     /// address the socket is bound to.
+    /// \return UNASSIGNED_SYSTEM_ADDRESS if \a socketIndex is outside the bound sockets or the Peer isn't running
     virtual SystemAddress GetMyBoundAddress( const int socketIndex = 0 ) = 0;
 
     /// Get a random 64-bit number from the operating system's random number source.
@@ -547,17 +548,17 @@ public:
     /// \return A packet you can write to, or 0 if memory ran out (notifyOutOfMemory has been called)
     virtual Packet* AllocatePacket( unsigned dataSize ) = 0;
 
-    /// Get the socket used with a particular active connection
-    /// The smart pointer reference counts the RakNetSocket2 object, so the socket will remain active as long as the smart pointer does, even if RakNet were to shutdown or close the connection.
-    /// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
-    /// \param[in] target Which system
-    /// \return A smart pointer object containing the socket information about the socket. Be sure to check IsNull() which is returned if the update thread is unresponsive, shutting down, or if this system is not connected
+    /// Get the socket used with a particular connection
+    /// \note Doesn't block. The pointer stays valid until Shutdown, which frees the socket.
+    /// \param[in] target Which system, or UNASSIGNED_SYSTEM_ADDRESS for the first bound socket
+    /// \return The socket, or 0 if there is no connection to \a target or the Peer isn't running
     virtual RakNetSocket2* GetSocket( const SystemAddress target ) = 0;
 
-    /// Get all sockets in use
-    /// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
-    /// \param[out] sockets List of RakNetSocket2 structures in use. Sockets will not be closed until \a sockets goes out of scope
+    /// Get every bound socket, in the order Startup was given their SocketDescriptors
+    /// \note Doesn't block. The pointers stay valid until Shutdown, which frees the sockets.
+    /// \param[out] sockets The bound sockets, or empty if the Peer isn't running
     virtual void GetSockets( std::vector<RakNetSocket2*>& sockets ) = 0;
+    /// Does nothing but clear \a sockets
     virtual void ReleaseSockets( std::vector<RakNetSocket2*>& sockets ) = 0;
 
     virtual void WriteOutOfBandHeader( BitStream* bitStream ) = 0;

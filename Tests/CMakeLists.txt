@@ -86,6 +86,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2UnrequestedForwardingSuccessTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RPC4LoopbackTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityFunctionsTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SocketQueryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketSendAddressFamilyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketTTLOptionTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketWildcardAddressTest.cpp

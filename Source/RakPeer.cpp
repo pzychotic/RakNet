@@ -245,7 +245,6 @@ RakPeer::RakPeer()
 #endif
 
     bufferedCommands.SetPageSize( sizeof( BufferedCommandStruct ) * 16 );
-    socketQueryOutput.SetPageSize( sizeof( SocketQueryOutput ) * 8 );
 
     packetAllocationPoolMutex.lock();
     packetAllocationPool.SetPageSize( sizeof( DataStructures::MemoryPool<Packet>::MemoryWithPage ) * 32 );
@@ -476,7 +475,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 
         ClearBufferedCommands();
         ClearBufferedPackets();
-        ClearSocketQueryOutput();
 
 #if RAKPEER_USER_THREADED != 1
         if( isMainLoopThreadActive == false )
@@ -498,6 +496,11 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 #endif // RAKPEER_USER_THREADED!=1
 
         SetAcceptingQueries( true );
+    }
+
+    {
+        std::lock_guard<std::mutex> guard( publishedViewMutex );
+        publishedSockets = socketList;
     }
 
     for( unsigned int i = 0; i < pluginListTS.size(); i++ )
@@ -868,7 +871,8 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     }
 
 
-    // No cycle publishes again, so this empties the view before the records it copies go.
+    // No cycle publishes again, so this empties the view before the records it copies go,
+    // and the published sockets before DerefAllSockets frees them.
     ClearPublishedView();
 
     // remoteSystemList in Single thread
@@ -902,7 +906,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
     ClearBufferedCommands();
     ClearBufferedPackets();
-    ClearSocketQueryOutput();
 
     ClearRequestedConnectionList();
 
@@ -2016,12 +2019,10 @@ const RakNetGUID RakPeer::GetMyGUID( void ) const
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetMyBoundAddress( const int socketIndex )
 {
-    std::vector<RakNetSocket2*> sockets;
-    GetSockets( sockets );
-    if( !sockets.empty() )
-        return sockets[socketIndex]->GetBoundAddress();
-    else
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    if( socketIndex < 0 || (size_t)socketIndex >= publishedSockets.size() )
         return UNASSIGNED_SYSTEM_ADDRESS;
+    return publishedSockets[socketIndex]->GetBoundAddress();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -2480,65 +2481,22 @@ Packet* RakPeer::AllocatePacket( unsigned dataSize )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakNetSocket2* RakPeer::GetSocket( const SystemAddress target )
 {
-    // Send a query to the thread to get the socket, and return when we got it
-    BufferedCommandStruct* bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-    bcs->command = BufferedCommandStruct::BCS_GET_SOCKET;
-    bcs->systemIdentifier = target;
-    bcs->data = 0;
-    bufferedCommands.Push( bcs );
-
-    // Block up to one second to get the socket, although it should actually take virtually no time
-    RakNet::TimeMS stopWaiting = RakNet::GetTimeMS() + 1000;
-    while( RakNet::GetTimeMS() < stopWaiting )
+    if( target == UNASSIGNED_SYSTEM_ADDRESS )
     {
-        if( isMainLoopThreadActive == false )
-            return 0;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
-
-        SocketQueryOutput* sqo = socketQueryOutput.Pop();
-        if( sqo )
-        {
-            std::vector<RakNetSocket2*> output = sqo->sockets;
-            sqo->sockets.clear();
-            socketQueryOutput.Deallocate( sqo, _FILE_AND_LINE_ );
-            if( !output.empty() )
-                return output[0];
-            break;
-        }
+        std::lock_guard<std::mutex> guard( publishedViewMutex );
+        return publishedSockets.empty() ? 0 : publishedSockets[0];
     }
-    return 0;
+
+    PublishedRemoteSystem entry;
+    if( GetPublishedByAddress( target, entry ) == false )
+        return 0;
+    return entry.rakNetSocket;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::GetSockets( std::vector<RakNetSocket2*>& sockets )
 {
-    sockets.clear();
-
-    // Send a query to the thread to get the socket, and return when we got it
-    BufferedCommandStruct* bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-    bcs->command = BufferedCommandStruct::BCS_GET_SOCKET;
-    bcs->systemIdentifier = UNASSIGNED_SYSTEM_ADDRESS;
-    bcs->data = 0;
-    bufferedCommands.Push( bcs );
-
-    // Block up to one second to get the socket, although it should actually take virtually no time
-    while( 1 )
-    {
-        if( isMainLoopThreadActive == false )
-            return;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
-
-        SocketQueryOutput* sqo = socketQueryOutput.Pop();
-        if( sqo )
-        {
-            sockets = sqo->sockets;
-            sqo->sockets.clear();
-            socketQueryOutput.Deallocate( sqo, _FILE_AND_LINE_ );
-            return;
-        }
-    }
-    return;
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    sockets = publishedSockets;
 }
 void RakPeer::ReleaseSockets( std::vector<RakNetSocket2*>& sockets )
 {
@@ -3543,6 +3501,7 @@ void RakPeer::PublishView( void )
         entry.guid = remoteSystem.guid;
         entry.guid.systemIndex = (SystemIndex)i;
         entry.connectMode = remoteSystem.connectMode;
+        entry.rakNetSocket = remoteSystem.rakNetSocket;
         for( int j = 0; j < MAXIMUM_NUMBER_OF_INTERNAL_IDS; j++ )
             entry.theirInternalSystemAddress[j] = remoteSystem.theirInternalSystemAddress[j];
         entry.myExternalSystemAddress = remoteSystem.myExternalSystemAddress;
@@ -3571,6 +3530,7 @@ void RakPeer::ClearPublishedView( void )
     std::lock_guard<std::mutex> guard( publishedViewMutex );
     publishedView.clear();
     publishedViewBuilding.clear();
+    publishedSockets.clear();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::AssertInsideUpdateCycle( void ) const
@@ -4158,11 +4118,6 @@ void RakPeer::ClearBufferedCommands( void )
         bufferedCommands.Deallocate( bcs, _FILE_AND_LINE_ );
     }
     bufferedCommands.Clear( _FILE_AND_LINE_ );
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::ClearSocketQueryOutput( void )
-{
-    socketQueryOutput.Clear( _FILE_AND_LINE_ );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearRequestedConnectionList( void )
@@ -5326,32 +5281,6 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
             {
                 unsigned int existingSystemIndex = GetRemoteSystemIndex( rssFromGuid->systemAddress );
                 ReferenceRemoteSystem( bcs->systemIdentifier.systemAddress, existingSystemIndex );
-            }
-        }
-        else if( bcs->command == BufferedCommandStruct::BCS_GET_SOCKET )
-        {
-            SocketQueryOutput* sqo;
-            if( bcs->systemIdentifier.IsUndefined() )
-            {
-                sqo = socketQueryOutput.Allocate( _FILE_AND_LINE_ );
-                sqo->sockets = socketList;
-                socketQueryOutput.Push( sqo );
-            }
-            else
-            {
-                remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
-                sqo = socketQueryOutput.Allocate( _FILE_AND_LINE_ );
-
-                sqo->sockets.clear();
-                if( remoteSystem )
-                {
-                    sqo->sockets.push_back( remoteSystem->rakNetSocket );
-                }
-                else
-                {
-                    // Leave empty smart pointer
-                }
-                socketQueryOutput.Push( sqo );
             }
         }
         else

@@ -559,16 +559,17 @@ public:
     /// \return A packet.
     Packet* AllocatePacket( unsigned dataSize );
 
-    /// \brief Get the socket used with a particular active connection.
-    /// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
-    /// \param[in] target Which system.
-    /// \return A pointer object containing the socket information about the target. Be sure to check IsNull() which is returned if the update thread is unresponsive, shutting down, or if this system is not connected.
+    /// \brief Get the socket used with a particular connection.
+    /// \note Doesn't block. The pointer stays valid until Shutdown.
+    /// \param[in] target Which system, or UNASSIGNED_SYSTEM_ADDRESS for the first bound socket.
+    /// \return The socket, or 0 if there is no connection to \a target or the Peer isn't running.
     virtual RakNetSocket2* GetSocket( const SystemAddress target );
 
-    /// \brief Gets all sockets in use.
-    /// \note This sends a query to the thread and blocks on the return value for up to one second. In practice it should only take a millisecond or so.
-    /// \param[out] sockets List of RakNetSocket2 structures in use.
+    /// \brief Gets every bound socket, in the order Startup was given their SocketDescriptors.
+    /// \note Doesn't block. The pointers stay valid until Shutdown.
+    /// \param[out] sockets The bound sockets, or empty if the Peer isn't running.
     virtual void GetSockets( std::vector<RakNetSocket2*>& sockets );
+    /// Does nothing but clear \a sockets.
     virtual void ReleaseSockets( std::vector<RakNetSocket2*>& sockets );
 
     /// \internal
@@ -788,6 +789,7 @@ protected:
         SystemAddress systemAddress;
         RakNetGUID guid;
         RemoteSystemStruct::ConnectMode connectMode;
+        RakNetSocket2* rakNetSocket; ///< What GetSocket returns
         SystemAddress theirInternalSystemAddress[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
         SystemAddress myExternalSystemAddress;
         int MTUSize;
@@ -812,7 +814,7 @@ protected:
     /// Rebuild the published view from the open connection records and swap it in.
     /// Network thread only.
     void PublishView( void );
-    /// Empty the published view, for Shutdown.
+    /// Empty the published view and the published sockets, for Shutdown.
     void ClearPublishedView( void );
     /// In debug builds, assert the caller is inside RunUpdateCycle. Every lookup that goes
     /// straight to the connection records calls it (ADR-0007, point 6).
@@ -942,6 +944,9 @@ protected:
     /// PublishView builds the next view here without the mutex, then swaps it in. Network
     /// thread only.
     std::vector<PublishedRemoteSystem> publishedViewBuilding;
+    /// A copy of socketList, set once Startup has succeeded and cleared by Shutdown before
+    /// it frees the sockets. Guarded by publishedViewMutex.
+    std::vector<RakNetSocket2*> publishedSockets;
     mutable std::mutex publishedViewMutex;
     /// Set while RunUpdateCycle runs. A flag rather than a thread id, so it holds under
     /// RAKPEER_USER_THREADED too.
@@ -1031,7 +1036,6 @@ protected:
         {
             BCS_SEND,
             BCS_CLOSE_CONNECTION,
-            BCS_GET_SOCKET,
             BCS_CHANGE_SYSTEM_ADDRESS,
             BCS_SET_TIMEOUT_TIME,
             BCS_SET_SPLIT_MESSAGE_PROGRESS_INTERVAL,
@@ -1064,15 +1068,6 @@ protected:
     bool PushBufferedPacket( RNS2RecvStruct* p );
     RNS2RecvStruct* PopBufferedPacket( void );
 
-    struct SocketQueryOutput
-    {
-        SocketQueryOutput() {}
-        ~SocketQueryOutput() {}
-        std::vector<RakNetSocket2*> sockets;
-    };
-
-    DataStructures::ThreadsafeAllocatingQueue<SocketQueryOutput> socketQueryOutput;
-
 
     bool AllowIncomingConnections( void ) const;
 
@@ -1084,7 +1079,6 @@ protected:
     bool SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool useCallerDataAllocation, RakNet::TimeUS currentTime, uint32_t receipt );
     void ClearBufferedCommands( void );
     void ClearBufferedPackets( void );
-    void ClearSocketQueryOutput( void );
     void ClearRequestedConnectionList( void );
     void AddPacketToProducer( Packet* p );
     unsigned int GenerateSeedFromGuid( void );

@@ -196,10 +196,14 @@ TEST_CASE( "Router2 re-routes a live forwarded connection through a Designated r
     } );
     REQUIRE( last.peer != nullptr );
 
-    // ChangeSystemAddress only queues a command; GetSockets queues one behind it and waits.
-    std::vector<RakNetSocket2*> sockets;
-    source->GetSockets( sockets );
-    endpoint->GetSockets( sockets );
+    // ChangeSystemAddress only queues a command, so the move shows in the getters a cycle later.
+    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
+    while( ( source->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == sourceSeesEndpointAt ||
+             endpoint->GetSystemAddressFromGuid( source->GetMyGUID() ) == endpointSeesSourceAt ) &&
+           !ConnectionWaits::Expired( deadline ) )
+    {
+        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+    }
     CHECK( source->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) != sourceSeesEndpointAt );
     CHECK( endpoint->GetSystemAddressFromGuid( source->GetMyGUID() ) != endpointSeesSourceAt );
 

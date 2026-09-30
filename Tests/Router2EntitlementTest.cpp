@@ -29,7 +29,7 @@ System and moved any connection to <sender's IP>:<port of its choosing>.
 Each injected Message is followed by a user Message on the same ordered channel, so once the
 user Message comes out of Receive the injected one has been through the plugin.
 ChangeSystemAddress only queues a command for the update thread, so every check on an address
-first calls GetSockets, which queues a command behind it and blocks until it is answered.
+first waits until a command queued behind it shows in the getters.
 */
 
 using namespace RakNet;
@@ -131,6 +131,28 @@ bool WaitForMessage( RakPeerInterface* peer, MessageID id )
     return false;
 }
 
+// Returns once peer's getters show every command queued before the call. Buffered commands
+// are applied in the order they were queued, so once a timeout change queued after them shows
+// on peer's connection to other, they have all been applied.
+bool WaitForQueuedCommands( RakPeerInterface* peer, RakNetGUID other )
+{
+    const SystemAddress otherAddress = peer->GetSystemAddressFromGuid( other );
+    // UNASSIGNED_SYSTEM_ADDRESS would change the Peer-wide default, which shows at once.
+    if( otherAddress == UNASSIGNED_SYSTEM_ADDRESS )
+        return false;
+    const TimeMS timeout = peer->GetTimeoutTime( otherAddress ) ^ 1;
+    peer->SetTimeoutTime( timeout, otherAddress );
+
+    const TimeMS deadline = GetTimeMS() + kMarkerBudgetMs;
+    while( peer->GetTimeoutTime( otherAddress ) != timeout )
+    {
+        if( ConnectionWaits::Expired( deadline ) )
+            return false;
+        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
+    }
+    return true;
+}
+
 bool Contains( const std::vector<MessageID>& ids, MessageID id )
 {
     for( MessageID each : ids )
@@ -159,9 +181,7 @@ std::vector<MessageID> Inject( RakPeerInterface* sender, RakPeerInterface* targe
     sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetAddress, false );
 
     std::vector<MessageID> received = ReceiveUntilMarker( target );
-
-    std::vector<RakNetSocket2*> sockets;
-    target->GetSockets( sockets );
+    REQUIRE( WaitForQueuedCommands( target, sender->GetMyGUID() ) );
     return received;
 }
 
