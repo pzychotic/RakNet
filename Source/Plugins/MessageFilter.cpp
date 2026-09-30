@@ -350,12 +350,6 @@ PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
     case ID_DOWNLOAD_PROGRESS:
         break;
     default:
-        if( packet->data[0] == ID_TIMESTAMP )
-        {
-            if( packet->length < sizeof( MessageID ) + sizeof( RakNet::TimeMS ) )
-                return RR_STOP_PROCESSING_AND_DEALLOCATE; // Invalid message
-            messageId = packet->data[sizeof( MessageID ) + sizeof( RakNet::TimeMS )];
-        }
         // If this system is filtered, check if this message is allowed.  If not allowed, return RR_STOP_PROCESSING_AND_DEALLOCATE
         auto it = systemList.find( packet );
         if( it == systemList.end() )
@@ -363,9 +357,21 @@ PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
 
         const FilteredSystem& value = it->second;
 
+        // A Timestamped Message's ID follows its time. One too short to hold both is disallowed.
+        if( messageId == ID_TIMESTAMP )
+        {
+            constexpr unsigned int idOffset = sizeof( MessageID ) + sizeof( RakNet::Time );
+            if( packet->length <= idOffset )
+            {
+                OnInvalidMessage( value.filter, packet, ID_TIMESTAMP );
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
+            }
+            messageId = packet->data[idOffset];
+        }
+
         if( value.filter->allowedIDs[messageId] == false )
         {
-            OnInvalidMessage( value.filter, packet, packet->data[0] );
+            OnInvalidMessage( value.filter, packet, messageId );
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
         }
 

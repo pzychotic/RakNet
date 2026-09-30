@@ -776,6 +776,14 @@ when to start punching in a Timestamped Message. On a little-endian host stock r
 as one far in the future, so the attempt never started. It now starts at the time the server
 named, on the client's clock.
 
+**`MessageFilter` judges a Timestamped Message by its Message ID.** Stock skipped a
+`RakNet::TimeMS` instead of a `RakNet::Time`, so it judged a byte of the time, which the
+sender chooses. Now it reads the Message ID after the whole time, and your disallowed-message
+callback gets that ID, where stock always passed `ID_TIMESTAMP`. A filtered System's
+Timestamped Message that is too short to hold a Message ID is disallowed, and the callback
+gets `ID_TIMESTAMP`. Stock dropped short ones from every System without calling back; an
+unfiltered System's now pass through.
+
 ## Exceptions and out-of-memory
 
 No signature changed here, but where you hook out-of-memory did. RakNet is
