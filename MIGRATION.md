@@ -663,8 +663,9 @@ to one cycle old. The identity, state, ping and clock getters have moved so far:
 `GetClockDifferential`, as has the clock differential `Receive` subtracts from an
 `ID_TIMESTAMP`. The statistics functions and `GetClientPublicKeyFromSystemAddress` ask
 the network thread instead, and wait for its answer. `Connect` and `ConnectWithSocket`
-take their "already connected" answer from the snapshot too. Four things change at
-runtime. One return type changed, which stops a build only in the narrow cases in the last
+take their "already connected" answer from the snapshot too, and the setters that change
+open connections queue the change for the network thread. Five things change at runtime.
+One return type changed, which stops a build only in the narrow cases in the last
 paragraph.
 
 **`GetConnectionState` reports a closed connection as `IS_NOT_CONNECTED`.** Stock returned
@@ -711,6 +712,17 @@ the snapshot, so for up to one cycle the answer can lag. Just after a connection
 can still return `ALREADY_CONNECTED_TO_ENDPOINT`. Call again on a later cycle. Just after one
 opens they can return `CONNECTION_ATTEMPT_STARTED`. The open connection carries on, and
 `Receive` may get `ID_ALREADY_CONNECTED` for the redundant attempt.
+
+**Setters reach open connections one cycle later.** `SetTimeoutTime`,
+`SetSplitMessageProgressInterval`, `SetUnreliableTimeout` and `ApplyNetworkSimulator`
+used to write into every open connection from your thread. Now they queue the change, and
+the network thread applies it at the start of its next cycle, in order with your `Send`
+calls. The Peer-wide value changes at once, so `GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS )`,
+`GetSplitMessageProgressInterval` and `IsNetworkSimulatorActive` answer with it straight
+away, and a connection opened afterwards gets it too. `GetTimeoutTime` for an open
+connection can return the old value for up to one cycle after `SetTimeoutTime`. If you need
+to see it, poll until it shows. Called before `Startup`, the setters change only the
+Peer-wide value, which is all they need to do.
 
 **`GetGuidFromSystemAddress` returns `RakNetGUID`, not `const RakNetGUID&`.** The answer is a
 copy out of the snapshot, so there's nothing for a reference to point at. Code that copies

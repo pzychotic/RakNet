@@ -742,9 +742,10 @@ protected:
     ConnectionAttemptResult SendConnectionRequest( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, PublicKey* publicKey, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime );
     void HandleConnectionCancelQueue();
     ///Get the reliability layer associated with a systemAddress.
+    /// Network thread only, like GetRemoteSystemFromGUID.
     /// \param[in] systemAddress The player identifier
     /// \return 0 if none
-    RemoteSystemStruct* GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread, bool onlyActive ) const;
+    RemoteSystemStruct* GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool onlyActive ) const;
     /// Network thread only, like GetRemoteSystemFromGUID.
     RakPeer::RemoteSystemStruct* GetRemoteSystem( const AddressOrGUID systemIdentifier, bool onlyActive ) const;
     void ValidateRemoteSystemLookup( void ) const;
@@ -904,8 +905,8 @@ protected:
     unsigned char incomingPasswordLength;
 
     /// The connection records. Network thread only: nothing guards them, so the user thread
-    /// reads the published view instead (ADR-0007). SetTimeoutTime still reads them
-    /// from the user thread, through the `calledFromNetworkThread == false` branch.
+    /// reads the published view instead, and changes them through buffered commands
+    /// (ADR-0007).
     ///
     /// This is an array of pointers to RemoteSystemStruct
     /// This allows us to preallocate the list when starting, so we don't have to allocate or delete at runtime.
@@ -1020,17 +1021,33 @@ protected:
         RakNetSocket2* socket;
         unsigned short port;
         uint32_t receipt;
+        /// The values the connection-record setters carry. systemIdentifier names the
+        /// connection, or is UNASSIGNED_SYSTEM_ADDRESS for every one.
+        RakNet::TimeMS timeMS;
+        int interval;
+        double packetloss;
+        unsigned short minExtraPing, extraPingVariance;
         enum
         {
             BCS_SEND,
             BCS_CLOSE_CONNECTION,
             BCS_GET_SOCKET,
             BCS_CHANGE_SYSTEM_ADDRESS,
+            BCS_SET_TIMEOUT_TIME,
+            BCS_SET_SPLIT_MESSAGE_PROGRESS_INTERVAL,
+            BCS_SET_UNRELIABLE_TIMEOUT,
+            BCS_APPLY_NETWORK_SIMULATOR,
             /* BCS_USE_USER_SOCKET, BCS_REBIND_SOCKET_ADDRESS, BCS_RPC, BCS_RPC_SHIFT,*/ BCS_DO_NOTHING
         } command;
     };
 
     DataStructures::ThreadsafeAllocatingQueue<BufferedCommandStruct> bufferedCommands;
+
+    /// A command for a connection-record setter, toward \a target, with no data. 0 if the
+    /// Peer isn't running: the connection records it would change don't exist.
+    BufferedCommandStruct* AllocateConnectionSetting( const SystemAddress& target );
+    /// Applies a connection-record setter's command. Network thread only.
+    void ApplyConnectionSetting( const BufferedCommandStruct& bcs );
 
     std::deque<RNS2RecvStruct*> bufferedPacketsFreePool;
     std::mutex bufferedPacketsFreePoolMutex;
@@ -1081,7 +1098,9 @@ protected:
     void DerefAllSockets( void );
     unsigned int GetRakNetSocketFromUserConnectionSocketIndex( unsigned int userIndex ) const;
 
-    RakNet::TimeMS defaultTimeoutTime;
+    /// The default each new connection record copies. Set on the user thread and read on the
+    /// network thread.
+    std::atomic<RakNet::TimeMS> defaultTimeoutTime;
 
     // Generate and store a unique GUID
     void GenerateGUID( void );
@@ -1092,8 +1111,10 @@ protected:
 
     // Nobody would use the internet simulator in a final build.
 #ifdef _DEBUG
-    double _packetloss;
-    unsigned short _minExtraPing, _extraPingVariance;
+    /// What ApplyNetworkSimulator last set, for Startup and IsNetworkSimulatorActive. The
+    /// connection records get it through BCS_APPLY_NETWORK_SIMULATOR.
+    std::atomic<double> _packetloss;
+    std::atomic<unsigned short> _minExtraPing, _extraPingVariance;
 #endif
 
     ///How long it has been since things were updated by a call to receiveUpdate thread uses this to determine how long to sleep for
@@ -1102,8 +1123,9 @@ protected:
     bool allowConnectionResponseIPMigration;
 
     SystemAddress firstExternalID;
-    int splitMessageProgressInterval;
-    RakNet::TimeMS unreliableTimeout;
+    /// Defaults each new connection record copies, like defaultTimeoutTime.
+    std::atomic<int> splitMessageProgressInterval;
+    std::atomic<RakNet::TimeMS> unreliableTimeout;
 
     bool ( *incomingDatagramEventHandler )( RNS2RecvStruct* );
 

@@ -452,6 +452,7 @@ public:
     /// Do not set different values for different computers that are connected to each other, or you won't be able to reconnect after ID_CONNECTION_LOST
     /// \param[in] timeMS Time, in MS
     /// \param[in] target Which system to do this for. Pass UNASSIGNED_SYSTEM_ADDRESS for all systems.
+    /// \note The default for new connections changes at once. Open connections change on the network thread's next update cycle, so until then GetTimeoutTime() for one of them can return the old value (ADR-0007).
     virtual void SetTimeoutTime( RakNet::TimeMS timeMS, const SystemAddress target ) = 0;
 
     /// \param[in] target Which system to do this for. Pass UNASSIGNED_SYSTEM_ADDRESS to get the default value
@@ -497,6 +498,7 @@ public:
     /// As it can be slow or cumbersome to get this notification for every chunk, you can set the interval at which it is returned.
     /// Defaults to 0 (never return this notification)
     /// \param[in] interval How many messages to use as an interval
+    /// \note GetSplitMessageProgressInterval() and new connections see the value at once. Open connections get it on the network thread's next update cycle (ADR-0007).
     virtual void SetSplitMessageProgressInterval( int interval ) = 0;
 
     /// Returns what was passed to SetSplitMessageProgressInterval()
@@ -507,6 +509,7 @@ public:
     /// Useful if the network is clogged up.
     /// Set to 0 or less to never timeout.  Defaults to 0.
     /// \param[in] timeoutMS How many ms to wait before simply not sending an unreliable message.
+    /// \note New connections see the value at once. Open connections get it on the network thread's next update cycle (ADR-0007).
     virtual void SetUnreliableTimeout( RakNet::TimeMS timeoutMS ) = 0;
 
     /// Send a message to host, with the IP socket option TTL set to 3
@@ -582,6 +585,7 @@ public:
     /// \param[in] packetloss Chance to lose a packet. Ranges from 0 to 1.
     /// \param[in] minExtraPing The minimum time to delay sends.
     /// \param[in] extraPingVariance The additional random time to delay sends.
+    /// \note IsNetworkSimulatorActive() sees the values at once. Connections get them on the network thread's next update cycle (ADR-0007).
     virtual void ApplyNetworkSimulator( float packetloss, unsigned short minExtraPing, unsigned short extraPingVariance ) = 0;
 
     /// Limits how much outgoing bandwidth can be sent per-connection.

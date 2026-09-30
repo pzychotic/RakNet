@@ -2111,25 +2111,14 @@ bool RakPeer::GetClientPublicKeyFromSystemAddress( const SystemAddress input, ch
 void RakPeer::SetTimeoutTime( RakNet::TimeMS timeMS, const SystemAddress target )
 {
     if( target == UNASSIGNED_SYSTEM_ADDRESS )
-    {
         defaultTimeoutTime = timeMS;
 
-        unsigned i;
-        for( i = 0; i < maximumNumberOfPeers; i++ )
-        {
-            if( remoteSystemList[i].isActive )
-            {
-                if( remoteSystemList[i].isActive )
-                    remoteSystemList[i].reliabilityLayer.SetTimeoutTime( timeMS );
-            }
-        }
-    }
-    else
+    BufferedCommandStruct* bcs = AllocateConnectionSetting( target );
+    if( bcs )
     {
-        RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( target, false, true );
-
-        if( remoteSystem != 0 )
-            remoteSystem->reliabilityLayer.SetTimeoutTime( timeMS );
+        bcs->command = BufferedCommandStruct::BCS_SET_TIMEOUT_TIME;
+        bcs->timeMS = timeMS;
+        bufferedCommands.Push( bcs );
     }
 }
 
@@ -2268,8 +2257,14 @@ void RakPeer::SetSplitMessageProgressInterval( int interval )
 {
     RakAssert( interval >= 0 );
     splitMessageProgressInterval = interval;
-    for( unsigned short i = 0; i < maximumNumberOfPeers; i++ )
-        remoteSystemList[i].reliabilityLayer.SetSplitMessageProgressInterval( splitMessageProgressInterval );
+
+    BufferedCommandStruct* bcs = AllocateConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
+    if( bcs )
+    {
+        bcs->command = BufferedCommandStruct::BCS_SET_SPLIT_MESSAGE_PROGRESS_INTERVAL;
+        bcs->interval = interval;
+        bufferedCommands.Push( bcs );
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2289,8 +2284,14 @@ int RakPeer::GetSplitMessageProgressInterval( void ) const
 void RakPeer::SetUnreliableTimeout( RakNet::TimeMS timeoutMS )
 {
     unreliableTimeout = timeoutMS;
-    for( unsigned short i = 0; i < maximumNumberOfPeers; i++ )
-        remoteSystemList[i].reliabilityLayer.SetUnreliableTimeout( unreliableTimeout );
+
+    BufferedCommandStruct* bcs = AllocateConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
+    if( bcs )
+    {
+        bcs->command = BufferedCommandStruct::BCS_SET_UNRELIABLE_TIMEOUT;
+        bcs->timeMS = timeoutMS;
+        bufferedCommands.Push( bcs );
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2422,6 +2423,56 @@ void RakPeer::ChangeSystemAddress( RakNetGUID guid, const SystemAddress& systemA
     bufferedCommands.Push( bcs );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RakPeer::BufferedCommandStruct* RakPeer::AllocateConnectionSetting( const SystemAddress& target )
+{
+    if( IsActive() == false )
+        return 0;
+
+    BufferedCommandStruct* bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
+    bcs->data = 0;
+    bcs->systemIdentifier = target;
+    return bcs;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::ApplyConnectionSetting( const BufferedCommandStruct& bcs )
+{
+    AssertInsideUpdateCycle();
+
+    switch( bcs.command )
+    {
+    case BufferedCommandStruct::BCS_SET_TIMEOUT_TIME:
+        if( bcs.systemIdentifier.systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
+        {
+            for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+                if( remoteSystemList[i].isActive )
+                    remoteSystemList[i].reliabilityLayer.SetTimeoutTime( bcs.timeMS );
+        }
+        else
+        {
+            RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( bcs.systemIdentifier.systemAddress, true );
+            if( remoteSystem != 0 )
+                remoteSystem->reliabilityLayer.SetTimeoutTime( bcs.timeMS );
+        }
+        break;
+    case BufferedCommandStruct::BCS_SET_SPLIT_MESSAGE_PROGRESS_INTERVAL:
+        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+            remoteSystemList[i].reliabilityLayer.SetSplitMessageProgressInterval( bcs.interval );
+        break;
+    case BufferedCommandStruct::BCS_SET_UNRELIABLE_TIMEOUT:
+        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+            remoteSystemList[i].reliabilityLayer.SetUnreliableTimeout( bcs.timeMS );
+        break;
+    case BufferedCommandStruct::BCS_APPLY_NETWORK_SIMULATOR:
+        // Every slot, open or not: a new connection record keeps what its slot was given,
+        // since ReliabilityLayer::Reset leaves the simulator alone.
+        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+            remoteSystemList[i].reliabilityLayer.ApplyNetworkSimulator( bcs.packetloss, bcs.minExtraPing, bcs.extraPingVariance );
+        break;
+    default:
+        break;
+    }
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Packet* RakPeer::AllocatePacket( unsigned dataSize )
 {
     return AllocPacket( dataSize, _FILE_AND_LINE_ );
@@ -2502,16 +2553,23 @@ void RakPeer::ReleaseSockets( std::vector<RakNetSocket2*>& sockets )
 void RakPeer::ApplyNetworkSimulator( float packetloss, unsigned short minExtraPing, unsigned short extraPingVariance )
 {
 #ifdef _DEBUG
-    if( remoteSystemList )
-    {
-        unsigned short i;
-        for( i = 0; i < maximumNumberOfPeers; i++ )
-            remoteSystemList[i].reliabilityLayer.ApplyNetworkSimulator( packetloss, minExtraPing, extraPingVariance );
-    }
-
     _packetloss = packetloss;
     _minExtraPing = minExtraPing;
     _extraPingVariance = extraPingVariance;
+
+    BufferedCommandStruct* bcs = AllocateConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
+    if( bcs )
+    {
+        bcs->command = BufferedCommandStruct::BCS_APPLY_NETWORK_SIMULATOR;
+        bcs->packetloss = packetloss;
+        bcs->minExtraPing = minExtraPing;
+        bcs->extraPingVariance = extraPingVariance;
+        bufferedCommands.Push( bcs );
+    }
+#else
+    (void)packetloss;
+    (void)minExtraPing;
+    (void)extraPingVariance;
 #endif
 }
 
@@ -2870,38 +2928,23 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const AddressOrGUID syste
     if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
         return GetRemoteSystemFromGUID( systemIdentifier.rakNetGuid, onlyActive );
     else
-        return GetRemoteSystemFromSystemAddress( systemIdentifier.systemAddress, true, onlyActive );
+        return GetRemoteSystemFromSystemAddress( systemIdentifier.systemAddress, onlyActive );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool calledFromNetworkThread, bool onlyActive ) const
+RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool onlyActive ) const
 {
-    unsigned i;
-
-    if( calledFromNetworkThread )
-        AssertInsideUpdateCycle();
+    AssertInsideUpdateCycle();
 
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         return 0;
 
-    if( calledFromNetworkThread )
+    unsigned int index = GetRemoteSystemIndex( systemAddress );
+    if( index != (unsigned int)-1 )
     {
-        unsigned int index = GetRemoteSystemIndex( systemAddress );
-        if( index != (unsigned int)-1 )
+        if( onlyActive == false || remoteSystemList[index].isActive == true )
         {
-            if( onlyActive == false || remoteSystemList[index].isActive == true )
-            {
-                RakAssert( remoteSystemList[index].systemAddress == systemAddress );
-                return remoteSystemList + index;
-            }
-        }
-    }
-    else
-    {
-        // Only an open connection record answers (ADR-0007), whatever onlyActive says.
-        for( i = 0; i < maximumNumberOfPeers; i++ )
-        {
-            if( remoteSystemList[i].isActive && remoteSystemList[i].systemAddress == systemAddress )
-                return remoteSystemList + i;
+            RakAssert( remoteSystemList[index].systemAddress == systemAddress );
+            return remoteSystemList + index;
         }
     }
 
@@ -3094,7 +3137,7 @@ void RakPeer::NotifyAndFlagForShutdown( const SystemAddress systemAddress, bool 
     if( performImmediate )
     {
         SendImmediate( (char*)temp.GetData(), temp.GetNumberOfBitsUsed(), disconnectionNotificationPriority, RELIABLE_ORDERED, orderingChannel, systemAddress, false, false, RakNet::GetTimeUS(), 0 );
-        RemoteSystemStruct* rss = GetRemoteSystemFromSystemAddress( systemAddress, true, true );
+        RemoteSystemStruct* rss = GetRemoteSystemFromSystemAddress( systemAddress, true );
         rss->connectMode = RemoteSystemStruct::DISCONNECT_ASAP;
     }
     else
@@ -3574,7 +3617,7 @@ void RakPeer::AnswerQuery( ConnectionQuery& query ) const
     switch( query.kind )
     {
     case ConnectionQuery::STATISTICS_BY_ADDRESS: {
-        RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( query.systemAddress, true, true );
+        RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( query.systemAddress, true );
         if( remoteSystem != 0 )
         {
             remoteSystem->reliabilityLayer.GetStatistics( &query.statistics );
@@ -3620,7 +3663,7 @@ void RakPeer::AnswerQuery( ConnectionQuery& query ) const
         break;
     case ConnectionQuery::CLIENT_PUBLIC_KEY: {
 #if LIBCAT_SECURITY == 1
-        const RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( query.systemAddress, true, true );
+        const RemoteSystemStruct* remoteSystem = GetRemoteSystemFromSystemAddress( query.systemAddress, true );
         if( remoteSystem == 0 )
             break;
 
@@ -4618,7 +4661,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     RakAssert( rcs->actionToTake == RakPeer::RequestedConnectionStruct::CONNECT );
                     // You might get this when already connected because of cross-connections
                     bool thisIPConnectedRecently = false;
-                    RakPeer::RemoteSystemStruct* remoteSystem = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true, true );
+                    RakPeer::RemoteSystemStruct* remoteSystem = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true );
                     if( remoteSystem == 0 )
                     {
                         if( rcs->socket == 0 )
@@ -4932,7 +4975,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bs.Read( mtu );
             bs.Read( guid );
 
-            RakPeer::RemoteSystemStruct* rssFromSA = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true, true );
+            RakPeer::RemoteSystemStruct* rssFromSA = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true );
             bool IPAddrInUse = rssFromSA != 0 && rssFromSA->isActive;
             RakPeer::RemoteSystemStruct* rssFromGuid = rakPeer->GetRemoteSystemFromGUID( guid, true );
             bool GUIDInUse = rssFromGuid != 0 && rssFromGuid->isActive;
@@ -5133,7 +5176,7 @@ void ProcessNetworkPacket( SystemAddress systemAddress, const char* data, const 
     }
 
     // See if this datagram came from a connected system
-    RakPeer::RemoteSystemStruct* remoteSystem = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true, true );
+    RakPeer::RemoteSystemStruct* remoteSystem = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true );
     if( remoteSystem )
     {
         // Handle regular incoming data
@@ -5310,6 +5353,10 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                 }
                 socketQueryOutput.Push( sqo );
             }
+        }
+        else
+        {
+            ApplyConnectionSetting( *bcs );
         }
 
 #ifdef _DEBUG

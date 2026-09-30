@@ -30,9 +30,10 @@ The shapes pinned here:
 - Once pings have settled, the ping and clock getters answer on the user thread, by address
   and by RakNetGUID, what the network thread works out from its connection records.
 - Under churn, with clients connecting and disconnecting while other threads call every
-  getter, each answer is coherent: an address and a RakNetGUID returned together belong to
-  one client, within one connection the state never moves backwards, and every ping is
-  either "none" or one loopback allows.
+  getter and the connection-record setters, each answer is coherent: an address and a
+  RakNetGUID returned together belong to one client, within one connection the state never
+  moves backwards, every ping is either "none" or one loopback allows, and every timeout
+  is one a setter or the default set.
 
 RakPeerInterface functions explicitly tested:
 
@@ -53,6 +54,12 @@ RakPeerInterface functions explicitly tested:
     GetLastPing
     GetLowestPing
     GetClockDifferential
+    SetTimeoutTime
+    SetSplitMessageProgressInterval
+    GetSplitMessageProgressInterval
+    SetUnreliableTimeout
+    ApplyNetworkSimulator
+    IsNetworkSimulatorActive
 */
 
 using namespace RakNet;
@@ -80,6 +87,9 @@ constexpr int kConnectionsPerClient = 12;
 constexpr TimeMS kChurnBudgetMs = 60000;
 // Hang guard for each wait below.
 constexpr TimeMS kWaitBudgetMs = 10000;
+// The timeouts the churn's setter thread alternates between. Both far above a loopback
+// round trip, so neither drops a connection.
+constexpr TimeMS kChurnTimeouts[] = { 20000, 25000 };
 
 /// Everything the ping and clock getters answer for one remote system.
 struct PingSummary
@@ -502,10 +512,17 @@ struct Client
     RakPeerInterface* peer;
 };
 
+/// Whether \a timeout is the Peer's initial default, \a initialTimeout, or one the setter
+/// thread sets.
+bool IsExpectedTimeout( TimeMS timeout, TimeMS initialTimeout )
+{
+    return timeout == initialTimeout || std::find( std::begin( kChurnTimeouts ), std::end( kChurnTimeouts ), timeout ) != std::end( kChurnTimeouts );
+}
+
 /// Calls every getter against every client, over and over, and records anything
 /// incoherent. Also follows each client's own state toward the server. \a passes counts
 /// completed sweeps.
-void ReadGettersUntilStopped( RakPeerInterface* server, const SystemAddress& serverAddress, const std::vector<Client>& clients, std::atomic<bool>& stop, std::atomic<unsigned long long>& passes, Failures& failures )
+void ReadGettersUntilStopped( RakPeerInterface* server, const SystemAddress& serverAddress, const std::vector<Client>& clients, TimeMS initialTimeout, std::atomic<bool>& stop, std::atomic<unsigned long long>& passes, Failures& failures )
 {
     const unsigned short serverPort = serverAddress.GetPort();
     std::vector<int> progress( clients.size(), -1 );
@@ -578,8 +595,9 @@ void ReadGettersUntilStopped( RakPeerInterface* server, const SystemAddress& ser
 
             if( server->GetMTUSize( client.address ) <= 0 )
                 failures.Add( who + "GetMTUSize returned no MTU" );
-            if( server->GetTimeoutTime( client.address ) == 0 )
-                failures.Add( who + "GetTimeoutTime returned 0" );
+            const TimeMS timeout = server->GetTimeoutTime( client.address );
+            if( IsExpectedTimeout( timeout, initialTimeout ) == false )
+                failures.Add( who + "GetTimeoutTime returned " + std::to_string( timeout ) );
 
             CheckPings( server, client.address, who + "by address: ", failures );
             CheckPings( server, client.guid, who + "by RakNetGUID: ", failures );
@@ -608,6 +626,44 @@ void ReadGettersUntilStopped( RakPeerInterface* server, const SystemAddress& ser
                 failures.Add( "GetConnectionList returned an address no client has" );
 
         ++passes;
+    }
+}
+
+/// Calls the connection-record setters on \a server, for every connection and for each
+/// client's, over and over, and records any Peer-wide value that reads back wrong. The
+/// values leave every connection working: long timeouts, and a simulator that does
+/// nothing.
+void CallSettersUntilStopped( RakPeerInterface* server, const std::vector<Client>& clients, TimeMS initialTimeout, std::atomic<bool>& stop, Failures& failures )
+{
+    for( unsigned int round = 0; stop.load() == false; round++ )
+    {
+        const TimeMS timeout = kChurnTimeouts[round % 2];
+        server->SetTimeoutTime( timeout, UNASSIGNED_SYSTEM_ADDRESS );
+        for( const Client& client : clients )
+            server->SetTimeoutTime( kChurnTimeouts[( round + 1 ) % 2], client.address );
+        if( server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS ) != timeout )
+            failures.Add( "GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS ) returned " + std::to_string( server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS ) ) );
+        for( const Client& client : clients )
+        {
+            const TimeMS clientTimeout = server->GetTimeoutTime( client.address );
+            if( IsExpectedTimeout( clientTimeout, initialTimeout ) == false )
+                failures.Add( "setter thread: GetTimeoutTime returned " + std::to_string( clientTimeout ) );
+        }
+
+        const int interval = (int)( round % 2 );
+        server->SetSplitMessageProgressInterval( interval );
+        if( server->GetSplitMessageProgressInterval() != interval )
+            failures.Add( "GetSplitMessageProgressInterval returned " + std::to_string( server->GetSplitMessageProgressInterval() ) );
+
+        server->SetUnreliableTimeout( round % 2 == 0 ? 0 : 1000 );
+
+        server->ApplyNetworkSimulator( 0.0f, 0, 0 );
+        if( server->IsNetworkSimulatorActive() )
+            failures.Add( "IsNetworkSimulatorActive returned true for a simulator that does nothing" );
+
+        // Paced, so the commands never outrun a network thread that cycles every few
+        // milliseconds.
+        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
 }
 
@@ -642,15 +698,17 @@ TEST_CASE( "Getters stay coherent while clients connect and disconnect under the
         clients.push_back( Client{ clientPeers.back()->Address(), clientPeers.back()->Guid(), clientPeers.back()->Get() } );
     }
 
-    std::atomic<bool> stopReading{ false };
+    const TimeMS initialTimeout = server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS );
+    std::atomic<bool> stopThreads{ false };
     std::atomic<unsigned long long> passes[kReaderThreads];
     Failures failures;
-    std::vector<std::thread> readers;
+    std::vector<std::thread> threads;
     for( int i = 0; i < kReaderThreads; i++ )
     {
         passes[i] = 0;
-        readers.emplace_back( ReadGettersUntilStopped, server.Get(), std::cref( server.Address() ), std::cref( clients ), std::ref( stopReading ), std::ref( passes[i] ), std::ref( failures ) );
+        threads.emplace_back( ReadGettersUntilStopped, server.Get(), std::cref( server.Address() ), std::cref( clients ), initialTimeout, std::ref( stopThreads ), std::ref( passes[i] ), std::ref( failures ) );
     }
+    threads.emplace_back( CallSettersUntilStopped, server.Get(), std::cref( clients ), initialTimeout, std::ref( stopThreads ), std::ref( failures ) );
 
     // Each client connects and disconnects kConnectionsPerClient times. Between two
     // connections it waits until the server's view has lost it and every reader has
@@ -724,9 +782,9 @@ TEST_CASE( "Getters stay coherent while clients connect and disconnect under the
         std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
     }
 
-    stopReading = true;
-    for( std::thread& reader : readers )
-        reader.join();
+    stopThreads = true;
+    for( std::thread& thread : threads )
+        thread.join();
 
     INFO( "first failure: " << failures.First() );
     CHECK( failures.Count() == 0 );
