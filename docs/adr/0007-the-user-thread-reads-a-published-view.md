@@ -21,7 +21,12 @@ can tear the ping and statistics fields the network thread writes on every datag
    the call returns.
 2. **There is no read-your-writes guarantee.** `CloseConnection`, `Connect` and the
    setters are buffered commands. A getter called straight after one of them may show the
-   state from before it, until the network thread's next cycle has run.
+   state from before it, until the network thread's next cycle has run. That holds for a
+   Message too: one that a plugin or a RakPeer call produces on the user thread may
+   announce a buffered command that hasn't run yet. `Router2` hands out
+   `ID_ROUTER_2_REROUTED` right after queuing `ChangeSystemAddress`, so the connection
+   still has its old address. `CloseConnection` without a notification queues
+   `ID_CONNECTION_LOST` at once, so the connection can still be `IS_CONNECTED`.
 3. **Only open connection records are authoritative.** A getter answers from connection
    records that are open. What a closed connection left in storage is not a connection
    record. `IS_DISCONNECTED` stays in the API as a hint that may fail to appear. It is not
@@ -43,6 +48,15 @@ can tear the ping and statistics fields the network thread writes on every datag
    to the connection records have no user-thread path. In debug builds they assert that the
    caller is inside `RunUpdateCycle`. That is a flag the cycle sets, not a thread id, so the
    assertion holds under `RAKPEER_USER_THREADED` too.
+7. **A Message from the network thread reaches `Receive` no earlier than the view of the
+   cycle that produced it.** While `Receive` hands out such a Message, the published view
+   reflects at least that update cycle. It may be newer: a handler for
+   `ID_NEW_INCOMING_CONNECTION` can find the connection already closed, if a later cycle
+   closed it and published. The closing Message is queued behind the opening one, so the
+   handler still learns of the close in order. There is no per-Message snapshot. What the
+   network thread pushes inside the cycle waits in a staging queue, and `PublishView` moves
+   it to the back of the receive queue after the swap. A push from the user thread, such
+   as `PushBackPacket` from `Receive`, goes to the receive queue at once (point 2).
 
 With `RAKPEER_USER_THREADED == 1` there is no network thread and so no race. The view is
 still built, so both modes run the same getters.
@@ -59,12 +73,22 @@ still built, so both modes run the same getters.
   would make every plugin that calls a getter from `Receive` non-conforming.
 - **Overlay pending commands on the view to give read-your-writes.** Every getter would scan
   the command queue for a guarantee nobody has asked for.
+- **Publish the view before each connection-change push.** Each publish is
+  O(`maxConnections`), so a burst of connection changes would multiply it. Every push site
+  would have to be found and kept up to date, and Messages other than connection changes
+  would still get ahead of the view.
+- **Stamp each Message with its cycle and have getters wait for that cycle's view.**
+  Getters would block, which is the cost that rules out overlays above.
 
 ## Consequences
 
 The staleness is now a documented property. Code that polls `GetConnectionState` right after
 `CloseConnection`, or `GetStatistics` in a tight loop, sees the old state or waits up to one
 cycle, and that's by design. Each cycle copies a small record per open connection, bounded by
-`maxConnections`. No MSVC tool proves the absence of a data race: a stress test in the suite
+`maxConnections`. The staging queue delays a network-thread Message by the rest of its cycle,
+usually well under a millisecond: the network thread's wait between cycles comes after
+`PublishView`. Under `RAKPEER_USER_THREADED` it adds nothing, since the whole cycle runs
+before the next `Receive`. Moving the staged Messages is a list splice, so no cycle
+allocates for it. No MSVC tool proves the absence of a data race: a stress test in the suite
 checks that answers are coherent on every platform, and a clang ThreadSanitizer job in CI
 checks for the race itself.
