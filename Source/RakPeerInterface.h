@@ -42,6 +42,11 @@ struct RakNetStatistics;
 /// - Connect(), CloseConnection() and the per-connection setters are queued for the network
 ///   thread. A getter called straight after one of them may still answer from the state
 ///   before it, until the network thread's next cycle has run.
+/// - When Receive() hands out a Message the network thread produced, the getters already
+///   reflect at least the update cycle that produced it, and possibly a later one. A
+///   Message produced on your thread may announce a queued command that hasn't run yet:
+///   ID_ROUTER_2_REROUTED arrives before the connection takes its new address, and
+///   CloseConnection()'s own ID_CONNECTION_LOST before the connection closes.
 /// - Only open connections are authoritative. IS_DISCONNECTED is a hint that may never
 ///   appear: a closed connection can go straight to IS_NOT_CONNECTED.
 ///

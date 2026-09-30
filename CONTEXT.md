@@ -22,6 +22,19 @@ handshake step until the connection closes. When a later connection is made, eve
 same System, it gets a new connection record. A Peer holds a bounded number of them.
 _Avoid_: Slot, remote system entry
 
+**Update cycle**:
+One pass of a Peer's network work: it reads what has arrived, applies the commands the
+application has queued, advances every connection, sends what is due, and ends by
+publishing a new view. A Peer runs one after another, on its own thread or when the
+application calls for one.
+_Avoid_: Tick, frame, update (unqualified)
+
+**Published view**:
+The snapshot of every open connection record that a Peer makes at the end of each update
+cycle. Every question the application asks about Systems is answered from the latest one.
+So an answer is coherent but may be up to one update cycle old.
+_Avoid_: Cache, mirror, copy
+
 **Half-open System**:
 A System that has begun the connection handshake but not completed it. It has a
 connection record but is not yet connected, and may send nothing but its connection

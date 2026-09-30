@@ -311,7 +311,7 @@ public:
         REQUIRE( WaitForMessage( ID_OPEN_CONNECTION_REPLY_2, Framing::Offline, kHandshakeBudgetMs, reply2, reply2Length ) );
     }
 
-    /// Everything after CompleteOfflineHandshake that takes the server's record of this
+    /// CompleteOfflineHandshake, then everything that takes the server's record of this
     /// System to CONNECTED: ID_CONNECTION_REQUEST, its acceptance, and
     /// ID_NEW_INCOMING_CONNECTION, field for field as RakPeer writes and reads them. Sent
     /// UNRELIABLE, which the server does not check, so nothing here waits for an ack.
@@ -321,7 +321,13 @@ public:
     void CompleteConnection()
     {
         CompleteOfflineHandshake();
+        CompleteConnectionRequest();
+    }
 
+    /// The part of CompleteConnection after CompleteOfflineHandshake, for a caller that
+    /// wants the Half-open record to exist a while before it goes on.
+    void CompleteConnectionRequest()
+    {
         BitStream request;
         request.Write( (MessageID)ID_CONNECTION_REQUEST );
         request.Write( RakNetGUID( m_guid ) );

@@ -669,6 +669,17 @@ answer without asking the network thread. Six things change at runtime.
 One return type changed, which stops a build only in the narrow cases in the last
 paragraph.
 
+A handler can trust the snapshot about the Message it is handling, as it could trust the
+records in stock. When `Receive` hands out a Message from the network thread, the snapshot
+reflects at least the cycle that produced it, so on `ID_NEW_INCOMING_CONNECTION` or
+`ID_CONNECTION_REQUEST_ACCEPTED` the new connection is there, and on
+`ID_DISCONNECTION_NOTIFICATION` or `ID_CONNECTION_LOST` it's gone. The snapshot can be newer,
+so a connection that closed straight after opening can already be gone when its
+`ID_NEW_INCOMING_CONNECTION` arrives. Its closing Message follows. A Message made on your
+thread for a queued command can arrive before the command runs: `ID_ROUTER_2_REROUTED`
+before the connection takes its new address, and the `ID_CONNECTION_LOST` that
+`CloseConnection` queues without a notification before the connection closes.
+
 **`GetConnectionState` reports a closed connection as `IS_NOT_CONNECTED`.** Stock returned
 `IS_DISCONNECTED` for as long as the closed connection's storage still held its address or
 RakNetGUID, until a new connection reused it. That's gone: nothing returns `IS_DISCONNECTED`

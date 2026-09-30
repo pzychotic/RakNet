@@ -29,6 +29,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <unordered_set>
@@ -811,8 +812,8 @@ protected:
 
     /// The body of RunUpdateCycle, which wraps it in insideUpdateCycle and PublishView.
     bool RunUpdateCycleBody( BitStream& updateBitStream );
-    /// Rebuild the published view from the open connection records and swap it in.
-    /// Network thread only.
+    /// Rebuild the published view from the open connection records and swap it in, then
+    /// hand the cycle's staged Packets to Receive. Network thread only.
     void PublishView( void );
     /// Empty the published view and the published sockets, for Shutdown.
     void ClearPublishedView( void );
@@ -1081,6 +1082,10 @@ protected:
     void ClearBufferedPackets( void );
     void ClearRequestedConnectionList( void );
     void AddPacketToProducer( Packet* p );
+    /// Where a Packet pushed from this thread goes: stagedPacketQueue from the thread
+    /// running the update cycle while inside it, packetReturnQueue otherwise. Call with
+    /// packetReturnMutex held.
+    std::list<Packet*>& QueueForPush( void );
     unsigned int GenerateSeedFromGuid( void );
     RakNet::Time GetClockDifferentialInt( RemoteSystemStruct* remoteSystem ) const;
     std::mutex securityExceptionMutex;
@@ -1139,10 +1144,15 @@ protected:
     DataStructures::MemoryPool<Packet> packetAllocationPool;
 
     std::mutex packetReturnMutex;
-    std::deque<Packet*> packetReturnQueue;
-    /// The Packets in packetReturnQueue that came from unconnected Systems, capped at
-    /// MAX_PENDING_OFFLINE_MESSAGES. Guarded by packetReturnMutex. By pointer, since a
-    /// connected System can send a Message with any of the same ids.
+    std::list<Packet*> packetReturnQueue;
+    /// What the network thread pushes during an update cycle. PublishView moves it onto
+    /// the back of packetReturnQueue once the view reflects the cycle (ADR-0007, point 7).
+    /// Guarded by packetReturnMutex. A list, so the move takes the nodes and allocates
+    /// nothing.
+    std::list<Packet*> stagedPacketQueue;
+    /// The Packets in packetReturnQueue or stagedPacketQueue that came from unconnected
+    /// Systems, capped at MAX_PENDING_OFFLINE_MESSAGES. Guarded by packetReturnMutex. By
+    /// pointer, since a connected System can send a Message with any of the same ids.
     std::unordered_set<Packet*> pendingOfflinePackets;
     /// Offline datagrams dropped because pendingOfflinePackets was full.
     std::atomic<uint64_t> offlineMessagesDroppedAtCap;

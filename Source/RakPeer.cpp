@@ -896,6 +896,9 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     for( Packet* pPacket : packetReturnQueue )
         DeallocatePacket( pPacket );
     packetReturnQueue.clear();
+    for( Packet* pPacket : stagedPacketQueue )
+        DeallocatePacket( pPacket );
+    stagedPacketQueue.clear();
     pendingOfflinePackets.clear();
     packetReturnMutex.unlock();
     packetAllocationPoolMutex.lock();
@@ -2403,13 +2406,14 @@ void RakPeer::PushBackPacket( Packet* packet, bool pushAtHead )
     }
 
     std::lock_guard<std::mutex> guard( packetReturnMutex );
+    std::list<Packet*>& queue = QueueForPush();
     if( pushAtHead )
     {
-        packetReturnQueue.push_front( packet );
+        queue.push_front( packet );
     }
     else
     {
-        packetReturnQueue.push_back( packet );
+        queue.push_back( packet );
     }
 }
 
@@ -3519,6 +3523,13 @@ void RakPeer::PublishView( void )
         publishedView.swap( publishedViewBuilding );
     }
 
+    // Only after the swap, so a Message the cycle produced reaches Receive once the view
+    // reflects the cycle.
+    {
+        std::lock_guard<std::mutex> guard( packetReturnMutex );
+        packetReturnQueue.splice( packetReturnQueue.end(), stagedPacketQueue );
+    }
+
     // Only after the swap, so GetConnectionState finds each of these either here or in
     // the view.
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
@@ -4137,10 +4148,20 @@ void RakPeer::ClearRequestedConnectionList( void )
         RakNet::OP_DELETE( pConnection, _FILE_AND_LINE_ );
     }
 }
+std::list<Packet*>& RakPeer::QueueForPush( void )
+{
+#if RAKPEER_USER_THREADED != 1
+    const bool staged = insideUpdateCycle.load() && networkThreadOf == this;
+#else
+    const bool staged = insideUpdateCycle.load();
+#endif
+    return staged ? stagedPacketQueue : packetReturnQueue;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 inline void RakPeer::AddPacketToProducer( Packet* p )
 {
     std::lock_guard<std::mutex> guard( packetReturnMutex );
-    packetReturnQueue.push_back( p );
+    QueueForPush().push_back( p );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::CountDropIfOfflineQueueFull( void )
@@ -4163,7 +4184,7 @@ void RakPeer::AddOfflinePacketToProducer( Packet* p )
 {
     std::lock_guard<std::mutex> guard( packetReturnMutex );
     pendingOfflinePackets.insert( p );
-    packetReturnQueue.push_back( p );
+    QueueForPush().push_back( p );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 uint64_t RakPeerInterface::Get64BitUniqueRandomNumber( void )
