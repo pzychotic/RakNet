@@ -30,8 +30,10 @@ can tear the ping and statistics fields the network thread writes on every datag
    network thread copies what the getters need from each open connection record into a
    **published view**, under a mutex. User-thread getters read only the view.
    - Data too large to copy every cycle (`RakNetStatistics`, a client's public key) is a
-     **blocking query**, like `GetSockets`: the user thread posts a request and the network
-     thread answers at the end of its cycle.
+     **blocking query**: the user thread posts a request and the network thread answers at
+     the end of its cycle.
+   - The bound sockets don't change between `Startup` and `Shutdown`, so `Startup` publishes
+     them once it succeeds and `Shutdown` clears them before freeing any socket.
    - Setters that change a connection record become buffered commands, which the network
      thread applies at the start of its next cycle.
 5. **Checks that gate an action are advisory on the user thread.** `Connect`'s "already
