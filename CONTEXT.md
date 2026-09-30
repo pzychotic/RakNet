@@ -81,7 +81,8 @@ Message — it means at least three things in this codebase already)
 A Message that begins with `ID_TIMESTAMP` followed by a time on the sender's clock. The
 receiving Peer rewrites that time onto its own clock before the application or any plugin
 sees the Message, so a receiver can compare it directly with its own time. The rest of the
-Message is untouched.
+Message is untouched. Its Message ID is the one after the time; `ID_TIMESTAMP` marks the
+prefix and is not the Message's ID.
 _Avoid_: Timestamp packet, timed message
 
 **Offline datagram**:
