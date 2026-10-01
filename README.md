@@ -18,6 +18,20 @@ The core has since been modernized to C++17, which broke the public API in five 
 changes are source-only (four of the five) and which are visible on the wire (one). The core
 wire protocol is unchanged, and this fork still interoperates with a stock 4.081 peer.
 
+Security fixes
+------------------------------------------
+
+Vulnerabilities fixed in this fork that are present in stock RakNet. Each entry names what was
+affected and what an attacker could do.
+
+- **Predictable TwoWayAuthentication challenges.** The plugin seeded a Mersenne Twister from
+  the millisecond clock and drew its challenge nonces from it, so the nonce a Peer would issue
+  next could be predicted. An attacker could get a legitimate Peer to answer that nonce in
+  advance and replay the answer, passing authentication without the password. Remotely
+  exploitable against any Peer using the plugin. Affected: every version through stock RakNet
+  4.081, and this fork until the nonces were drawn from the platform CSPRNG. The wire is
+  unchanged, and nothing changes for an integrator.
+
 Package notes
 ------------------------------------------
 The Help directory contains index.html, which is full help documentation in HTML format
