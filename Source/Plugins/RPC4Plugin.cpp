@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <deque>
+#include <string.h>
 #include <thread>
 
 namespace RakNet {

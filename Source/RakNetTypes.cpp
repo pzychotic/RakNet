@@ -20,6 +20,7 @@
 #include "WSAStartupSingleton.h"
 #include "SocketDefines.h"
 #include "RakNetSocket2.h"
+#include "LinuxStrings.h"
 
 
 #if defined( _WIN32 )
@@ -32,6 +33,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #endif
 
 #include "SuperFastHash.h"

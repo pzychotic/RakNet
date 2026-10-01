@@ -16,6 +16,8 @@
 #include "GetTime.h"
 #include <stdio.h>
 #include <string.h> // memcpy
+#include <chrono>
+#include <thread>
 
 #ifdef _WIN32
 #else

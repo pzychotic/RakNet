@@ -47,29 +47,29 @@ steady_clock::duration ElapsedSinceStart()
 
 namespace RakNet {
 
-RakNet::Time RakNet::GetTime()
+RakNet::Time GetTime()
 {
     return (RakNet::Time)duration_cast<milliseconds>( ElapsedSinceStart() ).count();
 }
 
-RakNet::TimeMS RakNet::GetTimeMS()
+RakNet::TimeMS GetTimeMS()
 {
     return (RakNet::TimeMS)duration_cast<milliseconds>( ElapsedSinceStart() ).count();
 }
 
-RakNet::TimeUS RakNet::GetTimeUS()
+RakNet::TimeUS GetTimeUS()
 {
     return (RakNet::TimeUS)duration_cast<microseconds>( ElapsedSinceStart() ).count();
 }
 
-bool RakNet::GreaterThan( RakNet::Time a, RakNet::Time b )
+bool GreaterThan( RakNet::Time a, RakNet::Time b )
 {
     // a > b?
     const RakNet::Time halfSpan = (RakNet::Time)( ( (RakNet::Time)(const RakNet::Time)-1 ) / (RakNet::Time)2 );
     return b != a && b - a > halfSpan;
 }
 
-bool RakNet::LessThan( RakNet::Time a, RakNet::Time b )
+bool LessThan( RakNet::Time a, RakNet::Time b )
 {
     // a < b?
     const RakNet::Time halfSpan = ( (RakNet::Time)(const RakNet::Time)-1 ) / (RakNet::Time)2;

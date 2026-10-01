@@ -16,6 +16,7 @@
 #include "MessageIdentifiers.h"
 
 #include <stdint.h>
+#include <string.h>
 
 namespace RakNet {
 

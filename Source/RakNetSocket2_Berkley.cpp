@@ -15,6 +15,11 @@
 
 #include <charconv>
 
+#ifndef _WIN32
+#include <netdb.h>
+#include "LinuxStrings.h"
+#endif
+
 namespace RakNet {
 
 #if RAKNET_SUPPORT_IPV6 == 1
@@ -63,9 +68,6 @@ void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_I
 
 #else
 
-#if( defined( __GNUC__ ) || defined( __GCCXML__ ) ) && !defined( __WIN32__ )
-#include <netdb.h>
-#endif
 void GetMyIP_Windows_Linux_IPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 {
     int idx = 0;

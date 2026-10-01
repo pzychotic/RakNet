@@ -14,6 +14,7 @@
 
 #include "RakNetStatistics.h"
 #include <stdio.h> // sprintf
+#include <string.h> // strcat
 #include "GetTime.h"
 
 namespace RakNet {

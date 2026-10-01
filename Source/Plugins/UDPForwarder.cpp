@@ -19,6 +19,10 @@
 #include "RakThread.h"
 #include "SocketDefines.h"
 #include "errno.h"
+#include <string.h>
+#ifndef _WIN32
+#include <netdb.h>
+#endif
 
 #include <chrono>
 #include <thread>

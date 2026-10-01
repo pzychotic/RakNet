@@ -18,6 +18,7 @@
 #include "RakPeerInterface.h"
 #include "TCPInterface.h"
 #include "BitStream.h"
+#include <string.h>
 
 namespace RakNet {
 
