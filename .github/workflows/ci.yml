@@ -7,6 +7,14 @@ on:
 permissions:
   contents: read
 
+# A green run does not mean the suite is deterministic. It drives real sockets and threads,
+# and a flaky test can pass here and fail on the next push.
+#
+# Each job gets its own runner, so the suite's hardcoded ports never collide across jobs.
+# Within a job, the RESOURCE_LOCK in Tests/CMakeLists.txt serializes the tests. Every test
+# gets a TIMEOUT from that file, so a hung test fails ctest. timeout-minutes catches a hang
+# outside any test.
+
 jobs:
   # Source/ must not call the APIs ADR-0004 bans. The compiler cannot catch these:
   # -fno-exceptions rejects only throw/try/catch. Tests/ is exempt and not linted.
@@ -18,3 +26,112 @@ jobs:
         run: perl tools/lint-banned-apis.t
       - name: Lint Source/
         run: perl tools/lint-banned-apis.pl Source
+
+  # Both toolchains, with RAKNET_SUPPORT_IPV6 off and on. Off is the default. Every cell
+  # runs the full suite.
+  #
+  # MSVC builds Debug: only its Debug configuration defines _DEBUG, and Source/ has code,
+  # the network simulator among it, that compiles only under _DEBUG. GCC builds Release, so
+  # the suite also runs optimized. no-exceptions-msvc compiles Source/ in MSVC Release.
+  test:
+    name: test (${{ matrix.platform }}, IPv6=${{ matrix.ipv6 }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-msvc, linux-gcc]
+        ipv6: [0, 1]
+        include:
+          - platform: windows-msvc
+            os: windows-latest
+            config: Debug
+          - platform: linux-gcc
+            os: ubuntu-latest
+            cxx: g++
+            config: Release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      CXX: ${{ matrix.cxx }}
+      # CMake reads CXXFLAGS at the first configure and keeps its own default flags.
+      CXXFLAGS: -DRAKNET_SUPPORT_IPV6=${{ matrix.ipv6 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+      - name: Build
+        run: cmake --build build --config ${{ matrix.config }} --parallel
+      - name: Test
+        run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure --no-tests=error
+
+  # FLIP_SEND_ORDER_TEST reverses the order of sends delayed by simulated latency. It sits
+  # inside an #ifdef _DEBUG block, so it gets one cell on MSVC Debug, the only configuration
+  # here that defines _DEBUG.
+  flip-send-order-test:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CXXFLAGS: -DFLIP_SEND_ORDER_TEST
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build --config Debug --parallel
+      - name: Test
+        run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
+
+  # RAKPEER_USER_THREADED=1: the application runs RakPeer's update cycles itself. Most
+  # network tests depend on the network thread and fail in this mode. StatisticsQueryTest and
+  # SocketQueryTest pump the update cycles themselves, so they pass in both modes, and this
+  # cell runs only those two files, in Debug so _DEBUG code is compiled in this mode too.
+  # Catch2 exits non-zero if the filter matches nothing.
+  user-threaded:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CXXFLAGS: -DRAKPEER_USER_THREADED=1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build --config Debug --parallel --target RakNetTests
+      - name: Test
+        working-directory: build/Tests
+        timeout-minutes: 10
+        run: ./Debug/RakNetTests.exe '-#' '[#StatisticsQueryTest],[#SocketQueryTest]'
+
+  # ADR-0004: Source/ builds with exceptions disabled. Both jobs build Source/ only, because
+  # Catch2 needs exceptions. Neither runs tests: a throw from Source/ turns the same test red
+  # in both modes, so the ordinary cells already catch it.
+  #
+  # The gate. GCC rejects any throw, try or catch under -fno-exceptions, so an unguarded one
+  # in Source/ turns this job red. It does not catch throwing allocations or banned APIs. The
+  # second of those is banned-api-lint's job.
+  no-exceptions-gcc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CXX: g++
+      CXXFLAGS: -fno-exceptions
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAKNET_ENABLE_TESTS=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+  # Best-effort. MSVC compiles even a bare throw under /EHs-c- without a diagnostic, and
+  # Microsoft does not support _HAS_EXCEPTIONS=0. This job mostly catches headers that stop
+  # compiling in that mode. CMAKE_CXX_FLAGS
+  # replaces MSVC's defaults outright. Flags in CXXFLAGS would come before the default /EHsc,
+  # and /EHsc would override them.
+  no-exceptions-msvc:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DRAKNET_ENABLE_TESTS=OFF "-DCMAKE_CXX_FLAGS=-DWIN32 -D_WINDOWS -EHs-c- -D_HAS_EXCEPTIONS=0"
+      - name: Build
+        run: cmake --build build --config Release --parallel

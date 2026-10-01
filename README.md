@@ -32,6 +32,18 @@ affected and what an attacker could do.
   4.081, and this fork until the nonces were drawn from the platform CSPRNG. The wire is
   unchanged, and nothing changes for an integrator.
 
+Continuous integration
+------------------------------------------
+
+`.github/workflows/ci.yml` builds the library and the test suite on every push and pull
+request with MSVC on Windows and GCC on Linux, both with and without `RAKNET_SUPPORT_IPV6`,
+and runs the suite in each configuration. Separate jobs build and test
+`FLIP_SEND_ORDER_TEST` and `RAKPEER_USER_THREADED`, and build `Source/` with exceptions
+disabled.
+
+A green run does not mean the suite is deterministic. The tests drive real sockets and
+threads, so a passing run is evidence, not proof.
+
 Package notes
 ------------------------------------------
 The Help directory contains index.html, which is full help documentation in HTML format
