@@ -12,10 +12,10 @@
 #if _RAKNET_SUPPORT_TwoWayAuthentication == 1
 
 #include "Plugins/TwoWayAuthentication.h"
-#include "Rand.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "BitStream.h"
+#include "PlatformRandom.h"
 #include "RakPeerInterface.h"
 
 #if LIBCAT_SECURITY == 1
@@ -39,13 +39,25 @@ TwoWayAuthentication::NonceGenerator::NonceGenerator()
     nextRequestId = 0;
     maxNoncesPerSystem = 4;
     noncesEvicted = 0;
+    fillRandomBytes = &RakNet::FillRandomBytes;
+    reportedDrawFailure = false;
 }
 TwoWayAuthentication::NonceGenerator::~NonceGenerator()
 {
     Clear();
 }
-void TwoWayAuthentication::NonceGenerator::GetNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short* requestId, AddressOrGUID remoteSystem )
+bool TwoWayAuthentication::NonceGenerator::GetNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short* requestId, AddressOrGUID remoteSystem )
 {
+    // Drawn first, so a failed draw leaves every held nonce and the request ID untouched
+    if( GenerateNonce( nonce ) == false )
+    {
+        // Once per plugin, like eviction
+        if( reportedDrawFailure == false )
+            RAKNET_DEBUG_PRINTF( "TwoWayAuthentication: could not draw a nonce, so a challenge goes unanswered.\n" );
+        reportedDrawFailure = true;
+        return false;
+    }
+
     // Nonces are in the order they were made, so the first of remoteSystem's is its oldest.
     // It goes rather than the new request, since a System that retries must not be locked out.
     unsigned int held = 0;
@@ -69,16 +81,17 @@ void TwoWayAuthentication::NonceGenerator::GetNonce( char nonce[TWO_WAY_AUTHENTI
 
     TwoWayAuthentication::NonceAndRemoteSystemRequest* narsr = RakNet::OP_NEW<TwoWayAuthentication::NonceAndRemoteSystemRequest>( _FILE_AND_LINE_ );
     narsr->remoteSystem = remoteSystem;
-    GenerateNonce( narsr->nonce );
+    memcpy( narsr->nonce, nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
     narsr->requestId = nextRequestId++;
     *requestId = narsr->requestId;
-    memcpy( nonce, narsr->nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
     narsr->whenGenerated = RakNet::GetTime();
     generatedNonces.push_back( narsr );
+    return true;
 }
-void TwoWayAuthentication::NonceGenerator::GenerateNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH] )
+bool TwoWayAuthentication::NonceGenerator::GenerateNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH] )
 {
-    fillBufferMT( nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
+    // Straight from the CSPRNG with nothing in between, as a nonce must be unpredictable (ADR-0001)
+    return fillRandomBytes( nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
 }
 bool TwoWayAuthentication::NonceGenerator::GetNonceById( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short requestId, AddressOrGUID remoteSystem, bool popIfFound )
 {
@@ -137,7 +150,6 @@ void TwoWayAuthentication::NonceGenerator::Update( RakNet::Time curTime )
 TwoWayAuthentication::TwoWayAuthentication()
 {
     whenLastTimeoutCheck = RakNet::GetTime();
-    seedMT( RakNet::GetTimeMS() );
 }
 TwoWayAuthentication::~TwoWayAuthentication()
 {
@@ -313,7 +325,9 @@ void TwoWayAuthentication::OnNonceRequest( Packet* packet )
 
     char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH];
     unsigned short requestId;
-    nonceGenerator.GetNonce( nonce, &requestId, packet );
+    // A nonce that could not be drawn is never sent. The challenger times out.
+    if( nonceGenerator.GetNonce( nonce, &requestId, packet ) == false )
+        return;
 
     BitStream bsOut;
     bsOut.Write( (MessageID)ID_TWO_WAY_AUTHENTICATION_NEGOTIATION );

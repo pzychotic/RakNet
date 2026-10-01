@@ -129,8 +129,12 @@ public:
     {
         NonceGenerator();
         ~NonceGenerator();
-        void GetNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short* requestId, AddressOrGUID remoteSystem );
-        void GenerateNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH] );
+        /// Draws a nonce for \a remoteSystem and keeps it under a new request ID.
+        /// \return false if no nonce could be drawn. Nothing is kept and no request ID is used.
+        bool GetNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short* requestId, AddressOrGUID remoteSystem );
+        /// Fills \a nonce from fillRandomBytes.
+        /// \return false if the source failed, and then \a nonce must not be used.
+        bool GenerateNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH] );
         bool GetNonceById( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short requestId, AddressOrGUID remoteSystem, bool popIfFound );
         void Clear( void );
         void ClearByAddress( AddressOrGUID remoteSystem );
@@ -140,6 +144,11 @@ public:
         unsigned short nextRequestId;
         unsigned int maxNoncesPerSystem;
         uint64_t noncesEvicted;
+        /// Where nonces come from, with RakNet::FillRandomBytes' contract. Defaults to
+        /// RakNet::FillRandomBytes, as a nonce must be unpredictable (ADR-0001). It exists only
+        /// so tests can reach the failure path, which the real CSPRNG never takes.
+        bool ( *fillRandomBytes )( void*, size_t );
+        bool reportedDrawFailure;
     };
 
 protected:
