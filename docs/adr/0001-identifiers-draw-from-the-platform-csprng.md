@@ -37,3 +37,16 @@ the contract would invite someone to build authorization on it, turning a latent
 into a real one. Harden the implementation; do not promise the property.
 
 Adding `bcrypt.lib` to `RAKNET_LIBRARY_LIBS` is a new Windows link dependency.
+
+## Addendum: values that must be unpredictable
+
+The decision covers values that must be **unpredictable** as well as values that must be
+unique. Today these are `TwoWayAuthentication`'s challenge nonces: a Peer that can be made
+to answer a nonce before it is issued can be impersonated by replaying the answer. They
+draw from `RakNet::FillRandomBytes` directly, with no generator between the CSPRNG and the
+nonce, and a nonce that cannot be drawn is never sent.
+
+The same seam, for the same reasons. The Mersenne Twister in `Source/Rand.h` remains for
+simulation and reproducible tests only. It never holds a secret, a nonce or an identifier,
+and nothing public seeds anything: not a clock value, and not a RakNetGUID, which a Peer
+sends in plaintext.
