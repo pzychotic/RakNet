@@ -4,7 +4,6 @@
 #include "GetTime.h"
 #include "RakMemoryOverride.h"
 #include "RakNetSocket2.h"
-#include "Rand.h"
 #include "ReliabilityLayer.h"
 
 #include <vector>
@@ -159,7 +158,7 @@ public:
     {
         return m_layer.HandleSocketReceiveFromConnectedPlayer(
             (const char*)datagram.GetData(), (unsigned int)datagram.GetNumberOfBytesUsed(),
-            m_address, m_plugins, kMTUSize, m_socket, &m_rnr, m_time, m_updateBitStream );
+            m_address, m_plugins, kMTUSize, m_socket, m_time, m_updateBitStream );
     }
 
     /// One datagram carrying \a messages, with the next datagram number.
@@ -187,7 +186,7 @@ public:
         for( CCTimeType elapsed = 0; elapsed < microseconds; elapsed += kTickMicroseconds )
         {
             m_time += kTickMicroseconds;
-            m_layer.Update( m_socket, m_address, kMTUSize, m_time, 0, m_plugins, &m_rnr, m_updateBitStream );
+            m_layer.Update( m_socket, m_address, kMTUSize, m_time, 0, m_plugins, m_updateBitStream );
         }
     }
 
@@ -200,7 +199,7 @@ public:
         {
             m_time = now;
         }
-        m_layer.Update( m_socket, m_address, kMTUSize, m_time, 0, m_plugins, &m_rnr, m_updateBitStream );
+        m_layer.Update( m_socket, m_address, kMTUSize, m_time, 0, m_plugins, m_updateBitStream );
     }
 
     /// Number of bits of user message waiting, freeing whatever it dequeues.
@@ -239,7 +238,6 @@ private:
     RakNetSocket2* m_socket;
     SystemAddress m_address;
     std::vector<PluginInterface2*> m_plugins;
-    RakNetRandom m_rnr;
     BitStream m_updateBitStream;
     CCTimeType m_time = 0;
     DatagramSequenceNumberType m_datagramNumber = 0;

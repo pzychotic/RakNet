@@ -32,7 +32,6 @@
 #include <string.h>
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
-#include "Rand.h"
 #include "PlatformRandom.h"
 #include "PluginInterface2.h"
 #include "StringCompressor.h"
@@ -120,8 +119,6 @@ static constexpr int mtuSizes[NUM_MTU_SIZES] = { MAXIMUM_MTU_SIZE, 1200, 576 };
 static_assert( mtuSizes[NUM_MTU_SIZES - 1] == MINIMUM_NEGOTIATED_MTU_SIZE,
                "MAXIMUM_MESSAGE_SIZE assumes 576 is the lowest MTU that can be negotiated" );
 static_assert( mtuSizes[0] == MAXIMUM_MTU_SIZE, "The MTU list is offered largest first" );
-
-static RakNetRandom rnr;
 
 static const unsigned int MAX_OFFLINE_DATA_LENGTH = 400; // I set this because I limit ID_CONNECTION_REQUEST to 512 bytes, and the password is appended to that packet.
 
@@ -325,11 +322,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 
 
     FillIPList();
-
-    if( myGuid == UNASSIGNED_RAKNET_GUID )
-    {
-        rnr.SeedMT( GenerateSeedFromGuid() );
-    }
 
     RakAssert( socketDescriptors && socketDescriptorCount >= 1 );
 
@@ -5161,7 +5153,7 @@ void ProcessNetworkPacket( SystemAddress systemAddress, const char* data, const 
             remoteSystem->reliabilityLayer.SetHalfOpen( remoteSystem->connectMode == RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER );
             remoteSystem->reliabilityLayer.HandleSocketReceiveFromConnectedPlayer(
                 data, length, systemAddress, rakPeer->pluginListNTS, remoteSystem->MTUSize,
-                rakNetSocket, &rnr, timeRead, updateBitStream );
+                rakNetSocket, timeRead, updateBitStream );
         }
     }
     else
@@ -5170,27 +5162,6 @@ void ProcessNetworkPacket( SystemAddress systemAddress, const char* data, const 
     }
 }
 
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-unsigned int RakPeer::GenerateSeedFromGuid( void )
-{
-    /*
-    // Construct a random seed based on the initial guid value, and the last digits of the difference to each subsequent number
-    // This assumes that only the last 3 bits of each guidId integer has a meaningful amount of randomness between it and the prior number
-    unsigned int t = guid.g[0];
-    unsigned int i;
-    for (i=1; i < sizeof(guid.g) / sizeof(guid.g[0]); i++)
-    {
-        unsigned int diff = guid.g[i]-guid.g[i-1];
-        unsigned int diff3Bits = diff & 0x0007;
-        diff3Bits <<= 29;
-        diff3Bits >>= (i-1)*3;
-        t ^= diff3Bits;
-    }
-
-    return t;
-    */
-    return (unsigned int)( ( myGuid.g >> 32 ) ^ myGuid.g );
-}
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::DerefAllSockets( void )
 {
@@ -5485,7 +5456,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
             }
         }
 
-        remoteSystem->reliabilityLayer.Update( remoteSystem->rakNetSocket, systemAddress, remoteSystem->MTUSize, timeNS, maxOutgoingBPS, pluginListNTS, &rnr, updateBitStream ); // systemAddress only used for the internet simulator test
+        remoteSystem->reliabilityLayer.Update( remoteSystem->rakNetSocket, systemAddress, remoteSystem->MTUSize, timeNS, maxOutgoingBPS, pluginListNTS, updateBitStream ); // systemAddress only used for the internet simulator test
 
         // A byte budget closed this connection (ADR-0005): the layer has freed what it held
         // and drops whatever else arrives. Reported locally the way a dead connection is, and

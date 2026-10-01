@@ -1086,7 +1086,6 @@ protected:
     /// running the update cycle while inside it, packetReturnQueue otherwise. Call with
     /// packetReturnMutex held.
     std::list<Packet*>& QueueForPush( void );
-    unsigned int GenerateSeedFromGuid( void );
     RakNet::Time GetClockDifferentialInt( RemoteSystemStruct* remoteSystem ) const;
     std::mutex securityExceptionMutex;
 
