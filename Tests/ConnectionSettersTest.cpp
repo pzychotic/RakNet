@@ -220,6 +220,9 @@ TEST_CASE( "ApplyNetworkSimulator reaches an open connection", "[network]" )
     client->ApplyNetworkSimulator( 0.0f, kSimulatedPingMs, 0 );
     if( client->IsNetworkSimulatorActive() == false )
         SKIP( "The network simulator only runs in Debug builds" );
+#ifdef FLIP_SEND_ORDER_TEST
+    SKIP( "FLIP_SEND_ORDER_TEST replaces the simulated delay with a reversed send order" );
+#endif
 
     // Pongs from before the simulator took effect may still arrive, so wait for a ping
     // that shows the delay rather than reading one.
