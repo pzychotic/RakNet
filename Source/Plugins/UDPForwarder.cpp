@@ -56,6 +56,8 @@ UDPForwarder::UDPForwarder()
     WSAStartupSingleton::AddRef();
 #endif
 
+    isRunning = 0;
+    threadRunning = 0;
     maxForwardEntries = DEFAULT_MAX_FORWARD_ENTRIES;
     nextInputId = 0;
     startForwardingInput.SetPageSize( sizeof( StartForwardingInputStruct ) * 16 );
