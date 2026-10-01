@@ -13,6 +13,7 @@
 #include "PeerScope.h"
 
 #include "GetTime.h"
+#include "MessageIdentifiers.h"
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
@@ -20,6 +21,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -86,6 +88,41 @@ constexpr TimeMS kCloseSettlePause = 100;
 // seconds of closing and reopening, so it should fail if it did not do that.
 constexpr int kMinimumChurnRounds = 10;
 
+// The connection-result messages a pair's last attempt can end in, by name.
+const char* ConnectionResultName( unsigned char id )
+{
+    switch( id )
+    {
+    case 0:
+        return "none";
+    case ID_CONNECTION_REQUEST_ACCEPTED:
+        return "ID_CONNECTION_REQUEST_ACCEPTED";
+    case ID_NEW_INCOMING_CONNECTION:
+        return "ID_NEW_INCOMING_CONNECTION";
+    case ID_CONNECTION_ATTEMPT_FAILED:
+        return "ID_CONNECTION_ATTEMPT_FAILED";
+    case ID_ALREADY_CONNECTED:
+        return "ID_ALREADY_CONNECTED";
+    case ID_NO_FREE_INCOMING_CONNECTIONS:
+        return "ID_NO_FREE_INCOMING_CONNECTIONS";
+    case ID_IP_RECENTLY_CONNECTED:
+        return "ID_IP_RECENTLY_CONNECTED";
+    case ID_DISCONNECTION_NOTIFICATION:
+        return "ID_DISCONNECTION_NOTIFICATION";
+    case ID_CONNECTION_LOST:
+        return "ID_CONNECTION_LOST";
+    default:
+        return "another message";
+    }
+}
+
+bool IsConnectionResult( unsigned char id )
+{
+    return id == ID_CONNECTION_REQUEST_ACCEPTED || id == ID_NEW_INCOMING_CONNECTION || id == ID_CONNECTION_ATTEMPT_FAILED ||
+           id == ID_ALREADY_CONNECTED || id == ID_NO_FREE_INCOMING_CONNECTIONS || id == ID_IP_RECENTLY_CONNECTED ||
+           id == ID_DISCONNECTION_NOTIFICATION || id == ID_CONNECTION_LOST;
+}
+
 } // namespace
 
 // Wrap-safe on a uint32_t TimeMS, where a plain >= is not. See ConnectionWaits.h.
@@ -126,6 +163,22 @@ TEST_CASE( "Eight peers closing and reopening every connection for ten seconds a
         }
     };
 
+    // The last connection-result message each peer received from each other peer. Kept
+    // so that a failure can say why a pair is missing, not only that it is.
+    unsigned char lastResult[kPeerNum][kPeerNum] = {};
+
+    auto drainRecordingResults = [&]() {
+        for( int i = 0; i < kPeerNum; i++ )
+        {
+            for( Packet* packet = peerList[i]->Receive(); packet; peerList[i]->DeallocatePacket( packet ), packet = peerList[i]->Receive() )
+            {
+                const int j = packet->systemAddress.GetPort() - kBasePort;
+                if( packet->length > 0 && IsConnectionResult( packet->data[0] ) && j >= 0 && j < kPeerNum )
+                    lastResult[i][j] = packet->data[0];
+            }
+        }
+    };
+
     connectMissingPairs();
 
     std::vector<SystemAddress> systemList;
@@ -160,7 +213,7 @@ TEST_CASE( "Eight peers closing and reopening every connection for ten seconds a
         // Every iteration, and this is not decoration: the churn generates a
         // connection notification per end per round, and a loop that polls without
         // draining grows its queues without bound.
-        ConnectionWaits::DrainAll( peerList, kPeerNum );
+        drainRecordingResults();
     }
 
     // The last word: whatever the churn left half-open gets one more attempt, then
@@ -171,11 +224,33 @@ TEST_CASE( "Eight peers closing and reopening every connection for ten seconds a
 
     // The count wait below does not drain - see ConnectionWaits.h - and it is the
     // longest single poll in the test, so the queues go into it empty.
-    ConnectionWaits::DrainAll( peerList, kPeerNum );
+    drainRecordingResults();
 
     // CHECK rather than REQUIRE: it reports on the loop above rather than gating
     // anything below, and it should not hide the verdict.
     CHECK( churnRounds >= kMinimumChurnRounds );
+
+    // Every pair not connected once the final attempts have settled, with each end's
+    // state and the last connection-result message it received. Only shown if the
+    // count wait below fails.
+    std::ostringstream missingPairs;
+    for( int i = 0; i < kPeerNum; i++ )
+    {
+        for( int j = i + 1; j < kPeerNum; j++ )
+        {
+            const SystemAddress toJ( "127.0.0.1", static_cast<unsigned short>( kBasePort + j ) );
+            const SystemAddress toI( "127.0.0.1", static_cast<unsigned short>( kBasePort + i ) );
+            const ConnectionState iState = peerList[i]->GetConnectionState( toJ );
+            const ConnectionState jState = peerList[j]->GetConnectionState( toI );
+            if( iState != IS_CONNECTED || jState != IS_CONNECTED )
+            {
+                missingPairs << "\n  " << i << "-" << j << ": peer " << i << " state " << (int)iState << ", last "
+                             << ConnectionResultName( lastResult[i][j] ) << "; peer " << j << " state " << (int)jState
+                             << ", last " << ConnectionResultName( lastResult[j][i] );
+            }
+        }
+    }
+    INFO( "pairs not connected after the final attempts (state 2 is IS_CONNECTED):" << missingPairs.str() );
 
     // The test's verdict, and a polled predicate rather than a reading taken after
     // a wait - taking it once is half of what made this test flaky. It fails if
