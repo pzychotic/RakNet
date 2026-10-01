@@ -10,6 +10,10 @@
 
 /// \file
 /// \brief \b [Internal] Random number generator
+/// \details A Mersenne Twister (MT19937): a deterministic generator for simulation, such as
+/// the network simulator and reproducible tests. Anyone who sees enough of its output, or
+/// knows its seed, can predict the rest. Never use it for secrets, nonces or identifiers;
+/// those come from RakNet::FillRandomBytes (ADR-0001).
 ///
 
 #pragma once
