@@ -470,16 +470,17 @@ int Progress( ConnectionState state )
     }
 }
 
-/// Records a failure if a connection's state moved backwards from \a previous to \a state,
-/// or fell out of a connection attempt, which on loopback always succeeds. Returns the new
-/// progress.
+/// Records a failure if a connection's state moved backwards from \a previous to \a state.
+/// Returns the new progress.
+///
+/// A reader samples, so it can miss every state between two reads. IS_CONNECTING followed
+/// by IS_NOT_CONNECTED may be a whole connection it never saw, so a failed attempt is
+/// caught by the churn loop instead, which watches the client's own state.
 int CheckProgress( int previous, ConnectionState state, const std::string& who, Failures& failures )
 {
     const int now = Progress( state );
     if( now != -1 && now < previous )
         failures.Add( who + "state moved backwards from " + std::to_string( previous ) + " to " + std::to_string( now ) );
-    if( now == -1 && ( previous == Progress( IS_PENDING ) || previous == Progress( IS_CONNECTING ) ) )
-        failures.Add( who + "state fell from " + std::to_string( previous ) + " to IS_NOT_CONNECTED during the connection attempt" );
     return now;
 }
 
@@ -746,7 +747,11 @@ TEST_CASE( "Getters stay coherent while clients connect and disconnect under the
                 }
                 else if( toServer == IS_NOT_CONNECTED )
                 {
-                    // The attempt failed. Wait for the server to forget it, then try again.
+                    // The attempt failed, which on loopback it never should. Only this loop
+                    // closes the connection, and only after seeing IS_CONNECTED, so this
+                    // read cannot be a connection that came and went unseen. Wait for the
+                    // server to forget it, then try again.
+                    failures.Add( "client " + std::to_string( i ) + ": the connection attempt failed" );
                     state.phase = Phase::Closing;
                     --state.connections;
                 }
