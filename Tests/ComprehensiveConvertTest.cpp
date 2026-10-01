@@ -96,15 +96,10 @@ connects, closes, restarts and sends IS the coverage - a fixed script would
 exercise one interleaving of it - and the seed is what makes a red run
 reproducible rather than re-measurable.
 
-randomMT is process-global, and three places in Source/ touch it:
-
-  - ReliabilityLayer.cpp:1887 and :1905 draw from it, both inside #ifdef _DEBUG
-    and both gated on packetloss / extraPingVariance, which only
-    ApplyNetworkSimulator sets and this test never calls.
-  - TwoWayAuthentication.cpp:117 *seeds* it, from the clock, in the plugin's
-    constructor. That is the one that would matter, since it would overwrite the
-    seed rather than consume draws - but it runs only if something constructs a
-    TwoWayAuthentication, and nothing under Tests/ does.
+randomMT is process-global, and only the network simulator in Source/ touches
+it: ReliabilityLayer::SendBitStream draws from it twice, inside #ifdef _DEBUG and
+gated on packetloss / extraPingVariance, which only ApplyNetworkSimulator sets
+and this test never calls. Nothing in Source/ seeds it.
 
 So the seed does determine every draw in this process. What it does not fix is
 the schedule: packet timing and the loop cadence still vary, so a replay repeats

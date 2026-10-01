@@ -53,7 +53,7 @@ script would test one ordering of it - and the seed is what makes a red run
 reproducible rather than re-measurable.
 
 Nothing in Source/ draws from the global Mersenne Twister in this test's process:
-the only two sites (ReliabilityLayer.cpp:1887,1905) are _DEBUG-only and gated on
+the only two sites (in ReliabilityLayer::SendBitStream) are _DEBUG-only and gated on
 ApplyNetworkSimulator settings this test never applies, so the seed really does
 determine every draw. What it does not fix is the schedule - packet timing and the
 loop cadence still vary - so a replay repeats the same sequence of actions, not the
