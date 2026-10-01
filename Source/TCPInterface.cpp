@@ -256,7 +256,9 @@ void TCPInterface::Stop( void )
     // Stuff from here on to the end of the function is not threadsafe
     for( int i = 0; i < remoteClientsLength; i++ )
     {
-        closesocket__( remoteClients[i].socket );
+        // 0 is an unused entry. On POSIX it is also stdin, so it must not be closed.
+        if( remoteClients[i].socket != 0 )
+            closesocket__( remoteClients[i].socket );
 #if OPEN_SSL_CLIENT_SUPPORT == 1
         remoteClients[i].FreeSSL();
 #endif
@@ -1191,7 +1193,9 @@ void UpdateTCPInterfaceLoop( void* arg )
             {
                 newSock = accept__( sts->listenSocket, (sockaddr*)&sockAddr, (socklen_t*)&sockAddrSize );
 
-                if( newSock != 0 )
+                // -1 is a failed accept, which Stop closing the listen socket under select
+                // produces. Stored, it would reach FD_SET, which aborts on it under glibc.
+                if( newSock != 0 && (int)newSock != -1 )
                 {
                     // "Table is full" is the handle's answer, so there is no index one past
                     // the end of the array in play here. The writes below happen while the
