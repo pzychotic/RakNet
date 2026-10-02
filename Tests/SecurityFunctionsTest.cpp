@@ -35,6 +35,11 @@ banned, unbanned by RemoveFromBanList, banned again, unbanned by ClearBanList.
 Each gate is asserted in both directions - the three connections that must be
 refused matter as much as the three that must succeed.
 
+A refusal is asserted by the Message that reports it - ID_INVALID_PASSWORD for no
+password or the wrong one, ID_CONNECTION_BANNED for a ban - and by the client not being
+connected after it. So a refusal for the wrong reason fails, and so does a refusal that
+stops sending its Message, even though the client is still kept out.
+
 The three cases after it pin how a refusal ends. A refused attempt leaves a record on
 both sides. The client acks the refusal before it drops its own record, which lets the
 server drop its record too. If that ack never comes, the server replaces the record when
@@ -67,25 +72,108 @@ namespace {
 
 constexpr unsigned short kServerPort = 60000;
 
-// Six call sites, three passwords, two budgets. Returns whether the connection
-// happened rather than asserting, because half of the call sites expect it NOT to.
-bool TryToConnect( RakPeerInterface* client, const SystemAddress& server, const char* password, int passwordLength, int millisecondsToWait )
-{
-    const TimeMS entryTime = GetTimeMS();
+// For a refusal to arrive: one round trip over loopback. A hang guard rather than a
+// tuning knob.
+constexpr TimeMS kRefusalArrivalBudgetMs = 5000;
 
-    while( !CommonFunctions::ConnectionStateMatchesOptions( client, server, true ) && GetTimeMS() - entryTime < static_cast<TimeMS>( millisecondsToWait ) )
+// For an accepted connection to come up. A hang guard too: an accepted attempt connects
+// on its first try.
+constexpr TimeMS kConnectBudgetMs = 5000;
+
+// The client's state toward the server while an attempt is in flight or its record is
+// still closing, so Connect is not re-issued into ALREADY_CONNECTED_TO_ENDPOINT.
+bool AttemptInFlight( RakPeerInterface* client, const SystemAddress& server )
+{
+    return CommonFunctions::ConnectionStateMatchesOptions( client, server, true, true, true, true, false, false, true );
+}
+
+// Polls until connected, re-issuing Connect whenever nothing is in flight. Ends on the
+// connection; the budget is a hang guard.
+bool TryToConnect( RakPeerInterface* client, const SystemAddress& server, const char* password, int passwordLength )
+{
+    const TimeMS deadline = GetTimeMS() + kConnectBudgetMs;
+
+    while( !CommonFunctions::ConnectionStateMatchesOptions( client, server, true ) && !ConnectionWaits::Expired( deadline ) )
     {
-        // Only re-issue Connect when nothing is already in flight, or the
-        // second attempt is refused as a duplicate.
-        if( !CommonFunctions::ConnectionStateMatchesOptions( client, server, true, true, true, true ) )
+        if( !AttemptInFlight( client, server ) )
         {
             client->Connect( "127.0.0.1", server.GetPort(), password, passwordLength );
         }
 
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+        ConnectionWaits::Drain( client );
+        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
     }
 
     return CommonFunctions::ConnectionStateMatchesOptions( client, server, true );
+}
+
+// Every Message that ends a connection attempt without connecting.
+bool IsRefusal( MessageID id )
+{
+    switch( id )
+    {
+    case ID_CONNECTION_ATTEMPT_FAILED:
+    case ID_ALREADY_CONNECTED:
+    case ID_NO_FREE_INCOMING_CONNECTIONS:
+    case ID_CONNECTION_BANNED:
+    case ID_INVALID_PASSWORD:
+    case ID_INCOMPATIBLE_PROTOCOL_VERSION:
+    case ID_IP_RECENTLY_CONNECTED:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Connects once and receives until a refusal comes out. True when it is `refusal` and
+// the client is not connected. Ends on the first refusal, so one for the wrong reason
+// fails at once and names itself; the budgets are hang guards. Waits first for the
+// client to let go of any record an earlier refusal left, which would turn this
+// Connect into ALREADY_CONNECTED_TO_ENDPOINT.
+bool RefusedWith( RakPeerInterface* client, const SystemAddress& server, const char* password, int passwordLength, MessageID refusal )
+{
+    const TimeMS recordDeadline = GetTimeMS() + kRefusalArrivalBudgetMs;
+    while( AttemptInFlight( client, server ) && !ConnectionWaits::Expired( recordDeadline ) )
+    {
+        ConnectionWaits::Drain( client );
+        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
+    }
+
+    const ConnectionAttemptResult attempt = client->Connect( "127.0.0.1", server.GetPort(), password, passwordLength );
+    if( attempt != CONNECTION_ATTEMPT_STARTED )
+    {
+        UNSCOPED_INFO( "Connect returned " << static_cast<int>( attempt ) << ", state toward the server " << static_cast<int>( client->GetConnectionState( server ) ) );
+        return false;
+    }
+
+    const TimeMS deadline = GetTimeMS() + kRefusalArrivalBudgetMs;
+    int received = -1;
+    while( received < 0 && !ConnectionWaits::Expired( deadline ) )
+    {
+        for( Packet* packet = client->Receive(); packet != nullptr; packet = client->Receive() )
+        {
+            if( received < 0 && IsRefusal( packet->data[0] ) )
+                received = packet->data[0];
+            client->DeallocatePacket( packet );
+        }
+
+        if( received < 0 )
+            std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
+    }
+
+    if( received < 0 )
+    {
+        UNSCOPED_INFO( "no refusal within " << kRefusalArrivalBudgetMs << " ms, expected message " << static_cast<int>( refusal ) );
+        return false;
+    }
+
+    if( received != refusal )
+    {
+        UNSCOPED_INFO( "refused with message " << received << ", expected " << static_cast<int>( refusal ) );
+        return false;
+    }
+
+    return !CommonFunctions::ConnectionStateMatchesOptions( client, server, true );
 }
 
 // Close once, then wait - never a poll that re-issues the close, which livelocks.
@@ -133,14 +221,14 @@ TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server a
     // acceptance below and there is no disconnect between them, so a client that
     // wrongly gets in here makes both following gates meaningless rather than
     // merely failed.
-    REQUIRE_FALSE( TryToConnect( client, serverAddress, 0, 0, 5000 ) );
+    REQUIRE( RefusedWith( client, serverAddress, 0, 0, ID_INVALID_PASSWORD ) );
 
     const std::string badPassword = "badpass";
-    REQUIRE_FALSE( TryToConnect( client, serverAddress, badPassword.c_str(), static_cast<int>( badPassword.size() ), 5000 ) );
+    REQUIRE( RefusedWith( client, serverAddress, badPassword.c_str(), static_cast<int>( badPassword.size() ), ID_INVALID_PASSWORD ) );
 
-    // Straight after two refusals, with the same budget: neither refusal leaves a
-    // record that blocks this attempt. The tests below pin why.
-    REQUIRE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
+    // Straight after two refusals, inside an accepted connection's own budget: neither
+    // refusal leaves a record that blocks this attempt. The tests below pin why.
+    REQUIRE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ) ) );
 
     Disconnect( client, serverAddress, "the correct password was accepted" );
 
@@ -149,11 +237,11 @@ TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server a
     // down, and a broken ban list reports every gate it breaks in a single run.
     server->AddToBanList( "127.0.0.1", 0 );
     CHECK( server->IsBanned( "127.0.0.1" ) );
-    CHECK_FALSE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
+    CHECK( RefusedWith( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), ID_CONNECTION_BANNED ) );
 
     server->RemoveFromBanList( "127.0.0.1" );
     CHECK_FALSE( server->IsBanned( "127.0.0.1" ) );
-    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
+    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ) ) );
 
     Disconnect( client, serverAddress, "RemoveFromBanList let the client back in" );
 
@@ -161,11 +249,11 @@ TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server a
     // half exists.
     server->AddToBanList( "127.0.0.1", 0 );
     CHECK( server->IsBanned( "127.0.0.1" ) );
-    CHECK_FALSE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
+    CHECK( RefusedWith( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), ID_CONNECTION_BANNED ) );
 
     server->ClearBanList();
     CHECK_FALSE( server->IsBanned( "127.0.0.1" ) );
-    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
+    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ) ) );
 }
 
 namespace {
@@ -174,19 +262,8 @@ namespace {
 // Refused System's record outlived its refusal and only the timeout let it go.
 constexpr TimeMS kRefusalReleaseBudgetMs = 2000;
 
-// For a refusal to arrive: one round trip over loopback. A hang guard rather than a
-// tuning knob.
-constexpr TimeMS kRefusalArrivalBudgetMs = 5000;
-
 const char kRightPassword[] = "password";
 const char kWrongPassword[] = "badpass";
-
-// The client's state toward the server while an attempt is in flight or its record is
-// still closing, so Connect is not re-issued into ALREADY_CONNECTED_TO_ENDPOINT.
-bool AttemptInFlight( RakPeerInterface* client, const SystemAddress& server )
-{
-    return CommonFunctions::ConnectionStateMatchesOptions( client, server, true, true, true, true, false, false, true );
-}
 
 // Connects with the wrong password and waits for the refusal, keeping the client's network
 // thread cycling meanwhile: GetStatistics is answered on that thread and wakes it. Cycles
