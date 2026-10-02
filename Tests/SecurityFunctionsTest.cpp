@@ -11,8 +11,12 @@
 #include "CommonFunctions.h"
 #include "ConnectionWaits.h"
 #include "PeerScope.h"
+#include "RawSystem.h"
 
 #include "GetTime.h"
+#include "MessageIdentifiers.h"
+#include "RakNetStatistics.h"
+#include "RakNetStringMakers.h"
 #include "RakNetTime.h"
 #include "RakPeerInterface.h"
 #include "RakNetTypes.h"
@@ -20,6 +24,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <cstring>
 #include <string>
 #include <thread>
 
@@ -29,6 +34,11 @@ client through every gate: no password, the wrong password, the right password,
 banned, unbanned by RemoveFromBanList, banned again, unbanned by ClearBanList.
 Each gate is asserted in both directions - the three connections that must be
 refused matter as much as the three that must succeed.
+
+The three cases after it pin how a refusal ends. A refused attempt leaves a record on
+both sides. The client acks the refusal before it drops its own record, which lets the
+server drop its record too. If that ack never comes, the server replaces the record when
+the same address tries again. Either way a retry is never told ID_ALREADY_CONNECTED.
 
 RakPeerInterface functions explicitly tested:
 
@@ -128,10 +138,9 @@ TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server a
     const std::string badPassword = "badpass";
     REQUIRE_FALSE( TryToConnect( client, serverAddress, badPassword.c_str(), static_cast<int>( badPassword.size() ), 5000 ) );
 
-    // 50 s rather than the 5 s every other attempt gets. Why the first accepted
-    // connection is the slow one has never been explained; the budget is a ceiling
-    // a healthy run does not approach, not a measurement.
-    REQUIRE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 50000 ) );
+    // Straight after two refusals, with the same budget: neither refusal leaves a
+    // record that blocks this attempt. The tests below pin why.
+    REQUIRE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
 
     Disconnect( client, serverAddress, "the correct password was accepted" );
 
@@ -157,4 +166,157 @@ TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server a
     server->ClearBanList();
     CHECK_FALSE( server->IsBanned( "127.0.0.1" ) );
     CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ), 5000 ) );
+}
+
+namespace {
+
+// Far under the server's timeout, 10 s in Release and 30 s in Debug. Expiry means the
+// Refused System's record outlived its refusal and only the timeout let it go.
+constexpr TimeMS kRefusalReleaseBudgetMs = 2000;
+
+// For a refusal to arrive: one round trip over loopback. A hang guard rather than a
+// tuning knob.
+constexpr TimeMS kRefusalArrivalBudgetMs = 5000;
+
+const char kRightPassword[] = "password";
+const char kWrongPassword[] = "badpass";
+
+// The client's state toward the server while an attempt is in flight or its record is
+// still closing, so Connect is not re-issued into ALREADY_CONNECTED_TO_ENDPOINT.
+bool AttemptInFlight( RakPeerInterface* client, const SystemAddress& server )
+{
+    return CommonFunctions::ConnectionStateMatchesOptions( client, server, true, true, true, true, false, false, true );
+}
+
+// Connects with the wrong password and waits for the refusal, keeping the client's network
+// thread cycling meanwhile: GetStatistics is answered on that thread and wakes it. Cycles
+// that come faster than the reliability layer holds an ack back (one SYN, 10 ms) are what
+// let a client drop its record before acking the refusal. Left to the 10 ms timer, a client
+// mostly gets the ack out first.
+bool RefuseWhileBusy( RakPeerInterface* client, const SystemAddress& server )
+{
+    if( client->Connect( "127.0.0.1", server.GetPort(), kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) ) != CONNECTION_ATTEMPT_STARTED )
+        return false;
+
+    const TimeMS deadline = GetTimeMS() + kRefusalArrivalBudgetMs;
+    while( !ConnectionWaits::Expired( deadline ) )
+    {
+        RakNetStatistics statistics;
+        client->GetStatistics( server, &statistics );
+
+        for( Packet* packet = client->Receive(); packet != nullptr; packet = client->Receive() )
+        {
+            const bool refused = packet->data[0] == ID_INVALID_PASSWORD;
+            client->DeallocatePacket( packet );
+            if( refused )
+                return true;
+        }
+    }
+
+    return false;
+}
+
+// Connects with the right password, re-issuing Connect whenever the client holds nothing
+// toward the server, until connected or the budget runs out. Drains as it goes and
+// reports any ID_ALREADY_CONNECTED, which is the server refusing for the wrong reason.
+bool ConnectWithin( RakPeerInterface* client, const SystemAddress& server, TimeMS budget, bool& sawAlreadyConnected )
+{
+    const TimeMS deadline = GetTimeMS() + budget;
+
+    while( !CommonFunctions::ConnectionStateMatchesOptions( client, server, true ) && !ConnectionWaits::Expired( deadline ) )
+    {
+        if( !AttemptInFlight( client, server ) )
+        {
+            client->Connect( "127.0.0.1", server.GetPort(), kRightPassword, static_cast<int>( strlen( kRightPassword ) ) );
+        }
+
+        for( Packet* packet = client->Receive(); packet != nullptr; packet = client->Receive() )
+        {
+            if( packet->data[0] == ID_ALREADY_CONNECTED )
+                sawAlreadyConnected = true;
+            client->DeallocatePacket( packet );
+        }
+
+        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
+    }
+
+    return CommonFunctions::ConnectionStateMatchesOptions( client, server, true );
+}
+
+} // namespace
+
+TEST_CASE( "A server lets go of a Refused System once the System acks the refusal", "[network]" )
+{
+    PeerScope peers;
+
+    RakPeerInterface* server = peers.Server( kServerPort );
+    server->SetIncomingPassword( kRightPassword, static_cast<int>( strlen( kRightPassword ) ) );
+
+    RakPeerInterface* client = peers.Client();
+
+    // The server sets its record closing in the call that sends the refusal, so from
+    // here on the record exists and only the client's ack can let it go early.
+    REQUIRE( RefuseWhileBusy( client, SystemAddress( "127.0.0.1", kServerPort ) ) );
+
+    const RakNetGUID clientGuid = client->GetMyGUID();
+    const TimeMS deadline = GetTimeMS() + kRefusalReleaseBudgetMs;
+    while( server->GetConnectionState( clientGuid ) != IS_NOT_CONNECTED && !ConnectionWaits::Expired( deadline ) )
+    {
+        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
+    }
+
+    CHECK( server->GetConnectionState( clientGuid ) == IS_NOT_CONNECTED );
+}
+
+TEST_CASE( "A Peer restarted on a Refused System's port gets in although the refusal was never acked", "[network]" )
+{
+    using namespace RawSystemHarness;
+
+    WinsockFixture winsock;
+    PeerScope peers;
+
+    RakPeerInterface* server = peers.Server( kServerPort );
+    server->SetIncomingPassword( kRightPassword, static_cast<int>( strlen( kRightPassword ) ) );
+
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    // A System that is refused and gone without a word, the way a Peer that is shut down
+    // between the refusal and its ack would be. A real Peer acks within one update cycle,
+    // too soon to be stopped reliably first.
+    unsigned short refusedPort = 0;
+    {
+        RawSystem refused( serverAddress, 0x0E05ED );
+        refused.CompleteOfflineHandshake();
+        refused.SendConnectionRequest( kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) );
+
+        char refusal[MAXIMUM_MTU_SIZE];
+        int refusalLength = 0;
+        REQUIRE( refused.WaitForMessage( ID_INVALID_PASSWORD, RawSystem::Framing::Connected, static_cast<int>( kRefusalArrivalBudgetMs ), refusal, refusalLength ) );
+
+        refusedPort = refused.GetBoundPort();
+    }
+
+    RakPeerInterface* restarted = peers.Client( refusedPort );
+
+    bool sawAlreadyConnected = false;
+    CHECK( ConnectWithin( restarted, serverAddress, kRefusalReleaseBudgetMs, sawAlreadyConnected ) );
+    CHECK_FALSE( sawAlreadyConnected );
+}
+
+TEST_CASE( "A client refused for a wrong password gets in with the right one", "[network]" )
+{
+    PeerScope peers;
+
+    RakPeerInterface* server = peers.Server( kServerPort );
+    server->SetIncomingPassword( kRightPassword, static_cast<int>( strlen( kRightPassword ) ) );
+
+    RakPeerInterface* client = peers.Client();
+
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    REQUIRE( RefuseWhileBusy( client, serverAddress ) );
+
+    bool sawAlreadyConnected = false;
+    CHECK( ConnectWithin( client, serverAddress, kRefusalReleaseBudgetMs, sawAlreadyConnected ) );
+    CHECK_FALSE( sawAlreadyConnected );
 }

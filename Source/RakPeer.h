@@ -705,6 +705,9 @@ public:
             DISCONNECT_ASAP,
             DISCONNECT_ASAP_SILENTLY,
             DISCONNECT_ON_NO_ACK,
+            // DISCONNECT_ON_NO_ACK without telling the application: a refused Peer's record
+            // of the Peer that refused it, which never connected.
+            DISCONNECT_ON_NO_ACK_SILENTLY,
             REQUESTED_CONNECTION,
             HANDLING_CONNECTION_REQUEST,
             UNVERIFIED_SENDER,
@@ -1078,6 +1081,12 @@ protected:
     void PingInternal( const SystemAddress target, bool performImmediate, PacketReliability reliability );
     // This stores the user send calls to be handled by the update thread.  This way we don't have thread contention over systemAddresss
     void CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bool sendDisconnectionNotification, bool performImmediate, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority );
+    // Closes a record now, on the update thread, and tells the application what its
+    // connectMode says it is owed: ID_CONNECTION_ATTEMPT_FAILED, ID_CONNECTION_LOST,
+    // ID_DISCONNECTION_NOTIFICATION, or nothing for a silent close.
+    void CloseRecordAndReport( RemoteSystemStruct* remoteSystem );
+    // Whether a record is already on its way out.
+    static bool IsClosing( RemoteSystemStruct::ConnectMode connectMode );
     void SendBuffered( const char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt );
     void SendBufferedList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt );
     bool SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, bool useCallerDataAllocation, RakNet::TimeUS currentTime, uint32_t receipt );

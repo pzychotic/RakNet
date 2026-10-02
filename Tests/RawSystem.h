@@ -328,12 +328,7 @@ public:
     /// wants the Half-open record to exist a while before it goes on.
     void CompleteConnectionRequest()
     {
-        BitStream request;
-        request.Write( (MessageID)ID_CONNECTION_REQUEST );
-        request.Write( RakNetGUID( m_guid ) );
-        request.Write( RakNet::GetTime() );
-        request.Write( (unsigned char)0 ); // doSecurity
-        SendUnreliable( request );
+        SendConnectionRequest( nullptr, 0 );
 
         char accepted[MAXIMUM_MTU_SIZE];
         int acceptedLength = 0;
@@ -348,6 +343,23 @@ public:
         newIncoming.Write( RakNet::GetTime() ); // sendPongTime
         SendUnreliable( newIncoming );
     }
+
+    /// ID_CONNECTION_REQUEST carrying \a password, field for field as RakPeer writes it, and
+    /// nothing after. Sent UNRELIABLE, so nothing waits for an ack.
+    void SendConnectionRequest( const char* password, int passwordLength )
+    {
+        BitStream request;
+        request.Write( (MessageID)ID_CONNECTION_REQUEST );
+        request.Write( RakNetGUID( m_guid ) );
+        request.Write( RakNet::GetTime() );
+        request.Write( (unsigned char)0 ); // doSecurity
+        if( passwordLength > 0 )
+            request.WriteAlignedBytes( (const unsigned char*)password, (unsigned int)passwordLength );
+        SendUnreliable( request );
+    }
+
+    /// The OS-assigned port, which is how the server knows this System.
+    unsigned short GetBoundPort() const { return m_socket.GetBoundAddress().GetPort(); }
 
 private:
     RNS2_Berkley m_socket;

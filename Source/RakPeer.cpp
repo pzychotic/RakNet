@@ -1450,6 +1450,8 @@ ConnectionState RakPeer::GetConnectionState( const AddressOrGUID systemIdentifie
         return IS_SILENTLY_DISCONNECTING;
     case RemoteSystemStruct::DISCONNECT_ON_NO_ACK:
         return IS_DISCONNECTING;
+    case RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY:
+        return IS_SILENTLY_DISCONNECTING;
     case RemoteSystemStruct::REQUESTED_CONNECTION:
         return IS_CONNECTING;
     case RemoteSystemStruct::HANDLING_CONNECTION_REQUEST:
@@ -3048,7 +3050,8 @@ bool RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
         memcmp( password, incomingPassword, incomingPasswordLength ) != 0 )
     {
         CAT_AUDIT_PRINTF( "AUDIT: Invalid password\n" );
-        // This one we only send once since we don't care if it arrives.
+        // Reliable, so the reason arrives. The record closes once the refusal is acked,
+        // and a new attempt from the same address replaces it if it never is.
         BitStream bitStream;
         bitStream.Write( (MessageID)ID_INVALID_PASSWORD );
         bitStream.Write( GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS ) );
@@ -3897,6 +3900,48 @@ void RakPeer::CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bo
     }
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::CloseRecordAndReport( RemoteSystemStruct* remoteSystem )
+{
+    const SystemAddress systemAddress = remoteSystem->systemAddress;
+
+    // TODO - RakNet 4.0 - Return a different message identifier for DISCONNECT_ASAP_SILENTLY and DISCONNECT_ASAP than for DISCONNECT_ON_NO_ACK
+    // The first two mean we called CloseConnection(), the last means the other system sent us ID_DISCONNECTION_NOTIFICATION
+    if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED || remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
+    {
+        Packet* packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
+        if( packet != 0 )
+        {
+            if( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
+                packet->data[0] = ID_CONNECTION_ATTEMPT_FAILED; // Attempted a connection and couldn't
+            else if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED )
+                packet->data[0] = ID_CONNECTION_LOST; // DeadConnection
+            else
+                packet->data[0] = ID_DISCONNECTION_NOTIFICATION; // DeadConnection
+
+            packet->guid = remoteSystem->guid;
+            packet->systemAddress = systemAddress;
+            packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
+            packet->guid.systemIndex = packet->systemAddress.systemIndex;
+
+            AddPacketToProducer( packet );
+        }
+    }
+    // else connection shutting down, don't bother telling the user
+
+#ifdef _DO_PRINTF
+    RAKNET_DEBUG_PRINTF( "Connection dropped for player %i:%i\n", systemAddress );
+#endif
+    CloseConnectionInternal( systemAddress, false, true, 0, LOW_PRIORITY );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::IsClosing( RemoteSystemStruct::ConnectMode connectMode )
+{
+    return connectMode == RemoteSystemStruct::DISCONNECT_ASAP ||
+           connectMode == RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY ||
+           connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK ||
+           connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
     BufferedCommandStruct* bcs;
@@ -4042,10 +4087,7 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
             return false;
         }
 
-        if( remoteSystemList[remoteSystemIndex].isActive == false ||
-            remoteSystemList[remoteSystemIndex].connectMode == RemoteSystemStruct::DISCONNECT_ASAP ||
-            remoteSystemList[remoteSystemIndex].connectMode == RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY ||
-            remoteSystemList[remoteSystemIndex].connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
+        if( remoteSystemList[remoteSystemIndex].isActive == false || IsClosing( remoteSystemList[remoteSystemIndex].connectMode ) )
             return false;
 
         sendTo( remoteSystemIndex, useCallerDataAllocation );
@@ -4940,6 +4982,15 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bs.Read( mtu );
             bs.Read( guid );
 
+            // A record from this address that is already closing never blocks a new
+            // attempt: it is closed here as the update cycle would close it, so a System
+            // that never acks holds nothing past its next attempt (ADR-0005).
+            RakPeer::RemoteSystemStruct* closingFromSA = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true );
+            if( closingFromSA != 0 && RakPeer::IsClosing( closingFromSA->connectMode ) )
+            {
+                rakPeer->CloseRecordAndReport( closingFromSA );
+            }
+
             RakPeer::RemoteSystemStruct* rssFromSA = rakPeer->GetRemoteSystemFromSystemAddress( systemAddress, true );
             bool IPAddrInUse = rssFromSA != 0 && rssFromSA->isActive;
             RakPeer::RemoteSystemStruct* rssFromGuid = rakPeer->GetRemoteSystemFromGUID( guid, true );
@@ -5489,45 +5540,14 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         // Check for failure conditions
         if( remoteSystem->reliabilityLayer.IsDeadConnection() ||
             ( ( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY ) && remoteSystem->reliabilityLayer.IsOutgoingDataWaiting() == false ) ||
-            ( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK && ( remoteSystem->reliabilityLayer.AreAcksWaiting() == false || remoteSystem->reliabilityLayer.AckTimeout( timeMS ) == true ) ) ||
+            ( ( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY ) && ( remoteSystem->reliabilityLayer.AreAcksWaiting() == false || remoteSystem->reliabilityLayer.AckTimeout( timeMS ) == true ) ) ||
             ( (
                 ( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION ||
                   remoteSystem->connectMode == RemoteSystemStruct::HANDLING_CONNECTION_REQUEST ||
                   remoteSystem->connectMode == RemoteSystemStruct::UNVERIFIED_SENDER ) &&
                 timeMS > remoteSystem->connectionTime && timeMS - remoteSystem->connectionTime > 10000 ) ) )
         {
-            //  RAKNET_DEBUG_PRINTF("timeMS=%i remoteSystem->connectionTime=%i\n", timeMS, remoteSystem->connectionTime );
-
-            // Failed.  Inform the user?
-            // TODO - RakNet 4.0 - Return a different message identifier for DISCONNECT_ASAP_SILENTLY and DISCONNECT_ASAP than for DISCONNECT_ON_NO_ACK
-            // The first two mean we called CloseConnection(), the last means the other system sent us ID_DISCONNECTION_NOTIFICATION
-            if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED || remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
-            {
-
-                packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
-                if( packet != 0 )
-                {
-                    if( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
-                        packet->data[0] = ID_CONNECTION_ATTEMPT_FAILED; // Attempted a connection and couldn't
-                    else if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED )
-                        packet->data[0] = ID_CONNECTION_LOST; // DeadConnection
-                    else
-                        packet->data[0] = ID_DISCONNECTION_NOTIFICATION; // DeadConnection
-
-                    packet->guid = remoteSystem->guid;
-                    packet->systemAddress = systemAddress;
-                    packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
-                    packet->guid.systemIndex = packet->systemAddress.systemIndex;
-
-                    AddPacketToProducer( packet );
-                }
-            }
-            // else connection shutting down, don't bother telling the user
-
-#ifdef _DO_PRINTF
-            RAKNET_DEBUG_PRINTF( "Connection dropped for player %i:%i\n", systemAddress );
-#endif
-            CloseConnectionInternal( systemAddress, false, true, 0, LOW_PRIORITY );
+            CloseRecordAndReport( remoteSystem );
             continue;
         }
 
@@ -5760,7 +5780,9 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                             AddPacketToProducer( packet );
                         }
 
-                        remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
+                        // Closes once the refusal is acked, so the refusing Peer lets go of
+                        // its record too.
+                        remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY;
                     }
                     else
                     {
