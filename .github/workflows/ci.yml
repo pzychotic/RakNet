@@ -101,6 +101,53 @@ jobs:
         timeout-minutes: 10
         run: ./Debug/RakNetTests.exe '-#' '[#StatisticsQueryTest],[#SocketQueryTest]'
 
+  # ADR-0007: no getter races the network thread. A test can show that the answers are
+  # coherent, but a race can give coherent answers by luck. Only ThreadSanitizer shows that
+  # the race itself is absent. MSVC has no equivalent, so this job is Linux and clang only.
+  # RAKNET_SUPPORT_IPV6 stays at its default.
+  #
+  # TSAN makes a test process that reported a race exit with 66, so any report not
+  # suppressed turns the job red. The known races are in tools/tsan-suppressions.txt.
+  #
+  # Four tests are left out. The two 256-client churn tests have fixed connection budgets
+  # that TSAN's slowdown cannot meet. The two receive-buffer tests count buffers through
+  # RakPeer's virtual allocator hooks, and under TSAN's timing Startup frees its own
+  # bind-test datagram without going through them.
+  thread-sanitizer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CXX: clang++
+      CXXFLAGS: -fsanitize=thread
+      LDFLAGS: -fsanitize=thread
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that every suppression is explained
+        run: |
+          awk '/^[[:space:]]*$/ { commented = 0; next }
+               /^[[:space:]]*#/ { commented = 1; next }
+               !commented { print FILENAME ":" FNR ": no comment above: " $0; bad = 1 }
+               END { exit bad }' tools/tsan-suppressions.txt
+      # TSAN keeps its shadow memory at fixed addresses. The runner kernel randomizes mmap
+      # with more bits than older TSAN runtimes allow for, and they abort at startup.
+      - name: Reduce mmap randomization
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - name: Build
+        run: cmake --build build --parallel
+      # Suppressions match function names, so a report without symbols cannot be suppressed.
+      # clang's own llvm-symbolizer first: one from an older LLVM on PATH may not read the
+      # debug info this clang writes.
+      - name: Test
+        run: |
+          symbolizer=$(clang++ -print-prog-name=llvm-symbolizer)
+          test -x "$symbolizer" || symbolizer=$(command -v llvm-symbolizer || true)
+          test -x "$symbolizer" || { echo "llvm-symbolizer not found"; exit 1; }
+          export TSAN_OPTIONS="suppressions=$PWD/tools/tsan-suppressions.txt external_symbolizer_path=$symbolizer second_deadlock_stack=1"
+          ctest --test-dir build -C RelWithDebInfo --output-on-failure --no-tests=error \
+            -E '^256 clients|gives its buffer back$|stops at MAX_BUFFERED_RECEIVED_DATAGRAMS$'
+
   # ADR-0004: Source/ builds with exceptions disabled. Both jobs build Source/ only, because
   # Catch2 needs exceptions. Neither runs tests: a throw from Source/ turns the same test red
   # in both modes, so the ordinary cells already catch it.

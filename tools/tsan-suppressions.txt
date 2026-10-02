@@ -1,0 +1,76 @@
+# ThreadSanitizer suppressions for the CI job that runs the suite under -fsanitize=thread.
+#
+# Every entry is a known data race in Source/ or Tests/ that is still unfixed. Each block
+# starts with a comment saying which race it hides, and CI rejects an entry without one.
+# Remove an entry together with the fix for its race.
+#
+# race_top: matches only the innermost frame of either access, so it is the default.
+# race: matches any frame of either stack. It is used only where the racing access sits
+# inside a library call (memcpy, a std::deque member, a libc interceptor), so the innermost
+# frame is not ours, and the function it names is small enough that hiding its whole call
+# tree hides little else.
+
+# RakPeer::endThreads is a volatile bool. Shutdown sets it, and the network thread polls it.
+# Shutdown also reads remoteSystemList and writes activeSystemListSize while the network
+# thread is still running and using both.
+race_top:RakNet::RakPeer::Shutdown(
+
+# UpdateNetworkLoop's own reads: endThreads, as above, and the user-update callback and its
+# data, which SetUserUpdateThread writes as plain fields (see the settings block below).
+race_top:RakNet::UpdateNetworkLoop(
+
+# RNS2_Berkley::endThreads is a volatile bool. The stop calls set it, and the receive
+# thread polls it.
+race_top:RakNet::RNS2_Berkley::RecvFromLoopInt(
+race_top:RakNet::RNS2_Berkley::SignalStopRecvPollingThread(
+race_top:RakNet::RNS2_Berkley::BlockOnStopRecvPollingThread(
+
+# Empty-queue checks made before the lock is taken, all inside std::deque or std::vector
+# members. PopInaccurate reads queue.empty() unlocked. RunUpdateCycleBody reads
+# requestedConnectionQueue.empty() unlocked while SendConnectionRequest pushes under the
+# lock; the network thread's side is all of RunUpdateCycleBody, so the entry names the
+# pushing side. IsBanned reads banList.empty() unlocked while AddToBanList inserts under the
+# lock.
+race:RakNet::DataStructures::ThreadsafeAllocatingQueue*::PopInaccurate(
+race:RakNet::RakPeer::SendConnectionRequest(
+race:RakNet::RakPeer::IsBanned(
+
+# Peer-wide settings that the user thread writes as plain fields while the network or
+# receive thread reads them. SetIncomingPassword's write is a memcpy.
+race_top:RakNet::RakPeer::SetMaximumIncomingConnections(
+race_top:RakNet::RakPeer::GetMaximumIncomingConnections(
+race_top:RakNet::RakPeer::SetOccasionalPing(
+race:RakNet::RakPeer::SetIncomingPassword(
+race_top:RakNet::RakPeer::SetIncomingDatagramEventHandler(
+race_top:RakNet::RakPeer::OnRNS2Recv(
+race_top:RakNet::RakPeer::SetUserUpdateThread(
+
+# The same race as SetUserUpdateThread above, seen from the callback: the network thread
+# gets the callback's data pointer with no happens-before edge to the code that built the
+# object, so the callback's first touch of it races that construction. Matched on the
+# constructing side, so a race of anything the callback calls still reports.
+race:Staller::Staller(
+race:Asker::Asker(
+race:UpdateThreadGate::UpdateThreadGate(
+
+# Send's IsLoopbackAddress compares against firstExternalID, through SystemAddress's
+# operator==, on the user thread. The network thread writes it when the first connection
+# completes.
+race:RakNet::RakPeer::IsLoopbackAddress(
+
+# TCPInterface's RemoteClient slots. Connect and ConnectionAttemptLoop write a slot's socket
+# and address without the slot's lock, while the update thread reads them under it.
+# Connect's address write is a SystemAddress copy, and the descriptor it creates in
+# SocketConnect is what recv races, so Connect needs race:. GetConnectionCount,
+# GetOutgoingDataBufferSize and the update loop read isActive without the lock that
+# SetActive writes it under.
+race:RakNet::TCPInterface::Connect(
+race_top:RakNet::ConnectionAttemptLoop(
+race_top:RakNet::RemoteClient::SetActive(
+race_top:RakNet::TCPInterface::GetConnectionCount(
+race_top:RakNet::TCPInterface::GetOutgoingDataBufferSize(
+
+# TelnetTransportLineBufferTest installs and restores its allocator hooks while the
+# TCPInterface update thread is running and allocating through them.
+race_top:RakNet::SetMalloc_Ex(
+race_top:RakNet::SetFree_Ex(
