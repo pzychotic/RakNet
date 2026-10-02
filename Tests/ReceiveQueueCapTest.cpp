@@ -174,12 +174,15 @@ bool WaitFor( Condition condition )
     return condition();
 }
 
+constexpr int kJunkDatagramBytes = 2;
+
 /// Two bytes that are no RakNet message: ProcessNetworkPacket treats them as offline and
 /// discards them, so a flood of them costs the update thread nothing once it runs.
 void WriteJunkDatagram( BitStream& datagram )
 {
     datagram.Write( (MessageID)ID_USER_PACKET_ENUM );
     datagram.Write( (MessageID)0 );
+    REQUIRE( datagram.GetNumberOfBytesUsed() == kJunkDatagramBytes );
 }
 
 /// An ID_UNCONNECTED_PING, field for field as RakPeer::Ping writes it.
@@ -191,11 +194,14 @@ void WriteUnconnectedPing( BitStream& datagram )
     datagram.Write( RakNetGUID( 0x5eed ) );
 }
 
-std::atomic<int> s_rejectedDatagrams{ 0 };
+std::atomic<int> s_rejectedJunkDatagrams{ 0 };
 
-bool RejectEveryDatagram( RNS2RecvStruct* )
+/// Counts only the junk datagrams the test sends. Startup's own bind-test datagram can still be
+/// waiting in the socket when the handler is installed, and is rejected uncounted.
+bool RejectEveryDatagram( RNS2RecvStruct* recvStruct )
 {
-    ++s_rejectedDatagrams;
+    if( recvStruct->bytesRead == kJunkDatagramBytes )
+        ++s_rejectedJunkDatagrams;
     return false;
 }
 
@@ -313,7 +319,7 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
     WinsockFixture winsock;
     ObservedPeer peer;
     peer.Start();
-    s_rejectedDatagrams = 0;
+    s_rejectedJunkDatagrams = 0;
     peer.SetIncomingDatagramEventHandler( &RejectEveryDatagram );
 
     RawSystem sender( peer.Address(), 0x53 );
@@ -323,7 +329,7 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
     for( int i = 0; i < kDatagrams; ++i )
         sender.Send( junk );
 
-    REQUIRE( WaitFor( [&] { return s_rejectedDatagrams.load() == kDatagrams; } ) );
+    REQUIRE( WaitFor( [&] { return s_rejectedJunkDatagrams.load() == kDatagrams; } ) );
     CHECK( WaitFor( [&] { return peer.BuffersOutstanding() == 1; } ) );
     CHECK( peer.BufferedDatagrams() == 0 );
 

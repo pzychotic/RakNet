@@ -15,6 +15,7 @@
 #include "Export.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 
 namespace RakNet {
@@ -206,6 +207,9 @@ protected:
 
     unsigned RecvFromLoopInt( void );
     std::atomic<uint32_t> isRecvFromLoopThreadActive;
+    /// The receive thread decrements isRecvFromLoopThreadActive and notifies under this mutex.
+    std::mutex recvFromLoopExitMutex;
+    std::condition_variable recvFromLoopExited;
     volatile bool endThreads;
     // Constructor not called!
 

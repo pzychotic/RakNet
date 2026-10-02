@@ -883,8 +883,11 @@ protected:
 
     ///Set this to true to terminate the Peer thread execution
     volatile bool endThreads;
-    ///true if the peer thread is active.
+    ///true from just before Startup creates the network thread until that thread exits.
     std::atomic<bool> isMainLoopThreadActive;
+    /// The network thread clears isMainLoopThreadActive and notifies under this mutex.
+    std::mutex networkThreadExitMutex;
+    std::condition_variable networkThreadExited;
 
     /// Queries waiting for the end of the network thread's cycle. Guarded by queryMutex.
     mutable std::vector<std::shared_ptr<ConnectionQuery>> pendingQueries;

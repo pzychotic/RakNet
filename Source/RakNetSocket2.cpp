@@ -152,7 +152,12 @@ unsigned RNS2_Berkley::RecvFromLoopInt( void )
             }
         }
     }
+
+    // The waiter may free this socket as soon as it sees the count drop, and its predicate wait
+    // can't return until this unlocks. Touch nothing of the socket after that.
+    std::lock_guard<std::mutex> guard( recvFromLoopExitMutex );
     isRecvFromLoopThreadActive--;
+    recvFromLoopExited.notify_all();
 
     return 0;
 }
@@ -200,12 +205,15 @@ void RNS2_Berkley::BlockOnStopRecvPollingThread( void )
     bsp.ttl = 0;
     Send( &bsp, _FILE_AND_LINE_ );
 
+    // One datagram normally does it. Resend in case it was lost, or recvfrom returned without
+    // data and blocked again.
     RakNet::TimeMS timeout = RakNet::GetTimeMS() + 1000;
-    while( isRecvFromLoopThreadActive > 0 && RakNet::GetTimeMS() < timeout )
+    std::unique_lock<std::mutex> lock( recvFromLoopExitMutex );
+    while( recvFromLoopExited.wait_for( lock, std::chrono::milliseconds( 30 ), [this] { return isRecvFromLoopThreadActive == 0; } ) == false && RakNet::GetTimeMS() < timeout )
     {
-        // Get recvfrom to unblock
+        lock.unlock();
         Send( &bsp, _FILE_AND_LINE_ );
-        std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
+        lock.lock();
     }
 }
 const RNS2_BerkleyBindParameters* RNS2_Berkley::GetBindings( void ) const { return &binding; }

@@ -471,19 +471,17 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 #if RAKPEER_USER_THREADED != 1
         if( isMainLoopThreadActive == false )
         {
+            // Active before the thread exists, so a Shutdown that gets in before it first runs
+            // still waits for it.
+            isMainLoopThreadActive = true;
             int errorCode = RakThread::Create( UpdateNetworkLoop, this, threadPriority );
 
             if( errorCode != 0 )
             {
+                isMainLoopThreadActive = false;
                 Shutdown( 0, 0 );
                 return FAILED_TO_CREATE_NETWORK_THREAD;
             }
-        }
-
-        // Wait for the threads to activate.  When they are active they will set these variables to true
-        while( isMainLoopThreadActive == false )
-        {
-            std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
         }
 #endif // RAKPEER_USER_THREADED!=1
 
@@ -832,9 +830,10 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
     activeSystemListSize = 0;
 
-    quitAndDataEvents.SetEvent();
-
+    // Set before the wake-up, so the network thread exits on waking.
     endThreads = true;
+
+    quitAndDataEvents.SetEvent();
 
 //  RakNet::TimeMS timeout;
 
@@ -847,10 +846,9 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     }
 
 #if RAKPEER_USER_THREADED != 1
-    while( isMainLoopThreadActive )
     {
-        endThreads = true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
+        std::unique_lock<std::mutex> lock( networkThreadExitMutex );
+        networkThreadExited.wait( lock, [this] { return isMainLoopThreadActive == false; } );
     }
 #endif
 
@@ -5940,7 +5938,6 @@ void UpdateNetworkLoop( void* arg )
     );
 
     networkThreadOf = rakPeer;
-    rakPeer->isMainLoopThreadActive = true;
 
     while( rakPeer->endThreads == false )
     {
@@ -5960,7 +5957,12 @@ void UpdateNetworkLoop( void* arg )
     }
 
     networkThreadOf = nullptr;
+
+    // Shutdown may return and the peer be freed as soon as it sees the flag clear, and its
+    // predicate wait can't return until this unlocks. Touch nothing of the peer after that.
+    std::lock_guard<std::mutex> guard( rakPeer->networkThreadExitMutex );
     rakPeer->isMainLoopThreadActive = false;
+    rakPeer->networkThreadExited.notify_all();
 }
 
 void RakPeer::CallPluginCallbacks( std::vector<PluginInterface2*>& pluginList, Packet* packet )
