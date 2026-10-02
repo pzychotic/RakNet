@@ -21,7 +21,7 @@ jobs:
   banned-api-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Test the lint
         run: perl tools/lint-banned-apis.t
       - name: Lint Source/
@@ -55,7 +55,7 @@ jobs:
       # CMake reads CXXFLAGS at the first configure and keeps its own default flags.
       CXXFLAGS: -DRAKNET_SUPPORT_IPV6=${{ matrix.ipv6 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
       - name: Build
@@ -72,7 +72,7 @@ jobs:
     env:
       CXXFLAGS: -DFLIP_SEND_ORDER_TEST
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build
       - name: Build
@@ -91,7 +91,7 @@ jobs:
     env:
       CXXFLAGS: -DRAKPEER_USER_THREADED=1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build
       - name: Build
@@ -121,7 +121,7 @@ jobs:
       CXXFLAGS: -fsanitize=thread
       LDFLAGS: -fsanitize=thread
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check that every suppression is explained
         run: |
           awk '/^[[:space:]]*$/ { commented = 0; next }
@@ -162,7 +162,7 @@ jobs:
       CXX: g++
       CXXFLAGS: -fno-exceptions
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAKNET_ENABLE_TESTS=OFF
       - name: Build
@@ -177,7 +177,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -DRAKNET_ENABLE_TESTS=OFF "-DCMAKE_CXX_FLAGS=-DWIN32 -D_WINDOWS -EHs-c- -D_HAS_EXCEPTIONS=0"
       - name: Build
