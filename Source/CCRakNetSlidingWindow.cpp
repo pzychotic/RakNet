@@ -22,6 +22,10 @@ namespace RakNet {
 
 static const double UNSET_TIME_US = -1;
 
+// GetSenderRTOForACK's answer before an RTT is known. An integer of its own, because
+// converting UNSET_TIME_US to CCTimeType is undefined behaviour.
+static const CCTimeType UNSET_SENDER_RTO = (CCTimeType)-1;
+
 #if CC_TIME_TYPE_BYTES == 4
 static const CCTimeType SYN = 10;
 #else
@@ -89,7 +93,7 @@ bool CCRakNetSlidingWindow::ShouldSendACKs( CCTimeType curTime, CCTimeType estim
     (void)estimatedTimeToNextTick;
 
     // iphone crashes on comparison between double and int64 http://www.jenkinssoftware.com/forum/index.php?topic=2717.0
-    if( rto == (CCTimeType)UNSET_TIME_US )
+    if( rto == UNSET_SENDER_RTO )
     {
         // Unknown how long until the remote system will retransmit, so better send right away
         return true;
@@ -356,7 +360,7 @@ uint64_t CCRakNetSlidingWindow::GetBytesPerSecondLimitByCongestionControl( void 
 CCTimeType CCRakNetSlidingWindow::GetSenderRTOForACK( void ) const
 {
     if( lastRtt == UNSET_TIME_US )
-        return (CCTimeType)UNSET_TIME_US;
+        return UNSET_SENDER_RTO;
     return (CCTimeType)( lastRtt + SYN );
 }
 // ----------------------------------------------------------------------------------------------------------------------------
