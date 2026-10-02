@@ -41,6 +41,12 @@ connection record but is not yet connected, and may send nothing but its connect
 request. It is dropped if the handshake does not finish in time.
 _Avoid_: Unverified sender, pending connection
 
+**Refused System**:
+A System whose connection request this Peer turned down, for a wrong password or a missing
+or invalid key. Its connection record lives only long enough to deliver the reason, and
+never blocks a new attempt from the same address.
+_Avoid_: Rejected system, denied connection
+
 **Designated System**:
 A connected System the application has named as entitled to act in a role for this Peer,
 such as its proxy coordinator or a router it accepts reroutes from. It is named by the
