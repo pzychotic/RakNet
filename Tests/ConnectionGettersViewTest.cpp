@@ -395,8 +395,12 @@ TEST_CASE( "The ping and clock getters answer on the user thread what the networ
         CHECK( fromRecords.average >= 0 );
         CHECK( fromRecords.lowest <= fromRecords.last );
         CHECK( fromRecords.lowest <= fromRecords.average );
+#ifndef FLIP_SEND_ORDER_TEST
+        // FLIP_SEND_ORDER_TEST turns the simulator's latency into a reordering and adds no
+        // delay, so there is no floor in that mode.
         if( client->IsNetworkSimulatorActive() )
             CHECK( fromRecords.lowest >= 10 );
+#endif
 
         CHECK( byAddress.average == fromRecords.average );
         CHECK( byAddress.last == fromRecords.last );
