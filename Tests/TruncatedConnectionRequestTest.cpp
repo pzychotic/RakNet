@@ -1,11 +1,16 @@
+#include "ConnectionWaits.h"
 #include "PeerScope.h"
 #include "RawSystem.h"
 
 #include "BitStream.h"
+#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <chrono>
+#include <thread>
 
 /*
 Pins what a Peer does with an ID_CONNECTION_REQUEST that is too short to read, arriving
@@ -53,10 +58,15 @@ using namespace RawSystemHarness;
 
 constexpr unsigned short kServerPort = 60000;
 
-// Long enough that "no reply arrived" means the Peer chose not to send one rather than
-// that it had not got round to it: the whole exchange is over loopback and the pre-fix
-// reply landed within a single update cycle.
-constexpr int kReplyBudgetMs = 2000;
+// Hang guard on the ban, not a tuning knob: over loopback the ban lands within an update
+// cycle of the request arriving, so expiry means the Peer never decided.
+constexpr TimeMS kBanBudgetMs = 5000;
+
+// How long to listen for a reply once the ban shows the request was handled. The ban and
+// any reply come out of the same arm of the same update cycle. SendImmediate queues a reply
+// in that cycle and the next one sends it, so this is many update cycles of slack past the
+// decision.
+constexpr TimeMS kReplyWindowMs = 200;
 
 // Any value, as long as no System already holds it - the server answers a duplicate guid
 // with ID_ALREADY_CONNECTED rather than opening a connection slot. Nothing else here
@@ -83,13 +93,21 @@ TEST_CASE( "A truncated connection request from an unverified sender draws no re
     truncatedRequest.Write( (MessageID)ID_CONNECTION_REQUEST );
     rawSystem.SendUnreliable( truncatedRequest );
 
+    // The ban is how the Peer answers this request, so it marks the update cycle that
+    // handled it; the reply check below listens from there.
+    const TimeMS banDeadline = GetTimeMS() + kBanBudgetMs;
+    while( !server->IsBanned( "127.0.0.1" ) && !ConnectionWaits::Expired( banDeadline ) )
+    {
+        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
+    }
+
     // The whole defect in one line: before the fix an ID_CONNECTION_REQUEST_ACCEPTED came
     // back, carrying an echoed timestamp read from nothing. Stated as "not that message"
     // rather than "no datagram at all" so that a Peer which one day answers a stranger
     // with something honest - an error, a disconnection - would not fail it.
     char reply[MAXIMUM_MTU_SIZE];
     int replyLength = 0;
-    CHECK_FALSE( rawSystem.WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, RawSystem::Framing::Connected, kReplyBudgetMs, reply, replyLength ) );
+    CHECK_FALSE( rawSystem.WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, RawSystem::Framing::Connected, static_cast<int>( kReplyWindowMs ), reply, replyLength ) );
 
     // And the sender is turned away rather than merely unanswered. UNVERIFIED_SENDER is the
     // state in which a Peer decides whether a stranger is talking sense, and a first message
