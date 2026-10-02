@@ -226,12 +226,22 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
 
     constexpr unsigned int kIncomingCap = 256 * 1024;
 
-    // Far more than the cap plus every kernel buffer between the two ends, so an
-    // uncapped server - which reads everything the moment it arrives - never stalls the
-    // sender and the whole stream goes through. The sender stalls under 1 MiB on Windows
-    // loopback; draining, the capped server reads about one cap per receive-thread pass.
-    // Static so the sender's lambda can name it without capturing it.
-    static constexpr size_t kStreamLength = 16 * 1024 * 1024;
+    // The stream's upper bound: far more than the cap plus every kernel buffer between the
+    // two ends, so an uncapped server - which reads everything the moment it arrives -
+    // never stalls the sender and the whole stream goes through. Once the sender stalls,
+    // the stream ends at the stall plus kResumeMargin, so draining reads only the cap, the
+    // kernel buffers and the margin. The sender stalls under 1 MiB on Windows loopback;
+    // draining, the capped server reads about one cap per receive-thread pass.
+    constexpr size_t kStreamLength = 16 * 1024 * 1024;
+
+    // Sent after the stall, so the drain proves flow resumes and those bytes come through
+    // intact too.
+    constexpr size_t kResumeMargin = 256 * 1024;
+
+    // A send blocked when the stream's end moves was sized against the old end, so it has
+    // to fit in the margin. Static so the sender's lambda can name it without capturing it.
+    static constexpr size_t kChunkLength = 4096;
+    static_assert( kChunkLength <= kResumeMargin, "a blocked send must fit in the margin" );
 
     TCPInterface server;
     REQUIRE( server.Start( kBackpressureListenPort, 4 ) );
@@ -243,12 +253,16 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
 
     // Blocking sends on their own thread: a send that stops returning is the stall.
     std::atomic<size_t> sentLength( 0 );
-    const auto sendStream = [&sentLength, client]() {
-        std::vector<char> chunk( 4096 );
-        while( sentLength < kStreamLength )
+    std::atomic<size_t> streamEnd( kStreamLength );
+    const auto sendStream = [&sentLength, &streamEnd, client]() {
+        std::vector<char> chunk( kChunkLength );
+        for( ;; )
         {
             const size_t offset = sentLength;
-            const size_t length = ( std::min )( chunk.size(), kStreamLength - offset );
+            const size_t end = streamEnd;
+            if( offset >= end )
+                return;
+            const size_t length = ( std::min )( chunk.size(), end - offset );
             for( size_t i = 0; i < length; i++ )
                 chunk[i] = (char)PatternByte( offset + i );
             const int sent = send__( client, chunk.data(), (int)length, 0 );
@@ -286,11 +300,14 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     REQUIRE( sentLength < kStreamLength );
     CHECK( server.GetIncomingBytesCapStallCount() > 0 );
 
+    // The sender is stalled, so it is still short of the new end.
+    streamEnd = sentLength + kResumeMargin;
+
     // Draining lets the stream through, every byte in order.
     size_t receivedLength = 0;
     bool isIntact = true;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 30 );
-    while( receivedLength < kStreamLength && std::chrono::steady_clock::now() < deadline )
+    while( receivedLength < streamEnd && std::chrono::steady_clock::now() < deadline )
     {
         Packet* packet = server.Receive();
         if( packet == 0 )
@@ -304,7 +321,7 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
         server.DeallocatePacket( packet );
     }
     CHECK( isIntact );
-    CHECK( receivedLength == kStreamLength );
+    CHECK( receivedLength == streamEnd );
 
     server.Stop();
 }
