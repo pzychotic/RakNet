@@ -348,7 +348,7 @@ TEST_CASE( "A statistics query that times out hands its answer to nobody", "[net
 
     Staller staller;
     server->SetUserUpdateThread( &Staller::Callback, &staller );
-    staller.stallMs = BLOCKING_QUERY_TIMEOUT_MS * 2;
+    staller.stallMs = BLOCKING_QUERY_TIMEOUT_MS + 250;
     REQUIRE( WaitFor( { &client }, [&] { return staller.stalling.load(); } ) );
 
     RakNetStatistics statistics;
