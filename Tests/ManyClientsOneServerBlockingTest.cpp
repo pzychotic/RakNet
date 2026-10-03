@@ -66,18 +66,9 @@ either - it fails on its own if the server never completes registration for a
 client the client believes it is connected to. Each client is one address and one
 address holds one entry, so the server cannot be over 256.
 
-WHERE THE 89 SECONDS WENT, because it was not where the name suggests: 65.1 s was
-building the 257 peers and 13.9 s destroying them, against 10.1 s for the whole
-ten-second loop and under 0.1 s for every close, connect and drain in it.
-RakPeerInterface::GetInstance() cost ~245 ms on its own - RakPeer's constructor
-called GenerateGUID, which harvested entropy from sixteen 1 ms sleeps, and a 1 ms
-sleep on Windows is ~15.6 ms.
-
-That is fixed. GenerateGUID now draws from the operating system's random number
-source and GetInstance() costs ~0.004 ms, so building the 257 peers is no longer
-the bulk of this test. The numbers in the paragraph above are kept because the
-shape of the test has not changed and they are the baseline the fix is measured
-against. Do not read them as current.
+The test runs in 10.1-10.4 s in Release and Debug, nearly all of it the
+ten-second loop. Building and destroying the 257 peers used to dominate, until
+GenerateGUID's sleeps went.
 */
 
 using namespace RakNet;
@@ -96,10 +87,10 @@ constexpr TimeMS kChurnDuration = 10000;
 // attempted.
 constexpr TimeMS kCloseSettlePause = 100;
 
-// A floor with slack, not an expected count: the churn does 51-54 sweeps in
-// Release and 45 in Debug - measured in both, because the floor has to hold in
-// the slower one - and a sweep costs the 100 ms pause plus a settle wait that
-// averages 80 ms across all 256 clients. Its only job is to rule out a run in
+// A floor with slack, not an expected count: the churn does 51-62 sweeps in
+// Release and 41-49 in Debug - measured in both, because the floor has to hold in
+// the slower one - and a sweep costs the 100 ms pause plus a settle wait of
+// roughly 60-140 ms across all 256 clients. Its only job is to rule out a run in
 // which the loop swept once or not at all and the count waits below then reported
 // on the initial connect - the test names ten seconds of closing and reopening, so
 // it should fail if it did not do that.
@@ -107,8 +98,8 @@ constexpr TimeMS kCloseSettlePause = 100;
 // The loop keeps its deadline, which is worth saying because the nearest
 // neighbour does not: ManyClientsOneServerDeallocateBlockingTest's "run for 30
 // seconds" loop completes two sweeps, because a sweep there destroys and
-// recreates 256 peers. Ten seconds here really is ten seconds - 10.1 s of an
-// 89 s test, and the file header says where the other 79 s go.
+// recreates 256 peers. Ten seconds here really is ten seconds, and nearly all of
+// the test's 10.1-10.4 s.
 constexpr int kMinimumSweeps = 10;
 
 } // namespace

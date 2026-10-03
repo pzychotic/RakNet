@@ -39,8 +39,8 @@ namespace ConnectionWaits {
 constexpr RakNet::TimeMS kSettleBudget = 60000;
 
 // The count wait's own hang guard, tighter than the settle budget because the
-// counts come good in one poll or not at all: the 256-client callers run 90 s,
-// almost all of it building peers, and reach their counts inside the first poll.
+// counts come good in one poll or not at all: the 256-client callers reach their
+// counts inside the first poll.
 // Not scaled by peer count either.
 constexpr RakNet::TimeMS kConnectionCountBudget = 10000;
 

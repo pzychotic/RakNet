@@ -45,13 +45,13 @@ reason the suite carries both. ONE thing carries it:
   - THE STIMULUS. THE CHURN HAS NO SETTLE WINDOW ANYWHERE IN IT, so the same
     assertions are made against a far harsher system. The blocking sibling pauses
     100 ms after its close pass and then calls WaitForRequestsToSettle, so its
-    connect pass reads a quiesced system, 51 times in ten seconds. Here the connect
-    pass follows the close pass immediately and the same ten seconds buy ~46,700
-    reconnects against the sibling's ~12,750. The state check and the Connect on
-    the line after it therefore straddle a system that never quiesces. The REQUIRE
-    on Connect's return value is the same line in both files and a different claim
-    in this one, and so is the verdict it leads to. ADDING A SETTLE WAIT TO THE
-    LOOP BELOW WOULD COLLAPSE THE PAIR INTO ONE TEST.
+    connect pass reads a quiesced system, 51-62 times in ten seconds. Here the
+    connect pass follows the close pass immediately and the same ten seconds buy
+    ~39,000 reconnects against the sibling's ~14,000. The state check and the
+    Connect on the line after it therefore straddle a system that never quiesces.
+    The REQUIRE on Connect's return value is the same line in both files and a
+    different claim in this one, and so is the verdict it leads to. ADDING A
+    SETTLE WAIT TO THE LOOP BELOW WOULD COLLAPSE THE PAIR INTO ONE TEST.
 
 Two refinements come with it, neither of which would earn a second entry alone:
 the clients and the server are read microseconds apart rather than by two
@@ -64,28 +64,16 @@ budget, which is why the verdict below is a snapshot rather than a wait.
 WHY THE LOOP FLOOR COUNTS RECONNECTS AND NOT SWEEPS, which is the one place the
 two files should NOT be read across. The blocking sibling counts sweeps because
 its settle wait makes a sweep a completed close-and-reopen cycle. Here a sweep is
-whatever the loop got through, and measured, the ten seconds do ~768,000 sweeps
-against ~46,700 reconnects - one Connect issued per sixteen iterations, because
-the overwhelming majority of iterations find every client connected, connecting
-or disconnecting and do nothing at all. A floor on sweeps in this file would be a
-floor on how fast the machine spins.
+whatever the loop got through, and measured, the ten seconds do ~296,000 sweeps
+in Release against ~39,000 reconnects - one Connect issued per seven or eight
+iterations, because the large majority of iterations find every client
+connected, connecting or disconnecting and do nothing at all. Debug does ~37,000
+sweeps for ~24,500 reconnects. A floor on sweeps in this file would be a floor on
+how fast the machine spins.
 
-WHERE THE TIME WENT, since it was not the loops. Of a 99.4-100.0 s body, 68.0 s
-was building the 257 peers and 14.5 s destroying them, against 10.0 s of churn and
-7.0 s of fixed recovery window. RakPeerInterface::GetInstance() cost ~245 ms on its
-own - RakPeer's constructor called GenerateGUID, which harvested entropy from
-sixteen 1 ms sleeps, and a 1 ms sleep on Windows is ~15.6 ms.
-
-Debug and Release used to finish within 0.5 s of each other - 99.4-100.0 s against
-99.8-99.9 s, an inflation of 1.00 - which followed from the paragraph above: four
-fifths of the runtime was sleeps and fixed windows, and neither gets slower without
-optimisation.
-
-Both of those are stale now. GenerateGUID draws from the operating system's random
-number source, GetInstance() costs ~0.004 ms, and peer construction is no longer
-the bulk of this test - so the Debug/Release inflation should be a normal one
-again. The old numbers are kept as the baseline the fix is measured against.
-Do not read them as current.
+The test runs in 17.1 s in Release and Debug alike: 17 s of it is the churn and
+the two fixed windows, and neither gets slower without optimisation. Building and
+destroying the 257 peers used to dominate, until GenerateGUID's sleeps went.
 */
 
 using namespace RakNet;
@@ -104,8 +92,8 @@ constexpr TimeMS kChurnDuration = 10000;
 // and the churn's last close pass leaves up to 256 of them in exactly that
 // state. Without this window those clients are skipped, finish disconnecting
 // with nothing left to reconnect them, and read as zero at the end. Measured, the
-// window does its job with room to spare - by the time it ends, 36-108 of 256
-// clients in Release and 205-208 in Debug are idle and get their connect, the
+// window does its job with room to spare - by the time it ends, 70-254 of 256
+// clients in Release and 41-190 in Debug are idle and get their connect, the
 // rest having already reconnected inside it.
 constexpr TimeMS kDisconnectSettleWindow = 2000;
 
@@ -132,9 +120,9 @@ constexpr TimeMS kRecoveryWindow = 5000;
 
 // A floor with slack, not an expected count, and it counts reconnects rather
 // than loop iterations for the reason in the header. The churn issues
-// 46,537-46,844 Connects in Release and 25,408-26,815 in Debug - measured in
+// 37,953-40,423 Connects in Release and 23,663-25,708 in Debug - measured in
 // both, because the floor has to hold in the slower one - so ten per client is
-// just under a factor of ten on the WORST Debug reading, which is the number
+// a factor of about nine on the WORST Debug reading, which is the number
 // that matters and not the range's top.
 //
 // Its job is to rule out a run in which the churn reconnected nothing and the
@@ -239,7 +227,7 @@ TEST_CASE( "256 clients closing and reopening their connection as fast as they c
         // Every iteration, and this is not decoration: the churn generates a
         // connection notification per end per reconnect across 257 peers, and a
         // loop that polls without draining grows its queues without bound. At
-        // ~766,000 iterations this is the loop in the suite least able to survive
+        // ~296,000 iterations this is the loop in the suite least able to survive
         // skipping it.
         ConnectionWaits::Drain( server );
         ConnectionWaits::DrainAll( clientList, kClientNum );

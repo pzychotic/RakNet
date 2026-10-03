@@ -50,8 +50,8 @@ Exercised indirectly by getting to that point: Startup,
 SetMaximumIncomingConnections, Receive, DeallocatePacket, GetConnectionState.
 
 This test does not carry [slow]: the rule is over 60 s in Release, and it runs in
-32.6-34.3 s in Release and Debug across four runs each. Thirty seconds of that is the
-fixed churn loop.
+33.2-34.1 s in Release and Debug across three runs each, and 33.1-34.9 s on CI.
+Thirty seconds of that is the fixed churn loop.
 */
 
 using namespace RakNet;

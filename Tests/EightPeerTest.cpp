@@ -46,7 +46,7 @@ The tail of the receive loop is where the runtime of a test like this hides: a
 per-peer wait of up to a second for one more packet, on eight peers with empty
 queues, cost 126.7 s in the baseline (docs/research/test-suite-baseline.md). The
 drain below is bounded by kDeliveryBudget but ends as soon as the counts are
-complete, and the test runs in about 2.6 s in Release - measured, which is why it
+complete, and the test runs in about 0.1 s in Release - measured, which is why it
 does not carry [slow].
 */
 

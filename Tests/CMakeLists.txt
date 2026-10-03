@@ -177,9 +177,10 @@ endif()
 # A convenience, never the default: [slow] is the likeliest place a regression
 # hides. ADD_TAGS_AS_LABELS below is what makes -LE work with no extra wiring.
 #
-# The rule is "over 60 s in Release", and no test carries the tag. The longest are
-# the three ManyClientsOneServer tests: DeallocateBlocking at 32.6-34.3 s in Release
-# and Debug, NonBlocking at 17 s and Blocking at 10 s.
+# The rule is "over 60 s in Release", and no test carries the tag. The longest is
+# ManyClientsOneServerDeallocateBlocking at 33.2-34.1 s in Release and Debug, then
+# ManyClientsOneServerNonBlocking at 17.1-17.2 s and DroppedConnectionConvert at
+# 17.0-17.1 s.
 # ---------------------------------------------------------------------------
 catch_discover_tests( RakNetTests
     # POST_BUILD, the default, is broken on multi-config generators: it writes one
