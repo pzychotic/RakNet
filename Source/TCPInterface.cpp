@@ -240,6 +240,7 @@ void TCPInterface::Stop( void )
     {
         closesocket__( socket );
     }
+    blockingSocketList.clear();
     blockingSocketListMutex.unlock();
 
     // Wait for the thread to stop
@@ -1019,16 +1020,20 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 
+    // Whoever takes sockfd out of the list owns it. Absent, Stop took it to abort the
+    // connect and has closed it already.
+    blockingSocketListMutex.lock();
+    auto it = std::find( blockingSocketList.begin(), blockingSocketList.end(), sockfd );
+    const bool isAbortedByStop = it == blockingSocketList.end();
+    if( isAbortedByStop == false )
+        blockingSocketList.erase( it );
+    blockingSocketListMutex.unlock();
+
+    if( isAbortedByStop )
+        return 0;
+
     if( connectResult == -1 )
     {
-        blockingSocketListMutex.lock();
-        auto it = std::find( blockingSocketList.begin(), blockingSocketList.end(), sockfd );
-        if( it != blockingSocketList.end() )
-        {
-            blockingSocketList.erase( it );
-        }
-        blockingSocketListMutex.unlock();
-
         closesocket__( sockfd );
         return 0;
     }
