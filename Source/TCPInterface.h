@@ -244,24 +244,23 @@ protected:
         unsigned short socketFamily;
     };
 
-    /// The one lock / SetActive( false ) / unlock that frees the entry at \a index. Called
-    /// by RemoteClientSlot and by the connect thread, which releases a slot claimed
-    /// elsewhere and so holds an index rather than a handle. The update loop and
-    /// CloseConnection free a connection through ReportLostRemoteClient and
+    /// The one lock / Free / unlock that gives back the entry at \a index, connecting or
+    /// active. Called by RemoteClientSlot and by the connect thread, which releases a slot
+    /// claimed elsewhere and so holds an index rather than a handle. The update loop and
+    /// CloseConnection free a connection through ReportLostRemoteClientLocked and
     /// CloseRemoteClientAt instead.
     void ReleaseRemoteClient( int index );
+
+    /// Finishes a connect into the entry at \a index, which Connect reserved: under its
+    /// isActiveMutex, writes \a socket and \a systemAddress and makes the entry active, so
+    /// it is never active with either unset. Returns false, writing nothing, if the entry
+    /// is not connecting any more; the caller then still owns \a socket and closes it.
+    bool ActivateConnectingClient( int index, __TCPSOCKET__ socket, const SystemAddress& systemAddress );
 
     /// CloseConnection's release: frees the entry at \a index if it is active at
     /// \a systemAddress, testing and freeing under its isActiveMutex. Returns whether it
     /// freed it.
     bool CloseRemoteClientAt( int index, const SystemAddress& systemAddress );
-
-    /// The update loop's release: if the entry at \a index is still active on \a socket,
-    /// queues its lost event and frees it, all under its isActiveMutex. So a connection
-    /// CloseConnection closed first is not reported lost as well. The socket check keeps a
-    /// connection the connect thread activated in the freed entry from being taken for the
-    /// lost one, unless the new socket reuses the old handle.
-    void ReportLostRemoteClient( int index, __TCPSOCKET__ socket );
 
     /// \internal
     /// \brief A scoped claim on one remoteClients entry.
@@ -272,19 +271,14 @@ protected:
     /// unrepresentable rather than something each claiming site has to remember not to
     /// leak.
     ///
-    /// There are two ways to fill the entry in, and the handle supports both because its
-    /// two callers genuinely differ:
+    /// The claim ends in one of two states:
     ///
-    /// - Publish first: write .socket and .systemAddress through Get() while the handle
-    ///   still holds the lock, then Activate(). The entry is never visible as active with
-    ///   its address unset. This is what the accept path in UpdateTCPInterfaceLoop wants.
-    /// - Activate first: call Activate() straight away and fill the entry in afterwards.
-    ///   Connect has to do this, because what it fills the entry in from is a connect that
-    ///   can block for as long as the network takes, and the update loop takes every
-    ///   entry's isActiveMutex on each pass - holding one across a connect would stall the
-    ///   whole interface. It is safe because the select loop skips an active entry whose
-    ///   socket is still INVALID_SOCKET; see the socketCopy != INVALID_SOCKET check in
-    ///   UpdateTCPInterfaceLoop.
+    /// - Activate(): the accept path writes .socket and .systemAddress through Get() while
+    ///   the handle still holds the lock, then activates the entry.
+    /// - Reserve(): Connect marks the entry connecting and drops the lock, since what fills
+    ///   it in is a connect that can block for as long as the network takes. A connecting
+    ///   entry is nobody's connection: only ActivateConnectingClient or a release touches
+    ///   it.
     class RemoteClientSlot
     {
     public:
@@ -308,19 +302,23 @@ protected:
         int GetIndex( void ) const;
 
         /// The held entry. Before Activate() this handle holds its isActiveMutex, so
-        /// writes made through here are published before the entry becomes active.
+        /// writes made through here are published before the entry becomes active. Only
+        /// valid while the lock is held.
         RemoteClient& Get( void ) const;
 
         /// Marks the entry active and drops its lock.
         void Activate( void );
+
+        /// Marks the entry connecting and drops its lock.
+        void Reserve( void );
 
         /// Gives the entry back now rather than at the end of the scope, for callers that
         /// want the slot free before they publish a failure the application can retry on.
         /// The handle holds nothing afterwards.
         void Release( void );
 
-        /// Hands the claim on: the entry stays active past this scope, and whoever it was
-        /// handed to is the one that releases it. Only valid after Activate().
+        /// Hands the claim on: the entry stays taken past this scope, and whoever it was
+        /// handed to is the one that releases it. Only valid after Activate() or Reserve().
         void Commit( void );
 
     private:
@@ -329,7 +327,9 @@ protected:
 
         /// remoteClientsLength when this handle holds no entry.
         int index;
-        bool isActivated;
+
+        /// Whether Activate() or Reserve() has dropped the entry's lock.
+        bool isPublished;
 
         /// Whether this handle is still the one that owes the entry a release.
         bool isReleasePending;
@@ -345,14 +345,28 @@ protected:
 };
 
 /// Stores information about a remote client.
+///
+/// Every field that is not atomic is read and written under isActiveMutex, and outgoingData
+/// under outgoingDataMutex as well. A thread that needs both takes isActiveMutex first.
 struct RemoteClient
 {
+    /// FREE entries are claimed by RemoteClientSlot. CONNECTING ones belong to a Connect in
+    /// flight and are no connection yet: only ACTIVE ones are counted, listed, sent to,
+    /// closed or selected on.
+    enum class State
+    {
+        FREE,
+        CONNECTING,
+        ACTIVE
+    };
+
     RemoteClient()
     {
 #if OPEN_SSL_CLIENT_SUPPORT == 1
         ssl = 0;
 #endif
-        isActive = false;
+        state = State::FREE;
+        generation = 0;
         socket = INVALID_SOCKET;
         incomingBytesQueued = 0;
         isOverOutgoingCap = false;
@@ -360,7 +374,12 @@ struct RemoteClient
     __TCPSOCKET__ socket;
     SystemAddress systemAddress;
     DataStructures::ByteQueue outgoingData;
-    bool isActive;
+    State state;
+
+    /// Bumped by every Activate, and never 0 while ACTIVE. The update loop keeps it from
+    /// select to the work on the result, so a connection that took the entry in between is
+    /// not given the old one's readiness, even on a reused descriptor.
+    uint32_t generation;
 
     /// Bytes read from this client and not yet handed on by Receive. Only the receive
     /// thread adds to it, so a read never takes it past the cap.
@@ -390,7 +409,16 @@ struct RemoteClient
         isOverOutgoingCap = false;
         incomingBytesQueued = 0;
     }
-    void SetActive( bool a );
+
+    /// Marks the entry connecting. It must be FREE.
+    void Reserve( void );
+
+    /// Marks the entry ACTIVE with fresh buffers and a new generation. socket and
+    /// systemAddress must already be written.
+    void Activate( void );
+
+    /// Gives the entry back from CONNECTING or ACTIVE, closing its socket and freeing its SSL.
+    void Free( void );
 
     /// Buffers the data for the update loop to send, unless that would take outgoingData
     /// past \a maxOutgoingBytes. Then it buffers nothing, flags the client for the update

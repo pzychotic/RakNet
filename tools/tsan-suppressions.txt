@@ -58,19 +58,6 @@ race:UpdateThreadGate::UpdateThreadGate(
 # completes.
 race:RakNet::RakPeer::IsLoopbackAddress(
 
-# TCPInterface's RemoteClient slots. Connect and ConnectionAttemptLoop write a slot's socket
-# and address without the slot's lock, while the update thread reads them under it.
-# Both address writes are SystemAddress copies, so the racing frame is
-# SystemAddress::operator= and both functions need race:. The descriptor Connect creates
-# in SocketConnect is also what recv races. GetConnectionCount,
-# GetOutgoingDataBufferSize and the update loop read isActive without the lock that
-# SetActive writes it under.
-race:RakNet::TCPInterface::Connect(
-race:RakNet::ConnectionAttemptLoop(
-race_top:RakNet::RemoteClient::SetActive(
-race_top:RakNet::TCPInterface::GetConnectionCount(
-race_top:RakNet::TCPInterface::GetOutgoingDataBufferSize(
-
 # TelnetTransportLineBufferTest installs and restores its allocator hooks while the
 # TCPInterface update thread is running and allocating through them.
 race_top:RakNet::SetMalloc_Ex(

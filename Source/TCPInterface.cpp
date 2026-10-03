@@ -218,8 +218,11 @@ void TCPInterface::Stop( void )
         return;
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
-    for( unsigned int i = 0; i < remoteClientsLength; i++ )
+    for( int i = 0; i < remoteClientsLength; i++ )
+    {
+        std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
         remoteClients[i].DisconnectSSL();
+    }
 #endif
 
     isStarted--;
@@ -260,11 +263,8 @@ void TCPInterface::Stop( void )
     // Stuff from here on to the end of the function is not threadsafe
     for( int i = 0; i < remoteClientsLength; i++ )
     {
-        if( remoteClients[i].socket != INVALID_SOCKET )
-            closesocket__( remoteClients[i].socket );
-#if OPEN_SSL_CLIENT_SUPPORT == 1
-        remoteClients[i].FreeSSL();
-#endif
+        std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
+        remoteClients[i].Free();
     }
     remoteClientsLength = 0;
     RakNet::OP_DELETE_ARRAY( remoteClients, _FILE_AND_LINE_ );
@@ -294,21 +294,32 @@ void TCPInterface::Stop( void )
 void TCPInterface::ReleaseRemoteClient( int index )
 {
     std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
-    remoteClients[index].SetActive( false );
+    remoteClients[index].Free();
+}
+bool TCPInterface::ActivateConnectingClient( int index, __TCPSOCKET__ socket, const SystemAddress& systemAddress )
+{
+    RemoteClient& remoteClient = remoteClients[index];
+    std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+    if( remoteClient.state != RemoteClient::State::CONNECTING )
+        return false;
+    remoteClient.socket = socket;
+    remoteClient.systemAddress = systemAddress;
+    remoteClient.Activate();
+    return true;
 }
 bool TCPInterface::CloseRemoteClientAt( int index, const SystemAddress& systemAddress )
 {
     std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
-    if( remoteClients[index].isActive == false || remoteClients[index].systemAddress != systemAddress )
+    if( remoteClients[index].state != RemoteClient::State::ACTIVE || remoteClients[index].systemAddress != systemAddress )
         return false;
-    remoteClients[index].SetActive( false );
+    remoteClients[index].Free();
     return true;
 }
 void TCPInterface::ReportLostRemoteClientLocked( RemoteClient& remoteClient )
 {
-    // Inactive before the event is queued, so an application that has taken the event from
+    // Freed before the event is queued, so an application that has taken the event from
     // HasLostConnection no longer counts the connection in GetConnectionCount.
-    remoteClient.SetActive( false );
+    remoteClient.Free();
     SystemAddress* lostConnectionSystemAddress = lostConnections.Allocate( _FILE_AND_LINE_ );
     *lostConnectionSystemAddress = remoteClient.systemAddress;
     lostConnections.Push( lostConnectionSystemAddress );
@@ -316,7 +327,7 @@ void TCPInterface::ReportLostRemoteClientLocked( RemoteClient& remoteClient )
 void TCPInterface::CloseRemoteClientOverOutgoingCap( int index )
 {
     std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
-    if( remoteClients[index].isActive == false || remoteClients[index].isOverOutgoingCap == false )
+    if( remoteClients[index].state != RemoteClient::State::ACTIVE || remoteClients[index].isOverOutgoingCap == false )
         return;
     ReportLostRemoteClientLocked( remoteClients[index] );
 }
@@ -331,30 +342,23 @@ void TCPInterface::ReleaseIncomingBytes( const Packet& packet )
     // entry takes the old connection's bytes as its own, and never below 0.
     RemoteClient& remoteClient = remoteClients[index];
     std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
-    if( remoteClient.isActive == false || remoteClient.systemAddress != packet.systemAddress )
+    if( remoteClient.state != RemoteClient::State::ACTIVE || remoteClient.systemAddress != packet.systemAddress )
         return;
     unsigned int queued = remoteClient.incomingBytesQueued;
     while( remoteClient.incomingBytesQueued.compare_exchange_weak( queued, queued > packet.length ? queued - packet.length : 0 ) == false )
     {
     }
 }
-void TCPInterface::ReportLostRemoteClient( int index, __TCPSOCKET__ socket )
-{
-    std::lock_guard<std::mutex> guard( remoteClients[index].isActiveMutex );
-    if( remoteClients[index].isActive == false || remoteClients[index].socket != socket )
-        return;
-    ReportLostRemoteClientLocked( remoteClients[index] );
-}
 TCPInterface::RemoteClientSlot::RemoteClientSlot( TCPInterface& owner )
 : tcpInterface( owner )
 , index( owner.remoteClientsLength )
-, isActivated( false )
+, isPublished( false )
 , isReleasePending( false )
 {
     for( int i = 0; i < owner.remoteClientsLength; i++ )
     {
         std::unique_lock<std::mutex> lock( owner.remoteClients[i].isActiveMutex );
-        if( owner.remoteClients[i].isActive == false )
+        if( owner.remoteClients[i].state == RemoteClient::State::FREE )
         {
             // Keeps the entry's lock, so nothing else can claim it and the caller's writes
             // land before Activate() publishes it. index stops being remoteClientsLength
@@ -386,9 +390,16 @@ RemoteClient& TCPInterface::RemoteClientSlot::Get( void ) const
 }
 void TCPInterface::RemoteClientSlot::Activate( void )
 {
-    RakAssert( isReleasePending && isActivated == false );
-    tcpInterface.remoteClients[index].SetActive( true );
-    isActivated = true;
+    RakAssert( isReleasePending && isPublished == false );
+    tcpInterface.remoteClients[index].Activate();
+    isPublished = true;
+    entryLock.unlock();
+}
+void TCPInterface::RemoteClientSlot::Reserve( void )
+{
+    RakAssert( isReleasePending && isPublished == false );
+    tcpInterface.remoteClients[index].Reserve();
+    isPublished = true;
     entryLock.unlock();
 }
 void TCPInterface::RemoteClientSlot::Release( void )
@@ -398,14 +409,14 @@ void TCPInterface::RemoteClientSlot::Release( void )
 
     isReleasePending = false;
 
-    if( isActivated )
+    if( isPublished )
     {
-        // Active and unlocked, so giving it back means taking the lock again.
+        // Taken and unlocked, so giving it back means taking the lock again.
         tcpInterface.ReleaseRemoteClient( index );
     }
     else
     {
-        // Never published as active, so dropping the lock is the whole of the release.
+        // Still FREE, so dropping the lock is the whole of the release.
         entryLock.unlock();
     }
 
@@ -415,10 +426,10 @@ void TCPInterface::RemoteClientSlot::Release( void )
 }
 void TCPInterface::RemoteClientSlot::Commit( void )
 {
-    // Committing before Activate() would hand on an entry that is not active and leave its
-    // lock held for good, so it is a caller error rather than a state to recover from. The
-    // index is kept: the caller goes on reading the entry it just handed on.
-    RakAssert( isActivated );
+    // Committing before Activate() or Reserve() would hand on an entry that is still FREE
+    // and leave its lock held for good, so it is a caller error rather than a state to
+    // recover from. The index is kept: the caller goes on naming the entry it handed on.
+    RakAssert( isPublished );
     isReleasePending = false;
 }
 SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort, bool block, unsigned short socketFamily, const char* bindAddress )
@@ -436,16 +447,15 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
 
     // "Table is full" is the handle's answer rather than a loop counter left one past the
     // end of the array, so there is no out-of-range index here to guard against indexing
-    // with. Connect is the handle's activate-first caller: what fills the entry in is a
-    // connect that can block, and holding the entry's lock across that would stall the
-    // update loop, so the entry goes active now and is filled in below.
+    // with. What fills the entry in is a connect that can block, and holding the entry's
+    // lock across that would stall the update loop, so the entry is reserved now and
+    // activated by ActivateConnectingClient once the connect has a socket.
     RemoteClientSlot slot( *this );
     if( slot.IsClaimed() == false )
         return UNASSIGNED_SYSTEM_ADDRESS;
 
-    slot.Activate();
+    slot.Reserve();
     const int newRemoteClientIndex = slot.GetIndex();
-    RemoteClient& newRemoteClient = slot.Get();
 
     if( block )
     {
@@ -470,18 +480,26 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             return UNASSIGNED_SYSTEM_ADDRESS;
         }
 
-        newRemoteClient.socket = sockfd;
-        newRemoteClient.systemAddress = systemAddress;
-
-        // The connection is live and the entry is the caller's until CloseConnection or
-        // the update loop gives it back.
+        // From here on the entry is ActivateConnectingClient's to fill in, and then the
+        // connection's until CloseConnection or the update loop gives it back.
         slot.Commit();
 
+        if( ActivateConnectingClient( newRemoteClientIndex, sockfd, systemAddress ) == false )
+        {
+            closesocket__( sockfd );
+
+            failedConnectionAttemptMutex.lock();
+            failedConnectionAttempts.push_back( systemAddress );
+            failedConnectionAttemptMutex.unlock();
+
+            return UNASSIGNED_SYSTEM_ADDRESS;
+        }
+
         completedConnectionAttemptMutex.lock();
-        completedConnectionAttempts.push_back( newRemoteClient.systemAddress );
+        completedConnectionAttempts.push_back( systemAddress );
         completedConnectionAttemptMutex.unlock();
 
-        return newRemoteClient.systemAddress;
+        return systemAddress;
     }
     else
     {
@@ -576,52 +594,31 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
         return false;
 
     const unsigned int maxOutgoingBytes = maxOutgoingBytesPerClient;
+    // Buffers for the entry if it is active and its address is a target, testing both under
+    // its lock. Returns whether it was a target.
     auto bufferFor = [&]( RemoteClient& remoteClient ) {
-        // The address was matched without the entry's lock. Matched again under it, so an
-        // entry freed and taken by another client since is neither sent to nor, at the
-        // outgoing cap, closed.
         std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+        if( remoteClient.state != RemoteClient::State::ACTIVE )
+            return false;
         if( ( remoteClient.systemAddress == systemAddress ) == broadcast )
-            return;
+            return false;
         if( remoteClient.SendOrBuffer( data, lengths, numParameters, maxOutgoingBytes ) == false )
-            return;
+            return true;
 
         // Once per interface: a flood of closes should not flood the console too.
         if( outgoingBytesCapCloseCount.fetch_add( 1 ) == 0 )
         {
             RAKNET_DEBUG_PRINTF( "TCPInterface: closing a connection with %u bytes waiting to be sent to it (SetMaxOutgoingBytesPerClient). See GetOutgoingBytesCapCloseCount.\n", maxOutgoingBytes );
         }
+        return true;
     };
 
-    if( broadcast )
+    // Broadcast sends to all but systemAddress. Otherwise the entry systemIndex names is
+    // tried first, and the search is for when it does not name the connection.
+    if( broadcast || systemAddress.systemIndex >= remoteClientsLength || bufferFor( remoteClients[systemAddress.systemIndex] ) == false )
     {
-        // Send to all, possible exception system
         for( i = 0; i < remoteClientsLength; i++ )
-        {
-            if( remoteClients[i].systemAddress != systemAddress )
-            {
-                bufferFor( remoteClients[i] );
-            }
-        }
-    }
-    else
-    {
-        // Send to this player
-        if( systemAddress.systemIndex < remoteClientsLength &&
-            remoteClients[systemAddress.systemIndex].systemAddress == systemAddress )
-        {
-            bufferFor( remoteClients[systemAddress.systemIndex] );
-        }
-        else
-        {
-            for( i = 0; i < remoteClientsLength; i++ )
-            {
-                if( remoteClients[i].systemAddress == systemAddress )
-                {
-                    bufferFor( remoteClients[i] );
-                }
-            }
-        }
+            bufferFor( remoteClients[i] );
     }
 
 
@@ -910,7 +907,8 @@ void TCPInterface::GetConnectionList( SystemAddress* remoteSystems, unsigned sho
     unsigned short maxToWrite = *numberOfSystems;
     for( int i = 0; i < remoteClientsLength; i++ )
     {
-        if( remoteClients[i].isActive )
+        std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
+        if( remoteClients[i].state == RemoteClient::State::ACTIVE )
         {
             if( systemCount < maxToWrite )
                 remoteSystems[systemCount] = remoteClients[i].systemAddress;
@@ -924,7 +922,8 @@ unsigned short TCPInterface::GetConnectionCount( void ) const
     unsigned short systemCount = 0;
     for( int i = 0; i < remoteClientsLength; i++ )
     {
-        if( remoteClients[i].isActive )
+        std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
+        if( remoteClients[i].state == RemoteClient::State::ACTIVE )
             systemCount++;
     }
     return systemCount;
@@ -932,24 +931,29 @@ unsigned short TCPInterface::GetConnectionCount( void ) const
 
 unsigned int TCPInterface::GetOutgoingDataBufferSize( SystemAddress systemAddress ) const
 {
-    unsigned bytesWritten = 0;
-    if( systemAddress.systemIndex < remoteClientsLength &&
-        remoteClients[systemAddress.systemIndex].isActive &&
-        remoteClients[systemAddress.systemIndex].systemAddress == systemAddress )
+    // The bytes buffered for the entry at index if it is active at systemAddress, or
+    // nothing if it is not.
+    auto bytesFor = [&]( int index, bool& isMatched ) -> unsigned int {
+        RemoteClient& remoteClient = remoteClients[index];
+        std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+        isMatched = remoteClient.state == RemoteClient::State::ACTIVE && remoteClient.systemAddress == systemAddress;
+        if( isMatched == false )
+            return 0;
+        std::lock_guard<std::mutex> outgoingGuard( remoteClient.outgoingDataMutex );
+        return remoteClient.outgoingData.GetBytesWritten();
+    };
+
+    bool isMatched = false;
+    if( systemAddress.systemIndex < remoteClientsLength )
     {
-        std::lock_guard<std::mutex> guard( remoteClients[systemAddress.systemIndex].outgoingDataMutex );
-        bytesWritten = remoteClients[systemAddress.systemIndex].outgoingData.GetBytesWritten();
-        return bytesWritten;
+        unsigned int bytesWritten = bytesFor( systemAddress.systemIndex, isMatched );
+        if( isMatched )
+            return bytesWritten;
     }
 
+    unsigned int bytesWritten = 0;
     for( int i = 0; i < remoteClientsLength; i++ )
-    {
-        if( remoteClients[i].isActive && remoteClients[i].systemAddress == systemAddress )
-        {
-            std::lock_guard<std::mutex> guard( remoteClients[i].outgoingDataMutex );
-            bytesWritten += remoteClients[i].outgoingData.GetBytesWritten();
-        }
-    }
+        bytesWritten += bytesFor( i, isMatched );
     return bytesWritten;
 }
 __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remotePort, unsigned short socketFamily, const char* bindAddress )
@@ -1072,8 +1076,14 @@ void ConnectionAttemptLoop( void* arg )
         return;
     }
 
-    tcpInterface->remoteClients[newRemoteClientIndex].socket = sockfd;
-    tcpInterface->remoteClients[newRemoteClientIndex].systemAddress = systemAddress;
+    if( tcpInterface->ActivateConnectingClient( newRemoteClientIndex, sockfd, systemAddress ) == false )
+    {
+        closesocket__( sockfd );
+
+        std::lock_guard<std::mutex> guard( tcpInterface->failedConnectionAttemptMutex );
+        tcpInterface->failedConnectionAttempts.push_back( systemAddress );
+        return;
+    }
 
     // Notify user that the connection attempt has completed.
     if( tcpInterface->threadRunning > 0 )
@@ -1112,6 +1122,9 @@ void UpdateTCPInterfaceLoop( void* arg )
     tv.tv_sec = 0;
     tv.tv_usec = 30000;
 
+    // Each entry's generation when its socket went into the select sets, or 0 if it did not.
+    // remoteClientsLength is fixed while this thread runs.
+    std::vector<uint32_t> selectedGenerations( sts->remoteClientsLength, 0 );
 
     while( sts->isStarted > 0 )
     {
@@ -1120,23 +1133,20 @@ void UpdateTCPInterfaceLoop( void* arg )
         sslSystemAddress = sts->startSSL.PopInaccurate();
         if( sslSystemAddress )
         {
-            if( sslSystemAddress->systemIndex >= 0 &&
-                sslSystemAddress->systemIndex < sts->remoteClientsLength &&
-                sts->remoteClients[sslSystemAddress->systemIndex].systemAddress == *sslSystemAddress )
-            {
-                sts->remoteClients[sslSystemAddress->systemIndex].InitSSL( sts->ctx, sts->meth );
-            }
-            else
+            // Starts SSL on the entry at index if it is active at the address and has none.
+            auto initSSLAt = [&]( int index ) {
+                RemoteClient& remoteClient = sts->remoteClients[index];
+                std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+                if( remoteClient.state != RemoteClient::State::ACTIVE || remoteClient.systemAddress != *sslSystemAddress )
+                    return false;
+                if( remoteClient.ssl == 0 )
+                    remoteClient.InitSSL( sts->ctx, sts->meth );
+                return true;
+            };
+            if( sslSystemAddress->systemIndex >= sts->remoteClientsLength || initSSLAt( sslSystemAddress->systemIndex ) == false )
             {
                 for( int i = 0; i < sts->remoteClientsLength; i++ )
-                {
-                    std::lock_guard<std::mutex> guard( sts->remoteClients[i].isActiveMutex );
-                    if( sts->remoteClients[i].isActive && sts->remoteClients[i].systemAddress == *sslSystemAddress )
-                    {
-                        if( sts->remoteClients[i].ssl == 0 )
-                            sts->remoteClients[i].InitSSL( sts->ctx, sts->meth );
-                    }
-                }
+                    initSSLAt( i );
             }
             sts->startSSL.Deallocate( sslSystemAddress, _FILE_AND_LINE_ );
         }
@@ -1175,28 +1185,33 @@ void UpdateTCPInterfaceLoop( void* arg )
                 largestDescriptor = sts->listenSocket; // @see largestDescriptor def
             }
 
-            unsigned i;
-            for( i = 0; i < (unsigned int)sts->remoteClientsLength; i++ )
+            for( int i = 0; i < sts->remoteClientsLength; i++ )
             {
-                std::lock_guard<std::mutex> guard( sts->remoteClients[i].isActiveMutex );
-                if( sts->remoteClients[i].isActive )
+                RemoteClient& remoteClient = sts->remoteClients[i];
+                std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+                if( remoteClient.state != RemoteClient::State::ACTIVE )
                 {
-                    // An active entry whose connect is still in progress has no socket yet.
-                    // FD_SET and FD_ISSET abort on INVALID_SOCKET under glibc.
-                    __TCPSOCKET__ socketCopy = sts->remoteClients[i].socket;
-                    if( socketCopy != INVALID_SOCKET )
-                    {
-                        // At the incoming cap the socket is not read, so TCP flow control
-                        // holds the client back until Receive drains what it sent.
-                        if( sts->remoteClients[i].incomingBytesQueued < sts->maxIncomingBytesPerClient )
-                            FD_SET( socketCopy, &readFD );
-                        FD_SET( socketCopy, &exceptionFD );
-                        if( sts->remoteClients[i].outgoingData.GetBytesWritten() > 0 )
-                            FD_SET( socketCopy, &writeFD );
-                        if( socketCopy > largestDescriptor ) // @see largestDescriptorDef
-                            largestDescriptor = socketCopy;
-                    }
+                    selectedGenerations[i] = 0;
+                    continue;
                 }
+
+                // An ACTIVE entry always has a socket: Connect's entries are activated only
+                // once their connect has one.
+                selectedGenerations[i] = remoteClient.generation;
+                // At the incoming cap the socket is not read, so TCP flow control holds the
+                // client back until Receive drains what it sent.
+                if( remoteClient.incomingBytesQueued < sts->maxIncomingBytesPerClient )
+                    FD_SET( remoteClient.socket, &readFD );
+                FD_SET( remoteClient.socket, &exceptionFD );
+                bool hasOutgoingData;
+                {
+                    std::lock_guard<std::mutex> outgoingGuard( remoteClient.outgoingDataMutex );
+                    hasOutgoingData = remoteClient.outgoingData.GetBytesWritten() > 0;
+                }
+                if( hasOutgoingData )
+                    FD_SET( remoteClient.socket, &writeFD );
+                if( remoteClient.socket > largestDescriptor ) // @see largestDescriptorDef
+                    largestDescriptor = remoteClient.socket;
             }
 
             selectResult = (int)select__( largestDescriptor + 1, &readFD, &writeFD, &exceptionFD, &tv );
@@ -1242,6 +1257,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                         // Both families: Receive finds the entry a packet's bytes are
                         // charged to by this index.
                         newRemoteClient.systemAddress.systemIndex = (SystemIndex)slot.GetIndex();
+                        const SystemAddress newSystemAddress = newRemoteClient.systemAddress;
                         slot.Activate();
 
                         // The entry belongs to the connection now; this loop gives it back
@@ -1249,7 +1265,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                         slot.Commit();
 
                         SystemAddress* newConnectionSystemAddress = sts->newIncomingConnections.Allocate( _FILE_AND_LINE_ );
-                        *newConnectionSystemAddress = newRemoteClient.systemAddress;
+                        *newConnectionSystemAddress = newSystemAddress;
                         sts->newIncomingConnections.Push( newConnectionSystemAddress );
                     }
                     else
@@ -1277,129 +1293,89 @@ void UpdateTCPInterfaceLoop( void* arg )
 #endif
             }
 
+            // Each entry's work is done under its lock, so CloseConnection cannot free it, nor
+            // a connect fill it in, part way through. An entry whose generation has changed
+            // since select holds another connection, or none, and select's answer is not
+            // about it.
+            for( int i = 0; i < sts->remoteClientsLength; i++ )
             {
-                i = 0;
-                while( i < (unsigned int)sts->remoteClientsLength )
-                {
-                    if( sts->remoteClients[i].isActive == false )
-                    {
-                        i++;
-                        continue;
-                    }
-                    // An active entry whose connect is still in progress has no socket yet.
-                    // FD_SET and FD_ISSET abort on INVALID_SOCKET under glibc.
-                    __TCPSOCKET__ socketCopy = sts->remoteClients[i].socket;
-                    if( socketCopy == INVALID_SOCKET )
-                    {
-                        i++;
-                        continue;
-                    }
+                RemoteClient& remoteClient = sts->remoteClients[i];
+                std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
+                if( selectedGenerations[i] == 0 || remoteClient.state != RemoteClient::State::ACTIVE || remoteClient.generation != selectedGenerations[i] )
+                    continue;
 
-                    if( FD_ISSET( socketCopy, &exceptionFD ) )
+                if( FD_ISSET( remoteClient.socket, &exceptionFD ) )
+                {
+                    // Connection lost abruptly.
+                    sts->ReportLostRemoteClientLocked( remoteClient );
+                    continue;
+                }
+
+                // Read no more than takes the client to the incoming cap, which may have been
+                // lowered since select.
+                const unsigned int maxIncomingBytes = sts->maxIncomingBytesPerClient;
+                const unsigned int incomingBytesQueued = remoteClient.incomingBytesQueued;
+                const unsigned int incomingRoom = incomingBytesQueued < maxIncomingBytes ? ( std::min )( maxIncomingBytes - incomingBytesQueued, BUFF_SIZE ) : 0;
+                if( FD_ISSET( remoteClient.socket, &readFD ) && incomingRoom > 0 )
+                {
+                    // if recv returns 0 this was a graceful close
+                    len = remoteClient.Recv( data, (int)incomingRoom );
+
+                    if( len > 0 )
                     {
-                        // #ifdef _DO_PRINTF
-                        //                      if (sts->listenSocket!=-1)
-                        //                      {
-                        //                          int err;
-                        //                          int errlen = sizeof(err);
-                        //                          getsockopt__(sts->listenSocket, SOL_SOCKET, SO_ERROR,(char*)&err, &errlen);
-                        //                          in_addr in;
-                        //                          in.s_addr = sts->remoteClients[i].systemAddress.binaryAddress;
-                        //                          RAKNET_DEBUG_PRINTF("Socket error %i on %s:%i\n", err,inet_ntoa( in ), sts->remoteClients[i].systemAddress.GetPort() );
-                        //                      }
-                        //
-                        // #endif
-                        // Connection lost abruptly, unless CloseConnection has closed it since
-                        // select, in which case that call accounted for it.
-                        sts->ReportLostRemoteClient( i, socketCopy );
+                        incomingMessage = sts->incomingMessages.Allocate( _FILE_AND_LINE_ );
+                        incomingMessage->data = (unsigned char*)rakMalloc_Ex( len + 1, _FILE_AND_LINE_ );
+                        memcpy( incomingMessage->data, data, len );
+                        incomingMessage->data[len] = 0; // Null terminate this so we can print it out as regular strings.  This is different from RakNet which does not do this.
+                        incomingMessage->length = len;
+                        incomingMessage->deleteData = true; // actually means came from SPSC, rather than AllocatePacket
+                        incomingMessage->systemAddress = remoteClient.systemAddress;
+
+                        // Charged before it can be received, so Receive never gives back
+                        // bytes that were not yet counted.
+                        if( remoteClient.incomingBytesQueued.fetch_add( (unsigned int)len ) + (unsigned int)len >= maxIncomingBytes )
+                        {
+                            // Once per interface: every slow poll would print otherwise.
+                            if( sts->incomingBytesCapStallCount.fetch_add( 1 ) == 0 )
+                            {
+                                RAKNET_DEBUG_PRINTF( "TCPInterface: stopped reading a client with %u bytes from it waiting for Receive (SetMaxIncomingBytesPerClient). See GetIncomingBytesCapStallCount.\n", maxIncomingBytes );
+                            }
+                        }
+                        sts->incomingMessages.Push( incomingMessage );
                     }
                     else
                     {
-                        // Read no more than takes the client to the incoming cap, which may
-                        // have been lowered since select.
-                        const unsigned int maxIncomingBytes = sts->maxIncomingBytesPerClient;
-                        const unsigned int incomingBytesQueued = sts->remoteClients[i].incomingBytesQueued;
-                        const unsigned int incomingRoom = incomingBytesQueued < maxIncomingBytes ? ( std::min )( maxIncomingBytes - incomingBytesQueued, BUFF_SIZE ) : 0;
-                        if( FD_ISSET( socketCopy, &readFD ) && incomingRoom > 0 )
+                        // Connection lost gracefully.
+                        sts->ReportLostRemoteClientLocked( remoteClient );
+                        continue;
+                    }
+                }
+                if( FD_ISSET( remoteClient.socket, &writeFD ) )
+                {
+                    int bytesAvailable;
+                    int bytesSent;
+                    std::lock_guard<std::mutex> outgoingGuard( remoteClient.outgoingDataMutex );
+                    const unsigned int bytesInBuffer = remoteClient.outgoingData.GetBytesWritten();
+                    if( bytesInBuffer > 0 )
+                    {
+                        unsigned int contiguousLength;
+                        char* contiguousBytesPointer = remoteClient.outgoingData.PeekContiguousBytes( &contiguousLength );
+                        if( contiguousLength < (unsigned int)BUFF_SIZE && contiguousLength < bytesInBuffer )
                         {
-                            // if recv returns 0 this was a graceful close
-                            len = sts->remoteClients[i].Recv( data, (int)incomingRoom );
-
-                            if( len > 0 )
-                            {
-                                incomingMessage = sts->incomingMessages.Allocate( _FILE_AND_LINE_ );
-                                incomingMessage->data = (unsigned char*)rakMalloc_Ex( len + 1, _FILE_AND_LINE_ );
-                                memcpy( incomingMessage->data, data, len );
-                                incomingMessage->data[len] = 0; // Null terminate this so we can print it out as regular strings.  This is different from RakNet which does not do this.
-                                // printf("RECV: %s\n",incomingMessage->data);
-                                /*
-                                if (1)
-                                {
-                                    static FILE *fp=0;
-                                    if (fp==0)
-                                    {
-                                        fp = fopen("tcpRcv.txt", "wb");
-                                    }
-                                    fwrite(data,1,len,fp);
-                                }
-                                */
-                                incomingMessage->length = len;
-                                incomingMessage->deleteData = true; // actually means came from SPSC, rather than AllocatePacket
-                                incomingMessage->systemAddress = sts->remoteClients[i].systemAddress;
-
-                                // Charged before it can be received, so Receive never gives
-                                // back bytes that were not yet counted.
-                                if( sts->remoteClients[i].incomingBytesQueued.fetch_add( (unsigned int)len ) + (unsigned int)len >= maxIncomingBytes )
-                                {
-                                    // Once per interface: every slow poll would print otherwise.
-                                    if( sts->incomingBytesCapStallCount.fetch_add( 1 ) == 0 )
-                                    {
-                                        RAKNET_DEBUG_PRINTF( "TCPInterface: stopped reading a client with %u bytes from it waiting for Receive (SetMaxIncomingBytesPerClient). See GetIncomingBytesCapStallCount.\n", maxIncomingBytes );
-                                    }
-                                }
-                                sts->incomingMessages.Push( incomingMessage );
-                            }
+                            if( bytesInBuffer > BUFF_SIZE )
+                                bytesAvailable = BUFF_SIZE;
                             else
-                            {
-                                // Connection lost gracefully, or closed by CloseConnection
-                                // since select, in which case that call accounted for it.
-                                sts->ReportLostRemoteClient( i, socketCopy );
-                                continue;
-                            }
+                                bytesAvailable = bytesInBuffer;
+                            remoteClient.outgoingData.ReadBytes( data, bytesAvailable, true );
+                            bytesSent = remoteClient.Send( data, bytesAvailable );
                         }
-                        if( FD_ISSET( socketCopy, &writeFD ) )
+                        else
                         {
-                            RemoteClient* rc = &sts->remoteClients[i];
-                            unsigned int bytesInBuffer;
-                            int bytesAvailable;
-                            int bytesSent;
-                            std::lock_guard<std::mutex> guard( rc->outgoingDataMutex );
-                            bytesInBuffer = rc->outgoingData.GetBytesWritten();
-                            if( bytesInBuffer > 0 )
-                            {
-                                unsigned int contiguousLength;
-                                char* contiguousBytesPointer = rc->outgoingData.PeekContiguousBytes( &contiguousLength );
-                                if( contiguousLength < (unsigned int)BUFF_SIZE && contiguousLength < bytesInBuffer )
-                                {
-                                    if( bytesInBuffer > BUFF_SIZE )
-                                        bytesAvailable = BUFF_SIZE;
-                                    else
-                                        bytesAvailable = bytesInBuffer;
-                                    rc->outgoingData.ReadBytes( data, bytesAvailable, true );
-                                    bytesSent = rc->Send( data, bytesAvailable );
-                                }
-                                else
-                                {
-                                    bytesSent = rc->Send( contiguousBytesPointer, contiguousLength );
-                                }
-
-                                if( bytesSent > 0 )
-                                    rc->outgoingData.IncrementReadOffset( bytesSent );
-                                bytesInBuffer = rc->outgoingData.GetBytesWritten();
-                            }
+                            bytesSent = remoteClient.Send( contiguousBytesPointer, contiguousLength );
                         }
 
-                        i++; // Nothing deleted so increment the index
+                        if( bytesSent > 0 )
+                            remoteClient.outgoingData.IncrementReadOffset( bytesSent );
                     }
                 }
             }
@@ -1416,22 +1392,37 @@ void UpdateTCPInterfaceLoop( void* arg )
     sts->threadRunning--;
 }
 
-void RemoteClient::SetActive( bool a )
+void RemoteClient::Reserve( void )
 {
-    if( isActive != a )
+    RakAssert( state == State::FREE );
+    state = State::CONNECTING;
+}
+void RemoteClient::Activate( void )
+{
+    RakAssert( state != State::ACTIVE && socket != INVALID_SOCKET );
+    state = State::ACTIVE;
+    Reset();
+    if( ++generation == 0 )
+        generation = 1;
+}
+void RemoteClient::Free( void )
+{
+    if( state == State::FREE )
+        return;
+    state = State::FREE;
+    Reset();
+#if OPEN_SSL_CLIENT_SUPPORT == 1
+    FreeSSL();
+#endif
+    if( socket != INVALID_SOCKET )
     {
-        isActive = a;
-        Reset();
-        if( isActive == false && socket != INVALID_SOCKET )
-        {
-            closesocket__( socket );
-            socket = INVALID_SOCKET;
-        }
+        closesocket__( socket );
+        socket = INVALID_SOCKET;
     }
 }
 bool RemoteClient::SendOrBuffer( const char** data, const unsigned int* lengths, const int numParameters, unsigned int maxOutgoingBytes )
 {
-    if( isActive == false )
+    if( state != State::ACTIVE )
         return false;
 
     uint64_t totalLength = 0;
@@ -1540,6 +1531,7 @@ void RemoteClient::FreeSSL( void )
 {
     if( ssl )
         SSL_free( ssl );
+    ssl = 0;
 }
 int RemoteClient::Send( const char* data, unsigned int length )
 {
