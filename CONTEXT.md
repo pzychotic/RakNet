@@ -19,7 +19,8 @@ _Avoid_: Remote peer, host, endpoint
 **Connection record**:
 What a Peer holds about one System for the life of one connection to it, from the first
 handshake step until the connection closes. When a later connection is made, even to the
-same System, it gets a new connection record. A Peer holds a bounded number of them.
+same System, it gets a new connection record. A Peer holds a bounded number of them, and
+at most one open connection record per System.
 _Avoid_: Slot, remote system entry
 
 **Update cycle**:
