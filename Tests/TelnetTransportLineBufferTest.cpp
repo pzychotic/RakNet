@@ -1,4 +1,5 @@
 #include "Plugins/TelnetTransport.h"
+#include "RakAssert.h"
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
 #include "SocketDefines.h"
@@ -8,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <mutex>
@@ -139,18 +141,27 @@ std::string SendLine( TelnetTransport& telnet, __TCPSOCKET__ client, const std::
     return ReceiveLine( telnet );
 }
 
-// Tracks the rakMalloc_Ex blocks of one exact size that have not been passed to rakFree_Ex.
+// Tracks the rakMalloc_Ex blocks of the armed size that have not been passed to rakFree_Ex.
 //
 // TCPInterface's receive thread allocates each incoming segment's data as its length plus a
-// terminator, and nothing else it or TelnetTransport allocates is that size here, so for a
-// 3-byte ESC [ A this counts the up-arrow packets not yet freed. The hooks are global and
-// the receive thread calls them, so the set is locked.
+// terminator, and nothing else it or TelnetTransport allocates is that size while armed, so
+// armed for a 3-byte ESC [ A this counts the up-arrow packets not yet freed.
+//
+// The hooks are plain globals, so a case declares its LiveBlocks before its TelnetTransport:
+// they go in before Start creates TCPInterface's thread and come out after Stop has waited
+// for it. That thread calls them, so the set is locked and the armed size atomic. The state
+// is static, so only one LiveBlocks exists at a time.
 class LiveBlocks
 {
 public:
-    explicit LiveBlocks( size_t size )
+    LiveBlocks()
     {
-        s_size = size;
+        RakAssert( s_previousMalloc == 0 );
+        s_armedSize = 0;
+        {
+            std::lock_guard<std::mutex> lock( s_mutex );
+            s_live.clear();
+        }
         s_previousMalloc = GetMalloc_Ex();
         s_previousFree = GetFree_Ex();
         SetMalloc_Ex( &Malloc );
@@ -161,12 +172,18 @@ public:
     {
         SetMalloc_Ex( s_previousMalloc );
         SetFree_Ex( s_previousFree );
+        s_previousMalloc = 0;
+        s_previousFree = 0;
     }
 
     LiveBlocks( const LiveBlocks& ) = delete;
     LiveBlocks& operator=( const LiveBlocks& ) = delete;
 
-    static size_t Count()
+    // Counts blocks of size allocated from now on, until Disarm.
+    void Arm( size_t size ) { s_armedSize = size; }
+    void Disarm() { s_armedSize = 0; }
+
+    size_t Count() const
     {
         std::lock_guard<std::mutex> lock( s_mutex );
         return s_live.size();
@@ -176,7 +193,8 @@ private:
     static void* Malloc( size_t size, const char* file, unsigned int line )
     {
         void* p = s_previousMalloc( size, file, line );
-        if( p != 0 && size == s_size )
+        const size_t armedSize = s_armedSize;
+        if( p != 0 && armedSize != 0 && size == armedSize )
         {
             std::lock_guard<std::mutex> lock( s_mutex );
             s_live.insert( p );
@@ -193,14 +211,14 @@ private:
         s_previousFree( p, file, line );
     }
 
-    static size_t s_size;
+    static std::atomic<size_t> s_armedSize;
     static void* ( *s_previousMalloc )( size_t, const char*, unsigned int );
     static void ( *s_previousFree )( void*, const char*, unsigned int );
     static std::mutex s_mutex;
     static std::set<void*> s_live;
 };
 
-size_t LiveBlocks::s_size = 0;
+std::atomic<size_t> LiveBlocks::s_armedSize( 0 );
 void* ( *LiveBlocks::s_previousMalloc )( size_t, const char*, unsigned int ) = 0;
 void ( *LiveBlocks::s_previousFree )( void*, const char*, unsigned int ) = 0;
 std::mutex LiveBlocks::s_mutex;
@@ -208,20 +226,21 @@ std::set<void*> LiveBlocks::s_live;
 
 // Sends ESC [ A in a segment of its own - Receive only recognises the up arrow as a whole
 // 3-byte packet - and has Receive take it. Returns whether the packet was freed after.
-bool SendUpArrow( TelnetTransport& telnet, __TCPSOCKET__ client )
+bool SendUpArrow( TelnetTransport& telnet, __TCPSOCKET__ client, LiveBlocks& blocks )
 {
-    LiveBlocks upArrowData( sizeof( kUpArrow ) + 1 );
+    blocks.Arm( sizeof( kUpArrow ) + 1 );
     SendAll( client, kUpArrow, sizeof( kUpArrow ) );
 
     // Received by TCPInterface's thread...
-    REQUIRE( WaitFor( [] { return LiveBlocks::Count() == 1; } ) );
+    REQUIRE( WaitFor( [&] { return blocks.Count() == 1; } ) );
 
     // ...and freed once Receive has taken it. Receive returns nothing for it.
     bool returnedNothing = true;
     const bool freed = WaitFor( [&] {
         returnedNothing = returnedNothing && telnet.Receive() == 0;
-        return LiveBlocks::Count() == 0;
+        return blocks.Count() == 0;
     } );
+    blocks.Disarm();
     CHECK( returnedNothing );
     return freed;
 }
@@ -232,6 +251,7 @@ TEST_CASE( "TelnetTransport recalls a long line with the up arrow without overru
 {
     WinsockScope winsock;
 
+    LiveBlocks blocks;
     TelnetTransport telnet;
     const __TCPSOCKET__ client = StartAndConnect( telnet, kUpArrowListenPort );
 
@@ -241,7 +261,7 @@ TEST_CASE( "TelnetTransport recalls a long line with the up arrow without overru
     const std::string longLine( REMOTE_MAX_TEXT_INPUT - 48, 'x' );
     REQUIRE( SendLine( telnet, client, longLine + "\n" ) == longLine );
 
-    CHECK( SendUpArrow( telnet, client ) );
+    CHECK( SendUpArrow( telnet, client, blocks ) );
 
     // The recalled line is the cursor's line now, so Enter sends it again.
     CHECK( SendLine( telnet, client, "\n" ) == longLine );
@@ -279,6 +299,7 @@ TEST_CASE( "TelnetTransport frees an up-arrow packet", "[telnettransport][networ
 {
     WinsockScope winsock;
 
+    LiveBlocks blocks;
     TelnetTransport telnet;
     const __TCPSOCKET__ client = StartAndConnect( telnet, kUpArrowLeakListenPort );
 
@@ -288,7 +309,7 @@ TEST_CASE( "TelnetTransport frees an up-arrow packet", "[telnettransport][networ
         if( withLastLine )
             REQUIRE( SendLine( telnet, client, "recall\n" ) == "recall" );
 
-        CHECK( SendUpArrow( telnet, client ) );
+        CHECK( SendUpArrow( telnet, client, blocks ) );
     }
 
     closesocket__( client );
@@ -361,22 +382,23 @@ TEST_CASE( "TelnetTransport frees lines still queued when it stops", "[telnettra
 {
     WinsockScope winsock;
 
+    LiveBlocks blocks;
     TelnetTransport telnet;
     const __TCPSOCKET__ client = StartAndConnect( telnet, kQueuedAtStopListenPort );
 
-    // A queued line's data is its length plus a terminator. Nothing else allocated here is
-    // that size: the TCP packet's data is the whole segment plus a terminator.
+    // A queued line's data is its length plus a terminator. Nothing else allocated while
+    // armed is that size: the TCP packet's data is the whole segment plus a terminator.
     const std::string queued = "queued";
-    LiveBlocks queuedLineData( queued.size() + 1 );
+    blocks.Arm( queued.size() + 1 );
 
     const std::string lines = "a\n" + queued + "\n";
     SendAll( client, lines.data(), lines.size() );
     REQUIRE( ReceiveLine( telnet ) == "a" );
 
     // The second line waits for a Receive that never comes.
-    CHECK( LiveBlocks::Count() == 1 );
+    CHECK( blocks.Count() == 1 );
 
     closesocket__( client );
     telnet.Stop();
-    CHECK( LiveBlocks::Count() == 0 );
+    CHECK( blocks.Count() == 0 );
 }

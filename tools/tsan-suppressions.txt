@@ -57,8 +57,3 @@ race:UpdateThreadGate::UpdateThreadGate(
 # operator==, on the user thread. The network thread writes it when the first connection
 # completes.
 race:RakNet::RakPeer::IsLoopbackAddress(
-
-# TelnetTransportLineBufferTest installs and restores its allocator hooks while the
-# TCPInterface update thread is running and allocating through them.
-race_top:RakNet::SetMalloc_Ex(
-race_top:RakNet::SetFree_Ex(

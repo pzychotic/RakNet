@@ -64,7 +64,9 @@ extern RAK_DLL_EXPORT void  ( *rakFree_Ex )( void* p, const char* file, unsigned
 extern RAK_DLL_EXPORT void  ( *notifyOutOfMemory )( const char* file, const long line );
 
 // Change to a user defined allocation function. These redirect only the rakMalloc family,
-// not operator new or the std containers; see the file comment.
+// not operator new or the std containers; see the file comment. The pointers are plain
+// globals, read by every RakNet thread unsynchronized: set them before any RakNet thread
+// starts, and restore them only after the last one has stopped.
 void RAK_DLL_EXPORT SetMalloc( void* ( *userFunction )( size_t size ) );
 void RAK_DLL_EXPORT SetRealloc( void* ( *userFunction )( void* p, size_t size ) );
 void RAK_DLL_EXPORT SetFree( void ( *userFunction )( void* p ) );
