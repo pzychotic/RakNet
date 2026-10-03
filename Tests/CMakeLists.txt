@@ -201,20 +201,20 @@ catch_discover_tests( RakNetTests
 
         # Uniform by necessity: discovered test names do not exist at configure
         # time, so a single test cannot be given its own timeout without a second
-        # TEST_SPEC'd discovery call. One number has to clear every test in both
-        # configurations.
+        # TEST_SPEC'd discovery call. One number has to clear every test in every
+        # environment the suite runs in: Release and Debug locally, and on CI GCC
+        # Release, MSVC Debug and TSAN.
         #
-        # The bound to clear is the slowest single measurement, not a product of
-        # slowest-in-Release and worst-inflation - the slowest test is not the one
-        # that inflates. Slowest anywhere is the deallocate test in Release,
-        # 169.29 s, and it is *faster* in Debug at 148.51 s; the worst Debug
-        # inflation is SecurityFunctions, 41.75 s against 22.55 s. So 300 leaves a
-        # factor of 1.77 on the worst real case.
+        # The bound to clear is the slowest single measurement. That is
+        # ManyClientsOneServerDeallocateBlocking everywhere, at 33.1-34.9 s across
+        # all five, and TSAN and Debug barely slow it because its time is fixed
+        # windows. So 120 leaves a factor of about 3.4 on the worst real case, and
+        # room for a test up to the 60 s [slow] line plus inflation.
         #
         # Deliberately on the generous side. A too-tight timeout turns a slow but
         # healthy test red, which is the exact false signal this suite exists to
         # avoid; a too-loose one only wastes seconds once. Every wait in Tests/ is
         # bounded and fails with a message of its own at its deadline, so a test
-        # reaching 300 s is a hang nothing inside the suite can explain.
-        TIMEOUT        300
+        # reaching 120 s is a hang nothing inside the suite can explain.
+        TIMEOUT        120
 )

@@ -31,7 +31,7 @@ is set, so the private helper is reached without widening the header.
 
 Every case runs under CompletesWithin. Against the unfixed code the first two hang, and
 that has to surface as a deadline rather than as a wrong return value, or the only
-signal would be ctest's 300 s TIMEOUT killing the whole binary.
+signal would be ctest's 120 s TIMEOUT killing the whole binary.
 */
 
 using namespace RakNet;
