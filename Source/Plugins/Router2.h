@@ -67,8 +67,11 @@ public:
     void SetSocketFamily( unsigned short _socketFamily );
 
     /// \brief Query all connected systems to connect through them to a third system.
-    /// System will return ID_ROUTER_2_FORWARDING_NO_PATH if unable to connect.
+    /// System will return ID_ROUTER_2_FORWARDING_NO_PATH if unable to connect, including when
+    /// connected to nobody.
     /// Else you will get ID_ROUTER_2_FORWARDING_ESTABLISHED
+    /// A call while a request for the same endpoint is in progress adds nothing: that request's
+    /// answer is the answer.
     ///
     /// On ID_ROUTER_2_FORWARDING_ESTABLISHED, EstablishRouting as follows:
     ///
@@ -201,6 +204,8 @@ protected:
     bool OnForwardingSuccess( Packet* packet );
     int GetLargestPingAmongConnectedSystems( void ) const;
     void ReturnToUser( MessageID messageId, RakNetGUID endpointGuid, const SystemAddress& systemAddress, bool wasGeneratedLocally );
+    // ID_CONNECTION_LOST for a live connection, else ID_ROUTER_2_FORWARDING_NO_PATH
+    void ReturnNoRoute( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure );
     bool ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure );
 
     UDPForwarder* udpForwarder;

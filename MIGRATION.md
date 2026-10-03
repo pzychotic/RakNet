@@ -669,6 +669,16 @@ a third of a second without calling `Receive` lost the route. The margin is now 
 that really can't be made is reported that much later, and a source with several routers
 spends that much longer on a dead one before trying the next.
 
+**A Source with no Intermediary to ask hears so at once.** Stock's `EstablishRouting` returned
+without a word when the Source was connected to nobody. When a forwarded connection lost its
+last Intermediary, stock started a re-route with no one to ask and kept it forever. The
+application heard only the forwarded connection's own `ID_CONNECTION_LOST`, once it timed
+out, and `EstablishRouting` to that Endpoint was ignored from then on. Now Router2 reports
+the first with `ID_ROUTER_2_FORWARDING_NO_PATH` and the second with `ID_CONNECTION_LOST`,
+straight away. The forwarded connection still times out later and reports its own
+`ID_CONNECTION_LOST`, as it does after any re-route that fails. A later `EstablishRouting`
+to that Endpoint works.
+
 ## Getters answer only for open connections
 
 Stock read the connection records from your thread while the network thread was changing

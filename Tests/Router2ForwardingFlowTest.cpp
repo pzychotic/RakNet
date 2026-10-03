@@ -142,6 +142,26 @@ RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRo
     return ConnectThroughRoute( peers, source, endpoint );
 }
 
+// Whether EstablishRouting from peer would treat other as not connected.
+bool IsClosedTo( RakPeerInterface* peer, RakPeerInterface* other )
+{
+    const ConnectionState state = peer->GetConnectionState( other->GetMyGUID() );
+    return state == IS_DISCONNECTED || state == IS_NOT_CONNECTED;
+}
+
+// Closes the connection between a and b on both ends without notifying either, and waits
+// until both see it closed.
+void CloseSilently( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* a, RakPeerInterface* b )
+{
+    a->CloseConnection( b->GetMyGUID(), false );
+    b->CloseConnection( a->GetMyGUID(), false );
+    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
+    while( !( IsClosedTo( a, b ) && IsClosedTo( b, a ) ) && !ConnectionWaits::Expired( deadline ) )
+        PumpUntil( peers, []( const Received& ) { return false; }, 10 );
+    REQUIRE( IsClosedTo( a, b ) );
+    REQUIRE( IsClosedTo( b, a ) );
+}
+
 } // namespace
 
 TEST_CASE( "Router2 forwards a new connection with nothing designated", "[router2][network]" )
@@ -309,6 +329,100 @@ TEST_CASE( "Router2 forwards a connection whose endpoint answers the punch late"
     CheckReaches( peers, endpoint, source );
 
     router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
+TEST_CASE( "Router2 tells a source connected to nobody that there is no route", "[router2][network]" )
+{
+    Router2 sourcePlugin;
+
+    PeerScope scope;
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    source->AttachPlugin( &sourcePlugin );
+
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received ended = PumpUntil( { source }, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( ended.peer == source );
+    CHECK( ended.id == ID_ROUTER_2_FORWARDING_NO_PATH );
+
+    source->DetachPlugin( &sourcePlugin );
+}
+
+TEST_CASE( "Router2 tells the source a forwarded connection is lost when no Intermediary is left", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    const RakNetGUID used = Route( peers, sourcePlugin, source, endpoint );
+    REQUIRE( used == router->GetMyGUID() );
+
+    // The source is left connected to the endpoint alone, so the re-route has no one to ask.
+    // The forwarded connection itself times out only after the step budget, so any
+    // ID_CONNECTION_LOST within it is Router2's.
+    router->Shutdown( 100 );
+    peers = { source, endpoint };
+    const Received ended = PumpUntil( peers, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_REROUTED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( ended.peer == source );
+    CHECK( ended.id == ID_CONNECTION_LOST );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
+TEST_CASE( "Router2 routes again to an endpoint whose re-route found no Intermediary", "[router2][network]" )
+{
+    Router2 firstPlugin, secondPlugin, sourcePlugin, endpointPlugin;
+    firstPlugin.SetMaximumForwardingRequests( 4 );
+    secondPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* first = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* second = scope.Server( kSecondRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    first->AttachPlugin( &firstPlugin );
+    second->AttachPlugin( &secondPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    std::vector<RakPeerInterface*> peers{ first, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    REQUIRE( Route( peers, sourcePlugin, source, endpoint ) == first->GetMyGUID() );
+
+    // The re-route this starts has no one to ask.
+    first->Shutdown( 100 );
+    peers = { second, source, endpoint };
+    REQUIRE( PumpUntil( peers, source, ID_DISCONNECTION_NOTIFICATION ).peer == source );
+    CloseSilently( peers, source, endpoint );
+
+    Connect( peers, source, kSecondRouterPort );
+    Connect( peers, endpoint, kSecondRouterPort );
+    const RakNetGUID used = Route( peers, sourcePlugin, source, endpoint );
+    CHECK( used == second->GetMyGUID() );
+    CheckReaches( peers, source, endpoint );
+    CheckReaches( peers, endpoint, source );
+
+    first->DetachPlugin( &firstPlugin );
+    second->DetachPlugin( &secondPlugin );
     source->DetachPlugin( &sourcePlugin );
     endpoint->DetachPlugin( &endpointPlugin );
 }

@@ -126,84 +126,66 @@ void Router2::ClearConnectionRequests( void )
 
 bool Router2::ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure )
 {
-    int largestPing = GetLargestPingAmongConnectedSystems();
-    if( largestPing < 0 )
-    {
-        char buff[512];
-        if( debugInterface )
-            debugInterface->ShowFailure( FormatStringTS( buff, "Router2: ConnectInternal(%I64d) failed at %s:%i\n", endpointGuid.g, __FILE__, __LINE__ ) );
+    std::lock_guard<std::mutex> guard( connectionRequestsMutex );
 
-        // Not connected to anyone
-        return false;
-    }
-
-    // ALready in progress?
-    connectionRequestsMutex.lock();
+    // The request in progress gives the answer for this endpoint
     if( GetConnectionRequestIndex( endpointGuid ) != ~0u )
     {
-        connectionRequestsMutex.unlock();
         char buff[512];
         if( debugInterface )
             debugInterface->ShowFailure( FormatStringTS( buff, "Router2: ConnectInternal(%I64d) failed at %s:%i\n", endpointGuid.g, __FILE__, __LINE__ ) );
 
         return false;
     }
-    connectionRequestsMutex.unlock();
 
-    // StoreRequest(endpointGuid, Largest(ping*2), systemsSentTo). Set state REQUEST_STATE_QUERY_FORWARDING
-    Router2::ConnnectRequest* cr = RakNet::OP_NEW<Router2::ConnnectRequest>( _FILE_AND_LINE_ );
+    // Every connected System but the endpoint may be an intermediary
     std::vector<SystemAddress> addresses;
     std::vector<RakNetGUID> guids;
     rakPeerInterface->GetSystemList( addresses, guids );
+    guids.erase( std::remove( guids.begin(), guids.end(), endpointGuid ), guids.end() );
     if( guids.empty() )
     {
         char buff[512];
         if( debugInterface )
-            debugInterface->ShowFailure( FormatStringTS( buff, "Router2 failed at %s:%i\n", _FILE_AND_LINE_ ) );
+            debugInterface->ShowFailure( FormatStringTS( buff, "Router2: ConnectInternal(%I64d) has no intermediary to ask at %s:%i\n", endpointGuid.g, __FILE__, __LINE__ ) );
 
+        ReturnNoRoute( endpointGuid, returnConnectionLostOnFailure );
         return false;
     }
+
+    // StoreRequest(endpointGuid, Largest(ping*2), systemsSentTo). Set state REQUEST_STATE_QUERY_FORWARDING
+    // A connection with no ping measured yet counts as 0
+    int largestPing = GetLargestPingAmongConnectedSystems();
+    if( largestPing < 0 )
+        largestPing = 0;
+    Router2::ConnnectRequest* cr = RakNet::OP_NEW<Router2::ConnnectRequest>( _FILE_AND_LINE_ );
     cr->requestState = R2RS_REQUEST_STATE_QUERY_FORWARDING;
     cr->pingTimeout = RakNet::GetTimeMS() + largestPing * 2 + 1000;
     cr->endpointGuid = endpointGuid;
     cr->returnConnectionLostOnFailure = returnConnectionLostOnFailure;
     for( const RakNetGUID& guid : guids )
     {
-        if( guid != endpointGuid )
-        {
-            ConnectionRequestSystem crs;
-            crs.guid = guid;
-            crs.pingToEndpoint = -1;
-            cr->connectionRequestSystemsMutex.lock();
-            cr->connectionRequestSystems.emplace_back( crs );
-            cr->connectionRequestSystemsMutex.unlock();
+        ConnectionRequestSystem crs;
+        crs.guid = guid;
+        crs.pingToEndpoint = -1;
+        cr->connectionRequestSystemsMutex.lock();
+        cr->connectionRequestSystems.emplace_back( crs );
+        cr->connectionRequestSystemsMutex.unlock();
 
-            // Broadcast(ID_ROUTER_2_QUERY_FORWARDING, endpointGuid);
-            BitStream bsOut;
-            bsOut.Write( (MessageID)ID_ROUTER_2_INTERNAL );
-            bsOut.Write( (unsigned char)ID_ROUTER_2_QUERY_FORWARDING );
-            bsOut.Write( endpointGuid );
-            uint32_t pack_id = rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, crs.guid, false );
+        // Broadcast(ID_ROUTER_2_QUERY_FORWARDING, endpointGuid);
+        BitStream bsOut;
+        bsOut.Write( (MessageID)ID_ROUTER_2_INTERNAL );
+        bsOut.Write( (unsigned char)ID_ROUTER_2_QUERY_FORWARDING );
+        bsOut.Write( endpointGuid );
+        uint32_t pack_id = rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, crs.guid, false );
 
-            if( debugInterface )
-            {
-                char buff[512];
-                debugInterface->ShowDiagnostic( FormatStringTS( buff, "Router2::ConnectInternal: at %s:%i, pack_id = %d", __FILE__, __LINE__, pack_id ) );
-            }
-        }
-        else
+        if( debugInterface )
         {
-            if( debugInterface )
-            {
-                char buff[512];
-                debugInterface->ShowDiagnostic( FormatStringTS( buff, "Router2::ConnectInternal: at %s:%i [else ..].: %I64d==%I64d", __FILE__, __LINE__,
-                                                                guid.g, endpointGuid.g ) );
-            }
+            char buff[512];
+            debugInterface->ShowDiagnostic( FormatStringTS( buff, "Router2::ConnectInternal: at %s:%i, pack_id = %d", __FILE__, __LINE__, pack_id ) );
         }
     }
-    connectionRequestsMutex.lock();
     connectionRequests.emplace_back( cr );
-    connectionRequestsMutex.unlock();
 
     if( debugInterface )
     {
@@ -508,9 +490,11 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
             }
             connectionRequestsMutex.unlock();
 
-            ConnectInternal( forwardedConnectionList[forwardedConnectionIndex].endpointGuid, true );
-
-            forwardedConnectionIndex++;
+            // Without an intermediary to ask, ConnectInternal has reported the connection lost
+            if( ConnectInternal( forwardedConnectionList[forwardedConnectionIndex].endpointGuid, true ) )
+                forwardedConnectionIndex++;
+            else
+                forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
 
             if( debugInterface )
             {
@@ -651,18 +635,7 @@ bool Router2::UpdateForwarding( ConnnectRequest* connectionRequest )
         connectionRequest->connectionRequestSystemsMutex.unlock();
 
         //  printf("Router2 failed at %s:%i\n", __FILE__, __LINE__);
-        if( connectionRequest->returnConnectionLostOnFailure )
-        {
-            ReturnToUser( ID_CONNECTION_LOST, connectionRequest->endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, true ); // This is a connection which was previously established. Rerouting is not possible.
-                                                                                                                  //             bool sendDisconnectionNotification = false;
-                                                                                                                  //             rakPeerInterface->CloseConnection(rakPeerInterface->GetSystemAddressFromGuid(connectionRequest->endpointGuid), sendDisconnectionNotification);
-                                                                                                                  //             RAKNET_DEBUG_PRINTF(__FUNCTION__": call rakPeerInterface->CloseConnection(%I64d)" , connectionRequest->endpointGuid.g);
-        }
-        else
-        {
-            // Generated locally, or OnReceive drops it as a remote System's claim
-            ReturnToUser( ID_ROUTER_2_FORWARDING_NO_PATH, connectionRequest->endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, true );
-        }
+        ReturnNoRoute( connectionRequest->endpointGuid, connectionRequest->returnConnectionLostOnFailure );
 
         if( debugInterface )
         {
@@ -1418,6 +1391,15 @@ void Router2::ReturnToUser( MessageID messageId, RakNetGUID endpointGuid, const 
     p->guid = endpointGuid;
     p->wasGeneratedLocally = wasGeneratedLocally;
     rakPeerInterface->PushBackPacket( p, true );
+}
+
+void Router2::ReturnNoRoute( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure )
+{
+    // Generated locally, or OnReceive drops it as a remote System's claim
+    if( returnConnectionLostOnFailure )
+        ReturnToUser( ID_CONNECTION_LOST, endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, true ); // A live connection, which no intermediary can carry on
+    else
+        ReturnToUser( ID_ROUTER_2_FORWARDING_NO_PATH, endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, true );
 }
 
 void Router2::ClearForwardedConnections( void )
