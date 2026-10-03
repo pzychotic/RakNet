@@ -75,10 +75,22 @@ Received PumpUntil( const std::vector<RakPeerInterface*>& peers, RakPeerInterfac
     return PumpUntil( peers, [peer, id]( const Received& each ) { return each.peer == peer && each.id == id; } );
 }
 
+// Returns once both ends hold the connection. The client is accepted before the server
+// finishes its side, and an Intermediary turns down a query for an Endpoint it has no ping
+// to yet.
 void Connect( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* client, unsigned short port )
 {
     REQUIRE( client->Connect( "127.0.0.1", port, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( PumpUntil( peers, client, ID_CONNECTION_REQUEST_ACCEPTED ).peer == client );
+    bool accepted = false;
+    bool incoming = false;
+    const Received last = PumpUntil( peers, [&]( const Received& each ) {
+        if( each.peer == client && each.id == ID_CONNECTION_REQUEST_ACCEPTED )
+            accepted = true;
+        if( each.peer != client && each.id == ID_NEW_INCOMING_CONNECTION && each.guid == client->GetMyGUID() )
+            incoming = true;
+        return accepted && incoming;
+    } );
+    REQUIRE( last.peer != nullptr );
 }
 
 // Sends a user Message from one end to the other by RakNetGUID, and checks it arrives.
