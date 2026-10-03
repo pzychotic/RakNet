@@ -28,5 +28,9 @@ typedef int socklen_t;
 /// Unix/Linux uses ints for sockets
 typedef int __UDPSOCKET__;
 typedef int __TCPSOCKET__;
+/// What a failed socket() or accept() returns, and the "no socket" value. Winsock's own name for it.
+#ifndef INVALID_SOCKET
+#define INVALID_SOCKET ( -1 )
+#endif
 
 #endif

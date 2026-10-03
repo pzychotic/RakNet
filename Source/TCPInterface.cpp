@@ -57,7 +57,7 @@ TCPInterface::TCPInterface()
 {
     isStarted = 0;
     threadRunning = 0;
-    listenSocket = 0;
+    listenSocket = INVALID_SOCKET;
     remoteClients = 0;
     remoteClientsLength = 0;
     maxIncomingBytesPerClient = DEFAULT_MAXIMUM_INCOMING_BYTES_PER_CLIENT;
@@ -94,7 +94,7 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
     (void)socketFamily;
 #if RAKNET_SUPPORT_IPV6 != 1
     listenSocket = socket__( AF_INET, SOCK_STREAM, 0 );
-    if( (int)listenSocket == -1 )
+    if( listenSocket == INVALID_SOCKET )
         return false;
 
     struct sockaddr_in serverAddress;
@@ -133,7 +133,7 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
         // Open socket. The address type depends on what
         // getaddrinfo() gave us.
         listenSocket = socket__( aip->ai_family, aip->ai_socktype, aip->ai_protocol );
-        if( listenSocket != 0 )
+        if( listenSocket != INVALID_SOCKET )
         {
             int ret = bind__( listenSocket, aip->ai_addr, (int)aip->ai_addrlen );
             if( ret >= 0 )
@@ -143,12 +143,12 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
             else
             {
                 closesocket__( listenSocket );
-                listenSocket = 0;
+                listenSocket = INVALID_SOCKET;
             }
         }
     }
 
-    if( listenSocket == 0 )
+    if( listenSocket == INVALID_SOCKET )
         return false;
 
     SocketLayer::SetSocketOptions( listenSocket, false, false );
@@ -183,7 +183,7 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
     remoteClientsLength = maxConnections;
     remoteClients = RakNet::OP_NEW_ARRAY<RemoteClient>( maxConnections, _FILE_AND_LINE_ );
 
-    listenSocket = 0;
+    listenSocket = INVALID_SOCKET;
     if( maxIncomingConnections > 0 )
     {
         CreateListenSocket( port, maxIncomingConnections, socketFamily, bindAddress );
@@ -224,7 +224,7 @@ void TCPInterface::Stop( void )
 
     isStarted--;
 
-    if( listenSocket != 0 )
+    if( listenSocket != INVALID_SOCKET )
     {
 #ifdef _WIN32
         shutdown__( listenSocket, SD_BOTH );
@@ -253,15 +253,14 @@ void TCPInterface::Stop( void )
 
     // Closed only once the update thread is gone, so it never accepts on a descriptor
     // number that has been released for reuse.
-    if( listenSocket != 0 )
+    if( listenSocket != INVALID_SOCKET )
         closesocket__( listenSocket );
-    listenSocket = 0;
+    listenSocket = INVALID_SOCKET;
 
     // Stuff from here on to the end of the function is not threadsafe
     for( int i = 0; i < remoteClientsLength; i++ )
     {
-        // 0 is an unused entry. On POSIX it is also stdin, so it must not be closed.
-        if( remoteClients[i].socket != 0 )
+        if( remoteClients[i].socket != INVALID_SOCKET )
             closesocket__( remoteClients[i].socket );
 #if OPEN_SSL_CLIENT_SUPPORT == 1
         remoteClients[i].FreeSSL();
@@ -458,7 +457,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         systemAddress.ToString( false, buffout );
 
         __TCPSOCKET__ sockfd = SocketConnect( buffout, remotePort, socketFamily, bindAddress );
-        if( sockfd == 0 )
+        if( sockfd == INVALID_SOCKET )
         {
             // Released here rather than left to the end of the scope, so the slot is free
             // by the time the application can observe the failure and retry.
@@ -963,11 +962,11 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     struct hostent* server;
     server = gethostbyname( host );
     if( server == NULL )
-        return 0;
+        return INVALID_SOCKET;
 
     __TCPSOCKET__ sockfd = socket__( AF_INET, SOCK_STREAM, 0 );
-    if( sockfd < 0 )
-        return 0;
+    if( sockfd == INVALID_SOCKET )
+        return INVALID_SOCKET;
 
     memset( &serverAddress, 0, sizeof( serverAddress ) );
     serverAddress.sin_family = AF_INET;
@@ -1009,9 +1008,14 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     *portRes.ptr = '\0';
 
     if( getaddrinfo( host, portStr, &hints, &res ) != 0 )
-        return 0;
+        return INVALID_SOCKET;
 
     sockfd = socket__( res->ai_family, res->ai_socktype, res->ai_protocol );
+    if( sockfd == INVALID_SOCKET )
+    {
+        freeaddrinfo( res );
+        return INVALID_SOCKET;
+    }
     blockingSocketListMutex.lock();
     blockingSocketList.push_back( sockfd );
     blockingSocketListMutex.unlock();
@@ -1030,12 +1034,12 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     blockingSocketListMutex.unlock();
 
     if( isAbortedByStop )
-        return 0;
+        return INVALID_SOCKET;
 
     if( connectResult == -1 )
     {
         closesocket__( sockfd );
-        return 0;
+        return INVALID_SOCKET;
     }
 
     return sockfd;
@@ -1058,7 +1062,7 @@ void ConnectionAttemptLoop( void* arg )
     char str1[64];
     systemAddress.ToString( false, str1 );
     __TCPSOCKET__ sockfd = tcpInterface->SocketConnect( str1, systemAddress.GetPort(), socketFamily, bindAddress );
-    if( sockfd == 0 )
+    if( sockfd == INVALID_SOCKET )
     {
         tcpInterface->ReleaseRemoteClient( newRemoteClientIndex );
 
@@ -1164,7 +1168,7 @@ void UpdateTCPInterfaceLoop( void* arg )
             FD_ZERO( &exceptionFD );
             FD_ZERO( &writeFD );
             largestDescriptor = 0;
-            if( sts->listenSocket != 0 )
+            if( sts->listenSocket != INVALID_SOCKET )
             {
                 FD_SET( sts->listenSocket, &readFD );
                 FD_SET( sts->listenSocket, &exceptionFD );
@@ -1177,9 +1181,10 @@ void UpdateTCPInterfaceLoop( void* arg )
                 std::lock_guard<std::mutex> guard( sts->remoteClients[i].isActiveMutex );
                 if( sts->remoteClients[i].isActive )
                 {
-                    // calling FD_ISSET with -1 as socket (that's what 0 is set to) produces a bus error under Linux 64-Bit
+                    // An active entry whose connect is still in progress has no socket yet.
+                    // FD_SET and FD_ISSET abort on INVALID_SOCKET under glibc.
                     __TCPSOCKET__ socketCopy = sts->remoteClients[i].socket;
-                    if( socketCopy != 0 )
+                    if( socketCopy != INVALID_SOCKET )
                     {
                         // At the incoming cap the socket is not read, so TCP flow control
                         // holds the client back until Receive drains what it sent.
@@ -1199,13 +1204,13 @@ void UpdateTCPInterfaceLoop( void* arg )
             if( selectResult <= 0 )
                 break;
 
-            if( sts->listenSocket != 0 && FD_ISSET( sts->listenSocket, &readFD ) )
+            if( sts->listenSocket != INVALID_SOCKET && FD_ISSET( sts->listenSocket, &readFD ) )
             {
                 newSock = accept__( sts->listenSocket, (sockaddr*)&sockAddr, (socklen_t*)&sockAddrSize );
 
-                // -1 is a failed accept, which Stop shutting down the listen socket under
-                // select produces. Stored, it would reach FD_SET, which aborts on it under glibc.
-                if( newSock != 0 && (int)newSock != -1 )
+                // INVALID_SOCKET is a failed accept, which Stop shutting down the listen socket
+                // under select produces. Stored, it would reach FD_SET, which aborts on it under glibc.
+                if( newSock != INVALID_SOCKET )
                 {
                     // "Table is full" is the handle's answer, so there is no index one past
                     // the end of the array in play here. The writes below happen while the
@@ -1262,7 +1267,7 @@ void UpdateTCPInterfaceLoop( void* arg )
 #endif
                 }
             }
-            else if( sts->listenSocket != 0 && FD_ISSET( sts->listenSocket, &exceptionFD ) )
+            else if( sts->listenSocket != INVALID_SOCKET && FD_ISSET( sts->listenSocket, &exceptionFD ) )
             {
 #ifdef _DO_PRINTF
                 int err;
@@ -1281,9 +1286,10 @@ void UpdateTCPInterfaceLoop( void* arg )
                         i++;
                         continue;
                     }
-                    // calling FD_ISSET with -1 as socket (that's what 0 is set to) produces a bus error under Linux 64-Bit
+                    // An active entry whose connect is still in progress has no socket yet.
+                    // FD_SET and FD_ISSET abort on INVALID_SOCKET under glibc.
                     __TCPSOCKET__ socketCopy = sts->remoteClients[i].socket;
-                    if( socketCopy == 0 )
+                    if( socketCopy == INVALID_SOCKET )
                     {
                         i++;
                         continue;
@@ -1416,10 +1422,10 @@ void RemoteClient::SetActive( bool a )
     {
         isActive = a;
         Reset();
-        if( isActive == false && socket != 0 )
+        if( isActive == false && socket != INVALID_SOCKET )
         {
             closesocket__( socket );
-            socket = 0;
+            socket = INVALID_SOCKET;
         }
     }
 }

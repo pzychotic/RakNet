@@ -283,7 +283,8 @@ protected:
     ///   can block for as long as the network takes, and the update loop takes every
     ///   entry's isActiveMutex on each pass - holding one across a connect would stall the
     ///   whole interface. It is safe because the select loop skips an active entry whose
-    ///   socket is still 0; see the socketCopy != 0 check in UpdateTCPInterfaceLoop.
+    ///   socket is still INVALID_SOCKET; see the socketCopy != INVALID_SOCKET check in
+    ///   UpdateTCPInterfaceLoop.
     class RemoteClientSlot
     {
     public:
@@ -352,7 +353,7 @@ struct RemoteClient
         ssl = 0;
 #endif
         isActive = false;
-        socket = 0;
+        socket = INVALID_SOCKET;
         incomingBytesQueued = 0;
         isOverOutgoingCap = false;
     }

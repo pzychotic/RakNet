@@ -27,10 +27,6 @@
 #include <chrono>
 #include <thread>
 
-#ifndef INVALID_SOCKET
-#define INVALID_SOCKET -1
-#endif
-
 namespace RakNet {
 
 static const unsigned short DEFAULT_MAX_FORWARD_ENTRIES = 64;

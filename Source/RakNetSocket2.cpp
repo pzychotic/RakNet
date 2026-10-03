@@ -37,10 +37,6 @@
 #include "RakNetSocket2_Berkley.cpp"
 #undef RAKNET_SOCKET_2_INLINE_FUNCTIONS
 
-#ifndef INVALID_SOCKET
-#define INVALID_SOCKET -1
-#endif
-
 namespace RakNet {
 
 RakNetSocket2* RakNetSocket2Allocator::AllocRNS2( void )
