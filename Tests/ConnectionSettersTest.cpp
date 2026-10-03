@@ -40,12 +40,12 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kTimeoutServerPort = 62180;
-constexpr unsigned short kTimeoutClientBasePort = 62181;
-constexpr unsigned short kProgressServerPort = 62190;
-constexpr unsigned short kProgressClientPort = 62191;
-constexpr unsigned short kSimulatorServerPort = 62200;
-constexpr unsigned short kSimulatorClientPort = 62201;
+constexpr unsigned short kTimeoutServerPort = 32180;
+constexpr unsigned short kTimeoutClientBasePort = 32181;
+constexpr unsigned short kProgressServerPort = 32190;
+constexpr unsigned short kProgressClientPort = 32191;
+constexpr unsigned short kSimulatorServerPort = 32200;
+constexpr unsigned short kSimulatorClientPort = 32201;
 
 // Hang guard for every wait below, not a settle time: each normally ends within a few
 // hundred milliseconds.

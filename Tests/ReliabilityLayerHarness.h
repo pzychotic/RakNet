@@ -24,7 +24,7 @@ namespace ReliabilityLayerHarness {
 using namespace RakNet;
 
 constexpr int kMTUSize = 1492;
-constexpr unsigned short kUnusedPeerPort = 60001;
+constexpr unsigned short kUnusedPeerPort = 30001;
 
 // Any splitPacketId, arbitrary: nothing in the layer treats a particular value
 // specially, it only has to be consistent within one message.

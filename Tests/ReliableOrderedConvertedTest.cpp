@@ -49,7 +49,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kReceiverPort = 60000;
+constexpr unsigned short kReceiverPort = 30000;
 
 // Only one connection is ever made; the number is what the test was measured at.
 constexpr unsigned int kReceiverMaxConnections = 32;

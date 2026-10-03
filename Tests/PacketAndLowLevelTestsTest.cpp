@@ -45,7 +45,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 // Large enough to be split by any plausible MTU, which is what makes
 // ID_DOWNLOAD_PROGRESS fire.

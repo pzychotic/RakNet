@@ -40,7 +40,7 @@ namespace {
 
 // TCP, so it shares no space with the UDP ports the rest of the suite hardcodes; distinct
 // from them regardless, so a stray listener is never ambiguous about which test left it.
-constexpr unsigned short kListenPort = 61010;
+constexpr unsigned short kListenPort = 31010;
 
 // A connect to a listening socket on loopback is immediate; this only has to be longer than
 // a scheduler hiccup, and is generous so a loaded machine cannot turn a pass into a failure.

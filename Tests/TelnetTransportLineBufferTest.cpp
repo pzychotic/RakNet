@@ -42,15 +42,15 @@ using namespace RakNet;
 
 namespace {
 
-// TCP, past the 61030-61033 that TelnetTransportReconnectTest.cpp takes. CreateListenSocket
+// TCP, past the 31030-31033 that TelnetTransportReconnectTest.cpp takes. CreateListenSocket
 // does not set SO_REUSEADDR before it binds, so no port is shared between cases.
-constexpr unsigned short kUpArrowListenPort = 61034;
-constexpr unsigned short kFullLineListenPort = 61035;
-constexpr unsigned short kUpArrowLeakListenPort = 61036;
-constexpr unsigned short kTwoLinesListenPort = 61044;
-constexpr unsigned short kSplitLineListenPort = 61045;
-constexpr unsigned short kManyLinesListenPort = 61046;
-constexpr unsigned short kQueuedAtStopListenPort = 61047;
+constexpr unsigned short kUpArrowListenPort = 31034;
+constexpr unsigned short kFullLineListenPort = 31035;
+constexpr unsigned short kUpArrowLeakListenPort = 31036;
+constexpr unsigned short kTwoLinesListenPort = 31044;
+constexpr unsigned short kSplitLineListenPort = 31045;
+constexpr unsigned short kManyLinesListenPort = 31046;
+constexpr unsigned short kQueuedAtStopListenPort = 31047;
 
 // Loopback, so every wait here is over as soon as the threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.

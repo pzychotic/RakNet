@@ -37,7 +37,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 // Polls server until it hands up an ID_DISCONNECTION_NOTIFICATION from guid,
 // deallocating everything else, or the deadline passes.

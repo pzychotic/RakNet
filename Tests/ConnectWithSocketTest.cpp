@@ -44,7 +44,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 /*
  *  ConnectWithSocket is fire-and-forget, so this polls: retry whenever the client

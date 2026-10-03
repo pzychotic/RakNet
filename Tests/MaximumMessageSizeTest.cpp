@@ -43,7 +43,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kUnusedPeerPort = 60001;
+constexpr unsigned short kUnusedPeerPort = 30001;
 
 // What the derivation is expected to produce in a default build: 65536 * ( 576 - 28 - 9 - 23 ).
 // Written out rather than recomputed from the expression the header uses, so a change to that

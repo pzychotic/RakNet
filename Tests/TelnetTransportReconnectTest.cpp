@@ -46,10 +46,10 @@ namespace {
 // distinct from the TCPInterface tests' ports so a stray listener is never ambiguous about
 // which test left it. CreateListenSocket does not set SO_REUSEADDR before it binds, so no
 // port is shared between cases.
-constexpr unsigned short kReconnectListenPort = 61030;
-constexpr unsigned short kReconnectClientPort = 61031;
-constexpr unsigned short kLostFirstListenPort = 61032;
-constexpr unsigned short kLostFirstClientPort = 61033;
+constexpr unsigned short kReconnectListenPort = 31030;
+constexpr unsigned short kReconnectClientPort = 31031;
+constexpr unsigned short kLostFirstListenPort = 31032;
+constexpr unsigned short kLostFirstClientPort = 31033;
 
 // Loopback, so every wait here is over as soon as the threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.

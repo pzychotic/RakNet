@@ -41,7 +41,7 @@ namespace
 // TEST-NET-1 (RFC 5737), which is never assigned to a host, so binding to it fails.
 const char* const kUnboundIP = "192.0.2.1";
 
-const unsigned short kServerPort = 60000;
+const unsigned short kServerPort = 30000;
 const TimeMS kResultBudgetMs = 5000;
 
 class ExposedServer : public NatTypeDetectionServer

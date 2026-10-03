@@ -43,8 +43,8 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
-constexpr unsigned short kClientPort = 60001;
+constexpr unsigned short kServerPort = 30000;
+constexpr unsigned short kClientPort = 30001;
 
 } // namespace
 

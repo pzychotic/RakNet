@@ -43,7 +43,7 @@ SetMaximumIncomingConnections, Receive, DeallocatePacket.
 
 This is PeerConnectDisconnect plus the cancel, and everything the two have in
 common is deliberately identical in both files: the same eight peers on
-60000-60007, the same connection cap of three times the peer count, the same
+30000-30007, the same connection cap of three times the peer count, the same
 ten-second churn, the same shared waits.
 
 THE CANCEL IS THE POINT OF THIS TEST, so it is given something to cancel and
@@ -101,7 +101,7 @@ using namespace RakNet;
 namespace {
 
 constexpr int kPeerNum = 8;
-constexpr unsigned short kBasePort = 60000;
+constexpr unsigned short kBasePort = 30000;
 
 // Startup slot count and incoming limit both.
 constexpr unsigned int kMaxConnections = kPeerNum * 3;

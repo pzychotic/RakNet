@@ -43,8 +43,8 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kAdvertiserPort = 60001;
-constexpr unsigned short kListenerPort = 60002;
+constexpr unsigned short kAdvertiserPort = 30001;
+constexpr unsigned short kListenerPort = 30002;
 
 constexpr char kOfflinePingResponse[] = "Offline Ping Data";
 constexpr char kAdvertisedData[] = "hello world";

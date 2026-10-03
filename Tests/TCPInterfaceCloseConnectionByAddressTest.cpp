@@ -44,9 +44,9 @@ namespace {
 // distinguishable from another by the address it was made to; one for the second. CreateListenSocket
 // does not set SO_REUSEADDR before it binds, so no port is shared between cases: a TIME_WAIT
 // left by one could fail the next one's Start for no reason of its own.
-constexpr unsigned short kStaleIndexPortA = 61021;
-constexpr unsigned short kStaleIndexPortB = 61022;
-constexpr unsigned short kUnsetIndexPort = 61023;
+constexpr unsigned short kStaleIndexPortA = 31021;
+constexpr unsigned short kStaleIndexPortB = 31022;
+constexpr unsigned short kUnsetIndexPort = 31023;
 
 // Loopback, so every wait here is over as soon as the two threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.

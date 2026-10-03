@@ -50,7 +50,7 @@ public:
 
     // A started peer with its incoming limit set to maxConnections, and Startup's
     // result asserted.
-    RakNet::RakPeerInterface* Server( unsigned short port = 60000, unsigned int maxConnections = 1 );
+    RakNet::RakPeerInterface* Server( unsigned short port = 30000, unsigned int maxConnections = 1 );
 
     // The same, without the incoming limit. port 0 = ephemeral.
     RakNet::RakPeerInterface* Client( unsigned short port = 0, unsigned int maxConnections = 1 );

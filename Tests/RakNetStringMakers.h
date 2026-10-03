@@ -14,7 +14,7 @@
  *      CHECK( client->GetSystemAddressFromIndex( 0 ) == serverAddress )
  *
  *  fails with "{?} == {?}". With it the same failure reads
- *  "127.0.0.1|60002 == 127.0.0.1|60000" and the bug is on the screen.
+ *  "127.0.0.1|30002 == 127.0.0.1|30000" and the bug is on the screen.
  *
  *  Tests/CMakeLists.txt force-includes this into every RakNetTests TU, and it has
  *  to: a specialization is the same symbol as the primary template's

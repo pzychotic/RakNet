@@ -30,7 +30,7 @@
 #include <vector>
 
 /*
-Ten peers on 60000-60009 spend ten seconds being shuffled by a seeded random
+Ten peers on 30000-30009 spend ten seconds being shuffled by a seeded random
 driver: which peer acts, which peer it targets, and whether it connects, closes,
 broadcasts or sends directed traffic, pings on or offline, reads its connection
 list or reads statistics. The subject is not any one of those calls. It is
@@ -117,7 +117,7 @@ GetConnectionList half as many draws again.
 
 Drawing a connect target as randomMT() % kPeerNum with no exclusion makes one
 attempt in ten a peer connecting to 127.0.0.1 on its own port. RakNet allows it:
-measured, peer 0 completes the connection and then lists port 60000 - itself - in
+measured, peer 0 completes the connection and then lists port 30000 - itself - in
 its own system list, which fires the "never itself" assertion below with 0 != 0.
 
 Suppressed here, deliberately. A peer connected to itself is not an edge of the
@@ -144,7 +144,7 @@ using namespace RakNet;
 namespace {
 
 constexpr int kPeerNum = 10;
-constexpr unsigned short kBasePort = 60000;
+constexpr unsigned short kBasePort = 30000;
 
 // Binds far more loosely than it reads - see MaximumConnectTest's header for why
 // an incoming limit of four does not hold a peer to four connections - which is

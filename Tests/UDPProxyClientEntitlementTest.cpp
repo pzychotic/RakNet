@@ -35,11 +35,11 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kClientPort = 60000;
-constexpr unsigned short kCoordinatorPort = 60001;
-constexpr unsigned short kListenerPort = 60003;
+constexpr unsigned short kClientPort = 30000;
+constexpr unsigned short kCoordinatorPort = 30001;
+constexpr unsigned short kListenerPort = 30003;
 // Nothing listens here or on the port after it.
-constexpr unsigned short kSilentPort = 60010;
+constexpr unsigned short kSilentPort = 30010;
 
 // Hang guard for the marker Message and for a pong. On loopback each arrives a few update
 // cycles after the send, tens of milliseconds.

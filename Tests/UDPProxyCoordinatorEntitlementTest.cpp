@@ -37,7 +37,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kCoordinatorPort = 60000;
+constexpr unsigned short kCoordinatorPort = 30000;
 
 // Hang guard for the marker Message and for a reply. On loopback each arrives a few update
 // cycles after the send, tens of milliseconds.

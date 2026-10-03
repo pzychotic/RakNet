@@ -33,7 +33,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 // Hang guard for the marker Message. On loopback it arrives a few update cycles after the
 // send, tens of milliseconds.
@@ -94,7 +94,7 @@ TEST_CASE( "Router2 consumes a forwarding success for an endpoint it never asked
     BitStream forged;
     forged.Write( (MessageID)ID_ROUTER_2_FORWARDING_ESTABLISHED );
     forged.Write( RakNetGUID( 1001 ) );
-    forged.Write( (unsigned short)40000 );
+    forged.Write( (unsigned short)25000 );
     client->Send( &forged, HIGH_PRIORITY, RELIABLE_ORDERED, 0, serverAddress, false );
 
     BitStream marker;

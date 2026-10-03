@@ -49,7 +49,7 @@ public:
     explicit RawPacket( std::vector<unsigned char> data, const char* address = "1.2.3.4" )
     : bytes( std::move( data ) )
     {
-        packet.systemAddress = SystemAddress( address, 60000 );
+        packet.systemAddress = SystemAddress( address, 30000 );
         packet.guid = UNASSIGNED_RAKNET_GUID;
         packet.length = static_cast<unsigned int>( bytes.size() );
         packet.bitSize = BYTES_TO_BITS( packet.length );

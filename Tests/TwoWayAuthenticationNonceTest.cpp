@@ -33,7 +33,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kAuthPort = 61070;
+constexpr unsigned short kAuthPort = 31070;
 constexpr TimeMS kStepBudgetMs = 5000;
 constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
 // TwoWayAuthentication.cpp's NegotiationIdentifiers

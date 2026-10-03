@@ -39,11 +39,11 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kCoordinatorPort = 60000;
-constexpr unsigned short kProxyServerPort = 60001;
-constexpr unsigned short kSourcePort = 60002;
-constexpr unsigned short kTargetPort = 60003;
-constexpr unsigned short kSecondProxyServerPort = 60004;
+constexpr unsigned short kCoordinatorPort = 30000;
+constexpr unsigned short kProxyServerPort = 30001;
+constexpr unsigned short kSourcePort = 30002;
+constexpr unsigned short kTargetPort = 30003;
+constexpr unsigned short kSecondProxyServerPort = 30004;
 
 // Hang guard for each step. On loopback each takes a few update cycles, tens of
 // milliseconds.

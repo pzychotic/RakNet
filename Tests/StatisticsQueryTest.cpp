@@ -46,19 +46,19 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kAgreeServerPort = 62100;
-constexpr unsigned short kAgreeClientPort = 62101;
-constexpr unsigned short kConcurrentServerPort = 62110;
-constexpr unsigned short kConcurrentSmallClientPort = 62111;
-constexpr unsigned short kConcurrentLargeClientPort = 62112;
-constexpr unsigned short kTimeoutServerPort = 62120;
-constexpr unsigned short kTimeoutClientPort = 62121;
-constexpr unsigned short kInlineServerPort = 62130;
-constexpr unsigned short kInlineClientPort = 62131;
-constexpr unsigned short kShutdownServerPort = 62140;
-constexpr unsigned short kShutdownClientPort = 62141;
-constexpr unsigned short kAfterShutdownServerPort = 62150;
-constexpr unsigned short kAfterShutdownClientPort = 62151;
+constexpr unsigned short kAgreeServerPort = 32100;
+constexpr unsigned short kAgreeClientPort = 32101;
+constexpr unsigned short kConcurrentServerPort = 32110;
+constexpr unsigned short kConcurrentSmallClientPort = 32111;
+constexpr unsigned short kConcurrentLargeClientPort = 32112;
+constexpr unsigned short kTimeoutServerPort = 32120;
+constexpr unsigned short kTimeoutClientPort = 32121;
+constexpr unsigned short kInlineServerPort = 32130;
+constexpr unsigned short kInlineClientPort = 32131;
+constexpr unsigned short kShutdownServerPort = 32140;
+constexpr unsigned short kShutdownClientPort = 32141;
+constexpr unsigned short kAfterShutdownServerPort = 32150;
+constexpr unsigned short kAfterShutdownClientPort = 32151;
 
 // Hang guard for each wait below.
 constexpr TimeMS kWaitBudgetMs = 10000;

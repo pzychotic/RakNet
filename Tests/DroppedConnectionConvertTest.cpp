@@ -71,7 +71,7 @@ namespace {
 
 constexpr int kNumberOfClients = 9;
 
-// 20000 for the server, 20001-20009 for the clients - not the 60000s most of the
+// 20000 for the server, 20001-20009 for the clients - not the 30000s most of the
 // suite binds. Harmless: the ctest RESOURCE_LOCK is one global lock and
 // serialises every test whichever port it takes.
 constexpr unsigned short kServerPort = 20000;

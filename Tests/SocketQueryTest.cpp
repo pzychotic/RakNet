@@ -39,13 +39,13 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kListFirstPort = 62300;
-constexpr unsigned short kListSecondPort = 62301;
-constexpr unsigned short kConnectionServerFirstPort = 62310;
-constexpr unsigned short kConnectionServerSecondPort = 62311;
-constexpr unsigned short kConnectionClientPort = 62312;
-constexpr unsigned short kIndexFirstPort = 62320;
-constexpr unsigned short kIndexSecondPort = 62321;
+constexpr unsigned short kListFirstPort = 32300;
+constexpr unsigned short kListSecondPort = 32301;
+constexpr unsigned short kConnectionServerFirstPort = 32310;
+constexpr unsigned short kConnectionServerSecondPort = 32311;
+constexpr unsigned short kConnectionClientPort = 32312;
+constexpr unsigned short kIndexFirstPort = 32320;
+constexpr unsigned short kIndexSecondPort = 32321;
 
 // Hang guard for the connection wait.
 constexpr TimeMS kWaitBudgetMs = 10000;

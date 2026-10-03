@@ -43,7 +43,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kFacilitatorPort = 60000;
+constexpr unsigned short kFacilitatorPort = 30000;
 
 // Hang guard for the three requests. On loopback they arrive a few update
 // cycles after the answer, tens of milliseconds.

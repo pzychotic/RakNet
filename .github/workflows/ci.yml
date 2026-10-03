@@ -61,7 +61,12 @@ jobs:
       - name: Build
         run: cmake --build build --config ${{ matrix.config }} --parallel
       - name: Test
+        id: test
         run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure --no-tests=error
+      # Shows what held a port when a test's Startup failed with SOCKET_PORT_ALREADY_IN_USE.
+      - name: Dump sockets
+        if: failure() && steps.test.outcome == 'failure' && runner.os == 'Windows'
+        run: netstat -ano
 
   # FLIP_SEND_ORDER_TEST reverses the order of sends delayed by simulated latency. It sits
   # inside an #ifdef _DEBUG block, so it gets one cell on MSVC Debug, the only configuration
@@ -78,7 +83,11 @@ jobs:
       - name: Build
         run: cmake --build build --config Debug --parallel
       - name: Test
+        id: test
         run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
+      - name: Dump sockets
+        if: failure() && steps.test.outcome == 'failure'
+        run: netstat -ano
 
   # RAKPEER_USER_THREADED=1: the application runs RakPeer's update cycles itself. Most
   # network tests depend on the network thread and fail in this mode. StatisticsQueryTest and
@@ -97,9 +106,13 @@ jobs:
       - name: Build
         run: cmake --build build --config Debug --parallel --target RakNetTests
       - name: Test
+        id: test
         working-directory: build/Tests
         timeout-minutes: 10
         run: ./Debug/RakNetTests.exe '-#' '[#StatisticsQueryTest],[#SocketQueryTest]'
+      - name: Dump sockets
+        if: failure() && steps.test.outcome == 'failure'
+        run: netstat -ano
 
   # ADR-0007: no getter races the network thread. A test can show that the answers are
   # coherent, but a race can give coherent answers by luck. Only ThreadSanitizer shows that

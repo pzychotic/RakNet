@@ -397,7 +397,7 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
 {
     using namespace RawSystemHarness;
 
-    constexpr unsigned short kServerPort = 60000;
+    constexpr unsigned short kServerPort = 30000;
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF12345679ull;
     constexpr RakNet::TimeMS kBudgetMs = 5000;
 
@@ -451,7 +451,7 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
 {
     using namespace RawSystemHarness;
 
-    constexpr unsigned short kServerPort = 60000;
+    constexpr unsigned short kServerPort = 30000;
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF1234567Aull;
     constexpr unsigned int kChunks = 20;
 

@@ -197,6 +197,11 @@ catch_discover_tests( RakNetTests
     PROPERTIES
         # Ports are hardcoded across ~70 call sites and are one global resource,
         # so no two tests may run at once. Makes -j safe, not faster.
+        #
+        # Fixed ports sit below 32768, under both Windows' dynamic range
+        # (49152-65535) and Linux's ephemeral range (32768-60999), so no outgoing
+        # connection on the machine can be holding one. New tests bind port 0 and
+        # read the port back with GetMyBoundAddress.
         RESOURCE_LOCK  raknet_udp_ports
 
         # Uniform by necessity: discovered test names do not exist at configure

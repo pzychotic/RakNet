@@ -44,7 +44,7 @@ using namespace RakNet;
 
 namespace {
 
-// 1234, not the 60000-60007 the rest of the suite binds. Harmless: the ctest
+// 1234, not the 30000s most of the suite binds. Harmless: the ctest
 // RESOURCE_LOCK serialises every test regardless of which port it takes.
 constexpr unsigned short kServerPort = 1234;
 

@@ -26,8 +26,8 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kServerPort = 62400;
-constexpr unsigned short kClientPort = 62401;
+constexpr unsigned short kServerPort = 32400;
+constexpr unsigned short kClientPort = 32401;
 
 // Hang guard for each wait, not a settle time: each normally ends within a second.
 constexpr TimeMS kWaitBudgetMs = 10000;

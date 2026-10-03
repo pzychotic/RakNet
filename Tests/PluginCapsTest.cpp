@@ -52,12 +52,12 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kRelayPort = 61060;
-constexpr unsigned short kCoordinatorPort = 61061;
-constexpr unsigned short kProxyClientPort = 61062;
-constexpr unsigned short kAuthPort = 61063;
+constexpr unsigned short kRelayPort = 31060;
+constexpr unsigned short kCoordinatorPort = 31061;
+constexpr unsigned short kProxyClientPort = 31062;
+constexpr unsigned short kAuthPort = 31063;
 // Nothing listens here.
-constexpr unsigned short kSilentPort = 61069;
+constexpr unsigned short kSilentPort = 31069;
 
 // Hang guard for the marker Message and for a reply. On loopback each arrives a few update
 // cycles after the send, tens of milliseconds.

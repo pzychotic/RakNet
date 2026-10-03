@@ -67,12 +67,12 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kClosedServerPort = 62000;
-constexpr unsigned short kClosedClientPort = 62001;
-constexpr unsigned short kChurnServerPort = 62010;
-constexpr unsigned short kChurnClientBasePort = 62011;
-constexpr unsigned short kPingServerPort = 62020;
-constexpr unsigned short kPingClientPort = 62021;
+constexpr unsigned short kClosedServerPort = 32000;
+constexpr unsigned short kClosedClientPort = 32001;
+constexpr unsigned short kChurnServerPort = 32010;
+constexpr unsigned short kChurnClientBasePort = 32011;
+constexpr unsigned short kPingServerPort = 32020;
+constexpr unsigned short kPingClientPort = 32021;
 
 // What GetLastPing and GetLowestPing answer for a connection no pong has reached yet.
 constexpr int kNoPingYet = 65535;

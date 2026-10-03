@@ -67,7 +67,7 @@ using namespace RakNet;
 namespace {
 
 constexpr int kPeerNum = 8;
-constexpr unsigned short kBasePort = 60000;
+constexpr unsigned short kBasePort = 30000;
 
 // Startup slot count and incoming limit both.
 constexpr unsigned int kMaxConnections = kPeerNum * 3;

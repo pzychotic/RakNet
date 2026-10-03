@@ -44,9 +44,9 @@ namespace {
 // connections, and CreateListenSocket does not set SO_REUSEADDR before it binds, so a
 // TIME_WAIT left by the previous case could fail the next one's Start for no reason of its
 // own.
-constexpr unsigned short kBlockingListenPort = 61011;
-constexpr unsigned short kNonBlockingListenPort = 61012;
-constexpr unsigned short kAcceptListenPort = 61013;
+constexpr unsigned short kBlockingListenPort = 31011;
+constexpr unsigned short kNonBlockingListenPort = 31012;
+constexpr unsigned short kAcceptListenPort = 31013;
 
 // Loopback, so every wait here is over as soon as the two threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.

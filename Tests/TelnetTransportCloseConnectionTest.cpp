@@ -38,13 +38,13 @@ namespace {
 
 // TCP, and distinct from every other test's ports; CreateListenSocket does not set
 // SO_REUSEADDR before it binds, so no port is shared between cases.
-constexpr unsigned short kUserCloseListenPort = 61037;
-constexpr unsigned short kUserCloseClientPort = 61038;
-constexpr unsigned short kLostQueuedListenPort = 61039;
-constexpr unsigned short kLostQueuedClientPort = 61040;
-constexpr unsigned short kReturnValueListenPort = 61041;
-constexpr unsigned short kReturnValueClientPortA = 61042;
-constexpr unsigned short kReturnValueClientPortB = 61043;
+constexpr unsigned short kUserCloseListenPort = 31037;
+constexpr unsigned short kUserCloseClientPort = 31038;
+constexpr unsigned short kLostQueuedListenPort = 31039;
+constexpr unsigned short kLostQueuedClientPort = 31040;
+constexpr unsigned short kReturnValueListenPort = 31041;
+constexpr unsigned short kReturnValueClientPortA = 31042;
+constexpr unsigned short kReturnValueClientPortB = 31043;
 
 // Loopback, so every wait here is over as soon as the threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.

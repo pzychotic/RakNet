@@ -62,7 +62,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kReceiverPort = 60000;
+constexpr unsigned short kReceiverPort = 30000;
 
 // Localhost. Command line pings to 127.0.0.1 typically come back under 1 ms,
 // so 10 ms is already a wide allowance and 100 ms is a stuck-somewhere check.

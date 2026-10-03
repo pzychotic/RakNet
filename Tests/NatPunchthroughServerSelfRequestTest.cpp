@@ -39,7 +39,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 // Hang guard for the server's answer. On loopback it arrives a few update cycles after the
 // request, tens of milliseconds.

@@ -42,12 +42,12 @@ namespace {
 
 // TCP, past every port another TCPInterface test takes. CreateListenSocket does not set
 // SO_REUSEADDR before it binds, so no port is shared between cases.
-constexpr unsigned short kOverlongListenPort = 61050;
-constexpr unsigned short kExactMaximumListenPort = 61051;
-constexpr unsigned short kBackpressureListenPort = 61052;
-constexpr unsigned short kNeverReadsListenPort = 61053;
-constexpr unsigned short kReconnectListenPort = 61054;
-constexpr unsigned short kReconnectClientPort = 61055;
+constexpr unsigned short kOverlongListenPort = 31050;
+constexpr unsigned short kExactMaximumListenPort = 31051;
+constexpr unsigned short kBackpressureListenPort = 31052;
+constexpr unsigned short kNeverReadsListenPort = 31053;
+constexpr unsigned short kReconnectListenPort = 31054;
+constexpr unsigned short kReconnectClientPort = 31055;
 
 // Loopback, so every wait here is over as soon as the threads have been scheduled once.
 // Generous so a loaded machine cannot turn a pass into a failure.

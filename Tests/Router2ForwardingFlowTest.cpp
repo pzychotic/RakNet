@@ -29,10 +29,10 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kRouterPort = 61000;
-constexpr unsigned short kSecondRouterPort = 61001;
-constexpr unsigned short kSourcePort = 61002;
-constexpr unsigned short kEndpointPort = 61003;
+constexpr unsigned short kRouterPort = 31000;
+constexpr unsigned short kSecondRouterPort = 31001;
+constexpr unsigned short kSourcePort = 31002;
+constexpr unsigned short kEndpointPort = 31003;
 
 // Hang guard for each step. On loopback each takes a few update cycles, tens of
 // milliseconds, apart from the query step, which waits for every router to answer.

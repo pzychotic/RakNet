@@ -56,7 +56,7 @@ namespace {
 
 using namespace RawSystemHarness;
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 // Hang guard on the ban, not a tuning knob: over loopback the ban lands within an update
 // cycle of the request arriving, so expiry means the Peer never decided.

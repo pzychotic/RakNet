@@ -46,7 +46,7 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
+constexpr unsigned short kServerPort = 30000;
 
 // One round trip over loopback: the client's ID_CONNECTION_REQUEST out, the
 // server's rejection back. Generous by two orders of magnitude, and a hang guard

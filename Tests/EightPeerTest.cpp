@@ -55,7 +55,7 @@ using namespace RakNet;
 namespace {
 
 constexpr int kPeerNum = 8;
-constexpr unsigned short kBasePort = 60000;
+constexpr unsigned short kBasePort = 30000;
 
 // Deliberately not equal: room for twice the peer count in total, incoming capped
 // at the peer count. Every peer needs the other seven, so neither number binds.

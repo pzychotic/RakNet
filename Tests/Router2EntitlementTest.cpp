@@ -36,9 +36,9 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 60000;
-constexpr unsigned short kIntermediaryPort = 60001;
-constexpr unsigned short kEndpointPort = 60002;
+constexpr unsigned short kServerPort = 30000;
+constexpr unsigned short kIntermediaryPort = 30001;
+constexpr unsigned short kEndpointPort = 30002;
 
 // Hang guard for the marker Message. On loopback it arrives a few update cycles after the
 // send, tens of milliseconds.
@@ -226,12 +226,12 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         Connect( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
-        const std::vector<MessageID> live = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 40000 );
+        const std::vector<MessageID> live = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
         REQUIRE( Contains( live, kMarker ) );
         CHECK( !Contains( live, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
 
-        const std::vector<MessageID> fresh = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 40001 );
+        const std::vector<MessageID> fresh = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         REQUIRE( Contains( fresh, kMarker ) );
         CHECK( !Contains( fresh, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 0 );
@@ -243,7 +243,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         Connect( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 40000 );
+        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
         REQUIRE( Contains( received, kMarker ) );
         CHECK( !Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
@@ -254,7 +254,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     {
         router.AddIntermediary( intermediaryAddress );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 40001 );
+        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         REQUIRE( Contains( received, kMarker ) );
         CHECK( Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 1 );
@@ -273,10 +273,10 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         Connect( endpoint, server );
         REQUIRE( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( kEndpointPort ) );
 
-        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 40002 );
+        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
         REQUIRE( Contains( rerouted, kMarker ) );
         CHECK( Contains( rerouted, ID_ROUTER_2_REROUTED ) );
-        CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 40002 ) );
+        CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 25002 ) );
         CHECK( router.ForwardedCount() == 1 );
     }
 
@@ -292,10 +292,10 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( kEndpointPort ) );
         CHECK( router.ForwardedCount() == 1 );
 
-        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 40002 );
+        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
         REQUIRE( Contains( rerouted, kMarker ) );
         CHECK( Contains( rerouted, ID_ROUTER_2_REROUTED ) );
-        CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 40002 ) );
+        CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 25002 ) );
     }
 
     SECTION( "A Designated intermediary cannot move a connection whose entry is stale" )
@@ -310,7 +310,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         Connect( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
-        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 40002 );
+        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
         REQUIRE( Contains( rerouted, kMarker ) );
         CHECK( !Contains( rerouted, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
@@ -321,7 +321,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         router.AddIntermediary( intermediaryAddress );
         router.RemoveIntermediary( intermediaryAddress );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 40001 );
+        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         REQUIRE( Contains( received, kMarker ) );
         CHECK( !Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 0 );
@@ -331,7 +331,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     {
         router.AddIntermediary( intermediaryAddress );
 
-        const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 40001 );
+        const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         REQUIRE( Contains( announced, kMarker ) );
         REQUIRE( router.ForwardedCount() == 1 );
 
@@ -346,7 +346,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         Connect( intermediary, server );
         REQUIRE( server->GetSystemAddressFromGuid( intermediary->GetMyGUID() ) == intermediaryAddress );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1002 ), 40001 );
+        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1002 ), 25001 );
         REQUIRE( Contains( received, kMarker ) );
         CHECK( !Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 0 );
@@ -371,7 +371,7 @@ TEST_CASE( "Router2 caps the connections a Designated intermediary announces ahe
 
     for( uint64_t g = 1; g <= 3; g++ )
     {
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1000 + g ), 40000 );
+        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1000 + g ), 25000 );
         REQUIRE( Contains( received, kMarker ) );
         CHECK( Contains( received, ID_ROUTER_2_REROUTED ) == ( g <= 2 ) );
     }
@@ -379,7 +379,7 @@ TEST_CASE( "Router2 caps the connections a Designated intermediary announces ahe
     CHECK( router.GetPendingForwardsRefused() == 1 );
 
     // A repeat announcement of an entry it already holds is not a new one.
-    const std::vector<MessageID> repeated = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1001 ), 40005 );
+    const std::vector<MessageID> repeated = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1001 ), 25005 );
     REQUIRE( Contains( repeated, kMarker ) );
     CHECK( Contains( repeated, ID_ROUTER_2_REROUTED ) );
     CHECK( router.ForwardedCount() == 2 );
@@ -405,13 +405,13 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
     {
         router.AddRequest( kUnconnectedGuid, asked->GetMyGUID() );
 
-        const std::vector<MessageID> forged = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 40000 );
+        const std::vector<MessageID> forged = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 25000 );
         REQUIRE( Contains( forged, kMarker ) );
         CHECK( !Contains( forged, ID_ROUTER_2_FORWARDING_ESTABLISHED ) );
         CHECK( router.HasRequest( kUnconnectedGuid ) );
         CHECK( router.ForwardedCount() == 0 );
 
-        const std::vector<MessageID> genuine = Inject( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 40000 );
+        const std::vector<MessageID> genuine = Inject( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 25000 );
         REQUIRE( Contains( genuine, kMarker ) );
         CHECK( Contains( genuine, ID_ROUTER_2_FORWARDING_ESTABLISHED ) );
         CHECK( !router.HasRequest( kUnconnectedGuid ) );
@@ -425,7 +425,7 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
         router.AddInitiatedForwarding( endpoint->GetMyGUID(), asked->GetMyGUID(), endpointAddress );
 
         // Nothing asked at all.
-        const std::vector<MessageID> unasked = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 40000 );
+        const std::vector<MessageID> unasked = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25000 );
         REQUIRE( Contains( unasked, kMarker ) );
         CHECK( !Contains( unasked, ID_ROUTER_2_FORWARDING_ESTABLISHED ) );
         CHECK( !Contains( unasked, ID_ROUTER_2_REROUTED ) );
@@ -433,16 +433,16 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
 
         // A re-route in progress, answered by a System that was not asked.
         router.AddRequest( endpoint->GetMyGUID(), asked->GetMyGUID() );
-        const std::vector<MessageID> forged = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 40000 );
+        const std::vector<MessageID> forged = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25000 );
         REQUIRE( Contains( forged, kMarker ) );
         CHECK( !Contains( forged, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
         CHECK( router.HasRequest( endpoint->GetMyGUID() ) );
 
-        const std::vector<MessageID> genuine = Inject( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 40003 );
+        const std::vector<MessageID> genuine = Inject( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25003 );
         REQUIRE( Contains( genuine, kMarker ) );
         CHECK( Contains( genuine, ID_ROUTER_2_REROUTED ) );
-        CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 40003 ) );
+        CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 25003 ) );
         CHECK( !router.HasRequest( endpoint->GetMyGUID() ) );
         CHECK( router.ForwardedCount() == 1 );
     }
