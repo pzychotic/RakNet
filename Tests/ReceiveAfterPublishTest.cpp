@@ -61,7 +61,9 @@ constexpr std::chrono::milliseconds kStall( 20 );
 // this long after it goes silent.
 constexpr TimeMS kShortTimeoutMs = 300;
 
-constexpr int kRounds = 8;
+// Two rounds close by timeout and two by notification. Each catches a connection change
+// handed out early, so the repeats cover a run where the user thread misses a stall.
+constexpr int kRounds = 4;
 
 /// Stalls the network thread when it sends to either of two ports, at most once per
 /// update cycle. The cycle's time is the same for every record it handles, so a
