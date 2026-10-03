@@ -1114,10 +1114,11 @@ void Router2::OnRequestForwarding( Packet* packet )
         miniPunchRequest.forwardingSocket = forwardingSocket;
         int ping1 = rakPeerInterface->GetAveragePing( packet->guid );
         int ping2 = rakPeerInterface->GetAveragePing( endpointGuid );
+        // The 3 s floor covers either end's application not calling Receive for a while, since the punch is answered only there
         if( ping1 > ping2 )
-            miniPunchRequest.timeout = RakNet::GetTimeMS() + ping1 * 8 + 300;
+            miniPunchRequest.timeout = RakNet::GetTimeMS() + ping1 * 8 + 3000;
         else
-            miniPunchRequest.timeout = RakNet::GetTimeMS() + ping2 * 8 + 300;
+            miniPunchRequest.timeout = RakNet::GetTimeMS() + ping2 * 8 + 3000;
         miniPunchRequest.nextAction = RakNet::GetTimeMS() + 100;
         SendOOBMessages( &miniPunchRequest );
 

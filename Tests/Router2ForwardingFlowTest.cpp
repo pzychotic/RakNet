@@ -275,3 +275,40 @@ TEST_CASE( "Router2 re-routes a live forwarded connection through a Designated r
     source->DetachPlugin( &sourcePlugin );
     endpoint->DetachPlugin( &endpointPlugin );
 }
+
+TEST_CASE( "Router2 forwards a connection whose endpoint answers the punch late", "[router2][network]" )
+{
+    // Longer than a loopback ping, short of what a busy host can stall a Peer for.
+    constexpr TimeMS kPunchStallMs = 1000;
+
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+
+    // The endpoint answers the router's punch only inside Receive, so not pumping it holds
+    // the punch back.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received early = PumpUntil( { router, source }, [source, endpoint]( const Received& each ) { return IsNoRoute( each, source, endpoint ); }, kPunchStallMs );
+    if( early.peer != nullptr )
+        FailNoRoute( early );
+
+    const RakNetGUID used = ConnectThroughRoute( peers, source, endpoint );
+    CHECK( used == router->GetMyGUID() );
+    CheckReaches( peers, source, endpoint );
+    CheckReaches( peers, endpoint, source );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}

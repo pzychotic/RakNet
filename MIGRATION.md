@@ -662,6 +662,13 @@ consumed its own `NO_PATH` before `Receive` returned it, so the source never lea
 router could reach the endpoint. If you guarded `EstablishRouting` with a timer of your own,
 you can drop it.
 
+**A router waits about 3 s for the punch, not 0.3 s.** Before forwarding, the router waits for
+the source and endpoint to answer a punch through the new route, and they answer only inside
+`Receive`. Stock gave up after eight pings plus 300 ms, so on a LAN any application that went
+a third of a second without calling `Receive` lost the route. The margin is now 3 s. A route
+that really can't be made is reported that much later, and a source with several routers
+spends that much longer on a dead one before trying the next.
+
 ## Getters answer only for open connections
 
 Stock read the connection records from your thread while the network thread was changing
