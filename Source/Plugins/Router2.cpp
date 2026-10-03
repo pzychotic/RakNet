@@ -660,7 +660,8 @@ bool Router2::UpdateForwarding( ConnnectRequest* connectionRequest )
         }
         else
         {
-            ReturnToUser( ID_ROUTER_2_FORWARDING_NO_PATH, connectionRequest->endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, false );
+            // Generated locally, or OnReceive drops it as a remote System's claim
+            ReturnToUser( ID_ROUTER_2_FORWARDING_NO_PATH, connectionRequest->endpointGuid, UNASSIGNED_SYSTEM_ADDRESS, true );
         }
 
         if( debugInterface )

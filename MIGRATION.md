@@ -654,6 +654,14 @@ choose which proxy server another pair was given.
 - A ping reply counts only from one of the pair's own ends, the two Systems the coordinator
   asked. Anything else is dropped. Nothing to do.
 
+## Router2 reports a route it can't make
+
+**`ID_ROUTER_2_FORWARDING_NO_PATH` reaches `Receive`.** `EstablishRouting` is documented to end
+in `ID_ROUTER_2_FORWARDING_ESTABLISHED` or `ID_ROUTER_2_FORWARDING_NO_PATH`. Stock's Router2
+consumed its own `NO_PATH` before `Receive` returned it, so the source never learned that no
+router could reach the endpoint. If you guarded `EstablishRouting` with a timer of your own,
+you can drop it.
+
 ## Getters answer only for open connections
 
 Stock read the connection records from your thread while the network thread was changing

@@ -173,6 +173,38 @@ TEST_CASE( "Router2 forwards a new connection with nothing designated", "[router
     endpoint->DetachPlugin( &endpointPlugin );
 }
 
+TEST_CASE( "Router2 tells the source when no router can reach the endpoint", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+
+    // The endpoint answers the router's punch only inside Receive, so never pumping it means
+    // the punch never completes.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received ended = PumpUntil( { router, source }, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( ended.peer == source );
+    CHECK( ended.id == ID_ROUTER_2_FORWARDING_NO_PATH );
+    CHECK( ended.guid == endpoint->GetMyGUID() );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
 TEST_CASE( "Router2 re-routes a live forwarded connection through a Designated router", "[router2][network]" )
 {
     Router2 firstPlugin, secondPlugin, sourcePlugin, endpointPlugin;
