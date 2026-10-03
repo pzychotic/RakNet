@@ -232,7 +232,6 @@ void TCPInterface::Stop( void )
 #else
         shutdown__( listenSocket, SHUT_RDWR );
 #endif
-        closesocket__( listenSocket );
     }
 
     // Abort waiting connect calls
@@ -251,6 +250,10 @@ void TCPInterface::Stop( void )
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
+    // Closed only once the update thread is gone, so it never accepts on a descriptor
+    // number that has been released for reuse.
+    if( listenSocket != 0 )
+        closesocket__( listenSocket );
     listenSocket = 0;
 
     // Stuff from here on to the end of the function is not threadsafe
@@ -1139,7 +1142,9 @@ void UpdateTCPInterfaceLoop( void* arg )
         tv.tv_sec = 0;
         tv.tv_usec = 30000;
 
-        while( 1 )
+        // On Linux, Stop's shutdown leaves the listen socket readable, so select keeps
+        // succeeding; isStarted is what ends this loop then.
+        while( sts->isStarted > 0 )
         {
             // Clients SendOrBuffer flagged at the outgoing cap. Not left to the select below,
             // which a client that does not read may never make writable.
@@ -1193,8 +1198,8 @@ void UpdateTCPInterfaceLoop( void* arg )
             {
                 newSock = accept__( sts->listenSocket, (sockaddr*)&sockAddr, (socklen_t*)&sockAddrSize );
 
-                // -1 is a failed accept, which Stop closing the listen socket under select
-                // produces. Stored, it would reach FD_SET, which aborts on it under glibc.
+                // -1 is a failed accept, which Stop shutting down the listen socket under
+                // select produces. Stored, it would reach FD_SET, which aborts on it under glibc.
                 if( newSock != 0 && (int)newSock != -1 )
                 {
                     // "Table is full" is the handle's answer, so there is no index one past
