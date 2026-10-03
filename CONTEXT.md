@@ -50,7 +50,7 @@ _Avoid_: Rejected system, denied connection
 
 **Designated System**:
 A connected System the application has named as entitled to act in a role for this Peer,
-such as its proxy coordinator or a router it accepts reroutes from. It is named by the
+such as its proxy coordinator or an Intermediary it accepts reroutes from. It is named by the
 address its connection was made at, never by its RakNetGUID, and loses the role when that
 connection closes.
 _Avoid_: Trusted system, authorised system
@@ -97,3 +97,10 @@ A single datagram exchanged with a System that has no connection record: a ping,
 an advertisement or out-of-band data. It is not a Message: it never goes through `Send`,
 is never split, and carries no delivery guarantee, so a Peer may drop it freely.
 _Avoid_: Unconnected message, offline message
+
+**Source**, **Intermediary**, **Endpoint**:
+The three roles in a forwarded connection. The Source asks for a route to the Endpoint, the
+Intermediary relays every datagram between them, and the Endpoint is the System being
+reached, which asked for nothing. Each is a Peer connected to the Intermediary. Endpoint
+names this role only; it is not a synonym for System.
+_Avoid_: Router (except for the plugin itself), sender, relay, destination
