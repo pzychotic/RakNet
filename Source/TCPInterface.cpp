@@ -963,10 +963,15 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
     sockaddr_in serverAddress;
 
-    struct hostent* server;
-    server = gethostbyname( host );
-    if( server == NULL )
+    // getaddrinfo is thread-safe, and connect attempts resolve concurrently.
+    struct addrinfo hints, *res = 0;
+    memset( &hints, 0, sizeof hints );
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if( getaddrinfo( host, 0, &hints, &res ) != 0 )
         return INVALID_SOCKET;
+    const in_addr serverHostAddress = ( (const sockaddr_in*)res->ai_addr )->sin_addr;
+    freeaddrinfo( res );
 
     __TCPSOCKET__ sockfd = socket__( AF_INET, SOCK_STREAM, 0 );
     if( sockfd == INVALID_SOCKET )
@@ -988,7 +993,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     int sock_opt = 1024 * 256;
     setsockopt__( sockfd, SOL_SOCKET, SO_RCVBUF, (char*)&sock_opt, sizeof( sock_opt ) );
 
-    memcpy( (char*)&serverAddress.sin_addr.s_addr, (char*)server->h_addr, server->h_length );
+    serverAddress.sin_addr = serverHostAddress;
 
     blockingSocketListMutex.lock();
     blockingSocketList.push_back( sockfd );
