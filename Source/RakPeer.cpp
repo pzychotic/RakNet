@@ -5302,10 +5302,11 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                 rakFree_Ex( bcs->data, _FILE_AND_LINE_ );
 
             // Set the new connection state AFTER we call sendImmediate in case we are setting it to a disconnection state, which does not allow further sends
+            // A closing record keeps the close it is in, so a DISCONNECT_ON_NO_ACK still sends the ack it owes.
             if( bcs->connectionMode != RemoteSystemStruct::NO_ACTION )
             {
                 remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
-                if( remoteSystem )
+                if( remoteSystem && IsClosing( remoteSystem->connectMode ) == false )
                     remoteSystem->connectMode = bcs->connectionMode;
             }
         }

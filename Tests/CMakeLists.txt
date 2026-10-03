@@ -44,6 +44,7 @@ include( Catch )
 # Every test file under Tests/ is here.
 set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/CloseClosingConnectionTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ComprehensiveConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectAlreadyConnectedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectWithSocketTest.cpp

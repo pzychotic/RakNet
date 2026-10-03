@@ -23,6 +23,12 @@ same System, it gets a new connection record. A Peer holds a bounded number of t
 at most one open connection record per System.
 _Avoid_: Slot, remote system entry
 
+**Closing connection record**:
+A connection record whose connection is ending. Either this Peer asked to close it and is
+waiting for the System to acknowledge, or the System asked and this Peer is acknowledging.
+Asking to close a closing connection record changes nothing.
+_Avoid_: Disconnecting connection, half-closed connection
+
 **Update cycle**:
 One pass of a Peer's network work: it reads what has arrived, applies the commands the
 application has queued, advances every connection, sends what is due, and ends by
