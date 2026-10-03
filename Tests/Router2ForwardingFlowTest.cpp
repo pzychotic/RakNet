@@ -49,10 +49,10 @@ struct Received
 };
 
 // Receives on every peer, since Router2 runs inside Receive, until one Message satisfies
-// wanted. Returns it, or a Received with a null peer at the deadline.
-Received PumpUntil( const std::vector<RakPeerInterface*>& peers, const std::function<bool( const Received& )>& wanted )
+// wanted. Returns it, or a Received with a null peer once budgetMs has passed.
+Received PumpUntil( const std::vector<RakPeerInterface*>& peers, const std::function<bool( const Received& )>& wanted, TimeMS budgetMs = kStepBudgetMs )
 {
-    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
+    const TimeMS deadline = GetTimeMS() + budgetMs;
     while( !ConnectionWaits::Expired( deadline ) )
     {
         for( RakPeerInterface* peer : peers )
@@ -92,13 +92,29 @@ void CheckReaches( const std::vector<RakPeerInterface*>& peers, RakPeerInterface
     CHECK( received.guid == from->GetMyGUID() );
 }
 
-// Runs EstablishRouting from source to endpoint and connects through the router it
-// reports. Returns the router's RakNetGUID.
-RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRouter, RakPeerInterface* source, RakPeerInterface* endpoint )
+// How Router2 tells the source it could not route to endpoint: ID_ROUTER_2_FORWARDING_NO_PATH
+// for a new connection, ID_CONNECTION_LOST for a live one.
+bool IsNoRoute( const Received& each, RakPeerInterface* source, RakPeerInterface* endpoint )
 {
-    sourceRouter.EstablishRouting( endpoint->GetMyGUID() );
-    const Received established = PumpUntil( peers, source, ID_ROUTER_2_FORWARDING_ESTABLISHED );
+    return each.peer == source && each.guid == endpoint->GetMyGUID() &&
+           ( each.id == ID_ROUTER_2_FORWARDING_NO_PATH || each.id == ID_CONNECTION_LOST );
+}
+
+void FailNoRoute( const Received& each )
+{
+    FAIL( "the source got " << ( each.id == ID_ROUTER_2_FORWARDING_NO_PATH ? "ID_ROUTER_2_FORWARDING_NO_PATH" : "ID_CONNECTION_LOST" ) << " for the endpoint" );
+}
+
+// After EstablishRouting, waits for the route and connects through the router it reports.
+// Returns the router's RakNetGUID.
+RakNetGUID ConnectThroughRoute( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* source, RakPeerInterface* endpoint )
+{
+    const Received established = PumpUntil( peers, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
     REQUIRE( established.peer == source );
+    if( established.id != ID_ROUTER_2_FORWARDING_ESTABLISHED )
+        FailNoRoute( established );
 
     std::vector<unsigned char> data = established.data;
     BitStream bs( data.data(), (unsigned int)data.size(), false );
@@ -116,6 +132,14 @@ RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRo
     REQUIRE( accepted.peer == source );
     CHECK( source->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == SystemAddress( "127.0.0.1", forwardingPort ) );
     return established.guid;
+}
+
+// Runs EstablishRouting from source to endpoint and connects through the router it
+// reports. Returns the router's RakNetGUID.
+RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRouter, RakPeerInterface* source, RakPeerInterface* endpoint )
+{
+    sourceRouter.EstablishRouting( endpoint->GetMyGUID() );
+    return ConnectThroughRoute( peers, source, endpoint );
 }
 
 } // namespace
@@ -138,7 +162,9 @@ TEST_CASE( "Router2 forwards a new connection with nothing designated", "[router
     Connect( peers, source, kRouterPort );
     Connect( peers, endpoint, kRouterPort );
 
-    CHECK( Route( peers, sourcePlugin, source, endpoint ) == router->GetMyGUID() );
+    // Outside the CHECK, so a failed REQUIRE inside Route ends the test case.
+    const RakNetGUID used = Route( peers, sourcePlugin, source, endpoint );
+    CHECK( used == router->GetMyGUID() );
     CheckReaches( peers, source, endpoint );
     CheckReaches( peers, endpoint, source );
 
@@ -192,9 +218,11 @@ TEST_CASE( "Router2 re-routes a live forwarded connection through a Designated r
             sourceRerouted = true;
         if( each.id == ID_ROUTER_2_REROUTED && each.peer == endpoint )
             endpointRerouted = true;
-        return sourceRerouted && endpointRerouted;
+        return ( sourceRerouted && endpointRerouted ) || IsNoRoute( each, source, endpoint );
     } );
     REQUIRE( last.peer != nullptr );
+    if( IsNoRoute( last, source, endpoint ) )
+        FailNoRoute( last );
 
     // ChangeSystemAddress only queues a command, so the move shows in the getters a cycle later.
     const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
