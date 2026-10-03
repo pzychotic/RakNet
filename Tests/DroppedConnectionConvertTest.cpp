@@ -12,7 +12,6 @@
 #include "CommonFunctions.h"
 #include "ConnectionWaits.h"
 
-#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "Rand.h"
 #include "RakNetTime.h"
@@ -24,10 +23,11 @@
 #include <thread>
 
 /*
-Nine clients spend thirty seconds randomly closing their connection to a server -
-sometimes with a disconnection notification, sometimes silently, so that only the
-server's two-second timeout can notice - and reconnecting afterwards. Two things
-are asserted throughout:
+Nine clients spend 42 rounds, about 17 seconds, randomly closing their connection
+to a server - sometimes with a disconnection notification, sometimes silently, so
+that only the server's one-second timeout can notice - and reconnecting
+afterwards. Fifteen of the rounds are wait rounds, each judged by a drop round at
+the top of the next. Two things are asserted throughout:
 
   - No client, started for one connection, ever holds two. That is what a
     reconnect onto a connection the server has not yet cleaned up would look like.
@@ -57,7 +57,9 @@ the only two sites (in ReliabilityLayer::SendBitStream) are _DEBUG-only and gate
 ApplyNetworkSimulator settings this test never applies, so the seed really does
 determine every draw. What it does not fix is the schedule - packet timing and the
 loop cadence still vary - so a replay repeats the same sequence of actions, not the
-same milliseconds.
+same milliseconds. The loop is bounded by its round count rather than by wall time
+for the same reason, so the seed also fixes how many of those rounds are drop
+rounds, and the test asserts that number exactly.
 */
 
 using namespace RakNet;
@@ -74,10 +76,14 @@ constexpr unsigned short kFirstClientPort = kServerPort + 1;
 
 // The asymmetry is the point: a silently closed connection disappears from the
 // client at once and has to age out of the server.
-constexpr TimeMS kServerTimeoutMs = 2000;
+constexpr TimeMS kServerTimeoutMs = 1000;
 constexpr TimeMS kClientTimeoutMs = 5000;
 
-constexpr TimeMS kTestDurationMs = 30000;
+// The last of the 42 rounds is the drop round for the fifteenth wait. The seed
+// fixes both numbers, so a change to its sequence fails the count at the end
+// rather than quietly thinning the test out.
+constexpr int kRounds = 42;
+constexpr int kExpectedDropRounds = 15;
 
 // Half the server's timeout, waited before the receive and again after it, so a
 // drop round ages out the connections that were actually dropped without idling
@@ -129,10 +135,9 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
     // client is started for a single connection, so one holding two has
     // reconnected onto a connection the server had not finished cleaning up.
     //
-    // REQUIRE rather than the suite's CHECK default: this runs every round of a
-    // thirty-second loop, so a CHECK would report the same defect a few thousand
-    // times, and a client started for one connection that holds two is already a
-    // complete diagnosis.
+    // REQUIRE rather than the suite's CHECK default: this runs every round, so a
+    // CHECK would report the same defect once per round, and a client started for
+    // one connection that holds two is already a complete diagnosis.
     auto requireNoClientHoldsTwoConnections = [&]() {
         for( int i = 0; i < kNumberOfClients; i++ )
         {
@@ -171,10 +176,10 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
 
     int dropRounds = 0;
 
-    const TimeMS entryTime = GetTimeMS();
-
-    while( GetTimeMS() - entryTime < kTestDurationMs )
+    for( int round = 1; round <= kRounds; round++ )
     {
+        INFO( "round " << round );
+
         // Drawn before the check below, so the sequence of actions is the one the
         // seed describes whichever branch the check takes.
         const unsigned int randomTest = randomMT() % 4;
@@ -196,9 +201,9 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
             // have passed since the last connect or close, so every connection
             // the server still counts must be one a client still counts too.
             //
-            // CHECK, not REQUIRE: this fires once per drop round, a handful of
-            // times in thirty seconds, and a run where round one passes and round
-            // four fails says something a run that stops at round four does not.
+            // CHECK, not REQUIRE: this fires once per drop round, and a run
+            // where round one passes and round four fails says something a run
+            // that stops at round four does not.
             INFO( "drop round " << dropRounds );
             CHECK( clientsConnected == serverConnections );
         }
@@ -270,10 +275,9 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
         std::this_thread::sleep_for( std::chrono::milliseconds( kLoopSleepMs ) );
     }
 
-    // One draw in four is the wait round, and each costs about two seconds of the
-    // thirty, so the count lands well into double figures. Asserted rather than
-    // merely counted because the drop check above is the whole point of the test:
-    // with none of them, everything above is a thirty-second connect-and-close
-    // exercise that never asks whether a timeout was detected.
-    CHECK( dropRounds > 0 );
+    // Asserted rather than merely counted because the drop check above is the
+    // whole point of the test: with fewer of them, the rounds above thin out into
+    // a connect-and-close exercise that asks less often whether a timeout was
+    // detected.
+    CHECK( dropRounds == kExpectedDropRounds );
 }
