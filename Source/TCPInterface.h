@@ -36,6 +36,7 @@
 #endif
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <deque>
 #include <mutex>
@@ -71,10 +72,15 @@ public:
     /// \param[in] socketFamily IP version: For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
     bool Start( unsigned short port, unsigned short maxIncomingConnections, unsigned short maxConnections = 0, int _threadPriority = -99999, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
 
-    /// Stops the TCP server
+    /// Stops the TCP server. Waits for every connect attempt to end, and ends each one still
+    /// connecting within about 50 ms. An attempt still resolving its host name is the
+    /// exception: resolution can't be interrupted, so Stop may wait for the resolver's own
+    /// timeout.
     void Stop( void );
 
-    /// Connect to the specified host on the specified port
+    /// Connect to the specified host on the specified port. Refused, with
+    /// UNASSIGNED_SYSTEM_ADDRESS and no failed connection attempt reported, if the interface
+    /// is not started or Stop is running.
     /// \param[in] bindAddress Local address to bind to, or 0 for none. At most
     /// MAXIMUM_BIND_ADDRESS_LENGTH characters: a longer one is rejected with
     /// UNASSIGNED_SYSTEM_ADDRESS rather than truncated.
@@ -226,14 +232,63 @@ protected:
     /// event and frees the entry, under its isActiveMutex, if it is still active and flagged.
     void CloseRemoteClientOverOutgoingCap( int index );
 
-    std::vector<__TCPSOCKET__> blockingSocketList;
-    std::mutex blockingSocketListMutex;
+    /// Guards isStopping and connectAttemptCount; connectAttemptEnded is notified under it.
+    std::mutex connectAttemptMutex;
+    std::condition_variable connectAttemptEnded;
 
+    /// Set for the length of Stop. Connect refuses, and connects in flight give up.
+    bool isStopping;
+
+    /// Connect attempts begun and not yet ended. Stop frees nothing until it is zero.
+    unsigned int connectAttemptCount;
+
+    /// Counts a connect attempt in, unless the update thread is not running or Stop is.
+    /// Returns whether it did.
+    bool BeginConnectAttempt( void );
+
+    /// Counts a connect attempt out. It is the attempt's last touch of this object: once it
+    /// returns, Stop may return and the object be destroyed.
+    void EndConnectAttempt( void );
+
+    /// Whether Stop is running, read under connectAttemptMutex.
+    bool IsStopping( void );
 
     friend void UpdateTCPInterfaceLoop( void* arg );
     friend void ConnectionAttemptLoop( void* arg );
 
+    /// Resolves \a host and connects to it. Returns the connected socket, in blocking mode,
+    /// or INVALID_SOCKET if the connect failed or Stop asked it to give up.
     __TCPSOCKET__ SocketConnect( const char* host, unsigned short remotePort, unsigned short socketFamily, const char* bindAddress );
+
+    /// Connects \a sockfd to \a address without blocking, waiting for the result in short
+    /// steps so it can give up as soon as Stop is running. Returns whether it connected.
+    bool ConnectUnlessStopping( __TCPSOCKET__ sockfd, const sockaddr* address, int addressLength );
+
+    /// \internal
+    /// \brief A scoped count on one connect attempt.
+    ///
+    /// Construction is BeginConnectAttempt. Unless the count is handed on to the thread that
+    /// carries the attempt on, which then ends it itself, the destructor ends it.
+    class ConnectAttempt
+    {
+    public:
+        explicit ConnectAttempt( TCPInterface& owner );
+        ~ConnectAttempt();
+
+        ConnectAttempt( const ConnectAttempt& ) = delete;
+        ConnectAttempt& operator=( const ConnectAttempt& ) = delete;
+
+        /// Whether the attempt was counted in. False means Connect is refused.
+        bool IsBegun( void ) const;
+
+        /// Hands the count on: whoever it was handed to calls EndConnectAttempt.
+        void HandOn( void );
+
+    private:
+        TCPInterface& tcpInterface;
+        bool isBegun;
+        bool isEndPending;
+    };
 
     struct ThisPtrPlusSysAddr
     {

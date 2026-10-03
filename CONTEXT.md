@@ -2,7 +2,8 @@
 
 A UDP networking library for games. This context covers the transport layer: the Peers
 that connect to each other, how they are named, how those names are exchanged, and what they
-send one another.
+send one another. It also covers `TCPInterface`, whose connections need not have a Peer at
+either end.
 
 ## Language
 
@@ -17,11 +18,18 @@ record. The same running program is a Peer to itself and a System to everyone el
 _Avoid_: Remote peer, host, endpoint
 
 **Connection record**:
-What a Peer holds about one System for the life of one connection to it, from the first
-handshake step until the connection closes. When a later connection is made, even to the
-same System, it gets a new connection record. A Peer holds a bounded number of them, and
-at most one open connection record per System.
-_Avoid_: Slot, remote system entry
+What one end of a connection holds about the far end for the life of that one connection,
+from the first handshake step until the connection closes. When a later connection is
+made, even to the same far end, it gets a new connection record. A Peer holds a bounded
+number of them, and at most one open connection record per System; a `TCPInterface` holds
+a bounded number of them too.
+_Avoid_: Slot, remote system entry, remote client
+
+**Connect attempt**:
+A request to open a connection, from the moment it is accepted until it ends exactly once,
+completed or failed. While it runs it holds a connection record that is not yet open.
+Stopping waits for every connect attempt to end, and asks each to end early.
+_Avoid_: Pending connection, connection thread
 
 **Closing connection record**:
 A connection record whose connection is ending. Either this Peer asked to close it and is

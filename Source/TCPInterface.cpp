@@ -42,6 +42,7 @@ typedef int socklen_t;
 #endif
 
 #include <algorithm>
+#include <cerrno>
 #include <charconv>
 #include <chrono>
 #include <thread>
@@ -51,12 +52,50 @@ namespace RakNet {
 void UpdateTCPInterfaceLoop( void* arg );
 void ConnectionAttemptLoop( void* arg );
 
+namespace {
+
+bool SetSocketBlocking( __TCPSOCKET__ socket, bool isBlocking )
+{
+#ifdef _WIN32
+    u_long isNonBlocking = isBlocking ? 0 : 1;
+    return ioctlsocket__( socket, FIONBIO, &isNonBlocking ) == 0;
+#else
+    const int flags = fcntl( socket, F_GETFL, 0 );
+    if( flags == -1 )
+        return false;
+    return fcntl( socket, F_SETFL, isBlocking ? ( flags & ~O_NONBLOCK ) : ( flags | O_NONBLOCK ) ) == 0;
+#endif
+}
+
+// Whether a non-blocking connect that did not connect at once is still going.
+bool IsConnectInProgress( void )
+{
+#ifdef _WIN32
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+    return errno == EINPROGRESS || errno == EINTR;
+#endif
+}
+
+bool IsInterruptedCall( void )
+{
+#ifdef _WIN32
+    return WSAGetLastError() == WSAEINTR;
+#else
+    return errno == EINTR;
+#endif
+}
+
+} // namespace
+
 STATIC_FACTORY_DEFINITIONS( TCPInterface, TCPInterface );
 
 TCPInterface::TCPInterface()
 {
     isStarted = 0;
     threadRunning = 0;
+    isStopping = false;
+    connectAttemptCount = 0;
     listenSocket = INVALID_SOCKET;
     remoteClients = 0;
     remoteClientsLength = 0;
@@ -209,12 +248,21 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
 }
 void TCPInterface::Stop( void )
 {
+    const bool wasStarted = isStarted > 0;
+
+    // Set before the plugins hear of the shutdown, so a Connect from one is refused too.
+    if( wasStarted )
+    {
+        std::lock_guard<std::mutex> guard( connectAttemptMutex );
+        isStopping = true;
+    }
+
     for( PluginInterface2* pPlugin : messageHandlerList )
     {
         pPlugin->OnRakPeerShutdown();
     }
 
-    if( isStarted == 0 )
+    if( wasStarted == false )
         return;
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
@@ -237,22 +285,19 @@ void TCPInterface::Stop( void )
 #endif
     }
 
-    // Abort waiting connect calls
-    blockingSocketListMutex.lock();
-    for( __TCPSOCKET__ socket : blockingSocketList )
+    // Every connect attempt ends before anything it touches is freed. One still connecting
+    // sees isStopping and gives up, closing its own socket; one that won has put its socket
+    // in its connection record, and the Free() loop below closes it.
     {
-        closesocket__( socket );
+        std::unique_lock<std::mutex> lock( connectAttemptMutex );
+        connectAttemptEnded.wait( lock, [this] { return connectAttemptCount == 0; } );
     }
-    blockingSocketList.clear();
-    blockingSocketListMutex.unlock();
 
     // Wait for the thread to stop
     while( threadRunning > 0 )
     {
         std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
     }
-
-    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     // Closed only once the update thread is gone, so it never accepts on a descriptor
     // number that has been released for reuse.
@@ -277,7 +322,6 @@ void TCPInterface::Stop( void )
     requestedCloseConnections.Clear( _FILE_AND_LINE_ );
     failedConnectionAttempts.clear();
     completedConnectionAttempts.clear();
-    failedConnectionAttempts.clear();
     for( Packet* pPacket : headPush )
         DeallocatePacket( pPacket );
     headPush.clear();
@@ -290,6 +334,51 @@ void TCPInterface::Stop( void )
     startSSL.Clear( _FILE_AND_LINE_ );
     activeSSLConnections.clear();
 #endif
+
+    // Connect is still refused from here on: the update thread is gone.
+    std::lock_guard<std::mutex> guard( connectAttemptMutex );
+    isStopping = false;
+}
+bool TCPInterface::BeginConnectAttempt( void )
+{
+    std::lock_guard<std::mutex> guard( connectAttemptMutex );
+    if( isStopping || threadRunning == 0 )
+        return false;
+    connectAttemptCount++;
+    return true;
+}
+void TCPInterface::EndConnectAttempt( void )
+{
+    // Notified under the lock: notified after it, Stop could return, and the destructor
+    // destroy connectAttemptEnded, before the notify.
+    std::lock_guard<std::mutex> guard( connectAttemptMutex );
+    connectAttemptCount--;
+    connectAttemptEnded.notify_all();
+}
+bool TCPInterface::IsStopping( void )
+{
+    std::lock_guard<std::mutex> guard( connectAttemptMutex );
+    return isStopping;
+}
+TCPInterface::ConnectAttempt::ConnectAttempt( TCPInterface& owner )
+: tcpInterface( owner )
+{
+    isBegun = tcpInterface.BeginConnectAttempt();
+    isEndPending = isBegun;
+}
+TCPInterface::ConnectAttempt::~ConnectAttempt()
+{
+    if( isEndPending )
+        tcpInterface.EndConnectAttempt();
+}
+bool TCPInterface::ConnectAttempt::IsBegun( void ) const
+{
+    return isBegun;
+}
+void TCPInterface::ConnectAttempt::HandOn( void )
+{
+    RakAssert( isEndPending );
+    isEndPending = false;
 }
 void TCPInterface::ReleaseRemoteClient( int index )
 {
@@ -434,9 +523,6 @@ void TCPInterface::RemoteClientSlot::Commit( void )
 }
 SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort, bool block, unsigned short socketFamily, const char* bindAddress )
 {
-    if( threadRunning == 0 )
-        return UNASSIGNED_SYSTEM_ADDRESS;
-
     // The non-blocking arm copies bindAddress into a fixed array, so it has a hard length
     // limit; the blocking arm passes the pointer straight through and has none. Enforcing
     // the smaller of the two here gives Connect one contract rather than one per arm, and
@@ -449,7 +535,12 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     // end of the array, so there is no out-of-range index here to guard against indexing
     // with. What fills the entry in is a connect that can block, and holding the entry's
     // lock across that would stall the update loop, so the entry is reserved now and
-    // activated by ActivateConnectingClient once the connect has a socket.
+    // activated by ActivateConnectingClient once the connect has a socket. Declared after
+    // the attempt, so the slot is done with remoteClients before the attempt is counted out.
+    ConnectAttempt attempt( *this );
+    if( attempt.IsBegun() == false )
+        return UNASSIGNED_SYSTEM_ADDRESS;
+
     RemoteClientSlot slot( *this );
     if( slot.IsClaimed() == false )
         return UNASSIGNED_SYSTEM_ADDRESS;
@@ -514,11 +605,13 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         s->tcpInterface = this;
         s->socketFamily = socketFamily;
 
+        // Handed on before the thread starts: the thread may end the attempt at once, and
+        // then Stop may free the slot and return, so nothing here may touch either after.
+        slot.Commit();
+        attempt.HandOn();
+
         // Start the connection thread
-        int errorCode;
-
-
-        errorCode = RakThread::Create( ConnectionAttemptLoop, s, threadPriority );
+        const int errorCode = RakThread::Create( ConnectionAttemptLoop, s, threadPriority );
 
         if( errorCode != 0 )
         {
@@ -528,17 +621,13 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             // No thread was started, so nothing else will ever clear the slot. Released
             // before the failure is pushed, so the slot is free by the time the
             // application can observe the failure and retry.
-            slot.Release();
+            ReleaseRemoteClient( newRemoteClientIndex );
 
             failedConnectionAttemptMutex.lock();
             failedConnectionAttempts.push_back( failedSystemAddress );
             failedConnectionAttemptMutex.unlock();
-        }
-        else
-        {
-            // The connect thread owns the slot now, and gives it back itself if the
-            // connection fails.
-            slot.Commit();
+
+            EndConnectAttempt();
         }
         return UNASSIGNED_SYSTEM_ADDRESS;
     }
@@ -995,12 +1084,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
     serverAddress.sin_addr = serverHostAddress;
 
-    blockingSocketListMutex.lock();
-    blockingSocketList.push_back( sockfd );
-    blockingSocketListMutex.unlock();
-
-    // This is blocking
-    int connectResult = connect__( sockfd, (struct sockaddr*)&serverAddress, sizeof( struct sockaddr ) );
+    const bool isConnected = ConnectUnlessStopping( sockfd, (struct sockaddr*)&serverAddress, sizeof( struct sockaddr ) );
 
 #else
 
@@ -1025,33 +1109,62 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
         freeaddrinfo( res );
         return INVALID_SOCKET;
     }
-    blockingSocketListMutex.lock();
-    blockingSocketList.push_back( sockfd );
-    blockingSocketListMutex.unlock();
-    int connectResult = connect__( sockfd, res->ai_addr, (int)res->ai_addrlen );
+    const bool isConnected = ConnectUnlessStopping( sockfd, res->ai_addr, (int)res->ai_addrlen );
     freeaddrinfo( res ); // free the linked-list
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 
-    // Whoever takes sockfd out of the list owns it. Absent, Stop took it to abort the
-    // connect and has closed it already.
-    blockingSocketListMutex.lock();
-    auto it = std::find( blockingSocketList.begin(), blockingSocketList.end(), sockfd );
-    const bool isAbortedByStop = it == blockingSocketList.end();
-    if( isAbortedByStop == false )
-        blockingSocketList.erase( it );
-    blockingSocketListMutex.unlock();
-
-    if( isAbortedByStop )
-        return INVALID_SOCKET;
-
-    if( connectResult == -1 )
+    if( isConnected == false )
     {
         closesocket__( sockfd );
         return INVALID_SOCKET;
     }
 
     return sockfd;
+}
+bool TCPInterface::ConnectUnlessStopping( __TCPSOCKET__ sockfd, const sockaddr* address, int addressLength )
+{
+    // Long enough not to spin, short enough that Stop never waits noticeably for it.
+    constexpr long kStopCheckMicroseconds = 50000;
+
+    if( SetSocketBlocking( sockfd, false ) == false )
+        return false;
+
+    if( connect__( sockfd, address, addressLength ) != 0 )
+    {
+        if( IsConnectInProgress() == false )
+            return false;
+
+        for( ;; )
+        {
+            if( IsStopping() )
+                return false;
+
+            fd_set writeFD, exceptionFD;
+            FD_ZERO( &writeFD );
+            FD_ZERO( &exceptionFD );
+            FD_SET( sockfd, &writeFD );
+            // Winsock reports a failed connect here rather than as writable.
+            FD_SET( sockfd, &exceptionFD );
+            timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = kStopCheckMicroseconds;
+
+            const int selectResult = select__( (int)sockfd + 1, 0, &writeFD, &exceptionFD, &tv );
+            if( selectResult > 0 )
+                break;
+            if( selectResult < 0 && IsInterruptedCall() == false )
+                return false;
+        }
+
+        int connectError = 0;
+        socklen_t connectErrorLength = sizeof( connectError );
+        if( getsockopt__( sockfd, SOL_SOCKET, SO_ERROR, (char*)&connectError, &connectErrorLength ) != 0 || connectError != 0 )
+            return false;
+    }
+
+    // The update loop and RemoteClient::Send rely on blocking sends.
+    return SetSocketBlocking( sockfd, true );
 }
 
 void ConnectionAttemptLoop( void* arg )
@@ -1075,27 +1188,24 @@ void ConnectionAttemptLoop( void* arg )
     {
         tcpInterface->ReleaseRemoteClient( newRemoteClientIndex );
 
-        tcpInterface->failedConnectionAttemptMutex.lock();
+        std::lock_guard<std::mutex> guard( tcpInterface->failedConnectionAttemptMutex );
         tcpInterface->failedConnectionAttempts.push_back( systemAddress );
-        tcpInterface->failedConnectionAttemptMutex.unlock();
-        return;
     }
-
-    if( tcpInterface->ActivateConnectingClient( newRemoteClientIndex, sockfd, systemAddress ) == false )
+    else if( tcpInterface->ActivateConnectingClient( newRemoteClientIndex, sockfd, systemAddress ) == false )
     {
         closesocket__( sockfd );
 
         std::lock_guard<std::mutex> guard( tcpInterface->failedConnectionAttemptMutex );
         tcpInterface->failedConnectionAttempts.push_back( systemAddress );
-        return;
     }
-
-    // Notify user that the connection attempt has completed.
-    if( tcpInterface->threadRunning > 0 )
+    else
     {
         std::lock_guard<std::mutex> guard( tcpInterface->completedConnectionAttemptMutex );
         tcpInterface->completedConnectionAttempts.push_back( systemAddress );
     }
+
+    // Last: once the attempt is counted out, Stop may free everything above and return.
+    tcpInterface->EndConnectAttempt();
 }
 
 void UpdateTCPInterfaceLoop( void* arg )
