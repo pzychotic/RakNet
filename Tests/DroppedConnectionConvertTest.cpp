@@ -21,6 +21,7 @@
 
 #include <chrono>
 #include <thread>
+#include <vector>
 
 /*
 Nine clients spend 42 rounds, about 17 seconds, randomly closing their connection
@@ -29,8 +30,9 @@ that only the server's one-second timeout can notice - and reconnecting
 afterwards. Fifteen of the rounds are wait rounds, each judged by a drop round at
 the top of the next. Two things are asserted throughout:
 
-  - No client, started for one connection, ever holds two. That is what a
-    reconnect onto a connection the server has not yet cleaned up would look like.
+  - The server never holds two connections to one client: no two of its connected
+    Systems share a RakNetGUID or an address. That is what a reconnect accepted
+    before the server has cleaned up the old connection would look like.
   - After a settle window with no connects or closes in it, the number of clients
     that count the server matches the number of clients the server counts. That is
     the timeout detection itself: a client that closed silently is gone on its own
@@ -41,6 +43,7 @@ RakPeerInterface functions explicitly tested:
     SetTimeoutTime
     CloseConnection (with and without a disconnection notification)
     GetConnectionList
+    GetSystemList
     IsActive
 
 Exercised indirectly by getting to that point: Startup,
@@ -98,7 +101,7 @@ constexpr unsigned int kSeed = 12345;
 
 } // namespace
 
-TEST_CASE( "A server times out clients that close silently, and they reconnect without ever holding two connections", "[network]" )
+TEST_CASE( "A server times out clients that close silently, and never holds two connections to one client when they reconnect", "[network]" )
 {
     PeerScope peers;
 
@@ -131,29 +134,31 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
 
     seedMT( kSeed );
 
-    // Reads every client's connection count and asserts the invariant on it: each
-    // client is started for a single connection, so one holding two has
-    // reconnected onto a connection the server had not finished cleaning up.
+    // Reads the server's connected Systems and asserts that no two of them are the
+    // same client, by RakNetGUID or by address. Each client is one Peer on its own
+    // port, so either match means the server accepted a reconnect while it still
+    // held the old connection.
     //
     // REQUIRE rather than the suite's CHECK default: this runs every round, so a
-    // CHECK would report the same defect once per round, and a client started for
-    // one connection that holds two is already a complete diagnosis.
-    auto requireNoClientHoldsTwoConnections = [&]() {
-        for( int i = 0; i < kNumberOfClients; i++ )
-        {
-            unsigned short connections = 0;
-            clients[i]->GetConnectionList( 0, &connections );
+    // CHECK would report the same defect once per round, and two connections to
+    // one client are already a complete diagnosis.
+    auto requireServerHoldsOneConnectionPerClient = [&]() {
+        std::vector<SystemAddress> addresses;
+        std::vector<RakNetGUID> guids;
+        server->GetSystemList( addresses, guids );
 
-            INFO( "client " << i );
-            REQUIRE( connections <= 1 );
+        for( size_t i = 0; i < guids.size(); i++ )
+        {
+            for( size_t j = i + 1; j < guids.size(); j++ )
+            {
+                INFO( "connections to " << addresses[i].ToString( true ) << " and " << addresses[j].ToString( true ) );
+                REQUIRE_FALSE( guids[i] == guids[j] );
+                REQUIRE_FALSE( addresses[i] == addresses[j] );
+            }
         }
     };
 
-    // How many clients still count the server. A plain query, split from the
-    // assertion above rather than folded into it: the one caller wants this
-    // inside a CHECK, and Catch2 evaluates a CHECK's expression inside a
-    // catch(...), which would swallow the REQUIRE's throw and turn a terminal
-    // invariant breach into a confusing unexpected-exception report.
+    // How many clients still count the server.
     auto connectedClientCount = [&]() {
         unsigned short connected = 0;
 
@@ -192,9 +197,6 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
             unsigned short serverConnections = 0;
             server->GetConnectionList( 0, &serverConnections );
 
-            // Both counts read before the CHECK, not inside it: see
-            // connectedClientCount above for why nothing that can throw belongs
-            // in a CHECK's expression.
             const unsigned short clientsConnected = connectedClientCount();
 
             // The timeout detection itself. Both halves of the server's timeout
@@ -258,11 +260,12 @@ TEST_CASE( "A server times out clients that close silently, and they reconnect w
             break;
         }
 
-        // Now that this round's connects and closes have been issued.
-        requireNoClientHoldsTwoConnections();
-
         ConnectionWaits::Drain( server );
         ConnectionWaits::DrainAll( clients, kNumberOfClients );
+
+        // After the drains, so the handshakes this round's connects started have
+        // had the drain's time to finish.
+        requireServerHoldsOneConnectionPerClient();
 
         if( dropTestPending )
         {
