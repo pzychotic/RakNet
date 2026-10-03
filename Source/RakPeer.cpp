@@ -786,35 +786,16 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
 
     if( blockDuration > 0 )
     {
-        for( unsigned int i = 0; i < systemListSize; i++ )
-        {
-            // remoteSystemList in user thread
-            if( remoteSystemList[i].isActive )
-                NotifyAndFlagForShutdown( remoteSystemList[i].systemAddress, false, orderingChannel, disconnectionNotificationPriority );
-        }
+        // From the view, as for any user-thread call (ADR-0007). A System whose record opens
+        // after the last publish isn't notified, and is dropped below.
+        for( const SystemAddress& systemAddress : GetPublishedAddresses() )
+            NotifyAndFlagForShutdown( systemAddress, false, orderingChannel, disconnectionNotificationPriority );
 
+        // The view holds closing records too, so an empty one means every record has closed.
         RakNet::TimeMS time = RakNet::GetTimeMS();
         RakNet::TimeMS startWaitingTime = time;
-        while( time - startWaitingTime < blockDuration )
+        while( time - startWaitingTime < blockDuration && IsPublishedViewEmpty() == false )
         {
-            bool anyActive = false;
-            for( unsigned int j = 0; j < systemListSize; j++ )
-            {
-                // remoteSystemList in user thread
-                if( remoteSystemList[j].isActive )
-                {
-                    anyActive = true;
-                    break;
-                }
-            }
-
-            // If this system is out of packets to send, then stop waiting
-            if( anyActive == false )
-                break;
-
-            // This will probably cause the update thread to run which will probably
-            // send the disconnection notification
-
             std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
             time = RakNet::GetTimeMS();
         }
@@ -827,8 +808,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     {
         pPlugin->OnRakPeerShutdown();
     }
-
-    activeSystemListSize = 0;
 
     // Set before the wake-up, so the network thread exits on waking.
     endThreads = true;
@@ -876,6 +855,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
         remoteSystemList[i].reliabilityLayer.Reset( false, remoteSystemList[i].MTUSize, false );
         remoteSystemList[i].rakNetSocket = 0;
     }
+    activeSystemListSize = 0;
 
 
     // Setting maximumNumberOfPeers to 0 allows remoteSystemList to be reallocated in Initialize.
@@ -3526,6 +3506,22 @@ void RakPeer::PublishView( void )
     // the view.
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
     requestsHandedToRecords.clear();
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+std::vector<SystemAddress> RakPeer::GetPublishedAddresses( void ) const
+{
+    std::vector<SystemAddress> addresses;
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    addresses.reserve( publishedView.size() );
+    for( const PublishedRemoteSystem& entry : publishedView )
+        addresses.emplace_back( entry.systemAddress );
+    return addresses;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::IsPublishedViewEmpty( void ) const
+{
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    return publishedView.empty();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearPublishedView( void )

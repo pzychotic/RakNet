@@ -10,20 +10,9 @@
 # frame is not ours, and the function it names is small enough that hiding its whole call
 # tree hides little else.
 
-# RakPeer::endThreads is a volatile bool. Shutdown sets it, and the network thread polls it.
-# Shutdown also reads remoteSystemList and writes activeSystemListSize while the network
-# thread is still running and using both.
-race_top:RakNet::RakPeer::Shutdown(
-
-# UpdateNetworkLoop's own reads: endThreads, as above, and the user-update callback and its
-# data, which SetUserUpdateThread writes as plain fields (see the settings block below).
+# UpdateNetworkLoop's reads of the user-update callback and its data, which
+# SetUserUpdateThread writes as plain fields (see the settings block below).
 race_top:RakNet::UpdateNetworkLoop(
-
-# RNS2_Berkley::endThreads is a volatile bool. The stop calls set it, and the receive
-# thread polls it.
-race_top:RakNet::RNS2_Berkley::RecvFromLoopInt(
-race_top:RakNet::RNS2_Berkley::SignalStopRecvPollingThread(
-race_top:RakNet::RNS2_Berkley::BlockOnStopRecvPollingThread(
 
 # Empty-queue checks made before the lock is taken, all inside std::deque or std::vector
 # members. PopInaccurate reads queue.empty() unlocked. RunUpdateCycleBody reads

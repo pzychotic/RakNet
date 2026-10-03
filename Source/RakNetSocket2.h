@@ -210,7 +210,7 @@ protected:
     /// The receive thread decrements isRecvFromLoopThreadActive and notifies under this mutex.
     std::mutex recvFromLoopExitMutex;
     std::condition_variable recvFromLoopExited;
-    volatile bool endThreads;
+    std::atomic<bool> endThreads;
     // Constructor not called!
 
     SocketLayerOverride* slo;

@@ -171,6 +171,7 @@ public:
     /// \param[in] orderingChannel If blockDuration > 0, ID_DISCONNECTION_NOTIFICATION will be sent on this channel
     /// \param[in] disconnectionNotificationPriority Priority to send ID_DISCONNECTION_NOTIFICATION on.
     /// If you set it to 0 then the disconnection notification won't be sent
+    /// \note No other call on this Peer may overlap Shutdown, from any thread.
     virtual void Shutdown( unsigned int blockDuration, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY ) = 0;
 
     /// Returns if the network thread is running

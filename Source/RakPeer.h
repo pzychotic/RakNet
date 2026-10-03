@@ -181,6 +181,7 @@ public:
     /// \param[in] orderingChannel Channel on which ID_DISCONNECTION_NOTIFICATION will be sent, if blockDuration > 0.
     /// \param[in] disconnectionNotificationPriority Priority of sending ID_DISCONNECTION_NOTIFICATION.
     /// If set to 0, the disconnection notification won't be sent.
+    /// \note No other call on this Peer may overlap Shutdown, from any thread.
     void Shutdown( unsigned int blockDuration, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY );
 
     /// \brief Returns true if the network thread is running.
@@ -820,6 +821,11 @@ protected:
     void PublishView( void );
     /// Empty the published view and the published sockets, for Shutdown.
     void ClearPublishedView( void );
+    /// The address of every entry in the published view. Callable from any thread.
+    std::vector<SystemAddress> GetPublishedAddresses( void ) const;
+    /// Whether the published view has no entry, so no connection record was open at the
+    /// last publish. Callable from any thread.
+    bool IsPublishedViewEmpty( void ) const;
     /// In debug builds, assert the caller is inside RunUpdateCycle. Every lookup that goes
     /// straight to the connection records calls it (ADR-0007, point 6).
     void AssertInsideUpdateCycle( void ) const;
@@ -885,7 +891,7 @@ protected:
     SystemAddress GetLoopbackAddress( void ) const;
 
     ///Set this to true to terminate the Peer thread execution
-    volatile bool endThreads;
+    std::atomic<bool> endThreads;
     ///true from just before Startup creates the network thread until that thread exits.
     std::atomic<bool> isMainLoopThreadActive;
     /// The network thread clears isMainLoopThreadActive and notifies under this mutex.
