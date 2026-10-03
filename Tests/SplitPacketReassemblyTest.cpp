@@ -3,9 +3,12 @@
 
 #include "RakMemoryOverride.h"
 #include "ReliabilityLayer.h"
+#include "WSAStartupSingleton.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+
+#include <cstring>
 
 /*
 Drives ReliabilityLayer's split-packet reassembly path with hand-built datagrams,
@@ -54,10 +57,10 @@ using SplitChunk = WireMessage;
 /// optionally fails one chosen size.
 ///
 /// SetMalloc_Ex is RakNet's own documented hook, so this drives the real allocator
-/// rather than a test-only seam. It is global and not thread-safe, which shapes how the
-/// cases below use it: the ones that only measure run with no Peer at all, and the one
-/// that injects a failure fails an *exact* byte count - a size no other allocation in
-/// the process plausibly asks for - rather than everything above a threshold.
+/// rather than a test-only seam. It is global and not thread-safe, so every case below
+/// installs it with no RakNet thread running: no Peer at all, and a BoundSocket where the
+/// layer needs one. The one that injects a failure fails an *exact* byte count - a size
+/// nothing else the layer allocates asks for - rather than everything above a threshold.
 class MallocProbe
 {
 public:
@@ -106,6 +109,45 @@ private:
 void* ( *MallocProbe::s_previous )( size_t, const char*, unsigned int ) = nullptr;
 size_t MallocProbe::s_largest = 0;
 size_t MallocProbe::s_failSize = 0;
+
+/// A UDP socket bound on loopback with no polling thread, for a layer that has to send.
+/// Nothing reads it, and it starts no RakNet thread, unlike a started Peer's socket.
+class BoundSocket
+{
+public:
+    BoundSocket()
+    {
+        // Nothing here goes through RakPeer::Startup, so this takes the same Winsock
+        // refcount RakNet itself does. A no-op off Windows.
+        WSAStartupSingleton::AddRef();
+
+        char hostAddress[] = "127.0.0.1";
+
+        RNS2_BerkleyBindParameters bindParameters;
+        memset( &bindParameters, 0, sizeof( bindParameters ) );
+        bindParameters.port = 0;
+        bindParameters.hostAddress = hostAddress;
+        bindParameters.addressFamily = AF_INET;
+        bindParameters.type = SOCK_DGRAM;
+        bindParameters.protocol = 0;
+        bindParameters.nonBlockingSocket = false;
+        bindParameters.eventHandler = 0;
+
+        m_bound = m_socket.Bind( &bindParameters, _FILE_AND_LINE_ ) == BR_SUCCESS;
+    }
+
+    ~BoundSocket() { WSAStartupSingleton::Deref(); }
+
+    BoundSocket( const BoundSocket& ) = delete;
+    BoundSocket& operator=( const BoundSocket& ) = delete;
+
+    /// The socket, or null if it could not be bound.
+    RakNetSocket2* Get() { return m_bound ? &m_socket : nullptr; }
+
+private:
+    RNS2_Berkley m_socket;
+    bool m_bound = false;
+};
 
 // What a channel at exactly the cap costs: one pointer per chunk.
 constexpr size_t kCapCost = sizeof( InternalPacket* ) * (size_t)MAXIMUM_SPLIT_PACKET_COUNT;
@@ -334,10 +376,13 @@ TEST_CASE( "A failed channel allocation drops the datagram instead of the proces
     // returns normally and keeps working.
     //
     // The chunk is at the cap, so its channel array is exactly kCapCost bytes, and the
-    // probe fails that one exact size - not everything above a threshold, which a Peer's
-    // own threads could trip.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
+    // probe fails that one exact size.
+    //
+    // Completing a message acks immediately, which needs a socket. A BoundSocket starts no
+    // thread that could call the probe while it is installed. The address the layer sends
+    // to is a port nothing is listening on, so the traffic goes nowhere.
+    BoundSocket boundSocket;
+    RakNetSocket2* socket = boundSocket.Get();
     REQUIRE( socket != nullptr );
 
     LayerUnderTest layer( socket );
