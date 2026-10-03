@@ -24,12 +24,25 @@
 #include <thread>
 
 /*
-Measures ping statistics over loopback twice: once driving Ping by hand with
+Checks ping over loopback in two phases: once driving Ping by hand with
 occasional pings switched off, and once leaving RakNet to ping on its own. Each
-sender gets its own peer so the second measurement starts from a statistics table
-of its own rather than inheriting the first's - which is what makes the second
-measurement the slow one, because a fresh table is not an empty table. See
-WaitForPingTableTurnover.
+sender gets its own peer so the second phase starts from a statistics table of
+its own rather than inheriting the first's.
+
+The first phase checks the statistics: average, last and lowest over ~50 pings.
+The second checks only that occasional ping pings: it sends pings on its own and
+their results land in the table. It reads one sample, GetLastPing, and fails if
+SetOccasionalPing( true ) does nothing, in Debug and Release alike. One sample is
+enough because the first phase already covers the average arithmetic, and because
+the value alone says where the sample came from - see kMaxOccasionalPingMs.
+
+Two things keep that sample honest. The sender's timeout is raised so RakPeer's
+keepalive ping, whose pong lands in the same table, cannot fall inside the wait:
+at the default Release timeout it would pass the second phase on its own, with
+occasional ping broken - see kSenderTimeoutMs. And the wait is a fixed one
+occasional-ping interval plus slack rather than a poll on GetLastPing, because
+polling the value about to be asserted would only wait out an over-budget reading
+- see WaitForOneOccasionalPing.
 
 RakPeerInterface functions explicitly tested:
 
@@ -39,7 +52,7 @@ RakPeerInterface functions explicitly tested:
     SetOccasionalPing
 
 Exercised indirectly by getting to that point: Startup,
-SetMaximumIncomingConnections, Receive, DeallocatePacket, Ping.
+SetMaximumIncomingConnections, Receive, DeallocatePacket, Ping, SetTimeoutTime.
 
 Ping is also covered by CrossConnectionConvertTest; SetOfflinePingResponse and
 GetOfflinePingResponse by OfflineMessagesConvertTest.
@@ -61,52 +74,58 @@ constexpr int kMaxLastPingMs = 100;
 
 constexpr int kMeasureWindowMs = 1500;
 
+// A fresh connection's ping table does not start out empty. Entry 0 is the pong
+// carried by ID_CONNECTION_REQUEST_ACCEPTED, and entry 1 the pong to the ping
+// RakPeer sends straight after handling it. Both are connection setup cost, not
+// link cost: over loopback they read 15-17 ms against a steady-state 0-1 ms, in
+// Debug and Release alike.
+//
+// This bound sits below that on purpose. A last ping at or under it cannot be a
+// setup entry, so it came from a ping sent after the handshake, and with the
+// keepalive shut out (see kSenderTimeoutMs) only occasional ping sends one.
+// kMaxLastPingMs would let a broken occasional ping pass on entry 1.
+constexpr int kMaxOccasionalPingMs = 10;
+
 // How often RakPeer::Update pings each connected system once occasional ping is
-// on (Source/RakPeer.cpp:5235). Not config dependent.
+// on. Not config dependent. A fresh connection's next ping time is 0, so the first
+// occasional ping goes out on the first update after SetOccasionalPing( true ),
+// and the next one an interval later.
 constexpr int kOccasionalPingIntervalMs = 5000;
 
-// One occasional ping per interval into a ring of PING_TIMES_ARRAY_SIZE entries,
-// so this is how long it takes occasional ping to have written over every entry
-// a fresh connection starts out with. Derived from the mechanism rather than
-// tuned: nothing here is a knob to widen when the test goes red.
-constexpr int kPingTableTurnoverMs = PING_TIMES_ARRAY_SIZE * kOccasionalPingIntervalMs;
+// RakPeer::Update also sends a reliable keepalive ping to a connection that has had
+// no reliable send for half its timeout, and its pong lands in the same table. The
+// default timeout is 10 s in Release, which puts a keepalive inside the wait
+// below, and its pong alone would pass the second phase with occasional ping
+// broken. A 60 s timeout puts the first keepalive at 30 s, well past the wait.
+// Only the sender's timeout matters, because the receiver's keepalive pongs land
+// in its own table.
+constexpr RakNet::TimeMS kSenderTimeoutMs = 60000;
 
-// Called for both measurement phases, so it says which one it is speaking
-// about. Two questions, not one: a negative average means the counter itself
-// is broken, a large one means the link is.
-void CheckAveragePing( int averagePing, const char* phase )
+// Pings go out on the update cycle, so a second covers the ping and its pong many
+// times over and is far short of another interval.
+constexpr int kOccasionalPingSlackMs = 1000;
+
+// Two questions, not one: a negative average means the counter itself is broken,
+// a large one means the link is.
+void CheckAveragePing( int averagePing )
 {
-    INFO( "phase: " << phase );
-
     CHECK( averagePing >= 0 );
     CHECK( averagePing <= kMaxAveragePingMs );
 }
 
-// A fresh connection's ping table does not start out holding pings.
-// RakPeer::OnConnectedPong runs out of ID_CONNECTION_REQUEST_ACCEPTED
-// (Source/RakPeer.cpp:5481) and that same handler pings immediately, so entries
-// 0 and 1 are connection setup cost, not link cost: measured over loopback they
-// come back at 15-17 ms against a steady-state ping of 0-1 ms, in Debug and
-// Release alike.
-//
-// The first phase never notices, because its ~50 manual pings write over the
-// whole ring several times before it reads anything. The second phase issues no
-// pings of its own, so reading the average at the end of a fixed window read
-// ( 15 + 15 + firstPing ) / 3 - which is 10 when the setup samples come back
-// 15 ms and 11 when either comes back 16, making the budget a coin toss decided
-// by one millisecond of handshake. Measured at 13 failures in 60 Debug runs and
-// 3 in 60 Release runs.
-//
-// So wait for occasional ping to have written over those entries, then read once.
-// Deliberately not a poll on `average <= kMaxAveragePingMs`: past the turnover the
-// reading is meaningful by construction, and polling the budget the caller is
-// about to assert on would only trade an honest over-budget reading for a later
-// one that happens to pass.
-void WaitForPingTableTurnover( RakPeerInterface* sender, RakPeerInterface* receiver )
+// Waits one occasional-ping interval plus slack, so the ping sent an interval
+// after switching occasional ping on has had its pong. The interval is what
+// occasional ping promises; the ping that goes out straight away only follows
+// from a fresh connection's next ping time. A fixed wait derived from the
+// mechanism, not tuned, and deliberately not a poll on GetLastPing: a single
+// sample against a deadline has no positive signal of its own, and polling the
+// value the caller is about to assert on would only trade an honest over-budget
+// reading for a later one that happens to pass.
+void WaitForOneOccasionalPing( RakPeerInterface* sender, RakPeerInterface* receiver )
 {
-    RakTimer turnover( kPingTableTurnoverMs );
+    RakTimer window( kOccasionalPingIntervalMs + kOccasionalPingSlackMs );
 
-    while( !turnover.IsExpired() )
+    while( !window.IsExpired() )
     {
         ConnectionWaits::Drain( receiver );
         ConnectionWaits::Drain( sender );
@@ -133,7 +152,7 @@ TEST_CASE( "Ping statistics over loopback stay within a millisecond budget, ping
     REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( sender2, receiver, 5000 ) );
 
     // Occasional ping off, so the numbers below come only from the pings this
-    // loop issues. The second phase turns it back on and measures that instead.
+    // loop issues. The second phase turns it on and checks that instead.
     sender2->SetOccasionalPing( false );
 
     RakTimer timer( kMeasureWindowMs );
@@ -153,7 +172,7 @@ TEST_CASE( "Ping statistics over loopback stay within a millisecond budget, ping
         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
     }
 
-    CheckAveragePing( sender2->GetAveragePing( receiverAddress ), "manual pings, occasional ping off" );
+    CheckAveragePing( sender2->GetAveragePing( receiverAddress ) );
 
     const int lastPing = sender2->GetLastPing( receiverAddress );
     const int lowestPing = sender2->GetLowestPing( receiverAddress );
@@ -169,7 +188,7 @@ TEST_CASE( "Ping statistics over loopback stay within a millisecond budget, ping
     CHECK( lastPing >= lowestPing );
 
     // Second phase on a second peer, so none of the pings above are counted twice.
-    // Its statistics do not start empty, though - see WaitForPingTableTurnover.
+    // Its statistics do not start empty, though - see kMaxOccasionalPingMs.
     // Closed once, then waited for; never re-issued per poll - see
     // ConnectionWaits::WaitForDisconnect.
     sender2->CloseConnection( receiverAddress, true, 0, LOW_PRIORITY );
@@ -177,12 +196,12 @@ TEST_CASE( "Ping statistics over loopback stay within a millisecond budget, ping
 
     REQUIRE( TestHelpers::WaitAndConnectTwoPeersLocally( sender, receiver, 5000 ) );
 
+    sender->SetTimeoutTime( kSenderTimeoutMs, receiverAddress );
     sender->SetOccasionalPing( true );
 
-    // A longer window than the first phase, and for a different reason: this one
-    // sends nothing of its own, so it waits for occasional ping rather than for
-    // enough of its own pings.
-    WaitForPingTableTurnover( sender, receiver );
+    // This phase sends nothing of its own, so it waits for occasional ping rather
+    // than for enough of its own pings.
+    WaitForOneOccasionalPing( sender, receiver );
 
-    CheckAveragePing( sender->GetAveragePing( receiverAddress ), "occasional ping on, no manual pings" );
+    CHECK( sender->GetLastPing( receiverAddress ) <= kMaxOccasionalPingMs );
 }
