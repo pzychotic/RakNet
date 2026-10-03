@@ -1402,9 +1402,12 @@ void UpdateTCPInterfaceLoop( void* arg )
         // Sleep 0 on Linux monopolizes the CPU
         std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     }
-    sts->threadRunning--;
 
+    // Freed before threadRunning drops: once it does, Stop may return and the caller may
+    // swap the allocator hooks.
     rakFree_Ex( data, _FILE_AND_LINE_ );
+
+    sts->threadRunning--;
 }
 
 void RemoteClient::SetActive( bool a )
