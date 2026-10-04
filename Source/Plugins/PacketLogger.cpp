@@ -88,14 +88,14 @@ void PacketLogger::FormatLine(
         sprintf( str3, "%5u", reliableMessageNumber );
     }
 
-    sprintf( into, "%s,%s%s,%s,%s,%5u,%s,%u,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,%i,%i,%i,%i,%s,", localtime, prefix, dir, type, str3, frame, idToPrint, bitLen, time, str1, str2, splitPacketId, splitPacketIndex, splitPacketCount, orderingIndex, suffix );
+    snprintf( into, 1024, "%s,%s%s,%s,%s,%5u,%s,%u,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,%i,%i,%i,%i,%s,", localtime, prefix, dir, type, str3, frame, idToPrint, bitLen, time, str1, str2, splitPacketId, splitPacketIndex, splitPacketCount, orderingIndex, suffix );
 }
 void PacketLogger::OnDirectSocketSend( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress )
 {
     if( logDirectMessages == false )
         return;
 
-    char str[256];
+    char str[1024];
     FormatLine( str, "Snd", "Raw", 0, 0, data[0], bitsUsed, RakNet::GetTimeMS(), rakPeerInterface->GetExternalID( remoteSystemAddress ), remoteSystemAddress, (unsigned int)-1, (unsigned int)-1, (unsigned int)-1, (unsigned int)-1 );
     AddToLog( str );
 }
@@ -110,7 +110,7 @@ void PacketLogger::OnDirectSocketReceive( const char* data, const BitSize_t bits
     if( logDirectMessages == false )
         return;
 
-    char str[256];
+    char str[1024];
     FormatLine( str, "Rcv", "Raw", 0, 0, data[0], bitsUsed, RakNet::GetTime(), rakPeerInterface->GetInternalID( UNASSIGNED_SYSTEM_ADDRESS ), remoteSystemAddress, (unsigned int)-1, (unsigned int)-1, (unsigned int)-1, (unsigned int)-1 );
     AddToLog( str );
 }
@@ -128,7 +128,7 @@ void PacketLogger::OnReliabilityLayerNotification( const char* errorMessage, con
 }
 void PacketLogger::OnAck( unsigned int messageNumber, SystemAddress remoteSystemAddress, RakNet::TimeMS time )
 {
-    char str[256];
+    char str[1024];
     char str1[64], str2[62];
     SystemAddress localSystemAddress = rakPeerInterface->GetExternalID( remoteSystemAddress );
     localSystemAddress.ToString( true, str1 );
@@ -136,12 +136,12 @@ void PacketLogger::OnAck( unsigned int messageNumber, SystemAddress remoteSystem
     char localtime[128];
     GetLocalTime( localtime );
 
-    sprintf( str, "%s,Rcv,Ack,%i,,,,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,,,,,,", localtime, messageNumber, (unsigned long long)time, str1, str2 );
+    snprintf( str, sizeof( str ), "%s,Rcv,Ack,%i,,,,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,,,,,,", localtime, messageNumber, (unsigned long long)time, str1, str2 );
     AddToLog( str );
 }
 void PacketLogger::OnPushBackPacket( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress )
 {
-    char str[256];
+    char str[1024];
     char str1[64], str2[62];
     SystemAddress localSystemAddress = rakPeerInterface->GetExternalID( remoteSystemAddress );
     localSystemAddress.ToString( true, str1 );
@@ -150,12 +150,12 @@ void PacketLogger::OnPushBackPacket( const char* data, const BitSize_t bitsUsed,
     char localtime[128];
     GetLocalTime( localtime );
 
-    sprintf( str, "%s,Lcl,PBP,,,%s,%i,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,,,,,,", localtime, BaseIDTOString( data[0] ), bitsUsed, (unsigned long long)time, str1, str2 );
+    snprintf( str, sizeof( str ), "%s,Lcl,PBP,,,%s,%i,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,,,,,,", localtime, BaseIDTOString( data[0] ), bitsUsed, (unsigned long long)time, str1, str2 );
     AddToLog( str );
 }
 void PacketLogger::OnInternalPacket( InternalPacket* internalPacket, unsigned frameNumber, SystemAddress remoteSystemAddress, RakNet::TimeMS time, int isSend )
 {
-    char str[256];
+    char str[1024];
     const char* sendTypes[] =
         {
             "Rcv",
@@ -207,9 +207,9 @@ void PacketLogger::WriteMiscellaneous( const char* type, const char* msg )
     char localtime[128];
     GetLocalTime( localtime );
 
-    sprintf( str, "%s,Lcl,%s,,,,,%" PRINTF_64_BIT_MODIFIER "u,%s,,,,,,,%s", localtime, type, (unsigned long long)time, str1, msg );
+    snprintf( str, sizeof( str ), "%s,Lcl,%s,,,,,%" PRINTF_64_BIT_MODIFIER "u,%s,,,,,,,%s", localtime, type, (unsigned long long)time, str1, msg );
 
-    AddToLog( msg );
+    AddToLog( str );
 }
 void PacketLogger::SetPrintID( bool print )
 {
@@ -401,7 +401,7 @@ void PacketLogger::GetLocalTime( char buffer[128] )
     auto duration   = clock_now.time_since_epoch();
 
     size_t pos = std::strftime( buffer, 128, "%x %X", &local_time );
-    sprintf( buffer + pos, ".%lld", ( duration_cast<microseconds>( duration ) - duration_cast<seconds>( duration ) ).count() );
+    snprintf( buffer + pos, 128 - pos, ".%06lld", (long long)( duration_cast<microseconds>( duration ) - duration_cast<seconds>( duration ) ).count() );
 }
 void PacketLogger::SetLogDirectMessages( bool send )
 {

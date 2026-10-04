@@ -33,6 +33,9 @@ jobs:
   # MSVC builds Debug: only its Debug configuration defines _DEBUG, and Source/ has code,
   # the network simulator among it, that compiles only under _DEBUG. GCC builds Release, so
   # the suite also runs optimized. no-exceptions-msvc compiles Source/ in MSVC Release.
+  #
+  # GCC also turns its printf-format, buffer-overflow and unused-result warnings into errors
+  # for Source/. MSVC reports none of these at its default level. Tests/ is not covered.
   test:
     name: test (${{ matrix.platform }}, IPv6=${{ matrix.ipv6 }})
     strategy:
@@ -48,6 +51,7 @@ jobs:
             os: ubuntu-latest
             cxx: g++
             config: Release
+            source-options: -Werror=format;-Werror=format-overflow;-Werror=format-truncation;-Werror=unused-result
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
@@ -57,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} "-DRAKNET_SOURCE_COMPILE_OPTIONS=${{ matrix.source-options }}"
       - name: Build
         run: cmake --build build --config ${{ matrix.config }} --parallel
       - name: Test

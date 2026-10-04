@@ -51,10 +51,11 @@ Algorithm:
 
 #define MIN_MINIPUNCH_TIMEOUT 5000
 
-template<typename... Args>
-char* FormatStringTS( char* output, const char* format, Args... args )
+template<size_t N, typename... Args>
+char* FormatStringTS( char ( &output )[N], const char* format, Args... args )
 {
-    snprintf( output, 511, format, args... );
+    if( snprintf( output, N, format, args... ) < 0 )
+        output[0] = 0;
     return output;
 }
 

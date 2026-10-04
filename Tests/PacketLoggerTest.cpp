@@ -152,3 +152,66 @@ TEST_CASE( "PacketLogger logs a Timestamped Message by the ID after its time", "
     CHECK( fields[1] == "Tms" );
     CHECK( fields[4] == std::to_string( ID_USER_PACKET_ENUM ) );
 }
+
+/*
+A 255-byte prefix and suffix, the most SetPrefix and SetSuffix keep, logged through
+OnInternalPacket. The whole line, from the clock to the suffix, must reach WriteLog.
+*/
+
+TEST_CASE( "PacketLogger logs a line with the longest prefix and suffix", "[packetlogger]" )
+{
+    const std::string prefix( 255, 'p' );
+    const std::string suffix( 255, 's' );
+
+    unsigned char buffer[1] = { ID_USER_PACKET_ENUM };
+    InternalPacket packet{};
+    packet.data = buffer;
+    packet.dataBitLength = BYTES_TO_BITS( 1 );
+    packet.reliability = RELIABLE_ORDERED;
+    packet.allocationScheme = InternalPacket::STACK;
+
+    CapturingPacketLogger logger;
+    logger.SetPrefix( prefix.c_str() );
+    logger.SetSuffix( suffix.c_str() );
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Create();
+    peer->AttachPlugin( &logger );
+
+    logger.OnInternalPacket( &packet, 0, UNASSIGNED_SYSTEM_ADDRESS, 0, 1 );
+    peer->DetachPlugin( &logger );
+
+    REQUIRE( logger.lines.size() == 1 );
+    const std::string& line = logger.lines[0];
+    CHECK( line.find( "," + prefix + "Snd," ) != std::string::npos );
+    REQUIRE( line.size() > suffix.size() + 1 );
+    CHECK( line.compare( line.size() - suffix.size() - 1, suffix.size() + 1, suffix + "," ) == 0 );
+}
+
+TEST_CASE( "PacketLogger::WriteMiscellaneous logs the formatted line", "[packetlogger]" )
+{
+    CapturingPacketLogger logger;
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Create();
+    peer->AttachPlugin( &logger );
+
+    logger.WriteMiscellaneous( "Note", "hello" );
+    peer->DetachPlugin( &logger );
+
+    // Clock,Lcl,Note,,,,,Time,Local IP:Port,,,,,,,hello
+    REQUIRE( logger.lines.size() == 1 );
+    const std::string& line = logger.lines[0];
+    const size_t type = line.find( ",Lcl,Note,,,,," );
+    REQUIRE( type != std::string::npos );
+    CHECK( type > 0 );
+
+    const size_t timeStart = type + std::string( ",Lcl,Note,,,,," ).size();
+    const size_t timeEnd = line.find( ',', timeStart );
+    REQUIRE( timeEnd != std::string::npos );
+    CHECK( timeEnd > timeStart );
+    CHECK( line.find_first_not_of( "0123456789", timeStart ) == timeEnd );
+
+    const size_t addressEnd = line.find( ',', timeEnd + 1 );
+    REQUIRE( addressEnd != std::string::npos );
+    CHECK( addressEnd > timeEnd + 1 );
+    CHECK( line.substr( addressEnd ) == ",,,,,,,hello" );
+}

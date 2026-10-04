@@ -12,6 +12,10 @@ include_directories( ${RakNet_SOURCE_DIR}/Source )
 
 source_group( TREE ${RakNet_SOURCE_DIR}/Source PREFIX "Source" FILES ${TARGET_HEADER} ${TARGET_SOURCE} )
 
+# Applies to the libraries built from Source/, not to Tests/.
+set( RAKNET_SOURCE_COMPILE_OPTIONS "" CACHE STRING "Extra compile options for the RakNet libraries only." )
+add_compile_options( ${RAKNET_SOURCE_COMPILE_OPTIONS} )
+
 # create dynamic library if enabled
 if( RAKNET_ENABLE_DLL )
 

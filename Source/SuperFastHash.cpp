@@ -120,16 +120,16 @@ uint32_t SuperFastHashFilePtr( FILE* fp )
     int bytesRemaining = length;
     unsigned int lastHash = length;
     char readBlock[INCREMENTAL_READ_BLOCK];
-    while( bytesRemaining >= (int)sizeof( readBlock ) )
+    // Stops at the first short read and hashes only the bytes that read returned.
+    while( bytesRemaining > 0 )
     {
-        fread( readBlock, sizeof( readBlock ), 1, fp );
-        lastHash = SuperFastHashIncremental( readBlock, (int)sizeof( readBlock ), lastHash );
-        bytesRemaining -= (int)sizeof( readBlock );
-    }
-    if( bytesRemaining > 0 )
-    {
-        fread( readBlock, bytesRemaining, 1, fp );
-        lastHash = SuperFastHashIncremental( readBlock, bytesRemaining, lastHash );
+        const size_t wanted = bytesRemaining < (int)sizeof( readBlock ) ? (size_t)bytesRemaining : sizeof( readBlock );
+        const size_t got = fread( readBlock, 1, wanted, fp );
+        if( got > 0 )
+            lastHash = SuperFastHashIncremental( readBlock, (int)got, lastHash );
+        if( got < wanted )
+            break;
+        bytesRemaining -= (int)got;
     }
     return lastHash;
 }

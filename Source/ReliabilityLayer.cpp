@@ -2876,13 +2876,13 @@ bool ReliabilityLayer::ChargeHeldBytes( uint64_t bytes, PacketReliability reliab
             // System sitting at the budget should not also be able to flood the console.
             if( statistics.messagesDroppedOverConnectionBudget == 0 )
             {
-                RAKNET_DEBUG_PRINTF( "ReliabilityLayer: dropping unreliable data that would take a connection over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::messagesDroppedOverConnectionBudget.\n", heldBytes );
+                RAKNET_DEBUG_PRINTF( "ReliabilityLayer: dropping unreliable data that would take a connection over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::messagesDroppedOverConnectionBudget.\n", (unsigned long long)heldBytes );
             }
             ++statistics.messagesDroppedOverConnectionBudget;
             return false;
         }
 
-        RAKNET_DEBUG_PRINTF( "ReliabilityLayer: closing a connection whose reliable data would take it over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::connectionsClosedOverConnectionBudget.\n", heldBytes );
+        RAKNET_DEBUG_PRINTF( "ReliabilityLayer: closing a connection whose reliable data would take it over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::connectionsClosedOverConnectionBudget.\n", (unsigned long long)heldBytes );
         CloseOverBudget( false );
         return false;
     }
