@@ -393,6 +393,10 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         socketList.push_back( r2 );
     }
 
+    // Both are empty until the receive threads below start, and no other thread touches them yet.
+    RakAssert( bufferedPacketsQueue.empty() );
+    RakAssert( bufferedPacketsFreePool.empty() );
+
     for( unsigned int i = 0; i < socketDescriptorCount; i++ )
     {
         if( socketList[i]->IsBerkleySocket() )
@@ -466,7 +470,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         firstExternalID = UNASSIGNED_SYSTEM_ADDRESS;
 
         ClearBufferedCommands();
-        ClearBufferedPackets();
 
 #if RAKPEER_USER_THREADED != 1
         if( isMainLoopThreadActive == false )
@@ -3761,21 +3764,24 @@ RNS2RecvStruct* RakPeer::AllocRNS2RecvStruct( const char* file, unsigned int lin
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearBufferedPackets( void )
 {
-    bufferedPacketsFreePoolMutex.lock();
+    // Queued datagrams go back through DeallocRNS2RecvStruct. The free pool holds only
+    // buffers RakPeer::DeallocRNS2RecvStruct put there.
+    std::deque<RNS2RecvStruct*> queued;
+    {
+        std::lock_guard<std::mutex> guard( bufferedPacketsQueueMutex );
+        queued.swap( bufferedPacketsQueue );
+    }
+    for( RNS2RecvStruct* pPacket : queued )
+    {
+        DeallocRNS2RecvStruct( pPacket, _FILE_AND_LINE_ );
+    }
+
+    std::lock_guard<std::mutex> guard( bufferedPacketsFreePoolMutex );
     for( RNS2RecvStruct* pPacket : bufferedPacketsFreePool )
     {
         RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
     }
     bufferedPacketsFreePool.clear();
-    bufferedPacketsFreePoolMutex.unlock();
-
-    bufferedPacketsQueueMutex.lock();
-    for( RNS2RecvStruct* pPacket : bufferedPacketsQueue )
-    {
-        RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
-    }
-    bufferedPacketsQueue.clear();
-    bufferedPacketsQueueMutex.unlock();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SetupBufferedPackets( void )

@@ -122,10 +122,8 @@ jobs:
   # TSAN makes a test process that reported a race exit with 66, so any report not
   # suppressed turns the job red. The known races are in tools/tsan-suppressions.txt.
   #
-  # Four tests are left out. The two 256-client churn tests have fixed connection budgets
-  # that TSAN's slowdown cannot meet. The two receive-buffer tests count buffers through
-  # RakPeer's virtual allocator hooks, and under TSAN's timing Startup frees its own
-  # bind-test datagram without going through them.
+  # Two tests are left out, both of them the 256-client churn tests. Their fixed connection
+  # budgets cannot be met under TSAN's slowdown.
   thread-sanitizer:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -159,7 +157,7 @@ jobs:
           test -x "$symbolizer" || { echo "llvm-symbolizer not found"; exit 1; }
           export TSAN_OPTIONS="suppressions=$PWD/tools/tsan-suppressions.txt external_symbolizer_path=$symbolizer second_deadlock_stack=1"
           ctest --test-dir build -C RelWithDebInfo --output-on-failure --no-tests=error \
-            -E '^256 clients|gives its buffer back$|stops at MAX_BUFFERED_RECEIVED_DATAGRAMS$'
+            -E '^256 clients'
 
   # ADR-0004: Source/ builds with exceptions disabled. Both jobs build Source/ only, because
   # Catch2 needs exceptions. Neither runs tests: a throw from Source/ turns the same test red

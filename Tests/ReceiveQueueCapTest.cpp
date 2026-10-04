@@ -335,3 +335,17 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
 
     peer.SetIncomingDatagramEventHandler( nullptr );
 }
+
+TEST_CASE( "Shutdown gives every receive buffer back through DeallocRNS2RecvStruct", "[network]" )
+{
+    WinsockFixture winsock;
+    ObservedPeer peer;
+    peer.Start();
+    REQUIRE( WaitFor( [&] { return peer.BuffersOutstanding() == 1; } ) );
+
+    // Shutdown wakes the receive thread with a datagram to the socket's own address, and
+    // the receive thread queues it after the update thread is gone. That buffer is freed
+    // by Shutdown, and has to come back through the override like every other one.
+    peer.Shutdown( 0 );
+    CHECK( peer.BuffersOutstanding() == 0 );
+}
