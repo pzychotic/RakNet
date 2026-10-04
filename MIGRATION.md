@@ -846,10 +846,10 @@ No signature changed here, but where you hook out-of-memory did. RakNet is
 *exception-neutral* ([ADR-0004](docs/adr/0004-raknet-is-exception-neutral.md)): it builds
 with exceptions disabled, never throws or catches, and fails the same way whether your build
 has exceptions or not. Recoverable failures come back as return values. Allocation failure
-and `std::mutex::lock` failure are fatal, and RakNet promises nothing after one. Catching an
-exception thrown through RakNet is unsupported, including in the mixed build where RakNet is
-compiled without exceptions and your application with them: the catch works but skips
-RakNet's destructors, so its locks stay held. To log before the process dies, install
+and mutex lock failure (`std::mutex`, `std::shared_mutex`) are fatal, and RakNet promises
+nothing after one. Catching an exception thrown through RakNet is unsupported, including in
+the mixed build where RakNet is compiled without exceptions and your application with them:
+the catch works but skips RakNet's destructors, so its locks stay held. To log before the process dies, install
 `std::set_new_handler`. The runtime calls it before throwing in both modes; on MSVC a
 fail-fast skips `std::set_terminate`, so that is not a reliable hook. To control RakNet's
 memory, replace the global `operator new`/`delete`. `SetMalloc` and friends redirect only

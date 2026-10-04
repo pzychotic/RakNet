@@ -36,8 +36,9 @@ report them, and it promises nothing after one:
   `-fno-exceptions` the throw still comes from the prebuilt runtime and ends the process.
   With exceptions enabled it propagates. Hand-written recovery would be an untested path in
   one mode and dead code in the other. Chromium, LLVM and Unreal make the same choice.
-- **`std::mutex::lock` failure.** Its `std::system_error` means misuse (a recursive lock or
-  a destroyed mutex) or OS resource exhaustion. There is no recovery to write.
+- **Mutex lock failure.** This is `std::mutex::lock`, and `std::shared_mutex::lock` and
+  `lock_shared`. Their `std::system_error` means misuse (a recursive lock or a destroyed
+  mutex) or OS resource exhaustion. There is no recovery to write.
 
 ## What is input validation, not "allocation"
 

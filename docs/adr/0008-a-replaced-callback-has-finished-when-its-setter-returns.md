@@ -22,8 +22,10 @@ told an application when it could free what the old callback used.
    the setter swaps without waiting, and the new callback applies from the next call. That
    is the only case that skips the wait. Calling the other setter from a callback waits as
    usual.
-4. **Calling a setter while holding something the old callback waits for deadlocks.** It is
-   documented on both setters, not detected.
+4. **Calling a setter while holding something the old callback waits for deadlocks.** That
+   includes the other callback: each is held for its whole call, so the update callback
+   calling `SetIncomingDatagramEventHandler` while a datagram handler calls
+   `SetUserUpdateThread` deadlocks. It is documented on both setters, not detected.
 5. **Datagram handler calls on different sockets still overlap.** Each call holds a shared
    lock and the setter takes it exclusively. A Peer with no handler installed takes no lock
    per datagram. A datagram that arrives while a handler is being installed may miss it.
