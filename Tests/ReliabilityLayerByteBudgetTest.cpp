@@ -473,7 +473,11 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
     WriteWireMessage( sample, WidestChannelChunk( 0, UNRELIABLE, 0 ) );
     const uint64_t bytesSent = (uint64_t)kChunks * sample.GetNumberOfBytesUsed();
 
-    const SystemAddress rawAddress = server->GetSystemAddressFromGuid( RakNetGUID( kRawSystemGuid ) );
+    // The Peer sends ID_OPEN_CONNECTION_REPLY_2 during an update cycle and publishes the
+    // System's record only at the cycle's end, so the reply can arrive before the record.
+    SystemAddress rawAddress = UNASSIGNED_SYSTEM_ADDRESS;
+    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + 5000; rawAddress == UNASSIGNED_SYSTEM_ADDRESS && RakNet::GetTimeMS() < deadline; std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) ) )
+        rawAddress = server->GetSystemAddressFromGuid( RakNetGUID( kRawSystemGuid ) );
     REQUIRE( rawAddress != UNASSIGNED_SYSTEM_ADDRESS );
 
     RakNetStatistics statistics;
