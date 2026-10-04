@@ -427,6 +427,19 @@ TEST_CASE( "A statistics query in flight when Shutdown starts fails promptly", "
                 longestFailure = took;
         }
     } );
+    // A failed REQUIRE unwinds through here, and a joinable std::thread destroyed on the
+    // way out terminates the run.
+    struct StopAsker
+    {
+        std::atomic<bool>& stop;
+        std::thread& asker;
+        ~StopAsker()
+        {
+            stop = true;
+            if( asker.joinable() )
+                asker.join();
+        }
+    } stopAsker{ stop, asker };
 
     REQUIRE( WaitFor( { &client }, [&] { return answered.load() > 10; } ) );
     server->Shutdown( 0 );
