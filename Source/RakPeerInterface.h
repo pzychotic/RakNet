@@ -395,10 +395,11 @@ public:
     /// Return the unique address identifier that represents you or another system on the the network and is based on your local IP / port.
     /// \param[in] systemAddress Use UNASSIGNED_SYSTEM_ADDRESS to get your behind-LAN address. Use a connected system to get their behind-LAN address
     /// \param[in] index When you have multiple internal IDs, which index to return? Currently limited to MAXIMUM_NUMBER_OF_INTERNAL_IDS (so the maximum value of this variable is MAXIMUM_NUMBER_OF_INTERNAL_IDS-1)
-    /// \return the identifier of your system internally, which may not be how other systems see if you if you are behind a NAT or proxy
+    /// \return the identifier of your system internally, which may not be how other systems see if you if you are behind a NAT or proxy. UNASSIGNED_SYSTEM_ADDRESS if \a index is out of range.
     virtual SystemAddress GetInternalID( const SystemAddress systemAddress = UNASSIGNED_SYSTEM_ADDRESS, const int index = 0 ) const = 0;
 
     /// \brief Sets your internal IP address, for platforms that do not support reading it, or to override a value
+    /// \details The list ends at its first UNASSIGNED_SYSTEM_ADDRESS, so setting that at \a index hides every address after it. An \a index out of range sets nothing.
     /// \param[in] systemAddress. The address to set. Use SystemAddress::FromString() if you want to use a dotted string
     /// \param[in] index When you have multiple internal IDs, which index to set?
     virtual void SetInternalID( SystemAddress systemAddress, int index = 0 ) = 0;
@@ -477,7 +478,7 @@ public:
 
     /// Returns an IP address at index 0 to GetNumberOfAddresses-1
     /// \param[in] index index into the list of IP addresses
-    /// \return The local IP address at this index
+    /// \return The local IP address at this index, or "" if \a index is out of range. The string belongs to the calling thread, and its next call to GetLocalIP overwrites it.
     virtual const char* GetLocalIP( unsigned int index ) = 0;
 
     /// Is this a local IP?

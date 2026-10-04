@@ -26,6 +26,7 @@
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
 
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -415,10 +416,11 @@ public:
     /// \brief Returns the unique address identifier that represents you or another system on the the network
     /// \param[in] systemAddress Use UNASSIGNED_SYSTEM_ADDRESS to get your behind-LAN address. Use a connected system to get their behind-LAN address. This does not return the port.
     /// \param[in] index When you have multiple internal IDs, which index to return? Currently limited to MAXIMUM_NUMBER_OF_INTERNAL_IDS (so the maximum value of this variable is MAXIMUM_NUMBER_OF_INTERNAL_IDS-1)
-    /// \return Identifier of your system internally, which may not be how other systems see if you if you are behind a NAT or proxy.
+    /// \return Identifier of your system internally, which may not be how other systems see if you if you are behind a NAT or proxy. UNASSIGNED_SYSTEM_ADDRESS if \a index is out of range.
     SystemAddress GetInternalID( const SystemAddress systemAddress = UNASSIGNED_SYSTEM_ADDRESS, const int index = 0 ) const;
 
     /// \brief Sets your internal IP address, for platforms that do not support reading it, or to override a value
+    /// \details The list ends at its first UNASSIGNED_SYSTEM_ADDRESS, so setting that at \a index hides every address after it. An \a index out of range sets nothing.
     /// \param[in] systemAddress. The address to set. Use SystemAddress::FromString() if you want to use a dotted string
     /// \param[in] index When you have multiple internal IDs, which index to set?
     void SetInternalID( SystemAddress systemAddress, int index = 0 );
@@ -481,7 +483,7 @@ public:
 
     /// Returns an IP address at index 0 to GetNumberOfAddresses-1 in ipList array.
     /// \param[in] index index into the list of IP addresses
-    /// \return The local IP address at this index
+    /// \return The local IP address at this index, or "" if \a index is out of range. The string belongs to the calling thread, and its next call to GetLocalIP overwrites it.
     const char* GetLocalIP( unsigned int index );
 
     /// Is this a local IP?
@@ -912,6 +914,8 @@ protected:
     bool IsLoopbackAddressInCycle( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
     /// MatchesThisPeer against the published external address. For the user thread.
     bool IsLoopbackAddressPublished( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
+    /// A copy of ipList, taken under ipListMutex, so a caller sees one version of the list.
+    std::array<SystemAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS> CopyIPList( void ) const;
     SystemAddress GetLoopbackAddress( void ) const;
 
     ///Set this to true to terminate the Peer thread execution
@@ -1187,7 +1191,11 @@ protected:
     // Systems in this list will not go through the secure connection process, even when secure connections are turned on. Wildcards are accepted.
     std::vector<std::string> securityExceptionList;
 
+    /// This Peer's internal addresses, ending at the first UNASSIGNED_SYSTEM_ADDRESS. Guarded
+    /// by ipListMutex everywhere but the constructor: the user thread sets them while the
+    /// network thread reads them.
     SystemAddress ipList[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
+    mutable std::mutex ipListMutex;
 
     /// SetUserUpdateThread's callback and its data. Guarded by userUpdateThreadMutex, which
     /// UpdateNetworkLoop holds around each call (ADR-0008).

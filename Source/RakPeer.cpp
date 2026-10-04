@@ -414,14 +414,17 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         }
     }
 
-    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
     {
-        if( ipList[i] == UNASSIGNED_SYSTEM_ADDRESS )
-            break;
-        if( socketList[0]->IsBerkleySocket() )
+        std::lock_guard<std::mutex> guard( ipListMutex );
+        for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
         {
-            unsigned short port = ( (RNS2_Berkley*)socketList[0] )->GetBoundAddress().GetPort();
-            ipList[i].SetPortHostOrder( port );
+            if( ipList[i] == UNASSIGNED_SYSTEM_ADDRESS )
+                break;
+            if( socketList[0]->IsBerkleySocket() )
+            {
+                unsigned short port = ( (RNS2_Berkley*)socketList[0] )->GetBoundAddress().GetPort();
+                ipList[i].SetPortHostOrder( port );
+            }
         }
     }
 
@@ -1962,8 +1965,12 @@ void RakPeer::GetOfflinePingResponse( char** data, unsigned int* length )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetInternalID( const SystemAddress systemAddress, const int index ) const
 {
+    if( index < 0 || index >= MAXIMUM_NUMBER_OF_INTERNAL_IDS )
+        return UNASSIGNED_SYSTEM_ADDRESS;
+
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
     {
+        std::lock_guard<std::mutex> guard( ipListMutex );
         return ipList[index];
     }
     else
@@ -1984,6 +1991,9 @@ SystemAddress RakPeer::GetInternalID( const SystemAddress systemAddress, const i
 void RakPeer::SetInternalID( SystemAddress systemAddress, int index )
 {
     RakAssert( index >= 0 && index < MAXIMUM_NUMBER_OF_INTERNAL_IDS );
+    if( index < 0 || index >= MAXIMUM_NUMBER_OF_INTERNAL_IDS )
+        return;
+    std::lock_guard<std::mutex> guard( ipListMutex );
     ipList[index] = systemAddress;
 }
 
@@ -2161,9 +2171,9 @@ unsigned int RakPeer::GetNumberOfAddresses( void )
         FillIPList();
     }
 
-    int i = 0;
-
-    while( ipList[i] != UNASSIGNED_SYSTEM_ADDRESS )
+    std::lock_guard<std::mutex> guard( ipListMutex );
+    unsigned int i = 0;
+    while( i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && ipList[i] != UNASSIGNED_SYSTEM_ADDRESS )
         i++;
 
     return i;
@@ -2172,7 +2182,7 @@ unsigned int RakPeer::GetNumberOfAddresses( void )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Returns an IP address at index 0 to GetNumberOfAddresses-1
 // \param[in] index index into the list of IP addresses
-// \return The local IP address at this index
+// \return The local IP address at this index, or "" if index is out of range, in a buffer the calling thread's next call overwrites
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 const char* RakPeer::GetLocalIP( unsigned int index )
 {
@@ -2183,9 +2193,17 @@ const char* RakPeer::GetLocalIP( unsigned int index )
         FillIPList();
     }
 
+    thread_local char str[128];
+    str[0] = 0;
+    if( index >= MAXIMUM_NUMBER_OF_INTERNAL_IDS )
+        return str;
 
-    static char str[128];
-    ipList[index].ToString( false, str );
+    SystemAddress address;
+    {
+        std::lock_guard<std::mutex> guard( ipListMutex );
+        address = ipList[index];
+    }
+    address.ToString( false, str );
     return str;
 }
 
@@ -2203,11 +2221,15 @@ bool RakPeer::IsLocalIP( const char* ip )
     if( strcmp( ip, "127.0.0.1" ) == 0 || strcmp( ip, "localhost" ) == 0 )
         return true;
 
-    int num = GetNumberOfAddresses();
-    int i;
-    for( i = 0; i < num; i++ )
+    if( IsActive() == false )
+        FillIPList();
+
+    const auto internalIDs = CopyIPList();
+    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && internalIDs[i] != UNASSIGNED_SYSTEM_ADDRESS; i++ )
     {
-        if( strcmp( ip, GetLocalIP( i ) ) == 0 )
+        char str[128];
+        internalIDs[i].ToString( false, str );
+        if( strcmp( ip, str ) == 0 )
             return true;
     }
 
@@ -3092,8 +3114,9 @@ void RakPeer::OnConnectionRequest( RakPeer::RemoteSystemStruct* remoteSystem, Ra
     SystemIndex systemIndex = (SystemIndex)GetRecordIndexFromSystemAddress( remoteSystem->systemAddress );
     RakAssert( systemIndex != 65535 );
     bitStream.Write( systemIndex );
+    const auto internalIDs = CopyIPList();
     for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-        bitStream.Write( ipList[i] );
+        bitStream.Write( internalIDs[i] );
     bitStream.Write( incomingTimestamp );
     bitStream.Write( RakNet::GetTime() );
 
@@ -3203,13 +3226,14 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
                 // See if this is an internal IP address.
                 // If so, force binding on it so we reply on the same IP address as they sent to.
                 unsigned int ipListIndex, foundIndex = (unsigned int)-1;
+                const auto internalIDs = CopyIPList();
 
                 for( ipListIndex = 0; ipListIndex < MAXIMUM_NUMBER_OF_INTERNAL_IDS; ipListIndex++ )
                 {
-                    if( ipList[ipListIndex] == UNASSIGNED_SYSTEM_ADDRESS )
+                    if( internalIDs[ipListIndex] == UNASSIGNED_SYSTEM_ADDRESS )
                         break;
 
-                    if( bindingAddress.EqualsExcludingPort( ipList[ipListIndex] ) )
+                    if( bindingAddress.EqualsExcludingPort( internalIDs[ipListIndex] ) )
                     {
                         foundIndex = ipListIndex;
                         break;
@@ -3765,16 +3789,17 @@ bool RakPeer::MatchesThisPeer( const AddressOrGUID& systemIdentifier, bool match
     if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
         return systemIdentifier.rakNetGuid == myGuid;
 
-    for( int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && ipList[i] != UNASSIGNED_SYSTEM_ADDRESS; i++ )
+    const auto internalIDs = CopyIPList();
+    for( int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && internalIDs[i] != UNASSIGNED_SYSTEM_ADDRESS; i++ )
     {
         if( matchPort )
         {
-            if( ipList[i] == systemIdentifier.systemAddress )
+            if( internalIDs[i] == systemIdentifier.systemAddress )
                 return true;
         }
         else
         {
-            if( ipList[i].EqualsExcludingPort( systemIdentifier.systemAddress ) )
+            if( internalIDs[i].EqualsExcludingPort( systemIdentifier.systemAddress ) )
                 return true;
         }
     }
@@ -3785,7 +3810,17 @@ bool RakPeer::MatchesThisPeer( const AddressOrGUID& systemIdentifier, bool match
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetLoopbackAddress( void ) const
 {
+    std::lock_guard<std::mutex> guard( ipListMutex );
     return ipList[0];
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+std::array<SystemAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS> RakPeer::CopyIPList( void ) const
+{
+    std::array<SystemAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS> copy;
+    std::lock_guard<std::mutex> guard( ipListMutex );
+    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
+        copy[i] = ipList[i];
+    return copy;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::AllowIncomingConnections( void ) const
@@ -5921,9 +5956,10 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 
                             BitStream outBitStream;
                             outBitStream.Write( (MessageID)ID_NEW_INCOMING_CONNECTION );
+                            const auto internalIDs = CopyIPList();
                             outBitStream.Write( systemAddress );
                             for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-                                outBitStream.Write( ipList[i] );
+                                outBitStream.Write( internalIDs[i] );
                             outBitStream.Write( sendPongTime );
                             outBitStream.Write( RakNet::GetTime() );
 
@@ -6116,6 +6152,7 @@ void RakPeer::CallPluginCallbacks( std::vector<PluginInterface2*>& pluginList, P
 
 void RakPeer::FillIPList( void )
 {
+    std::lock_guard<std::mutex> guard( ipListMutex );
     if( ipList[0] != UNASSIGNED_SYSTEM_ADDRESS )
         return;
 
