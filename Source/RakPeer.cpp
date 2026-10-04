@@ -5329,7 +5329,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         DeallocRNS2RecvStruct( recvFromStruct, _FILE_AND_LINE_ );
     }
 
-    while( ( bcs = bufferedCommands.PopInaccurate() ) != 0 )
+    while( ( bcs = bufferedCommands.Pop() ) != 0 )
     {
         if( bcs->command == BufferedCommandStruct::BCS_SEND )
         {

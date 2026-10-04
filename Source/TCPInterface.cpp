@@ -781,7 +781,7 @@ Packet* TCPInterface::ReceiveInt( void )
         headPush.pop_front();
         return p;
     }
-    Packet* p = incomingMessages.PopInaccurate();
+    Packet* p = incomingMessages.Pop();
     if( p )
     {
         ReleaseIncomingBytes( *p );
@@ -952,7 +952,7 @@ SystemAddress TCPInterface::HasFailedConnectionAttempt( void )
 }
 SystemAddress TCPInterface::HasNewIncomingConnection( void )
 {
-    SystemAddress* out = newIncomingConnections.PopInaccurate();
+    SystemAddress* out = newIncomingConnections.Pop();
     if( out )
     {
         SystemAddress out2 = *out;
@@ -972,7 +972,7 @@ SystemAddress TCPInterface::HasNewIncomingConnection( void )
 }
 SystemAddress TCPInterface::HasLostConnection( void )
 {
-    SystemAddress* out = lostConnections.PopInaccurate();
+    SystemAddress* out = lostConnections.Pop();
     if( out )
     {
         SystemAddress out2 = *out;
@@ -1245,7 +1245,7 @@ void UpdateTCPInterfaceLoop( void* arg )
     {
 #if OPEN_SSL_CLIENT_SUPPORT == 1
         SystemAddress* sslSystemAddress;
-        sslSystemAddress = sts->startSSL.PopInaccurate();
+        sslSystemAddress = sts->startSSL.Pop();
         if( sslSystemAddress )
         {
             // Starts SSL on the entry at index if it is active at the address and has none.

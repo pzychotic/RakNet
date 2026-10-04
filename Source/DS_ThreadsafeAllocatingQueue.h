@@ -33,7 +33,6 @@ class RAK_DLL_EXPORT ThreadsafeAllocatingQueue
 public:
     // Queue operations
     void Push( structureType* s );
-    structureType* PopInaccurate( void );
     structureType* Pop( void );
     void SetPageSize( int size );
     bool IsEmpty( void );
@@ -56,23 +55,6 @@ void ThreadsafeAllocatingQueue<structureType>::Push( structureType* s )
 {
     std::lock_guard<std::mutex> guard( queueMutex );
     queue.push_back( s );
-}
-
-template<class structureType>
-structureType* ThreadsafeAllocatingQueue<structureType>::PopInaccurate( void )
-{
-    structureType* s;
-    if( queue.empty() )
-        return 0;
-    std::lock_guard<std::mutex> guard( queueMutex );
-    if( !queue.empty() )
-    {
-        s = queue.front();
-        queue.pop_front();
-    }
-    else
-        s = 0;
-    return s;
 }
 
 template<class structureType>
@@ -112,17 +94,15 @@ void ThreadsafeAllocatingQueue<structureType>::Deallocate( structureType* s, con
 template<class structureType>
 void ThreadsafeAllocatingQueue<structureType>::Clear( const char* file, unsigned int line )
 {
-    memoryPoolMutex.lock();
+    std::lock_guard<std::mutex> queueGuard( queueMutex );
+    std::lock_guard<std::mutex> memoryPoolGuard( memoryPoolMutex );
     for( structureType* s : queue )
     {
         s->~structureType();
         memoryPool.Release( s, file, line );
     }
     queue.clear();
-    memoryPoolMutex.unlock();
-    memoryPoolMutex.lock();
     memoryPool.Clear( file, line );
-    memoryPoolMutex.unlock();
 }
 
 template<class structureType>
