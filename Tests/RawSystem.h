@@ -233,9 +233,19 @@ public:
         return true;
     }
 
+    /// Whether an offline message is the server refusing the handshake. Nothing follows a
+    /// refusal, so a wait for the next handshake reply has already failed when one arrives.
+    static bool IsHandshakeRefusal( MessageID messageId )
+    {
+        return messageId == ID_ALREADY_CONNECTED || messageId == ID_NO_FREE_INCOMING_CONNECTIONS ||
+               messageId == ID_IP_RECENTLY_CONNECTED || messageId == ID_CONNECTION_BANNED ||
+               messageId == ID_INCOMPATIBLE_PROTOCOL_VERSION;
+    }
+
     /// The next datagram carrying this message id, or false once the budget is spent.
     /// Anything else is discarded and the wait continues: the server resends handshake
-    /// replies, and none of them are what a caller here is waiting for.
+    /// replies, and none of them are what a caller here is waiting for. An Offline wait
+    /// ends early, and false, on a handshake refusal, which is left in dataOut.
     bool WaitForMessage( MessageID messageId, Framing framing, int millisecondsToWait, char* dataOut, int& lengthOut )
     {
         const RakNet::TimeMS deadline = RakNet::GetTimeMS() + (RakNet::TimeMS)millisecondsToWait;
@@ -250,6 +260,8 @@ public:
             {
                 if( (unsigned char)dataOut[0] == messageId )
                     return true;
+                if( IsHandshakeRefusal( (MessageID)dataOut[0] ) )
+                    return false;
             }
             else if( DatagramCarriesMessage( dataOut, lengthOut, messageId ) )
             {
@@ -306,9 +318,13 @@ public:
         request2.Write( RakNetGUID( m_guid ) );
         Send( request2 );
 
-        char reply2[MAXIMUM_MTU_SIZE];
+        // A record the server still holds for this port under another GUID is refused here
+        // with ID_ALREADY_CONNECTED, so the port is part of the report.
+        char reply2[MAXIMUM_MTU_SIZE] = {};
         int reply2Length = 0;
-        REQUIRE( WaitForMessage( ID_OPEN_CONNECTION_REPLY_2, Framing::Offline, kHandshakeBudgetMs, reply2, reply2Length ) );
+        const bool replied = WaitForMessage( ID_OPEN_CONNECTION_REPLY_2, Framing::Offline, kHandshakeBudgetMs, reply2, reply2Length );
+        INFO( "from port " << GetBoundPort() << ", the last offline message id was " << (int)(unsigned char)reply2[0] );
+        REQUIRE( replied );
     }
 
     /// CompleteOfflineHandshake, then everything that takes the server's record of this

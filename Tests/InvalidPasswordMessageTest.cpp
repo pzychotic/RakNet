@@ -13,7 +13,9 @@
 
 #include <atomic>
 #include <cstring>
+#include <memory>
 #include <thread>
+#include <vector>
 
 /*
 Pins the length of the ID_INVALID_PASSWORD a server sends when a client offers
@@ -165,12 +167,33 @@ TEST_CASE( "Connection requests are checked against a password that changes as t
         }
     } );
 
+    // A failed REQUIRE unwinds through here, and a joinable std::thread destroyed on the
+    // way out terminates the run. The churner also uses the server, so it stops before
+    // PeerScope does.
+    struct StopAndJoin
+    {
+        std::atomic<bool>& running;
+        std::thread& thread;
+        ~StopAndJoin()
+        {
+            running = false;
+            if( thread.joinable() )
+                thread.join();
+        }
+    } stopChurner{ churning, churner };
+
     const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    // Every requester keeps its socket to the end. The server still holds an accepted
+    // requester's record, so a later requester the OS gave the same port would be refused
+    // with ID_ALREADY_CONNECTED.
+    std::vector<std::unique_ptr<RawSystemHarness::RawSystem>> requesters;
 
     int answered = 0;
     for( int i = 0; i < kRequests; ++i )
     {
-        RawSystemHarness::RawSystem requester( serverAddress, 0x7000 + (uint64_t)i );
+        requesters.push_back( std::make_unique<RawSystemHarness::RawSystem>( serverAddress, 0x7000 + (uint64_t)i ) );
+        RawSystemHarness::RawSystem& requester = *requesters.back();
         requester.CompleteOfflineHandshake();
         requester.SendConnectionRequest( kServerPassword, (int)strlen( kServerPassword ) );
 
