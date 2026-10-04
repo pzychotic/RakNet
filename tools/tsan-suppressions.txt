@@ -19,8 +19,3 @@
 race:RakNet::DataStructures::ThreadsafeAllocatingQueue*::PopInaccurate(
 race:RakNet::RakPeer::SendConnectionRequest(
 race:RakNet::RakPeer::IsBanned(
-
-# Send's IsLoopbackAddress compares against firstExternalID, through SystemAddress's
-# operator==, on the user thread. The network thread writes it when the first connection
-# completes.
-race:RakNet::RakPeer::IsLoopbackAddress(

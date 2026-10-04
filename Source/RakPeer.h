@@ -830,10 +830,13 @@ protected:
 
     /// The body of RunUpdateCycle, which wraps it in insideUpdateCycle and PublishView.
     bool RunUpdateCycleBody( BitStream& updateBitStream );
-    /// Rebuild the published view from the open connection records and swap it in, then
-    /// hand the cycle's staged Packets to Receive. Network thread only.
+    /// Rebuild the published view from the open connection records and swap it in with
+    /// firstExternalID, then hand the cycle's staged Packets to Receive. Network thread only.
     void PublishView( void );
-    /// Empty the published view and the published sockets, for Shutdown.
+    /// The Peer's external address as of the last publish. Callable from any thread.
+    SystemAddress GetPublishedExternalAddress( void ) const;
+    /// Empty the published view, the published sockets and the published external address,
+    /// for Shutdown.
     void ClearPublishedView( void );
     /// The address of every entry in the published view. Callable from any thread.
     std::vector<SystemAddress> GetPublishedAddresses( void ) const;
@@ -901,7 +904,13 @@ protected:
     /// Start or stop taking queries. Stopping settles every pending one unanswered.
     void SetAcceptingQueries( bool accepting );
 
-    bool IsLoopbackAddress( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
+    /// Whether \a systemIdentifier names this Peer: its RakNetGUID, an address in ipList, or
+    /// \a externalAddress.
+    bool MatchesThisPeer( const AddressOrGUID& systemIdentifier, bool matchPort, const SystemAddress& externalAddress ) const;
+    /// MatchesThisPeer against the live firstExternalID. Inside the update cycle only.
+    bool IsLoopbackAddressInCycle( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
+    /// MatchesThisPeer against the published external address. For the user thread.
+    bool IsLoopbackAddressPublished( const AddressOrGUID& systemIdentifier, bool matchPort ) const;
     SystemAddress GetLoopbackAddress( void ) const;
 
     ///Set this to true to terminate the Peer thread execution
@@ -978,6 +987,9 @@ protected:
     /// A copy of socketList, set once Startup has succeeded and cleared by Shutdown before
     /// it frees the sockets. Guarded by publishedViewMutex.
     std::vector<RakNetSocket2*> publishedSockets;
+    /// firstExternalID as of the last PublishView, and UNASSIGNED_SYSTEM_ADDRESS once
+    /// Shutdown clears the view. Guarded by publishedViewMutex.
+    SystemAddress publishedExternalAddress;
     mutable std::mutex publishedViewMutex;
     /// Set while RunUpdateCycle runs. A flag rather than a thread id, so it holds under
     /// RAKPEER_USER_THREADED too.
@@ -1157,6 +1169,8 @@ protected:
     /// True to allow connection accepted packets from anyone.  False to only allow these packets from servers we requested a connection to.
     std::atomic<bool> allowConnectionResponseIPMigration;
 
+    /// The first external address any System reported since Startup. Network thread only,
+    /// once it runs. The user thread reads publishedExternalAddress.
     SystemAddress firstExternalID;
     /// Defaults each new connection record copies, like defaultTimeoutTime.
     std::atomic<int> splitMessageProgressInterval;

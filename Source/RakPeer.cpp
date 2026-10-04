@@ -232,6 +232,7 @@ RakPeer::RakPeer()
     unreliableTimeout = 1000;
     maxOutgoingBPS = 0;
     firstExternalID = UNASSIGNED_SYSTEM_ADDRESS;
+    publishedExternalAddress = UNASSIGNED_SYSTEM_ADDRESS;
     myGuid = UNASSIGNED_RAKNET_GUID;
     userUpdateThreadPtr = 0;
     userUpdateThreadData = 0;
@@ -1024,7 +1025,7 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
     else
         usedSendReceipt = IncrementNextSendReceipt();
 
-    if( broadcast == false && IsLoopbackAddress( systemIdentifier, true ) )
+    if( broadcast == false && IsLoopbackAddressPublished( systemIdentifier, true ) )
     {
         SendLoopback( data, length );
 
@@ -1092,7 +1093,7 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
     else
         usedSendReceipt = IncrementNextSendReceipt();
 
-    if( broadcast == false && IsLoopbackAddress( systemIdentifier, true ) )
+    if( broadcast == false && IsLoopbackAddressPublished( systemIdentifier, true ) )
     {
         SendLoopback( (const char*)bitStream->GetData(), bitStream->GetNumberOfBytesUsed() );
         if( reliability >= UNRELIABLE_WITH_ACK_RECEIPT )
@@ -1987,7 +1988,7 @@ void RakPeer::SetInternalID( SystemAddress systemAddress, int index )
 SystemAddress RakPeer::GetExternalID( const SystemAddress target ) const
 {
     if( target == UNASSIGNED_SYSTEM_ADDRESS )
-        return firstExternalID;
+        return GetPublishedExternalAddress();
 
     PublishedRemoteSystem entry;
     if( GetPublishedByAddress( target, entry ) == false )
@@ -3137,7 +3138,7 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
 
     if( limitConnectionFrequencyFromTheSameIP )
     {
-        if( IsLoopbackAddress( systemAddress, false ) == false )
+        if( IsLoopbackAddressInCycle( systemAddress, false ) == false )
         {
             for( i = 0; i < maximumNumberOfPeers; i++ )
             {
@@ -3517,6 +3518,7 @@ void RakPeer::PublishView( void )
     {
         std::lock_guard<std::mutex> guard( publishedViewMutex );
         publishedView.swap( publishedViewBuilding );
+        publishedExternalAddress = firstExternalID;
     }
 
     // Only after the swap, so a Message the cycle produced reaches Receive once the view
@@ -3542,6 +3544,12 @@ std::vector<SystemAddress> RakPeer::GetPublishedAddresses( void ) const
     return addresses;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+SystemAddress RakPeer::GetPublishedExternalAddress( void ) const
+{
+    std::lock_guard<std::mutex> guard( publishedViewMutex );
+    return publishedExternalAddress;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::IsPublishedViewEmpty( void ) const
 {
     std::lock_guard<std::mutex> guard( publishedViewMutex );
@@ -3554,6 +3562,7 @@ void RakPeer::ClearPublishedView( void )
     publishedView.clear();
     publishedViewBuilding.clear();
     publishedSockets.clear();
+    publishedExternalAddress = UNASSIGNED_SYSTEM_ADDRESS;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::AssertInsideUpdateCycle( void ) const
@@ -3729,7 +3738,18 @@ void RakPeer::RemoveFromActiveSystemList( const SystemAddress& sa )
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-bool RakPeer::IsLoopbackAddress( const AddressOrGUID& systemIdentifier, bool matchPort ) const
+bool RakPeer::IsLoopbackAddressInCycle( const AddressOrGUID& systemIdentifier, bool matchPort ) const
+{
+    AssertInsideUpdateCycle();
+    return MatchesThisPeer( systemIdentifier, matchPort, firstExternalID );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::IsLoopbackAddressPublished( const AddressOrGUID& systemIdentifier, bool matchPort ) const
+{
+    return MatchesThisPeer( systemIdentifier, matchPort, GetPublishedExternalAddress() );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RakPeer::MatchesThisPeer( const AddressOrGUID& systemIdentifier, bool matchPort, const SystemAddress& externalAddress ) const
 {
     if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
         return systemIdentifier.rakNetGuid == myGuid;
@@ -3748,8 +3768,8 @@ bool RakPeer::IsLoopbackAddress( const AddressOrGUID& systemIdentifier, bool mat
         }
     }
 
-    return ( matchPort == true && systemIdentifier.systemAddress == firstExternalID ) ||
-           ( matchPort == false && systemIdentifier.systemAddress.EqualsExcludingPort( firstExternalID ) );
+    return ( matchPort == true && systemIdentifier.systemAddress == externalAddress ) ||
+           ( matchPort == false && systemIdentifier.systemAddress.EqualsExcludingPort( externalAddress ) );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 SystemAddress RakPeer::GetLoopbackAddress( void ) const
@@ -4040,7 +4060,7 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
         }
     }
 
-    if( broadcast == false && IsLoopbackAddress( systemIdentifier, true ) )
+    if( broadcast == false && IsLoopbackAddressPublished( systemIdentifier, true ) )
     {
         SendLoopback( dataAggregate, (int)totalLength );
         rakFree_Ex( dataAggregate, _FILE_AND_LINE_ );
