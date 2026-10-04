@@ -1,7 +1,9 @@
 #include "PeerScope.h"
+#include "RawSystem.h"
 
 #include "BitStream.h"
 #include "CommonFunctions.h"
+#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakNetStringMakers.h"
 #include "RakNetTypes.h"
@@ -9,7 +11,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
 #include <cstring>
+#include <thread>
 
 /*
 Pins the length of the ID_INVALID_PASSWORD a server sends when a client offers
@@ -36,6 +40,7 @@ in the output.
 RakPeerInterface functions explicitly tested:
 
     SetIncomingPassword
+    GetIncomingPassword
     Connect (with passwordData)
 
 Exercised indirectly by getting to that point: Startup,
@@ -128,4 +133,63 @@ TEST_CASE( "The correct password connects, so the rejection above is a rejection
     Packet* accepted = CommonFunctions::WaitAndReturnMessageWithID( client, ID_CONNECTION_REQUEST_ACCEPTED, kConnectBudgetMs );
     REQUIRE( accepted != nullptr );
     client->DeallocatePacket( accepted );
+}
+
+TEST_CASE( "Connection requests are checked against a password that changes as they arrive", "[network]" )
+{
+    // Exists for ThreadSanitizer: the user thread rewrites the password while the network
+    // thread checks requests against it. Each request is answered one way or the other, and
+    // the getter reads back exactly what was set.
+    constexpr int kRequests = 16;
+
+    RawSystemHarness::WinsockFixture winsock;
+    PeerScope peers;
+    RakPeerInterface* server = peers.Server( kServerPort, kRequests );
+    server->SetIncomingPassword( kServerPassword, (int)strlen( kServerPassword ) );
+
+    std::atomic<bool> churning{ true };
+    int readBacksDiffering = 0;
+    std::thread churner( [&] {
+        bool right = false;
+        while( churning )
+        {
+            const char* password = right ? kServerPassword : kWrongPassword;
+            const int passwordLength = (int)strlen( password );
+            server->SetIncomingPassword( password, passwordLength );
+            char readBack[64];
+            int readBackLength = (int)sizeof( readBack );
+            server->GetIncomingPassword( readBack, &readBackLength );
+            if( readBackLength != passwordLength || memcmp( readBack, password, passwordLength ) != 0 )
+                ++readBacksDiffering;
+            right = !right;
+        }
+    } );
+
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    int answered = 0;
+    for( int i = 0; i < kRequests; ++i )
+    {
+        RawSystemHarness::RawSystem requester( serverAddress, 0x7000 + (uint64_t)i );
+        requester.CompleteOfflineHandshake();
+        requester.SendConnectionRequest( kServerPassword, (int)strlen( kServerPassword ) );
+
+        const TimeMS deadline = GetTimeMS() + kRejectBudgetMs;
+        char data[MAXIMUM_MTU_SIZE];
+        int length = 0;
+        while( GetTimeMS() < deadline && requester.WaitForDatagram( (int)( deadline - GetTimeMS() ), data, length ) )
+        {
+            if( RawSystemHarness::DatagramCarriesMessage( data, length, ID_CONNECTION_REQUEST_ACCEPTED ) ||
+                RawSystemHarness::DatagramCarriesMessage( data, length, ID_INVALID_PASSWORD ) )
+            {
+                ++answered;
+                break;
+            }
+        }
+    }
+
+    churning = false;
+    churner.join();
+    CHECK( answered == kRequests );
+    CHECK( readBacksDiffering == 0 );
 }

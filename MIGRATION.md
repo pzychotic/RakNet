@@ -24,6 +24,10 @@ If you hooked out-of-memory with `SetNotifyOutOfMemory`, it now hears about far 
 `RakPeer`'s getters now answer from a snapshot, and a closed connection no longer answers
 at all. See [Getters answer only for open connections](#getters-answer-only-for-open-connections).
 
+Setting `SetUserUpdateThread`'s callback or `SetIncomingDatagramEventHandler`'s handler now
+waits for the old one to return. See
+[Replacing a callback waits for the old one](#replacing-a-callback-waits-for-the-old-one).
+
 On a little-endian host, a Timestamped Message now carries the time its sender wrote, shifted
 to your clock, where stock handed it out with its bytes reversed. Nothing on the wire changed.
 See
@@ -783,6 +787,33 @@ copy out of the snapshot, so there's nothing for a reference to point at. Code t
 the result, or binds it to a `const RakNetGUID&`, compiles unchanged. Code that takes its
 address, or binds it to `auto&`, doesn't: copy it into a `RakNetGUID` instead. A class of
 your own that implements `RakPeerInterface` has to change the return type of its override.
+
+## Replacing a callback waits for the old one
+
+Stock stored the `SetUserUpdateThread` callback and the `SetIncomingDatagramEventHandler`
+handler as plain fields, and their setters returned at once. The old callback could still
+be running on the network or receive thread, and could be called once more after the setter
+returned, so clearing a callback and then freeing what it used was a use-after-free. The
+network thread could also call a new update callback with the old data pointer.
+
+Now, when either setter returns, the old callback isn't running and won't be called again
+([ADR-0008](docs/adr/0008-a-replaced-callback-has-finished-when-its-setter-returns.md)). A
+callback and its data pointer are published together, and everything your thread did before
+the setter is visible to the new callback's first call. Three things follow:
+
+- **The setter may block** for as long as a call of the old callback takes to return.
+- **A callback may replace or clear itself.** Called from inside the callback it replaces,
+  the setter swaps without waiting, and the change applies from the next call. Calling the
+  other setter from a callback waits as usual.
+- **Don't call a setter while holding something the old callback waits for.** That
+  deadlocks. A callback that waits on the thread that clears it has to be released before
+  the setter is called. Each callback is held for its whole call, so the update callback
+  calling `SetIncomingDatagramEventHandler` while a datagram handler calls
+  `SetUserUpdateThread` deadlocks too.
+
+Handler calls on different sockets still overlap. A Peer with no handler installed takes no
+lock per datagram, and a datagram that arrives while a handler is being installed may miss
+it.
 
 ## Timestamped Messages arrive shifted
 

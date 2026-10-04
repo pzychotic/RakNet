@@ -10,10 +10,6 @@
 # frame is not ours, and the function it names is small enough that hiding its whole call
 # tree hides little else.
 
-# UpdateNetworkLoop's reads of the user-update callback and its data, which
-# SetUserUpdateThread writes as plain fields (see the settings block below).
-race_top:RakNet::UpdateNetworkLoop(
-
 # Empty-queue checks made before the lock is taken, all inside std::deque or std::vector
 # members. PopInaccurate reads queue.empty() unlocked. RunUpdateCycleBody reads
 # requestedConnectionQueue.empty() unlocked while SendConnectionRequest pushes under the
@@ -23,24 +19,6 @@ race_top:RakNet::UpdateNetworkLoop(
 race:RakNet::DataStructures::ThreadsafeAllocatingQueue*::PopInaccurate(
 race:RakNet::RakPeer::SendConnectionRequest(
 race:RakNet::RakPeer::IsBanned(
-
-# Peer-wide settings that the user thread writes as plain fields while the network or
-# receive thread reads them. SetIncomingPassword's write is a memcpy.
-race_top:RakNet::RakPeer::SetMaximumIncomingConnections(
-race_top:RakNet::RakPeer::GetMaximumIncomingConnections(
-race_top:RakNet::RakPeer::SetOccasionalPing(
-race:RakNet::RakPeer::SetIncomingPassword(
-race_top:RakNet::RakPeer::SetIncomingDatagramEventHandler(
-race_top:RakNet::RakPeer::OnRNS2Recv(
-race_top:RakNet::RakPeer::SetUserUpdateThread(
-
-# The same race as SetUserUpdateThread above, seen from the callback: the network thread
-# gets the callback's data pointer with no happens-before edge to the code that built the
-# object, so the callback's first touch of it races that construction. Matched on the
-# constructing side, so a race of anything the callback calls still reports.
-race:Staller::Staller(
-race:Asker::Asker(
-race:UpdateThreadGate::UpdateThreadGate(
 
 # Send's IsLoopbackAddress compares against firstExternalID, through SystemAddress's
 # operator==, on the user thread. The network thread writes it when the first connection

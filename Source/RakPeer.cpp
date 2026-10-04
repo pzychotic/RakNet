@@ -107,6 +107,14 @@ bool IPAddressMatch( const char* pszIpToCheck, const char* pszIpToCheckFor )
 /// answered inline rather than waiting on itself.
 thread_local const RakPeer* networkThreadOf = nullptr;
 
+/// The Peer whose SetUserUpdateThread callback this thread is running, for the length of the
+/// call. Its setter, called from inside, already holds userUpdateThreadMutex.
+thread_local const RakPeer* insideUserUpdateCallbackOf = nullptr;
+
+/// The Peer whose incoming-datagram handler this thread is running, for the length of the
+/// call. Its setter, called from inside, already holds incomingDatagramEventHandlerMutex shared.
+thread_local const RakPeer* insideDatagramHandlerOf = nullptr;
+
 } // namespace
 
 void UpdateNetworkLoop( void* arg );
@@ -693,8 +701,7 @@ void RakPeer::SetIncomingPassword( const char* passwordData, int passwordDataLen
     if( passwordData == 0 )
         passwordDataLength = 0;
 
-    // Not threadsafe but it's not important enough to lock.  Who is going to change the password a lot during runtime?
-    // It won't overflow at least because incomingPasswordLength is an unsigned char
+    std::lock_guard<std::mutex> guard( incomingPasswordMutex );
     if( passwordDataLength > 0 )
         memcpy( incomingPassword, passwordData, passwordDataLength );
     incomingPasswordLength = (unsigned char)passwordDataLength;
@@ -703,6 +710,7 @@ void RakPeer::SetIncomingPassword( const char* passwordData, int passwordDataLen
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::GetIncomingPassword( char* passwordData, int* passwordDataLength )
 {
+    std::lock_guard<std::mutex> guard( incomingPasswordMutex );
     if( passwordData == 0 )
     {
         *passwordDataLength = incomingPasswordLength;
@@ -2539,12 +2547,21 @@ void RakPeer::WriteOutOfBandHeader( BitStream* bitStream )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SetUserUpdateThread( void ( *_userUpdateThreadPtr )( RakPeerInterface*, void* ), void* _userUpdateThreadData )
 {
+    // From inside the callback, this thread already holds the mutex.
+    std::unique_lock<std::mutex> lock( userUpdateThreadMutex, std::defer_lock );
+    if( insideUserUpdateCallbackOf != this )
+        lock.lock();
     userUpdateThreadPtr = _userUpdateThreadPtr;
     userUpdateThreadData = _userUpdateThreadData;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SetIncomingDatagramEventHandler( bool ( *_incomingDatagramEventHandler )( RNS2RecvStruct* ) )
 {
+    // From inside the handler, this thread already holds the mutex shared, and handler calls on
+    // other sockets may still be running.
+    std::unique_lock<std::shared_mutex> lock( incomingDatagramEventHandlerMutex, std::defer_lock );
+    if( insideDatagramHandlerOf != this )
+        lock.lock();
     incomingDatagramEventHandler = _incomingDatagramEventHandler;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3029,8 +3046,12 @@ bool RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
 
     unsigned char* password = bs.GetData() + BITS_TO_BYTES( bs.GetReadOffset() );
     int passwordLength = byteSize - BITS_TO_BYTES( bs.GetReadOffset() );
-    if( incomingPasswordLength != passwordLength ||
-        memcmp( password, incomingPassword, incomingPasswordLength ) != 0 )
+    bool passwordMatches;
+    {
+        std::lock_guard<std::mutex> guard( incomingPasswordMutex );
+        passwordMatches = incomingPasswordLength == passwordLength && memcmp( password, incomingPassword, incomingPasswordLength ) == 0;
+    }
+    if( passwordMatches == false )
     {
         CAT_AUDIT_PRINTF( "AUDIT: Invalid password\n" );
         // Reliable, so the reason arrives. The record closes once the refusal is acked,
@@ -5937,10 +5958,24 @@ void RakPeer::OnRNS2Recv( RNS2RecvStruct* recvStruct )
 {
     // Either drop gives the buffer back: the handler may not keep it past the call, and a
     // full queue drops the newest datagram as a full socket buffer would.
-    if( incomingDatagramEventHandler && incomingDatagramEventHandler( recvStruct ) != true )
+    if( incomingDatagramEventHandler.load() != nullptr )
     {
-        DeallocRNS2RecvStruct( recvStruct, _FILE_AND_LINE_ );
-        return;
+        bool keep = true;
+        {
+            std::shared_lock<std::shared_mutex> lock( incomingDatagramEventHandlerMutex );
+            bool ( *handler )( RNS2RecvStruct* ) = incomingDatagramEventHandler.load();
+            if( handler != nullptr )
+            {
+                insideDatagramHandlerOf = this;
+                keep = handler( recvStruct );
+                insideDatagramHandlerOf = nullptr;
+            }
+        }
+        if( keep == false )
+        {
+            DeallocRNS2RecvStruct( recvStruct, _FILE_AND_LINE_ );
+            return;
+        }
     }
 
     if( PushBufferedPacket( recvStruct ) == false )
@@ -5972,8 +6007,15 @@ void UpdateNetworkLoop( void* arg )
         //      RakAssert(thisCall-lastCall<250);
         //      lastCall=thisCall;
         // #endif
-        if( rakPeer->userUpdateThreadPtr )
-            rakPeer->userUpdateThreadPtr( rakPeer, rakPeer->userUpdateThreadData );
+        {
+            std::lock_guard<std::mutex> guard( rakPeer->userUpdateThreadMutex );
+            if( rakPeer->userUpdateThreadPtr )
+            {
+                insideUserUpdateCallbackOf = rakPeer;
+                rakPeer->userUpdateThreadPtr( rakPeer, rakPeer->userUpdateThreadData );
+                insideUserUpdateCallbackOf = nullptr;
+            }
+        }
 
         rakPeer->RunUpdateCycle( updateBitStream );
 

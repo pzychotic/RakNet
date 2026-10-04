@@ -32,6 +32,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <unordered_set>
 #include <vector>
 
@@ -578,14 +579,27 @@ public:
     virtual void WriteOutOfBandHeader( BitStream* bitStream );
 
     /// If you need code to run in the same thread as RakNet's update thread, this function can be used for that
+    /// \note When this returns, the old callback isn't running and won't be called again, so
+    /// what it used may be freed. This blocks while a call of the old callback is in flight.
+    /// A callback may replace or clear itself: called from inside it, this swaps without
+    /// waiting, and the new callback applies from the next call. Calling this while holding
+    /// anything the old callback waits for deadlocks, as does a datagram handler calling this
+    /// while this callback calls SetIncomingDatagramEventHandler (ADR-0008).
     /// \param[in] _userUpdateThreadPtr C callback function
-    /// \param[in] _userUpdateThreadData Passed to C callback function
+    /// \param[in] _userUpdateThreadData Passed to C callback function. What the calling thread did before this call is visible to the callback's first call.
     virtual void SetUserUpdateThread( void ( *_userUpdateThreadPtr )( RakPeerInterface*, void* ), void* _userUpdateThreadData );
 
     /// Set a C callback to be called whenever a datagram arrives
     /// Return true from the callback to have RakPeer handle the datagram. Return false and RakPeer will ignore the datagram.
     /// This can be used to filter incoming datagrams by system, or to share a recvfrom socket with RakPeer
     /// RNS2RecvStruct will only remain valid for the duration of the call
+    /// \note When this returns, the old handler isn't running and won't be called again. This
+    /// blocks while a call of the old handler is in flight. Calls for different sockets still
+    /// overlap, and a datagram that arrives while a handler is being installed may miss it.
+    /// A handler may replace or clear itself: called from inside it, this swaps without
+    /// waiting, and the new handler applies from the next datagram. Calling this while
+    /// holding anything the old handler waits for deadlocks, as does the user-update callback
+    /// calling this while a handler calls SetUserUpdateThread (ADR-0008).
     virtual void SetIncomingDatagramEventHandler( bool ( *_incomingDatagramEventHandler )( RNS2RecvStruct* ) );
 
     // --------------------------------------------------------------------------------------------Network Simulator Functions--------------------------------------------------------------------------------------------
@@ -907,17 +921,21 @@ protected:
     bool acceptingQueries;
     mutable std::mutex queryMutex;
 
-    bool occasionalPing; /// Do we occasionally ping the other systems?*/
+    /// Do we occasionally ping the other systems? Set on the user thread and read on the
+    /// network thread.
+    std::atomic<bool> occasionalPing;
     ///Store the maximum number of peers allowed to connect
     unsigned int maximumNumberOfPeers;
     //05/02/06 Just using maximumNumberOfPeers instead
     ///Store the maximum number of peers able to connect, including reserved connection slots for pings, etc.
-    ///Store the maximum incoming connection allowed
-    unsigned int maximumIncomingConnections;
+    ///Store the maximum incoming connection allowed. Set on the user thread and read on the
+    ///network thread.
+    std::atomic<unsigned int> maximumIncomingConnections;
     BitStream offlinePingResponse;
-    ///Local Player ID
+    /// What a connection request has to carry. Guarded by incomingPasswordMutex.
     char incomingPassword[256];
     unsigned char incomingPasswordLength;
+    std::mutex incomingPasswordMutex;
 
     /// The connection records. Network thread only: nothing guards them, so the user thread
     /// reads the published view instead, and changes them through buffered commands
@@ -1123,7 +1141,8 @@ protected:
     unsigned int GetSystemIndexFromGuid( const RakNetGUID input ) const;
     RakNetGUID myGuid;
 
-    unsigned maxOutgoingBPS;
+    /// Set on the user thread and read on the network thread every cycle.
+    std::atomic<unsigned> maxOutgoingBPS;
 
     // Nobody would use the internet simulator in a final build.
 #ifdef _DEBUG
@@ -1136,26 +1155,35 @@ protected:
     ///How long it has been since things were updated by a call to receiveUpdate thread uses this to determine how long to sleep for
     //unsigned int lastUserUpdateCycle;
     /// True to allow connection accepted packets from anyone.  False to only allow these packets from servers we requested a connection to.
-    bool allowConnectionResponseIPMigration;
+    std::atomic<bool> allowConnectionResponseIPMigration;
 
     SystemAddress firstExternalID;
     /// Defaults each new connection record copies, like defaultTimeoutTime.
     std::atomic<int> splitMessageProgressInterval;
     std::atomic<RakNet::TimeMS> unreliableTimeout;
 
-    bool ( *incomingDatagramEventHandler )( RNS2RecvStruct* );
+    /// SetIncomingDatagramEventHandler's handler, or null. Each call holds
+    /// incomingDatagramEventHandlerMutex shared, and the setter stores it holding the mutex
+    /// exclusively, except from inside the handler, where it holds it shared (ADR-0008).
+    /// OnRNS2Recv reads it without the lock first, and takes no lock while it is null.
+    std::atomic<bool ( * )( RNS2RecvStruct* )> incomingDatagramEventHandler;
+    std::shared_mutex incomingDatagramEventHandlerMutex;
 
     // Systems in this list will not go through the secure connection process, even when secure connections are turned on. Wildcards are accepted.
     std::vector<std::string> securityExceptionList;
 
     SystemAddress ipList[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
 
+    /// SetUserUpdateThread's callback and its data. Guarded by userUpdateThreadMutex, which
+    /// UpdateNetworkLoop holds around each call (ADR-0008).
     void ( *userUpdateThreadPtr )( RakPeerInterface*, void* );
     void* userUpdateThreadData;
+    std::mutex userUpdateThreadMutex;
 
 
     mutable SignaledEvent quitAndDataEvents;
-    bool limitConnectionFrequencyFromTheSameIP;
+    /// Set on the user thread and read on the network thread.
+    std::atomic<bool> limitConnectionFrequencyFromTheSameIP;
 
     std::mutex packetAllocationPoolMutex;
     DataStructures::MemoryPool<Packet> packetAllocationPool;

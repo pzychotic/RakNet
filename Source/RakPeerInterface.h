@@ -570,8 +570,14 @@ public:
     virtual void WriteOutOfBandHeader( BitStream* bitStream ) = 0;
 
     /// If you need code to run in the same thread as RakNet's update thread, this function can be used for that
+    /// \note When this returns, the old callback isn't running and won't be called again, so
+    /// what it used may be freed. This blocks while a call of the old callback is in flight.
+    /// A callback may replace or clear itself: called from inside it, this swaps without
+    /// waiting, and the new callback applies from the next call. Calling this while holding
+    /// anything the old callback waits for deadlocks, as does a datagram handler calling this
+    /// while this callback calls SetIncomingDatagramEventHandler (ADR-0008).
     /// \param[in] _userUpdateThreadPtr C callback function
-    /// \param[in] _userUpdateThreadData Passed to C callback function
+    /// \param[in] _userUpdateThreadData Passed to C callback function. What the calling thread did before this call is visible to the callback's first call.
     virtual void SetUserUpdateThread( void ( *_userUpdateThreadPtr )( RakPeerInterface*, void* ), void* _userUpdateThreadData ) = 0;
 
     /// Set a C callback to be called whenever a datagram arrives
@@ -581,6 +587,13 @@ public:
     /// If the incoming datagram is not from your game at all, it is a RakNet packet.
     /// If the incoming datagram has an IP address that matches a known address from your game, then check the first byte of data.
     /// For RakNet connected systems, the first bit is always 1. So for your own game packets, make sure the first bit is always 0.
+    /// \note When this returns, the old handler isn't running and won't be called again. This
+    /// blocks while a call of the old handler is in flight. Calls for different sockets still
+    /// overlap, and a datagram that arrives while a handler is being installed may miss it.
+    /// A handler may replace or clear itself: called from inside it, this swaps without
+    /// waiting, and the new handler applies from the next datagram. Calling this while
+    /// holding anything the old handler waits for deadlocks, as does the user-update callback
+    /// calling this while a handler calls SetUserUpdateThread (ADR-0008).
     virtual void SetIncomingDatagramEventHandler( bool ( *_incomingDatagramEventHandler )( RNS2RecvStruct* ) ) = 0;
 
     // --------------------------------------------------------------------------------------------Network Simulator Functions--------------------------------------------------------------------------------------------
