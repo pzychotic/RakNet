@@ -206,6 +206,9 @@ protected:
     RNS2_BerkleyBindParameters binding;
 
     unsigned RecvFromLoopInt( void );
+    /// The longest RecvFromBlocking waits for a datagram. The receive thread checks endThreads
+    /// at least this often, even when no datagram arrives.
+    static constexpr int RECV_FROM_TIMEOUT_MS = 100;
     std::atomic<uint32_t> isRecvFromLoopThreadActive;
     /// The receive thread decrements isRecvFromLoopThreadActive and notifies under this mutex.
     std::mutex recvFromLoopExitMutex;

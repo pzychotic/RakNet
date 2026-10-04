@@ -16,6 +16,7 @@
 #include <charconv>
 
 #ifndef _WIN32
+#include <poll.h>
 #include <netdb.h>
 #include "LinuxStrings.h"
 #endif
@@ -628,6 +629,26 @@ void RNS2_Berkley::RecvFromBlockingIPV4( RNS2RecvStruct* recvFromStruct )
 
 void RNS2_Berkley::RecvFromBlocking( RNS2RecvStruct* recvFromStruct )
 {
+    // Waits for a datagram for at most RECV_FROM_TIMEOUT_MS, and reads nothing if none came.
+#ifdef _WIN32
+    WSAPOLLFD readable;
+    readable.fd = rns2Socket;
+    readable.events = POLLRDNORM;
+    readable.revents = 0;
+    int ready = WSAPoll( &readable, 1, RECV_FROM_TIMEOUT_MS );
+#else
+    pollfd readable;
+    readable.fd = rns2Socket;
+    readable.events = POLLIN;
+    readable.revents = 0;
+    int ready = poll( &readable, 1, RECV_FROM_TIMEOUT_MS );
+#endif
+    if( ready <= 0 )
+    {
+        recvFromStruct->bytesRead = -1;
+        return;
+    }
+
 #if RAKNET_SUPPORT_IPV6 == 1
     return RecvFromBlockingIPV4And6( recvFromStruct );
 #else

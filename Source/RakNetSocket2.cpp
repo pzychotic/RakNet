@@ -192,7 +192,8 @@ void RNS2_Berkley::BlockOnStopRecvPollingThread( void )
 {
     endThreads = true;
 
-    // Get recvfrom to unblock
+    // Wakes the receive thread at once. If the datagram is lost, RecvFromBlocking still
+    // returns within RECV_FROM_TIMEOUT_MS, so the wait below always ends.
     RNS2_SendParameters bsp;
     unsigned long zero = 0;
     bsp.data = (char*)&zero;
@@ -201,16 +202,8 @@ void RNS2_Berkley::BlockOnStopRecvPollingThread( void )
     bsp.ttl = 0;
     Send( &bsp, _FILE_AND_LINE_ );
 
-    // One datagram normally does it. Resend in case it was lost, or recvfrom returned without
-    // data and blocked again.
-    RakNet::TimeMS timeout = RakNet::GetTimeMS() + 1000;
     std::unique_lock<std::mutex> lock( recvFromLoopExitMutex );
-    while( recvFromLoopExited.wait_for( lock, std::chrono::milliseconds( 30 ), [this] { return isRecvFromLoopThreadActive == 0; } ) == false && RakNet::GetTimeMS() < timeout )
-    {
-        lock.unlock();
-        Send( &bsp, _FILE_AND_LINE_ );
-        lock.lock();
-    }
+    recvFromLoopExited.wait( lock, [this] { return isRecvFromLoopThreadActive == 0; } );
 }
 const RNS2_BerkleyBindParameters* RNS2_Berkley::GetBindings( void ) const { return &binding; }
 RNS2Socket RNS2_Berkley::GetSocket( void ) const { return rns2Socket; }
