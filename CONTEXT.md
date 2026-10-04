@@ -45,10 +45,18 @@ application calls for one.
 _Avoid_: Tick, frame, update (unqualified)
 
 **Published view**:
-The snapshot of every open connection record that a Peer makes at the end of each update
-cycle. Every question the application asks about Systems is answered from the latest one.
-So an answer is coherent but may be up to one update cycle old.
+The snapshot a Peer makes at the end of each update cycle of every open connection record,
+and of what the Peer has learned about itself from them, such as its external address.
+Every question the application asks about Systems, or about what Systems have told the
+Peer, is answered from the latest one. So an answer is coherent but may be up to one update
+cycle old.
 _Avoid_: Cache, mirror, copy
+
+**External address**:
+The address a System sees this Peer at, as that System reports it during the handshake.
+Each connection has its own. The Peer's external address, unqualified, is the first one
+any System reported after `Startup`, and the Peer has none once it shuts down.
+_Avoid_: External ID, public IP
 
 **Half-open System**:
 A System that has begun the connection handshake but not completed it. It has a

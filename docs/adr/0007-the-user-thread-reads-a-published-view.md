@@ -39,6 +39,8 @@ can tear the ping and statistics fields the network thread writes on every datag
      the end of its cycle.
    - The bound sockets don't change between `Startup` and `Shutdown`, so `Startup` publishes
      them once it succeeds and `Shutdown` clears them before freeing any socket.
+   - Peer-wide facts that only the network thread learns, such as the Peer's external
+     address, are published with the view and cleared with it at `Shutdown`.
    - Setters that change a connection record become buffered commands, which the network
      thread applies at the start of its next cycle.
 5. **Checks that gate an action are advisory on the user thread.** `Connect`'s "already
