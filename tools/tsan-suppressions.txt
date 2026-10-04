@@ -9,11 +9,3 @@
 # inside a library call (memcpy, a std::deque member, a libc interceptor), so the innermost
 # frame is not ours, and the function it names is small enough that hiding its whole call
 # tree hides little else.
-
-# Empty-container checks made before the lock is taken, inside std::deque or std::vector
-# members. RunUpdateCycleBody reads requestedConnectionQueue.empty() unlocked while
-# SendConnectionRequest pushes under the lock; the network thread's side is all of
-# RunUpdateCycleBody, so the entry names the pushing side. IsBanned reads banList.empty()
-# unlocked while AddToBanList inserts under the lock.
-race:RakNet::RakPeer::SendConnectionRequest(
-race:RakNet::RakPeer::IsBanned(

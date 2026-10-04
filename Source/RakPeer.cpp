@@ -1660,9 +1660,6 @@ bool RakPeer::IsBanned( const char* IP )
     if( IP == 0 || IP[0] == 0 || strlen( IP ) > 15 )
         return false;
 
-    if( banList.empty() )
-        return false; // Skip the mutex if possible
-
     RakNet::TimeMS time = RakNet::GetTimeMS();
 
     std::lock_guard<std::mutex> guard( banListMutex );
@@ -5381,15 +5378,14 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 
     HandleConnectionCancelQueue();
 
-    if( !requestedConnectionQueue.empty() )
     {
-        if( timeNS == 0 )
+        std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
+        if( !requestedConnectionQueue.empty() && timeNS == 0 )
         {
             timeNS = RakNet::GetTimeUS();
             timeMS = ( RakNet::TimeMS )( timeNS / (RakNet::TimeUS)1000 );
         }
 
-        std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
         for( auto it = requestedConnectionQueue.begin(); it != requestedConnectionQueue.end(); )
         {
             RequestedConnectionStruct* rcs = *it;
