@@ -94,9 +94,10 @@ jobs:
         run: netstat -ano
 
   # RAKPEER_USER_THREADED=1: the application runs RakPeer's update cycles itself. Most
-  # network tests depend on the network thread and fail in this mode. StatisticsQueryTest and
-  # SocketQueryTest pump the update cycles themselves, so they pass in both modes, and this
-  # cell runs only those two files, in Debug so _DEBUG code is compiled in this mode too.
+  # network tests depend on the network thread and fail in this mode. StatisticsQueryTest,
+  # SocketQueryTest and ShutdownNotifiesTest pump the update cycles themselves, so they pass
+  # in both modes, and this cell runs only those three files, in Debug so _DEBUG code is
+  # compiled in this mode too.
   # Catch2 exits non-zero if the filter matches nothing.
   user-threaded:
     runs-on: windows-latest
@@ -113,7 +114,7 @@ jobs:
         id: test
         working-directory: build/Tests
         timeout-minutes: 10
-        run: ./Debug/RakNetTests.exe '-#' '[#StatisticsQueryTest],[#SocketQueryTest]'
+        run: ./Debug/RakNetTests.exe '-#' '[#StatisticsQueryTest],[#SocketQueryTest],[#ShutdownNotifiesTest]'
       - name: Dump sockets
         if: failure() && steps.test.outcome == 'failure'
         run: netstat -ano
