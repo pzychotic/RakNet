@@ -39,6 +39,7 @@
 #include "SuperFastHash.h"
 
 #include <charconv>
+#include <cinttypes>
 #include <stdlib.h>
 
 namespace RakNet {
@@ -663,7 +664,7 @@ void RakNetGUID::ToString( char* dest ) const
         strcpy( dest, "UNASSIGNED_RAKNET_GUID" );
     else
         //sprintf(dest, "%u.%u.%u.%u.%u.%u", g[0], g[1], g[2], g[3], g[4], g[5]);
-        sprintf( dest, "%" PRINTF_64_BIT_MODIFIER "u", (long long unsigned int)g );
+        sprintf( dest, "%" PRIu64, g );
     // sprintf(dest, "%u.%u.%u.%u.%u.%u", g[0], g[1], g[2], g[3], g[4], g[5]);
 }
 bool RakNetGUID::FromString( const char* source )

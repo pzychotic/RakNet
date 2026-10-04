@@ -12,6 +12,7 @@
 #if _RAKNET_SUPPORT_PacketLogger == 1
 
 #include "Plugins/PacketLogger.h"
+#include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
 #include "InternalPacket.h"
@@ -88,7 +89,7 @@ void PacketLogger::FormatLine(
         sprintf( str3, "%5u", reliableMessageNumber );
     }
 
-    snprintf( into, 1024, "%s,%s%s,%s,%s,%5u,%s,%u,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,%i,%i,%i,%i,%s,", localtime, prefix, dir, type, str3, frame, idToPrint, bitLen, time, str1, str2, splitPacketId, splitPacketIndex, splitPacketCount, orderingIndex, suffix );
+    snprintf( into, 1024, "%s,%s%s,%s,%s,%5u,%s,%u,%" PRIu64 ",%s,%s,%i,%i,%i,%i,%s,", localtime, prefix, dir, type, str3, frame, idToPrint, bitLen, (uint64_t)time, str1, str2, splitPacketId, splitPacketIndex, splitPacketCount, orderingIndex, suffix );
 }
 void PacketLogger::OnDirectSocketSend( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress )
 {
@@ -136,7 +137,7 @@ void PacketLogger::OnAck( unsigned int messageNumber, SystemAddress remoteSystem
     char localtime[128];
     GetLocalTime( localtime );
 
-    snprintf( str, sizeof( str ), "%s,Rcv,Ack,%i,,,,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,,,,,,", localtime, messageNumber, (unsigned long long)time, str1, str2 );
+    snprintf( str, sizeof( str ), "%s,Rcv,Ack,%i,,,,%" PRIu64 ",%s,%s,,,,,,", localtime, messageNumber, (uint64_t)time, str1, str2 );
     AddToLog( str );
 }
 void PacketLogger::OnPushBackPacket( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress )
@@ -150,7 +151,7 @@ void PacketLogger::OnPushBackPacket( const char* data, const BitSize_t bitsUsed,
     char localtime[128];
     GetLocalTime( localtime );
 
-    snprintf( str, sizeof( str ), "%s,Lcl,PBP,,,%s,%i,%" PRINTF_64_BIT_MODIFIER "u,%s,%s,,,,,,", localtime, BaseIDTOString( data[0] ), bitsUsed, (unsigned long long)time, str1, str2 );
+    snprintf( str, sizeof( str ), "%s,Lcl,PBP,,,%s,%i,%" PRIu64 ",%s,%s,,,,,,", localtime, BaseIDTOString( data[0] ), bitsUsed, (uint64_t)time, str1, str2 );
     AddToLog( str );
 }
 void PacketLogger::OnInternalPacket( InternalPacket* internalPacket, unsigned frameNumber, SystemAddress remoteSystemAddress, RakNet::TimeMS time, int isSend )
@@ -207,7 +208,7 @@ void PacketLogger::WriteMiscellaneous( const char* type, const char* msg )
     char localtime[128];
     GetLocalTime( localtime );
 
-    snprintf( str, sizeof( str ), "%s,Lcl,%s,,,,,%" PRINTF_64_BIT_MODIFIER "u,%s,,,,,,,%s", localtime, type, (unsigned long long)time, str1, msg );
+    snprintf( str, sizeof( str ), "%s,Lcl,%s,,,,,%" PRIu64 ",%s,,,,,,,%s", localtime, type, (uint64_t)time, str1, msg );
 
     AddToLog( str );
 }

@@ -20,6 +20,7 @@
 #include "StringUtils.h"
 
 #include <algorithm>
+#include <cinttypes>
 
 namespace RakNet {
 
@@ -746,17 +747,9 @@ void NatPunchthroughClient::SendOutOfBand( SystemAddress sa, MessageID oobId )
         RakNet::Time serverTime = RakNet::GetTime() + clockDifferential;
 
         if( oobId == ID_NAT_ESTABLISH_UNIDIRECTIONAL )
-#if defined( _WIN32 )
-            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "%I64d: %s: OOB ID_NAT_ESTABLISH_UNIDIRECTIONAL to guid %s, system address %s.\n", serverTime, TestModeToString( sp.testMode ), guidString, ipAddressString ).c_str() );
-#else
-            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "%lld: %s: OOB ID_NAT_ESTABLISH_UNIDIRECTIONAL to guid %s, system address %s.\n", serverTime, TestModeToString( sp.testMode ), guidString, ipAddressString ).c_str() );
-#endif
+            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "%" PRIu64 ": %s: OOB ID_NAT_ESTABLISH_UNIDIRECTIONAL to guid %s, system address %s.\n", (uint64_t)serverTime, TestModeToString( sp.testMode ), guidString, ipAddressString ).c_str() );
         else
-#if defined( _WIN32 )
-            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "%I64d: %s: OOB ID_NAT_ESTABLISH_BIDIRECTIONAL to guid %s, system address %s.\n", serverTime, TestModeToString( sp.testMode ), guidString, ipAddressString ).c_str() );
-#else
-            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "%lld: %s: OOB ID_NAT_ESTABLISH_BIDIRECTIONAL to guid %s, system address %s.\n", serverTime, TestModeToString( sp.testMode ), guidString, ipAddressString ).c_str() );
-#endif
+            natPunchthroughDebugInterface->OnClientMessage( RakNet::format( "%" PRIu64 ": %s: OOB ID_NAT_ESTABLISH_BIDIRECTIONAL to guid %s, system address %s.\n", (uint64_t)serverTime, TestModeToString( sp.testMode ), guidString, ipAddressString ).c_str() );
     }
 }
 void NatPunchthroughClient::OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming )

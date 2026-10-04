@@ -17,6 +17,7 @@
 #include "RakAssert.h"
 #include "Rand.h"
 #include "MessageIdentifiers.h"
+#include <cinttypes>
 #include <math.h>
 
 namespace RakNet {
@@ -1209,7 +1210,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
                         if( packetId == ID_USER_PACKET_ENUM + 1 && fp )
                         {
-                            fprintf( fp, "Heap push %i, %s, weight=%" PRINTF_64_BIT_MODIFIER "u. OI=%i. waiting on %i. SI=%i.\n", receivedPacketNumber, type, weight, internalPacket->orderingIndex.val, orderedReadIndex[internalPacket->orderingChannel].val, internalPacket->sequencingIndex );
+                            fprintf( fp, "Heap push %i, %s, weight=%" PRIu64 ". OI=%i. waiting on %i. SI=%i.\n", receivedPacketNumber, type, weight, internalPacket->orderingIndex.val, orderedReadIndex[internalPacket->orderingChannel].val, internalPacket->sequencingIndex );
                             fflush( fp );
                         }
 #endif
@@ -2876,13 +2877,13 @@ bool ReliabilityLayer::ChargeHeldBytes( uint64_t bytes, PacketReliability reliab
             // System sitting at the budget should not also be able to flood the console.
             if( statistics.messagesDroppedOverConnectionBudget == 0 )
             {
-                RAKNET_DEBUG_PRINTF( "ReliabilityLayer: dropping unreliable data that would take a connection over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::messagesDroppedOverConnectionBudget.\n", (unsigned long long)heldBytes );
+                RAKNET_DEBUG_PRINTF( "ReliabilityLayer: dropping unreliable data that would take a connection over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRIu64 " bytes held). See RakNetStatistics::messagesDroppedOverConnectionBudget.\n", heldBytes );
             }
             ++statistics.messagesDroppedOverConnectionBudget;
             return false;
         }
 
-        RAKNET_DEBUG_PRINTF( "ReliabilityLayer: closing a connection whose reliable data would take it over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRINTF_64_BIT_MODIFIER "u bytes held). See RakNetStatistics::connectionsClosedOverConnectionBudget.\n", (unsigned long long)heldBytes );
+        RAKNET_DEBUG_PRINTF( "ReliabilityLayer: closing a connection whose reliable data would take it over RELIABILITY_LAYER_CONNECTION_BYTE_BUDGET (%" PRIu64 " bytes held). See RakNetStatistics::connectionsClosedOverConnectionBudget.\n", heldBytes );
         CloseOverBudget( false );
         return false;
     }

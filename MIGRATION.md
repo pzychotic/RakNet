@@ -400,6 +400,11 @@ to compile. Fix: include `<malloc.h>`/`<alloca.h>` directly.
 them still compiles, and it loses nothing: the stack buffers they controlled have been
 replaced by code that needs no scratch buffer at all.
 
+**`PRINTF_64_BIT_MODIFIER`.** Source-only. The `RakNetTypes.h` macro that expanded to
+`"I64"` on MSVC and `"ll"` elsewhere is gone, because every supported compiler accepts the
+standard specifiers. Replace `"%" PRINTF_64_BIT_MODIFIER "u"` with `"%" PRIu64` (and `d` with
+`PRId64`) from `<cinttypes>`, and pass the `uint64_t`/`int64_t` value without a cast.
+
 The plugins that remain are `NatPunchthroughClient`/`Server`, `NatTypeDetectionClient`/
 `Server`, `Router2`, `RelayPlugin`, `UDPProxyClient`/`Coordinator`/`Server`,
 `UDPForwarder`, `RPC4Plugin`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistory`,

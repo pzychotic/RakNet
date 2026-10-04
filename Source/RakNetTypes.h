@@ -91,12 +91,6 @@ typedef unsigned char MessageID;
 
 typedef uint32_t BitSize_t;
 
-#if defined( _MSC_VER ) && _MSC_VER > 0
-#define PRINTF_64_BIT_MODIFIER "I64"
-#else
-#define PRINTF_64_BIT_MODIFIER "ll"
-#endif
-
 /// Used with the PublicKey structure
 enum PublicKeyMode
 {

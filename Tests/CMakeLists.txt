@@ -102,6 +102,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsHistoryCullOnAddTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsQueryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringUtilsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressAndGuidTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SystemAddressToStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPCapsTest.cpp

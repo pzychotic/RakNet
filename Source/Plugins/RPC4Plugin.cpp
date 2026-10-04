@@ -442,9 +442,7 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
 
     if( invokeLocal )
     {
-        //TimeUS t1 = GetTimeUS();
         auto it = localSlots.find( sharedIdentifier );
-        //TimeUS t2 = GetTimeUS();
 
         if( it == localSlots.end() )
             return;
@@ -468,31 +466,18 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
             bsptr = &bstemp;
         }
 
-        //TimeUS t3 = GetTimeUS();
         InvokeSignal( it->second, bsptr, &p );
-        //TimeUS t4 = GetTimeUS();
-        //printf("b1: %I64d\n", t2-t1);
-        //printf("b2: %I64d\n", t3-t2);
-        //printf("b3: %I64d\n", t4-t3);
     }
 }
 
 void RPC4::InvokeSignal( LocalSlot* localSlot, BitStream* serializedParameters, Packet* packet )
 {
-    //TimeUS t1 = GetTimeUS();
-    //TimeUS t2=0;
-    //TimeUS t3=0;
-
     interruptSignal = false;
     //LocalSlot* localSlot = localSlots.ItemAtIndex( functionIndex );
     unsigned int i = 0u;
     while( i < localSlot->slotObjects.Size() )
     {
-        //t2 = GetTimeUS();
-
         localSlot->slotObjects[i].functionPointer( serializedParameters, packet );
-
-        //t3 = GetTimeUS();
 
         // Not threadsafe
         if( interruptSignal == true )
@@ -502,12 +487,6 @@ void RPC4::InvokeSignal( LocalSlot* localSlot, BitStream* serializedParameters, 
 
         i++;
     }
-
-    //TimeUS t4 = GetTimeUS();
-
-    //printf("b1: %I64d\n", t2-t1);
-    //printf("b2: %I64d\n", t3-t2);
-    //printf("b3: %I64d\n", t4-t3);
 }
 
 void RPC4::InterruptSignal( void )
