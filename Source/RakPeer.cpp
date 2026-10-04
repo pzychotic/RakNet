@@ -803,11 +803,25 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
         for( const SystemAddress& systemAddress : GetPublishedAddresses() )
             NotifyAndFlagForShutdown( systemAddress, false, orderingChannel, disconnectionNotificationPriority );
 
+#if RAKPEER_USER_THREADED == 1
+        BitStream updateBitStream( MAXIMUM_MTU_SIZE
+#if LIBCAT_SECURITY == 1
+                                   + cat::AuthenticatedEncryption::OVERHEAD_BYTES
+#endif
+        );
+#endif
+
         // The view holds closing records too, so an empty one means every record has closed.
         RakNet::TimeMS time = RakNet::GetTimeMS();
         RakNet::TimeMS startWaitingTime = time;
-        while( time - startWaitingTime < blockDuration && IsPublishedViewEmpty() == false )
+        while( time - startWaitingTime < blockDuration )
         {
+#if RAKPEER_USER_THREADED == 1
+            // No network thread sends the notifications, so this one runs the cycles.
+            RunUpdateCycle( updateBitStream );
+#endif
+            if( IsPublishedViewEmpty() )
+                break;
             std::this_thread::sleep_for( std::chrono::milliseconds( 15 ) );
             time = RakNet::GetTimeMS();
         }

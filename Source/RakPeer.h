@@ -182,6 +182,7 @@ public:
     /// \param[in] orderingChannel Channel on which ID_DISCONNECTION_NOTIFICATION will be sent, if blockDuration > 0.
     /// \param[in] disconnectionNotificationPriority Priority of sending ID_DISCONNECTION_NOTIFICATION.
     /// If set to 0, the disconnection notification won't be sent.
+    /// \note Under RAKPEER_USER_THREADED it runs the update cycles itself while it waits, so the notifications go out and it returns once every connection has closed.
     /// \note No other call on this Peer may overlap Shutdown, from any thread.
     void Shutdown( unsigned int blockDuration, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY );
 
