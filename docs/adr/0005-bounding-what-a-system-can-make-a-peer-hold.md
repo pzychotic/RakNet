@@ -102,6 +102,8 @@ reason and no new callback API.
   datagrams, exactly as the core's receive queue does, so they share its
   `MAX_BUFFERED_RECEIVED_DATAGRAMS` macro rather than get a setter of their own.
 - *Debug print.* Once per plugin instance, on the first time the cap bites, as for the core.
+- *Point 7.* A queue the application drains is capped when its entries are not ACKed data.
+  `ThreadsafePacketLogger` refuses lines at the cap, and the next `Update` writes how many.
 
 ## Considered and rejected
 

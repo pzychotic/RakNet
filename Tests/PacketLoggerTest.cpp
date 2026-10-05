@@ -333,3 +333,83 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
     CHECK( sendsToHeld == pingsSent );
     CHECK( networkThreadLines > 0 );
 }
+
+/*
+ThreadsafePacketLogger with its queue capped and Receive never called on the logged
+peer, so nothing drains it. A second peer keeps sending offline pings until the cap
+refuses a line. Every line offered to the queue is counted on the way in, so the
+refused count can be checked against what was offered.
+*/
+
+namespace {
+
+class CountingThreadsafePacketLogger : public CollectingThreadsafePacketLogger
+{
+public:
+    std::atomic<uint64_t> linesOffered{ 0 };
+
+protected:
+    void AddToLog( const char* str ) override
+    {
+        ++linesOffered;
+        CollectingThreadsafePacketLogger::AddToLog( str );
+    }
+};
+
+constexpr unsigned int kQueueCap = 16;
+
+// Fills logger's queue past kQueueCap, stops the network thread, then drains once.
+void FillPastCapThenDrain( CountingThreadsafePacketLogger& logger )
+{
+    REQUIRE( logger.GetMaxQueuedLines() == 8192 );
+    logger.SetMaxQueuedLines( kQueueCap );
+    REQUIRE( logger.GetMaxQueuedLines() == kQueueCap );
+    PeerScope peers;
+    RakPeerInterface* logged = peers.Create();
+    logged->AttachPlugin( &logger );
+    SocketDescriptor socketDescriptor( 0, nullptr );
+    REQUIRE( logged->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
+    RakPeerInterface* pinger = peers.Client();
+    const unsigned short loggedPort = logged->GetMyBoundAddress().GetPort();
+
+    for( int i = 0; i < 10000 && logger.GetLinesRefused() == 0; ++i )
+    {
+        pinger->Ping( "127.0.0.1", loggedPort, false );
+        DrainReceive( pinger );
+        std::this_thread::yield();
+    }
+    REQUIRE( logger.GetLinesRefused() > 0 );
+
+    logged->Shutdown( 0 );
+    REQUIRE( logger.lines.empty() );
+    logger.Update();
+    logged->DetachPlugin( &logger );
+}
+
+} // namespace
+
+TEST_CASE( "ThreadsafePacketLogger refuses lines past SetMaxQueuedLines and counts them", "[packetlogger][network]" )
+{
+    CountingThreadsafePacketLogger logger;
+    FillPastCapThenDrain( logger );
+
+    // The queued lines and the marker after them.
+    CHECK( logger.lines.size() == kQueueCap + 1 );
+    CHECK( logger.GetLinesRefused() == logger.linesOffered - kQueueCap );
+}
+
+TEST_CASE( "ThreadsafePacketLogger's Update ends a drain with the count it refused", "[packetlogger][network]" )
+{
+    CountingThreadsafePacketLogger logger;
+    FillPastCapThenDrain( logger );
+
+    REQUIRE( !logger.lines.empty() );
+    const std::string& marker = logger.lines.back();
+    INFO( marker );
+    CHECK( marker.find( std::to_string( logger.GetLinesRefused() ) + " log lines refused at the cap" ) != std::string::npos );
+
+    // The count resets with the drain.
+    logger.lines.clear();
+    logger.Update();
+    CHECK( logger.lines.empty() );
+}

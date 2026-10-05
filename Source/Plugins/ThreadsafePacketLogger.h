@@ -19,6 +19,7 @@
 
 #include "Plugins/PacketLogger.h"
 
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <string>
@@ -33,15 +34,32 @@ public:
     ThreadsafePacketLogger();
     virtual ~ThreadsafePacketLogger();
 
+    /// Writes the queued lines. If any were refused since the last call, ends with one
+    /// line giving how many.
     virtual void Update( void );
+
+    /// \brief Caps how many lines wait in the queue for Update().
+    /// \details At the cap a new line is refused and counted in GetLinesRefused(). Lowering
+    /// the cap below the current queue length drops nothing already queued. 0 queues
+    /// nothing. Defaults to 8192 lines.
+    void SetMaxQueuedLines( unsigned int max );
+
+    /// \return The value passed to SetMaxQueuedLines(), or the default.
+    unsigned int GetMaxQueuedLines( void ) const;
+
+    /// \return How many lines SetMaxQueuedLines()'s cap has refused since construction.
+    uint64_t GetLinesRefused( void ) const;
 
 protected:
     /// Thread-safe. Called from the network thread and from any thread that logs.
     virtual void AddToLog( const char* str );
 
 private:
-    std::mutex logMessagesMutex;
+    mutable std::mutex logMessagesMutex;
     std::deque<std::string> logMessages;
+    unsigned int maxQueuedLines;
+    uint64_t linesRefused;
+    uint64_t linesRefusedSinceUpdate;
 };
 
 } // namespace RakNet
