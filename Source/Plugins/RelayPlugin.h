@@ -109,7 +109,7 @@ public:
     /// \param[in] destinationGuid The key value passed to AddParticipant() earlier on the server. If this was not done, the server will not relay the message (it will be silently discarded).
     /// \param[in] bitStream The data to relay
     /// \param[in] priority See the parameter of the same name in RakPeerInterface::Send()
-    /// \param[in] reliability See the parameter of the same name in RakPeerInterface::Send()
+    /// \param[in] reliability See the parameter of the same name in RakPeerInterface::Send(). A receipt reliability covers only the hop to the server. The server forwards the message without a receipt.
     /// \param[in] orderingChannel See the parameter of the same name in RakPeerInterface::Send()
     void SendToParticipant( const RakNetGUID& relayPluginServerGuid, const std::string& destinationGuid, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel );
 

@@ -21,6 +21,26 @@
 
 namespace RakNet {
 
+namespace {
+
+// The reliability the server forwards a relayed message with: the client's, without a receipt.
+PacketReliability WithoutReceipt( PacketReliability reliability )
+{
+    switch( reliability )
+    {
+    case UNRELIABLE_WITH_ACK_RECEIPT:
+        return UNRELIABLE;
+    case RELIABLE_WITH_ACK_RECEIPT:
+        return RELIABLE;
+    case RELIABLE_ORDERED_WITH_ACK_RECEIPT:
+        return RELIABLE_ORDERED;
+    default:
+        return reliability;
+    }
+}
+
+} // namespace
+
 STATIC_FACTORY_DEFINITIONS( RelayPlugin, RelayPlugin );
 
 RelayPlugin::RelayPlugin()
@@ -196,7 +216,7 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
                 bsOut.WriteCompressed( itStrAndGuidSender->second->str );
                 bsOut.AlignWriteToByteBoundary();
                 bsOut.Write( bsData );
-                SendUnified( &bsOut, priority, reliability, orderingChannel, itStrAndGuid->second->guid, false );
+                SendUnified( &bsOut, priority, WithoutReceipt( reliability ), orderingChannel, itStrAndGuid->second->guid, false );
             }
 
             return RR_STOP_PROCESSING_AND_DEALLOCATE;

@@ -33,6 +33,8 @@ Pins what a connected System can make a plugin hold (ADR-0005).
   one group per cycle, past the System's disconnect. Names and group names are capped. A
   message to a participant whose priority, reliability or channel is out of range is dropped,
   rather than sent on with a value that indexed the server's per-priority arrays past their end.
+  A receipt reliability is forwarded without the receipt, so the server's application never
+  gets ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS for a send it did not make.
 - UDPProxyCoordinator. Forwarding requests are capped per requesting System, and so is the
   server selection data each keeps. Past either the request is refused with
   ID_UDP_PROXY_ALL_SERVERS_BUSY.
@@ -220,15 +222,22 @@ BitStream* RelayToParticipant( std::deque<BitStream>& storage, const std::string
 constexpr TimeMS kStragglerWaitMs = 250;
 
 // Receives on server and on target until target has been forwarded a copy tagged until, then
-// for kStragglerWaitMs more, and returns the tag of every copy target was forwarded.
-std::vector<unsigned char> ForwardedTags( RakPeerInterface* server, RakPeerInterface* target, unsigned char until )
+// for kStragglerWaitMs more, and returns the tag of every copy target was forwarded. If
+// serverIds is given, the first byte of every Message server receives meanwhile goes into it.
+std::vector<unsigned char> ForwardedTags( RakPeerInterface* server, RakPeerInterface* target, unsigned char until,
+                                          std::vector<MessageID>* serverIds = nullptr )
 {
     std::vector<unsigned char> tags;
     TimeMS deadline = GetTimeMS() + kStepBudgetMs;
     bool seen = false;
     while( !ConnectionWaits::Expired( deadline ) )
     {
-        ConnectionWaits::Drain( server );
+        for( Packet* packet = server->Receive(); packet != nullptr; packet = server->Receive() )
+        {
+            if( serverIds != nullptr && packet->length > 0 )
+                serverIds->push_back( packet->data[0] );
+            server->DeallocatePacket( packet );
+        }
         for( Packet* packet = target->Receive(); packet != nullptr; packet = target->Receive() )
         {
             if( packet->length > 2 && packet->data[0] == ID_RELAY_PLUGIN && packet->data[1] == RPE_MESSAGE_TO_CLIENT_FROM_SERVER )
@@ -494,6 +503,45 @@ TEST_CASE( "RelayPlugin drops a message to a participant whose send parameters a
     const bool allValid = priority == kTopPriority && reliability == kTopReliability && channel == kTopChannel;
     const std::vector<unsigned char> expected = allValid ? std::vector<unsigned char>{ kFirst, kSecond } : std::vector<unsigned char>{ kSecond };
     CHECK( ForwardedTags( server, target, kSecond ) == expected );
+
+    server->DetachPlugin( &relay );
+}
+
+TEST_CASE( "RelayPlugin forwards a message relayed with a receipt reliability without the receipt", "[relay][network]" )
+{
+    // Before the PeerScope, so it outlives the peers.
+    RelayProbe relay;
+    relay.SetAcceptAddParticipantRequests( true );
+
+    PeerScope peers;
+    RakPeerInterface* server = peers.Server( kRelayPort, 4 );
+    RakPeerInterface* sender = peers.Client();
+    RakPeerInterface* target = peers.Client();
+    server->AttachPlugin( &relay );
+    Connect( server, kRelayPort, sender );
+    Connect( server, kRelayPort, target );
+
+    std::deque<BitStream> storage;
+    Inject( sender, server, *RelayAdd( storage, "sender" ) );
+    Inject( target, server, *RelayAdd( storage, "target" ) );
+    REQUIRE( relay.IsParticipant( sender->GetMyGUID() ) );
+    REQUIRE( relay.IsParticipant( target->GetMyGUID() ) );
+
+    PacketReliability reliability = UNRELIABLE_WITH_ACK_RECEIPT;
+    SECTION( "UNRELIABLE_WITH_ACK_RECEIPT" ) { reliability = UNRELIABLE_WITH_ACK_RECEIPT; }
+    SECTION( "RELIABLE_WITH_ACK_RECEIPT" ) { reliability = RELIABLE_WITH_ACK_RECEIPT; }
+    SECTION( "RELIABLE_ORDERED_WITH_ACK_RECEIPT" ) { reliability = RELIABLE_ORDERED_WITH_ACK_RECEIPT; }
+
+    constexpr unsigned char kTag = 1;
+    Inject( sender, server, *RelayToParticipant( storage, "target", HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
+
+    std::vector<MessageID> serverIds;
+    CHECK( ForwardedTags( server, target, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
+    for( MessageID id : serverIds )
+    {
+        CHECK( id != ID_SND_RECEIPT_ACKED );
+        CHECK( id != ID_SND_RECEIPT_LOSS );
+    }
 
     server->DetachPlugin( &relay );
 }
