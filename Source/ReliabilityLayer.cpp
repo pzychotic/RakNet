@@ -1299,7 +1299,7 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
 {
 #ifdef _DEBUG
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
-    RakAssert( !( priority > NUMBER_OF_PRIORITIES || priority < 0 ) );
+    RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
     RakAssert( numberOfBitsToSend > 0 );
 #endif
@@ -1314,7 +1314,7 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     if( reliability > RELIABLE_ORDERED_WITH_ACK_RECEIPT || reliability < 0 )
         reliability = RELIABLE;
 
-    if( priority > NUMBER_OF_PRIORITIES || priority < 0 )
+    if( priority >= NUMBER_OF_PRIORITIES || priority < 0 )
         priority = HIGH_PRIORITY;
 
     if( orderingChannel >= NUMBER_OF_ORDERED_STREAMS )

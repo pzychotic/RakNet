@@ -84,6 +84,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ReceiveAfterPublishTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReceiveQueueCapTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayerByteBudgetTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayerSendParametersTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliableOrderedConvertedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReplacedCallbackTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2EntitlementTest.cpp

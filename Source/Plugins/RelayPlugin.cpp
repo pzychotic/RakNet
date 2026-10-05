@@ -15,6 +15,7 @@
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
+#include "ReliabilityLayer.h"
 
 #include <algorithm>
 
@@ -177,6 +178,10 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             bsIn.Read( cIn );
             reliability = (PacketReliability)cIn;
             bsIn.Read( orderingChannel );
+            // Only a broken or hostile System sends parameters out of range.
+            if( priority >= NUMBER_OF_PRIORITIES || reliability >= NUMBER_OF_RELIABILITIES ||
+                (unsigned char)orderingChannel >= NUMBER_OF_ORDERED_STREAMS )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             std::string key;
             bsIn.ReadCompressed( key );
             BitStream bsData;

@@ -1016,7 +1016,7 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
     RakAssert( data && length > 0 );
 #endif
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
-    RakAssert( !( priority > NUMBER_OF_PRIORITIES || priority < 0 ) );
+    RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
     if( data == 0 || length < 0 )
@@ -1088,7 +1088,7 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
 #endif
 
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
-    RakAssert( !( priority > NUMBER_OF_PRIORITIES || priority < 0 ) );
+    RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
     if( bitStream->GetNumberOfBytesUsed() == 0 )
@@ -4045,7 +4045,7 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
     }
 
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
-    RakAssert( !( priority > NUMBER_OF_PRIORITIES || priority < 0 ) );
+    RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
     memcpy( bcs->data, data, (size_t)BITS_TO_BYTES( numberOfBitsToSend ) );
@@ -4114,7 +4114,7 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
     }
 
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
-    RakAssert( !( priority > NUMBER_OF_PRIORITIES || priority < 0 ) );
+    RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
     bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
