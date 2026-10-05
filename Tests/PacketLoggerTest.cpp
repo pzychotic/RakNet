@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -226,6 +227,10 @@ offline pings a second peer keeps sending, and their pongs. Meanwhile the test t
 logs its own Ping calls, each of which runs OnDirectSocketSend on the caller's thread.
 Those pings go to a peer that only the test thread addresses, so its send lines count
 the Ping calls exactly. Update runs on the test thread, inside Receive.
+
+The pinger can outrun the network thread, which then works off its backlog after the
+test thread's last Receive, with no Update to drain the queue. That burst can pass the
+default SetMaxQueuedLines cap, so the cap is lifted here: refusal has tests of its own.
 */
 
 namespace {
@@ -274,6 +279,7 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
     constexpr int kPings = 2000;
 
     CollectingThreadsafePacketLogger logger;
+    logger.SetMaxQueuedLines( ( std::numeric_limits<unsigned int>::max )() );
     PeerScope peers;
     // Attached before Startup, because the network thread walks the plugin list unlocked.
     RakPeerInterface* logged = peers.Create();
@@ -310,6 +316,7 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
     // Stops the network thread, so the last Update collects every line.
     logged->Shutdown( 0 );
     logger.Update();
+    REQUIRE( logger.GetLinesRefused() == 0 );
 
     const std::string heldSuffix = "|" + std::to_string( heldPort );
     int sendsToHeld = 0;
