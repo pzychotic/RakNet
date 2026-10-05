@@ -75,6 +75,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketAllocationFailureTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketAndLowLevelTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketLoggerTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PacketizedTCPDownloadProgressTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerConnectDisconnectTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerConnectDisconnectWithCancelPendingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PingTestsTest.cpp

@@ -253,12 +253,17 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
     // Return ID_DOWNLOAD_PROGRESS
     if( newWritten / 65536 != oldWritten / 65536 )
     {
+        // The chunk is the message's first 64 KiB, or as much of it as follows the header
+        // so far.
+        const unsigned int bufferedAfterHeader = newWritten - sizeof( PTCPHeader );
+        const unsigned int oneChunkSize = bufferedAfterHeader < 65536 ? bufferedAfterHeader : 65536;
+
         Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
         outgoingPacket->length = sizeof( MessageID ) +
                                     sizeof( unsigned int ) * 2 +
                                     sizeof( unsigned int ) +
-                                    65536;
-        outgoingPacket->bitSize = BYTES_TO_BITS( incomingPacket.length );
+                                    oneChunkSize;
+        outgoingPacket->bitSize = BYTES_TO_BITS( outgoingPacket->length );
         outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
         outgoingPacket->systemAddress = incomingPacket.systemAddress;
         outgoingPacket->deleteData = false;
@@ -273,7 +278,6 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
         outgoingPacket->data[0] = (MessageID)ID_DOWNLOAD_PROGRESS;
         unsigned int totalParts = dataLength / 65536;
         unsigned int partIndex = newWritten / 65536;
-        unsigned int oneChunkSize = 65536;
         memcpy( outgoingPacket->data + sizeof( MessageID ), &partIndex, sizeof( unsigned int ) );
         memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &totalParts, sizeof( unsigned int ) );
         memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &oneChunkSize, sizeof( unsigned int ) );
