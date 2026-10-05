@@ -558,10 +558,16 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
             hints.ai_family = AF_UNSPEC;
             getaddrinfo( ipPart, "", &hints, &servinfo );
             if( servinfo == 0 )
+            {
+                WSAStartupSingleton::Deref();
                 return false;
+            }
         }
         else
+        {
+            WSAStartupSingleton::Deref();
             return false;
+        }
     }
     RakAssert( servinfo );
 

@@ -21,6 +21,8 @@ public:
     static void Deref( void );
 
 protected:
+    /// Guarded by a mutex private to WSAStartupSingleton.cpp; AddRef and Deref may be
+    /// called from any thread.
     static int refCount;
 };
 

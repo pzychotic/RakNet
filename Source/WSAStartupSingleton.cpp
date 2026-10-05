@@ -15,9 +15,16 @@
 #include <ws2tcpip.h>
 #endif
 #include "RakNetDefines.h"
+#include <mutex>
 #include <stdio.h>
 
 namespace RakNet {
+
+namespace {
+// Guards refCount, and is held across WSAStartup and WSACleanup, so no caller returns
+// from AddRef before Winsock is started.
+std::mutex refCountMutex;
+} // namespace
 
 int WSAStartupSingleton::refCount = 0;
 
@@ -26,6 +33,7 @@ WSAStartupSingleton::~WSAStartupSingleton() {}
 void WSAStartupSingleton::AddRef( void )
 {
 #if defined( _WIN32 )
+    std::lock_guard<std::mutex> lock( refCountMutex );
 
     refCount++;
 
@@ -53,6 +61,8 @@ void WSAStartupSingleton::AddRef( void )
 void WSAStartupSingleton::Deref( void )
 {
 #if defined( _WIN32 )
+    std::lock_guard<std::mutex> lock( refCountMutex );
+
     if( refCount == 0 )
         return;
 

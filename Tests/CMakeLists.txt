@@ -125,6 +125,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyClientForwardingFlowTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorEntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorPingOrderTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/WSAStartupSingletonTest.cpp
 )
 
 # Support code shared by the tests.
