@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -332,6 +333,81 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
     CHECK( pingsSent == kPings );
     CHECK( sendsToHeld == pingsSent );
     CHECK( networkThreadLines > 0 );
+}
+
+/*
+PacketLogger's setters called while the network thread logs. The test thread alternates
+SetPrefix between two strings and toggles SetLogDirectMessages, while a second peer's
+offline pings make the network thread log raw lines. Every line's prefix must be exactly
+one of the two strings.
+*/
+
+namespace {
+
+class LockedCapturingPacketLogger : public PacketLogger
+{
+public:
+    void WriteLog( const char* str ) override
+    {
+        std::lock_guard<std::mutex> lock( linesMutex );
+        lines.emplace_back( str );
+    }
+
+    size_t LineCount()
+    {
+        std::lock_guard<std::mutex> lock( linesMutex );
+        return lines.size();
+    }
+
+    std::mutex linesMutex;
+    std::vector<std::string> lines;
+};
+
+} // namespace
+
+TEST_CASE( "PacketLogger's setters may be called while the network thread logs", "[packetlogger][network]" )
+{
+    constexpr size_t kLines = 500;
+    const std::string longPrefix( 255, 'x' );
+    const std::string shortPrefix = "y";
+
+    LockedCapturingPacketLogger logger;
+    logger.SetPrefix( shortPrefix.c_str() );
+    PeerScope peers;
+    // Attached before Startup, because the network thread walks the plugin list unlocked.
+    RakPeerInterface* logged = peers.Create();
+    logged->AttachPlugin( &logger );
+    SocketDescriptor socketDescriptor( 0, nullptr );
+    REQUIRE( logged->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
+    RakPeerInterface* pinger = peers.Client();
+    const unsigned short loggedPort = logged->GetMyBoundAddress().GetPort();
+
+    for( int i = 0; i < 100000 && logger.LineCount() < kLines; ++i )
+    {
+        pinger->Ping( "127.0.0.1", loggedPort, false );
+        DrainReceive( pinger );
+        logger.SetPrefix( ( i % 2 == 0 ? longPrefix : shortPrefix ).c_str() );
+        logger.SetLogDirectMessages( false );
+        logger.SetLogDirectMessages( true );
+    }
+
+    // Stops the network thread, so no line is written while they are checked.
+    logged->Shutdown( 0 );
+    logged->DetachPlugin( &logger );
+
+    REQUIRE( logger.lines.size() >= kLines );
+    for( const std::string& line : logger.lines )
+    {
+        INFO( line );
+        const size_t prefixStart = line.find( ',' );
+        REQUIRE( prefixStart != std::string::npos );
+        size_t prefixEnd = line.find( "Snd,", prefixStart + 1 );
+        if( prefixEnd == std::string::npos )
+            prefixEnd = line.find( "Rcv,", prefixStart + 1 );
+        REQUIRE( prefixEnd != std::string::npos );
+        const std::string prefix = line.substr( prefixStart + 1, prefixEnd - prefixStart - 1 );
+        CHECK( ( prefix == longPrefix || prefix == shortPrefix ) );
+    }
 }
 
 /*

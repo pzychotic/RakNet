@@ -21,6 +21,9 @@
 #include "PluginInterface2.h"
 #include "Export.h"
 
+#include <atomic>
+#include <mutex>
+
 namespace RakNet {
 
 /// \defgroup PACKETLOGGER_GROUP PacketLogger
@@ -67,19 +70,27 @@ public:
     virtual void WriteMiscellaneous( const char* type, const char* msg );
 
 
-    // Set to true to print ID_* instead of numbers
+    /// Set to true to print ID_* instead of numbers.
+    /// \note May be called at any time. The next line formatted uses the new value, while a
+    /// line already being formatted may use the old one.
     virtual void SetPrintID( bool print );
     // Print or hide acks (clears up the screen not to print them but is worse for debugging)
     virtual void SetPrintAcks( bool print );
 
     /// Prepend this string to output logs.
+    /// \note May be called at any time. The next line formatted uses the new value, while a
+    /// line already being formatted may use the old one.
     virtual void SetPrefix( const char* _prefix );
 
     /// Append this string to output logs. (newline is useful here)
+    /// \note May be called at any time. The next line formatted uses the new value, while a
+    /// line already being formatted may use the old one.
     virtual void SetSuffix( const char* _suffix );
     static const char* BaseIDTOString( unsigned char Id );
 
     /// Log the direct sends and receives or not. Default true
+    /// \note May be called at any time. The next direct send or receive uses the new value,
+    /// while one already being logged may use the old one.
     void SetLogDirectMessages( bool send );
 
 protected:
@@ -89,9 +100,12 @@ protected:
     // Users should override this
     virtual const char* UserIDTOString( unsigned char Id );
     void GetLocalTime( char buffer[128] );
-    bool logDirectMessages;
+    std::atomic<bool> logDirectMessages;
 
-    bool printId, printAcks;
+    std::atomic<bool> printId;
+    bool printAcks;
+    // Guards prefix and suffix.
+    std::mutex affixMutex;
     char prefix[256];
     char suffix[256];
 };

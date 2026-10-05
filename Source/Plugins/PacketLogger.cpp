@@ -89,6 +89,7 @@ void PacketLogger::FormatLine(
         sprintf( str3, "%5u", reliableMessageNumber );
     }
 
+    std::lock_guard<std::mutex> lock( affixMutex );
     snprintf( into, 1024, "%s,%s%s,%s,%s,%5u,%s,%u,%" PRIu64 ",%s,%s,%i,%i,%i,%i,%s,", localtime, prefix, dir, type, str3, frame, idToPrint, bitLen, (uint64_t)time, str1, str2, splitPacketId, splitPacketIndex, splitPacketCount, orderingIndex, suffix );
 }
 void PacketLogger::OnDirectSocketSend( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress )
@@ -384,11 +385,13 @@ const char* PacketLogger::IDTOString( unsigned char Id )
 }
 void PacketLogger::SetPrefix( const char* _prefix )
 {
+    std::lock_guard<std::mutex> lock( affixMutex );
     strncpy( prefix, _prefix, 255 );
     prefix[255] = 0;
 }
 void PacketLogger::SetSuffix( const char* _suffix )
 {
+    std::lock_guard<std::mutex> lock( affixMutex );
     strncpy( suffix, _suffix, 255 );
     suffix[255] = 0;
 }
