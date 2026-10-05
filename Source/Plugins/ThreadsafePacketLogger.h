@@ -18,7 +18,10 @@
 #if _RAKNET_SUPPORT_PacketLogger == 1
 
 #include "Plugins/PacketLogger.h"
-#include "SingleProducerConsumer.h"
+
+#include <deque>
+#include <mutex>
+#include <string>
 
 namespace RakNet {
 
@@ -33,9 +36,12 @@ public:
     virtual void Update( void );
 
 protected:
+    /// Thread-safe. Called from the network thread and from any thread that logs.
     virtual void AddToLog( const char* str );
 
-    DataStructures::SingleProducerConsumer<char*> logMessages;
+private:
+    std::mutex logMessagesMutex;
+    std::deque<std::string> logMessages;
 };
 
 } // namespace RakNet

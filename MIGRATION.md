@@ -104,7 +104,7 @@ below, which are all about strings, cannot reach the core protocol.
 
 **Source break.** Most of RakNet was already in `namespace RakNet` in stock 4.081. A
 handful of headers were not, and they are now: `MessageIdentifiers.h`, `PacketPriority.h`,
-`DR_SHA1.h`, `SingleProducerConsumer.h`, `SuperFastHash.h`, `WSAStartupSingleton.h`, and
+`DR_SHA1.h`, `SuperFastHash.h`, `WSAStartupSingleton.h`, and
 the surviving `DS_*` headers.
 
 The two that matter to ordinary code are `PacketPriority` and `PacketReliability`, which
@@ -375,6 +375,10 @@ or do without.
 `EpochTimeToString`, `GridSectorizer`, `ThreadPool`, and the
 `Gets`/`Getche`/`Kbhit`/`_FindFirst` platform shims. `<mutex>`, `<thread>`, `<atomic>` and
 `<chrono>` replace the threading and timing ones.
+
+**`SingleProducerConsumer.h`.** Gone, with no replacement. Use a `std::mutex` and a
+`std::deque`. `ThreadsafePacketLogger`, its only user, now keeps its lines in private
+members, so `ThreadsafePacketLogger::logMessages` is no longer visible to subclasses.
 
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.

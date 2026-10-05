@@ -396,10 +396,17 @@ void PacketLogger::GetLocalTime( char buffer[128] )
 {
     using namespace std::chrono;
 
-    auto clock_now  = system_clock::now();
-    auto time_now   = system_clock::to_time_t( clock_now );
-    auto local_time = *std::localtime( &time_now );
-    auto duration   = clock_now.time_since_epoch();
+    auto clock_now = system_clock::now();
+    auto time_now = system_clock::to_time_t( clock_now );
+    auto duration = clock_now.time_since_epoch();
+
+    // The network thread and the user thread both log, and std::localtime shares one buffer.
+    std::tm local_time{};
+#if defined( _WIN32 )
+    localtime_s( &local_time, &time_now );
+#else
+    localtime_r( &time_now, &local_time );
+#endif
 
     size_t pos = std::strftime( buffer, 128, "%x %X", &local_time );
     snprintf( buffer + pos, 128 - pos, ".%06lld", (long long)( duration_cast<microseconds>( duration ) - duration_cast<seconds>( duration ) ).count() );

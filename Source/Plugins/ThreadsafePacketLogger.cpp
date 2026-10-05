@@ -12,7 +12,6 @@
 #if _RAKNET_SUPPORT_PacketLogger == 1
 
 #include "Plugins/ThreadsafePacketLogger.h"
-#include <string.h>
 
 namespace RakNet {
 
@@ -21,27 +20,22 @@ ThreadsafePacketLogger::ThreadsafePacketLogger()
 }
 ThreadsafePacketLogger::~ThreadsafePacketLogger()
 {
-    char** msg;
-    while( ( msg = logMessages.ReadLock() ) != 0 )
-    {
-        rakFree_Ex( ( *msg ), _FILE_AND_LINE_ );
-    }
 }
 void ThreadsafePacketLogger::Update( void )
 {
-    char** msg;
-    while( ( msg = logMessages.ReadLock() ) != 0 )
+    std::deque<std::string> pending;
     {
-        WriteLog( *msg );
-        rakFree_Ex( ( *msg ), _FILE_AND_LINE_ );
+        std::lock_guard<std::mutex> lock( logMessagesMutex );
+        pending.swap( logMessages );
     }
+    // Outside the lock, so a slow WriteLog never holds up the network thread.
+    for( const std::string& msg : pending )
+        WriteLog( msg.c_str() );
 }
 void ThreadsafePacketLogger::AddToLog( const char* str )
 {
-    char** msg = logMessages.WriteLock();
-    *msg = (char*)rakMalloc_Ex( strlen( str ) + 1, _FILE_AND_LINE_ );
-    strcpy( *msg, str );
-    logMessages.WriteUnlock();
+    std::lock_guard<std::mutex> lock( logMessagesMutex );
+    logMessages.emplace_back( str );
 }
 
 } // namespace RakNet

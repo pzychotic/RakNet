@@ -1,4 +1,5 @@
 #include "Plugins/PacketLogger.h"
+#include "Plugins/ThreadsafePacketLogger.h"
 
 #include "InternalPacket.h"
 #include "MessageIdentifiers.h"
@@ -7,13 +8,15 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
 #include <string>
+#include <thread>
 #include <vector>
 
 /*
 PacketLogger::UserIDTOString, driven directly. It takes only an id and touches
 nothing else on the plugin - no peer, no socket, no waiting - so exercising it is a
-function call, which is why this file carries no [network] tag. It is protected and
+function call, which is why this case carries no [network] tag. It is protected and
 virtual because the header's own comment says users should override it, so the test
 reaches it the way a user would: through a subclass, calling the base implementation
 that everyone who does not override it gets.
@@ -214,4 +217,119 @@ TEST_CASE( "PacketLogger::WriteMiscellaneous logs the formatted line", "[packetl
     REQUIRE( addressEnd != std::string::npos );
     CHECK( addressEnd > timeEnd + 1 );
     CHECK( line.substr( addressEnd ) == ",,,,,,,hello" );
+}
+
+/*
+ThreadsafePacketLogger fed from two threads at once. The network thread logs the
+offline pings a second peer keeps sending, and their pongs. Meanwhile the test thread
+logs its own Ping calls, each of which runs OnDirectSocketSend on the caller's thread.
+Those pings go to a peer that only the test thread addresses, so its send lines count
+the Ping calls exactly. Update runs on the test thread, inside Receive.
+*/
+
+namespace {
+
+class CollectingThreadsafePacketLogger : public ThreadsafePacketLogger
+{
+public:
+    void WriteLog( const char* str ) override { lines.emplace_back( str ); }
+
+    std::vector<std::string> lines;
+};
+
+// A raw line from its direction onward: direction, type, reliable#, frame, ID, bit
+// length, time, local, remote, the four split and ordering fields, suffix, and the
+// empty field after the trailing comma. Empty if the line has no Snd or Rcv direction.
+std::vector<std::string> FieldsOfRawLine( const std::string& line )
+{
+    std::vector<std::string> fields;
+    size_t start = line.find( ",Snd," );
+    if( start == std::string::npos )
+        start = line.find( ",Rcv," );
+    if( start == std::string::npos )
+        return fields;
+    ++start;
+    for( ;; )
+    {
+        const size_t end = line.find( ',', start );
+        fields.push_back( line.substr( start, end == std::string::npos ? std::string::npos : end - start ) );
+        if( end == std::string::npos )
+            break;
+        start = end + 1;
+    }
+    return fields;
+}
+
+void DrainReceive( RakPeerInterface* peer )
+{
+    for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
+        peer->DeallocatePacket( packet );
+}
+
+} // namespace
+
+TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thread and the user thread at once", "[packetlogger][network]" )
+{
+    constexpr int kPings = 2000;
+
+    CollectingThreadsafePacketLogger logger;
+    PeerScope peers;
+    // Attached before Startup, because the network thread walks the plugin list unlocked.
+    RakPeerInterface* logged = peers.Create();
+    logged->AttachPlugin( &logger );
+    SocketDescriptor socketDescriptor( 0, nullptr );
+    REQUIRE( logged->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
+    RakPeerInterface* pinger = peers.Client();
+    RakPeerInterface* held = peers.Client();
+
+    const unsigned short loggedPort = logged->GetMyBoundAddress().GetPort();
+    const unsigned short heldPort = held->GetMyBoundAddress().GetPort();
+
+    std::atomic<bool> stop{ false };
+    std::thread pingLoop( [&] {
+        while( !stop.load() )
+        {
+            pinger->Ping( "127.0.0.1", loggedPort, false );
+            DrainReceive( pinger );
+            std::this_thread::yield();
+        }
+    } );
+
+    int pingsSent = 0;
+    for( int i = 0; i < kPings; ++i )
+    {
+        if( logged->Ping( "127.0.0.1", heldPort, false ) )
+            ++pingsSent;
+        DrainReceive( logged );
+        DrainReceive( held );
+    }
+
+    stop = true;
+    pingLoop.join();
+    // Stops the network thread, so the last Update collects every line.
+    logged->Shutdown( 0 );
+    logger.Update();
+
+    const std::string heldSuffix = "|" + std::to_string( heldPort );
+    int sendsToHeld = 0;
+    int networkThreadLines = 0;
+    for( const std::string& line : logger.lines )
+    {
+        const std::vector<std::string> fields = FieldsOfRawLine( line );
+        INFO( line );
+        REQUIRE( fields.size() == 15 );
+        CHECK( fields[1] == "Raw" );
+        CHECK( fields[14].empty() );
+
+        const std::string& remote = fields[8];
+        const bool toHeld = remote.size() > heldSuffix.size() && remote.compare( remote.size() - heldSuffix.size(), heldSuffix.size(), heldSuffix ) == 0;
+        if( fields[0] == "Snd" && toHeld )
+            ++sendsToHeld;
+        else if( !toHeld )
+            ++networkThreadLines;
+    }
+
+    CHECK( pingsSent == kPings );
+    CHECK( sendsToHeld == pingsSent );
+    CHECK( networkThreadLines > 0 );
 }
