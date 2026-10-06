@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <thread>
 
 /*
@@ -122,16 +123,40 @@ bool ViewShowsClosed( RakPeerInterface* peer, const Packet* packet )
     return peer->GetConnectionState( packet->systemAddress ) == IS_NOT_CONNECTED;
 }
 
+/// The connection changes this test awaits by name, anything else by number.
+std::string MessageName( MessageID id )
+{
+    switch( id )
+    {
+    case ID_NEW_INCOMING_CONNECTION:
+        return "ID_NEW_INCOMING_CONNECTION";
+    case ID_CONNECTION_LOST:
+        return "ID_CONNECTION_LOST";
+    case ID_DISCONNECTION_NOTIFICATION:
+        return "ID_DISCONNECTION_NOTIFICATION";
+    default:
+        return "ID " + std::to_string( id );
+    }
+}
+
+std::string DescribeMessage( const Packet* packet )
+{
+    return MessageName( packet->data[0] ) + " from " + Catch::StringMaker<RakNetGUID>::convert( packet->guid );
+}
+
 /// Receive on the server, checking the view in every connection-change handler, and
-/// drain the clients, until \a isAwaited holds for a Message. FAILs at the deadline.
-void PollUntil( RakPeerInterface* server, RakPeerInterface* const* clients, Observations& observations, const std::function<bool( const Packet* )>& isAwaited )
+/// drain the clients, until \a isAwaited holds for a Message. FAILs at the deadline,
+/// naming the wait by \a awaited and listing the Messages that did arrive.
+void PollUntil( RakPeerInterface* server, RakPeerInterface* const* clients, Observations& observations, const std::string& awaited, const std::function<bool( const Packet* )>& isAwaited )
 {
     const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
+    std::string arrived;
     bool awaitedSeen = false;
     while( awaitedSeen == false )
     {
         for( Packet* packet = server->Receive(); packet != 0; packet = server->Receive() )
         {
+            arrived += ( arrived.empty() ? "" : ", " ) + DescribeMessage( packet );
             switch( packet->data[0] )
             {
             case ID_NEW_INCOMING_CONNECTION:
@@ -155,7 +180,7 @@ void PollUntil( RakPeerInterface* server, RakPeerInterface* const* clients, Obse
         ConnectionWaits::DrainAll( clients, 2 );
 
         if( ConnectionWaits::Expired( deadline ) )
-            FAIL( "The awaited Message did not arrive" );
+            FAIL( "Waited " << kWaitBudgetMs << " ms for " << awaited << ". Arrived: " << ( arrived.empty() ? "nothing" : arrived ) );
         std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
     }
 }
@@ -210,6 +235,7 @@ TEST_CASE( "Receive hands out a connection change only once the published view s
     {
         INFO( "round " << round );
         const RakNetGUID rawGuid( 0x5741000000000000ull + (uint64_t)round );
+        INFO( "RawSystem " << Catch::StringMaker<RakNetGUID>::convert( rawGuid ) );
         RawSystem raw( serverAddress, rawGuid.g );
 
         // The server holds the RawSystem's record from here, so the clients' records
@@ -218,7 +244,7 @@ TEST_CASE( "Receive hands out a connection change only once the published view s
         for( RakPeerInterface* client : clients )
             REQUIRE( client->Connect( "127.0.0.1", serverPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
         int clientsConnected = 0;
-        PollUntil( server, clients, observations, [&]( const Packet* packet ) {
+        PollUntil( server, clients, observations, "both clients' ID_NEW_INCOMING_CONNECTION", [&]( const Packet* packet ) {
             if( packet->data[0] == ID_NEW_INCOMING_CONNECTION && packet->guid != rawGuid )
                 clientsConnected++;
             return clientsConnected == 2;
@@ -226,7 +252,7 @@ TEST_CASE( "Receive hands out a connection change only once the published view s
 
         raw.CompleteConnectionRequest();
         SystemAddress rawAddress;
-        PollUntil( server, clients, observations, [&]( const Packet* packet ) {
+        PollUntil( server, clients, observations, "the RawSystem's ID_NEW_INCOMING_CONNECTION", [&]( const Packet* packet ) {
             if( packet->data[0] != ID_NEW_INCOMING_CONNECTION || packet->guid != rawGuid )
                 return false;
             rawAddress = packet->systemAddress;
@@ -248,14 +274,14 @@ TEST_CASE( "Receive hands out a connection change only once the published view s
             notification.Write( (MessageID)ID_DISCONNECTION_NOTIFICATION );
             raw.SendUnreliable( notification );
         }
-        PollUntil( server, clients, observations, [&]( const Packet* packet ) {
+        PollUntil( server, clients, observations, "the RawSystem's " + MessageName( closedWith ), [&]( const Packet* packet ) {
             return packet->data[0] == closedWith && packet->guid == rawGuid;
         } );
 
         for( RakPeerInterface* client : clients )
             client->CloseConnection( serverAddress, true );
         int clientsClosed = 0;
-        PollUntil( server, clients, observations, [&]( const Packet* packet ) {
+        PollUntil( server, clients, observations, "both clients' ID_DISCONNECTION_NOTIFICATION", [&]( const Packet* packet ) {
             if( packet->data[0] == ID_DISCONNECTION_NOTIFICATION && packet->guid != rawGuid )
                 clientsClosed++;
             return clientsClosed == 2;
