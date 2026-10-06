@@ -74,7 +74,9 @@ public:
     /// \note May be called at any time. The next line formatted uses the new value, while a
     /// line already being formatted may use the old one.
     virtual void SetPrintID( bool print );
-    // Print or hide acks (clears up the screen not to print them but is worse for debugging)
+    /// Print or hide acks (clears up the screen not to print them but is worse for debugging)
+    /// \note May be called at any time. The next ack uses the new value, while one already
+    /// being logged may use the old one.
     virtual void SetPrintAcks( bool print );
 
     /// Prepend this string to output logs.
@@ -103,7 +105,7 @@ protected:
     std::atomic<bool> logDirectMessages;
 
     std::atomic<bool> printId;
-    bool printAcks;
+    std::atomic<bool> printAcks;
     // Guards prefix and suffix.
     std::mutex affixMutex;
     char prefix[256];

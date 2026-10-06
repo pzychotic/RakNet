@@ -130,6 +130,9 @@ void PacketLogger::OnReliabilityLayerNotification( const char* errorMessage, con
 }
 void PacketLogger::OnAck( unsigned int messageNumber, SystemAddress remoteSystemAddress, RakNet::TimeMS time )
 {
+    if( !printAcks )
+        return;
+
     char str[1024];
     char str1[64], str2[62];
     SystemAddress localSystemAddress = rakPeerInterface->GetExternalID( remoteSystemAddress );

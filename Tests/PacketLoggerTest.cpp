@@ -222,6 +222,42 @@ TEST_CASE( "PacketLogger::WriteMiscellaneous logs the formatted line", "[packetl
 }
 
 /*
+PacketLogger::OnAck, driven directly on a logger attached to an unstarted peer, with
+SetPrintAcks off and on.
+*/
+
+namespace {
+
+std::vector<std::string> LogAck( bool printAcks )
+{
+    CapturingPacketLogger logger;
+    logger.SetPrintAcks( printAcks );
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Create();
+    peer->AttachPlugin( &logger );
+
+    logger.OnAck( 7, UNASSIGNED_SYSTEM_ADDRESS, 0 );
+    peer->DetachPlugin( &logger );
+    return logger.lines;
+}
+
+} // namespace
+
+TEST_CASE( "PacketLogger::OnAck logs nothing while SetPrintAcks is false", "[packetlogger]" )
+{
+    CHECK( LogAck( false ).empty() );
+}
+
+TEST_CASE( "PacketLogger::OnAck logs one ack line while SetPrintAcks is true", "[packetlogger]" )
+{
+    const std::vector<std::string> lines = LogAck( true );
+
+    REQUIRE( lines.size() == 1 );
+    INFO( lines[0] );
+    CHECK( lines[0].find( ",Rcv,Ack," ) != std::string::npos );
+}
+
+/*
 ThreadsafePacketLogger fed from two threads at once. The network thread logs the
 offline pings a second peer keeps sending, and their pongs. Meanwhile the test thread
 logs its own Ping calls, each of which runs OnDirectSocketSend on the caller's thread.
