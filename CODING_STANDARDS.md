@@ -18,9 +18,14 @@ clang-format already gate the mechanical rules in the pre-commit hook and CI.
 
 - **Flags** a test sets on seeing a message are named `sawX` or `gotX`
   (`sawNotification`, `gotPong`).
-- **Waking the network thread.** `GetStatistics` is answered on the network thread, so
-  calling it wakes the thread now. Tests use it to make an update cycle come before the
-  10 ms ack hold runs out, with a comment saying so.
+- **Waking the network thread.** A test that needs an update cycle before the 10 ms timer
+  or ack hold runs out wakes the thread, with a comment saying so, in one of two ways:
+  - `GetStatistics`, which is answered on the network thread, so it returns once that
+    cycle has run. Use it when the test waits for the cycle anyway, or polls in a loop.
+  - A command at `IMMEDIATE_PRIORITY`, which wakes the thread and returns at once: a
+    notifying `CloseConnection` with that `disconnectionNotificationPriority`, or, after a
+    command that takes no priority such as a silent close, an `IMMEDIATE_PRIORITY` `Send`
+    to the same System.
 - **Waits** are a spin or poll bounded by a deadline (`ConnectionWaits::Expired`), with the
   budget a named constant whose comment says what it guards. A fixed sleep only lets traffic
   die down, and its comment says which traffic.

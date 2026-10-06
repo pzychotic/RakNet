@@ -26,6 +26,10 @@ offline handshake completes, and there is no supported way to ask it for anythin
 
 Once the connection record exists, everything is framed the way
 ReliabilityLayerHarness writes it.
+
+It never sends acks, so a reliable send to it keeps the Peer's record of it open until the
+record's timeout, 10 s in Release. Shorten it with SetTimeoutTime on its address. A Half-open
+record has nothing reliable outstanding until that send, so it can't time out sooner.
 */
 
 namespace RawSystemHarness {
