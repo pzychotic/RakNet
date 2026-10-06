@@ -22,6 +22,15 @@ Create a new file under `.scratch/<feature-slug>/` (creating the directory if ne
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.
 
+## Bug tickets
+
+A ticket with `Type: bug` moves through the triage states in `triage-labels.md`, then:
+
+- **Claim**: set `Status: claimed` and save before touching code.
+- **Resolve**: tick the acceptance criteria, set `Status: resolved`, and append
+  `- YYYY-MM-DD: Fixed in <sha>. <red-before/green-after evidence>. <ctest result>.` at the
+  bottom. `map.md` is unchanged.
+
 ## Wayfinding operations
 
 Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
