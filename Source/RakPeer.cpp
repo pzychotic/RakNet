@@ -1342,7 +1342,7 @@ unsigned int RakPeer::GetMaximumNumberOfPeers( void ) const
 //
 // Parameters:
 // target: Which connection to close
-// sendDisconnectionNotification: True to send ID_DISCONNECTION_NOTIFICATION to the recipient. False to close it silently.
+// sendDisconnectionNotification: True to send ID_DISCONNECTION_NOTIFICATION to the recipient. False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged.
 // channel: If blockDuration > 0, the disconnect packet will be sent on this channel
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )
@@ -5401,7 +5401,13 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         }
         else if( bcs->command == BufferedCommandStruct::BCS_CLOSE_CONNECTION )
         {
-            CloseConnectionInternal( bcs->systemIdentifier, false, true, bcs->orderingChannel, bcs->priority );
+            // A silent close still sends the acks a record in either ON_NO_ACK mode owes.
+            remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
+            if( remoteSystem && ( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK ||
+                                  remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY ) )
+                remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY;
+            else
+                CloseConnectionInternal( bcs->systemIdentifier, false, true, bcs->orderingChannel, bcs->priority );
         }
         else if( bcs->command == BufferedCommandStruct::BCS_CHANGE_SYSTEM_ADDRESS )
         {

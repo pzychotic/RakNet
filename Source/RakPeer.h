@@ -290,7 +290,7 @@ public:
     /// \brief Close the connection to another host (if we initiated the connection it will disconnect, if they did it will kick them out).
     /// \details This method closes the connection irrespective of who initiated the connection.
     /// \param[in] target Which system to close the connection to.
-    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it silently.
+    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged.
     /// \param[in] channel Which ordering channel to send the disconnection notification on, if any
     /// \param[in] disconnectionNotificationPriority Priority to send ID_DISCONNECTION_NOTIFICATION on.
     void CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY );
@@ -724,7 +724,8 @@ public:
             DISCONNECT_ASAP_SILENTLY,
             DISCONNECT_ON_NO_ACK,
             // DISCONNECT_ON_NO_ACK without telling the application: a refused Peer's record
-            // of the Peer that refused it, which never connected.
+            // of the Peer that refused it, which never connected, or a record acknowledging a
+            // close that the application then closed silently.
             DISCONNECT_ON_NO_ACK_SILENTLY,
             REQUESTED_CONNECTION,
             HANDLING_CONNECTION_REQUEST,

@@ -273,7 +273,7 @@ public:
     // -------------------------------------------------------------------------------------------- Connection Management Functions--------------------------------------------------------------------------------------------
     /// Close the connection to another host (if we initiated the connection it will disconnect, if they did it will kick them out).
     /// \param[in] target Which system to close the connection to.
-    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it silently.
+    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged.
     /// \param[in] channel Which ordering channel to send the disconnection notification on, if any
     /// \param[in] disconnectionNotificationPriority Priority to send ID_DISCONNECTION_NOTIFICATION on.
     virtual void CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY ) = 0;

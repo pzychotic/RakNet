@@ -34,7 +34,8 @@ _Avoid_: Pending connection, connection thread
 **Closing connection record**:
 A connection record whose connection is ending. Either this Peer asked to close it and is
 waiting for the System to acknowledge, or the System asked and this Peer is acknowledging.
-Asking to close a closing connection record changes nothing.
+Asking to close it again never stops this Peer acknowledging a close the System asked for.
+Asking to close it silently ends this Peer's wait for the System to acknowledge its own.
 _Avoid_: Disconnecting connection, half-closed connection
 
 **Update cycle**:
