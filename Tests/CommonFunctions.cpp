@@ -60,7 +60,7 @@ bool CommonFunctions::ConnectionStateMatchesOptions( RakPeerInterface* peer, Sys
     }
 }
 
-bool CommonFunctions::WaitAndConnect( RakPeerInterface* peer, char* ip, unsigned short int port, int millisecondsToWait )
+bool CommonFunctions::WaitAndConnect( RakPeerInterface* peer, const char* ip, unsigned short int port, int millisecondsToWait )
 {
     SystemAddress connectToAddress( ip, port );
     TimeMS entryTime = GetTimeMS();

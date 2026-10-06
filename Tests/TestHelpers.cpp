@@ -26,29 +26,12 @@ bool TestHelpers::WaitAndConnectTwoPeersLocally( RakPeerInterface* connector, Ra
     return CommonFunctions::WaitAndConnect( connector, "127.0.0.1", connecteeAdd.GetPort(), millisecondsToWait );
 }
 
-//returns false if connect fails
-bool TestHelpers::ConnectTwoPeersLocally( RakPeerInterface* connector, RakPeerInterface* connectee )
-{
-    SystemAddress connecteeAdd = connectee->GetInternalID();
-    return connector->Connect( "127.0.0.1", connecteeAdd.GetPort(), 0, 0 );
-}
-
 bool TestHelpers::BroadCastTestPacket( RakPeerInterface* sender, PacketReliability rel, PacketPriority pr, int typeNum ) //returns send return value
 {
 
     char str2[] = "AAAAAAAAAA";
     str2[0] = typeNum;
     return sender->Send( str2, (int)strlen( str2 ) + 1, pr, rel, 0, UNASSIGNED_SYSTEM_ADDRESS, true ) > 0;
-}
-
-bool TestHelpers::SendTestPacketDirected( RakPeerInterface* sender, char* ip, int port, PacketReliability rel, PacketPriority pr, int typeNum ) //returns send return value
-{
-
-    SystemAddress recAddress( ip, port );
-
-    char str2[] = "AAAAAAAAAA";
-    str2[0] = typeNum;
-    return sender->Send( str2, (int)strlen( str2 ) + 1, pr, rel, 0, recAddress, false ) > 0;
 }
 
 bool TestHelpers::WaitForTestPacket( RakPeerInterface* reciever, int millisecondsToWait )
