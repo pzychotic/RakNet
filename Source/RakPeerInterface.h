@@ -420,7 +420,7 @@ public:
     virtual SystemAddress GetMyBoundAddress( const int socketIndex = 0 ) = 0;
 
     /// Get a random 64-bit number from the operating system's random number source.
-    /// See CONTEXT.md for what a RakNetGUID promises.
+    /// See GLOSSARY.md for what a RakNetGUID promises.
     ///
     /// This exists for the exported and SWIG-bound API. New code inside the library
     /// should call RakNet::FillRandomBytes, which reports failure separately from its

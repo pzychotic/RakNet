@@ -11,7 +11,7 @@
 #include <thread>
 
 /*
-Pins that asking to close a closing connection record changes nothing (CONTEXT.md).
+Pins that asking to close a closing connection record changes nothing (GLOSSARY.md).
 
 B receives A's disconnection notification and owes A an ack for it. The view can be one
 update cycle old (ADR-0007), so B's application can still ask to close the connection at that

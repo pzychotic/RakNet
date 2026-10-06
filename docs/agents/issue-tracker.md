@@ -3,14 +3,14 @@
 Issues and specs for this repo live as markdown files in `.scratch/`.
 
 `.scratch/` is git-ignored and never committed. Move or rename ticket files with plain `mv`,
-not `git mv`, and don't `git add` them. Committed files (code, comments, ADRs, `CONTEXT.md`,
+not `git mv`, and don't `git add` them. Committed files (code, comments, ADRs, `GLOSSARY.md`,
 commit messages) never reference `.scratch/` paths or ticket numbers.
 
 ## Conventions
 
 - One feature per directory: `.scratch/<feature-slug>/`
 - The spec is `.scratch/<feature-slug>/spec.md`
-- Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` — never a single combined tickets file
+- Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 

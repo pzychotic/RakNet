@@ -14,7 +14,7 @@
 /*
 Guards RakNetGUID generation, which until this file existed harvested its entropy
 from sixteen 1 ms sleeps and cost ~240 ms per RakPeerInterface::GetInstance() -
-about half the suite's wall clock. See CONTEXT.md for what a RakNetGUID promises
+about half the suite's wall clock. See GLOSSARY.md for what a RakNetGUID promises
 and ADR-0001 for why the entropy now comes from the operating system.
 
 Deliberately tagged [guid] and NOT [network]: only the last two cases create peers,

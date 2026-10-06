@@ -28,7 +28,7 @@ of Peers depend on an optional subsystem would be wrong even then.
 
 The uniqueness of a RakNetGUID is a contract other code may rely on. Its
 *unpredictability* is a property of this implementation and is deliberately **not**
-promised — see the `RakNetGUID` entry in `CONTEXT.md`. The distinction is load-bearing:
+promised — see the `RakNetGUID` entry in `GLOSSARY.md`. The distinction is load-bearing:
 several paths act on a RakNetGUID supplied by a System (`Router2::OnRerouted` →
 `RakPeer::ChangeSystemAddress` re-points a connection found by RakNetGUID alone;
 `NatPunchthroughServer` discloses a Peer's addresses to whoever names its RakNetGUID), so
