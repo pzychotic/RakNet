@@ -38,6 +38,14 @@ Asking to close it again never stops this Peer acknowledging a close the System 
 Asking to close it silently ends this Peer's wait for the System to acknowledge its own.
 _Avoid_: Disconnecting connection, half-closed connection
 
+**End message**:
+The one Message that tells the application, and through it every plugin, that a connection
+it was told had opened has ended: `ID_CONNECTION_LOST` or `ID_DISCONNECTION_NOTIFICATION`.
+Every such connection gets exactly one, however it closes and whichever end closes it. A
+connect attempt the application stops itself is owed none, and `Shutdown` ends every
+connection without one.
+_Avoid_: Disconnect message, close notification, lost message
+
 **Update cycle**:
 One pass of a Peer's network work: it reads what has arrived, applies the commands the
 application has queued, advances every connection, sends what is due, and ends by

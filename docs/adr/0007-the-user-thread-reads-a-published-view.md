@@ -25,8 +25,9 @@ can tear the ping and statistics fields the network thread writes on every datag
    Message too: one that a plugin or a RakPeer call produces on the user thread may
    announce a buffered command that hasn't run yet. `Router2` hands out
    `ID_ROUTER_2_REROUTED` right after queuing `ChangeSystemAddress`, so the connection
-   still has its old address. `CloseConnection` without a notification queues
-   `ID_CONNECTION_LOST` at once, so the connection can still be `IS_CONNECTED`.
+   still has its old address. `CloseConnection` without a notification doesn't queue
+   its end message at once: an end message decided from the view could be duplicated or
+   omitted, so the network thread decides it when it applies the close.
 3. **Only open connection records are authoritative.** A getter answers from connection
    records that are open. What a closed connection left in storage is not a connection
    record. `IS_DISCONNECTED` stays in the API as a hint that may fail to appear. It is not
@@ -81,6 +82,10 @@ still built, so both modes run the same getters.
   would still get ahead of the view.
 - **Stamp each Message with its cycle and have getters wait for that cycle's view.**
   Getters would block, which is the cost that rules out overlays above.
+- **Queue a silent close's end message on the user thread, from the view.** The view can
+  show a connection as open after its end message has been staged, or as closing when the
+  close still owes one, so the application could hear of the end twice or not at all. A
+  Message once queued can't be taken back.
 
 ## Consequences
 

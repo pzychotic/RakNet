@@ -290,7 +290,7 @@ public:
     /// \brief Close the connection to another host (if we initiated the connection it will disconnect, if they did it will kick them out).
     /// \details This method closes the connection irrespective of who initiated the connection.
     /// \param[in] target Which system to close the connection to.
-    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged.
+    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged. The application gets the connection's end message once the close is applied, not when this returns.
     /// \param[in] channel Which ordering channel to send the disconnection notification on, if any
     /// \param[in] disconnectionNotificationPriority Priority to send ID_DISCONNECTION_NOTIFICATION on.
     void CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY );
@@ -721,6 +721,10 @@ public:
         {
             NO_ACTION,
             DISCONNECT_ASAP,
+            // DISCONNECT_ASAP without telling the application: a record refused or failed in
+            // the connection request or its security handshake, a record over its byte budget,
+            // reported already where it was owed a report, or a record that never reached CONNECTED
+            // closed with a notification.
             DISCONNECT_ASAP_SILENTLY,
             DISCONNECT_ON_NO_ACK,
             // DISCONNECT_ON_NO_ACK without telling the application: a refused Peer's record
@@ -1127,6 +1131,9 @@ protected:
     // connectMode says it is owed: ID_CONNECTION_ATTEMPT_FAILED, ID_CONNECTION_LOST,
     // ID_DISCONNECTION_NOTIFICATION, or nothing for a silent close.
     void CloseRecordAndReport( RemoteSystemStruct* remoteSystem );
+    // Tells the application, from the update thread, that a record's connection has ended
+    // or failed to open: its end message, or ID_CONNECTION_ATTEMPT_FAILED.
+    void PushConnectionChange( const RemoteSystemStruct* remoteSystem, MessageID messageId );
     // Whether a record is already on its way out.
     static bool IsClosing( RemoteSystemStruct::ConnectMode connectMode );
     void SendBuffered( const char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt );

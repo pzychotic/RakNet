@@ -45,8 +45,8 @@ struct RakNetStatistics;
 /// - When Receive() hands out a Message the network thread produced, the getters already
 ///   reflect at least the update cycle that produced it, and possibly a later one. A
 ///   Message produced on your thread may announce a queued command that hasn't run yet:
-///   ID_ROUTER_2_REROUTED arrives before the connection takes its new address, and
-///   CloseConnection()'s own ID_CONNECTION_LOST before the connection closes.
+///   ID_ROUTER_2_REROUTED arrives before the connection takes its new address. A
+///   connection's end message comes from the network thread, once its close is applied.
 /// - Only open connections are authoritative. IS_DISCONNECTED is a hint that may never
 ///   appear: a closed connection can go straight to IS_NOT_CONNECTED.
 ///
@@ -273,7 +273,7 @@ public:
     // -------------------------------------------------------------------------------------------- Connection Management Functions--------------------------------------------------------------------------------------------
     /// Close the connection to another host (if we initiated the connection it will disconnect, if they did it will kick them out).
     /// \param[in] target Which system to close the connection to.
-    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged.
+    /// \param[in] sendDisconnectionNotification True to send ID_DISCONNECTION_NOTIFICATION to the recipient.  False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged. The application gets the connection's end message once the close is applied, not when this returns.
     /// \param[in] channel Which ordering channel to send the disconnection notification on, if any
     /// \param[in] disconnectionNotificationPriority Priority to send ID_DISCONNECTION_NOTIFICATION on.
     virtual void CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY ) = 0;

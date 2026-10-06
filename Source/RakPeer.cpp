@@ -1342,7 +1342,7 @@ unsigned int RakPeer::GetMaximumNumberOfPeers( void ) const
 //
 // Parameters:
 // target: Which connection to close
-// sendDisconnectionNotification: True to send ID_DISCONNECTION_NOTIFICATION to the recipient. False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged.
+// sendDisconnectionNotification: True to send ID_DISCONNECTION_NOTIFICATION to the recipient. False to close it without notifying the recipient. If the recipient is already closing the connection, its notification is still acknowledged. The application gets the connection's end message once the close is applied, not when this returns.
 // channel: If blockDuration > 0, the disconnect packet will be sent on this channel
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )
@@ -1361,21 +1361,6 @@ void RakPeer::CloseConnection( const AddressOrGUID target, bool sendDisconnectio
     */
 
     CloseConnectionInternal( target, sendDisconnectionNotification, false, orderingChannel, disconnectionNotificationPriority );
-
-    // 12/14/09 Return ID_CONNECTION_LOST when calling CloseConnection with sendDisconnectionNotification==false, elsewise it is never returned
-    if( sendDisconnectionNotification == false && GetConnectionState( target ) == IS_CONNECTED )
-    {
-        Packet* packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
-        if( packet == 0 )
-            return;
-        packet->data[0] = ID_CONNECTION_LOST; // DeadConnection
-        packet->guid = target.rakNetGuid == UNASSIGNED_RAKNET_GUID ? GetGuidFromSystemAddress( target.systemAddress ) : target.rakNetGuid;
-        packet->systemAddress = target.systemAddress == UNASSIGNED_SYSTEM_ADDRESS ? GetSystemAddressFromGuid( target.rakNetGuid ) : target.systemAddress;
-        packet->systemAddress.systemIndex = (SystemIndex)GetIndexFromSystemAddress( packet->systemAddress );
-        packet->guid.systemIndex = packet->systemAddress.systemIndex;
-        packet->wasGeneratedLocally = true; // else processed twice
-        AddPacketToProducer( packet );
-    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3995,32 +3980,31 @@ void RakPeer::CloseRecordAndReport( RemoteSystemStruct* remoteSystem )
 
     // TODO - RakNet 4.0 - Return a different message identifier for DISCONNECT_ASAP_SILENTLY and DISCONNECT_ASAP than for DISCONNECT_ON_NO_ACK
     // The first two mean we called CloseConnection(), the last means the other system sent us ID_DISCONNECTION_NOTIFICATION
-    if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED || remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
-    {
-        Packet* packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
-        if( packet != 0 )
-        {
-            if( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
-                packet->data[0] = ID_CONNECTION_ATTEMPT_FAILED; // Attempted a connection and couldn't
-            else if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED )
-                packet->data[0] = ID_CONNECTION_LOST; // DeadConnection
-            else
-                packet->data[0] = ID_DISCONNECTION_NOTIFICATION; // DeadConnection
-
-            packet->guid = remoteSystem->guid;
-            packet->systemAddress = systemAddress;
-            packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
-            packet->guid.systemIndex = packet->systemAddress.systemIndex;
-
-            AddPacketToProducer( packet );
-        }
-    }
+    if( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
+        PushConnectionChange( remoteSystem, ID_CONNECTION_ATTEMPT_FAILED ); // Attempted a connection and couldn't
+    else if( remoteSystem->connectMode == RemoteSystemStruct::CONNECTED )
+        PushConnectionChange( remoteSystem, ID_CONNECTION_LOST );
+    else if( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP || remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK )
+        PushConnectionChange( remoteSystem, ID_DISCONNECTION_NOTIFICATION );
     // else connection shutting down, don't bother telling the user
 
 #ifdef _DO_PRINTF
     RAKNET_DEBUG_PRINTF( "Connection dropped for player %i:%i\n", systemAddress );
 #endif
     CloseConnectionInternal( systemAddress, false, true, 0, LOW_PRIORITY );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::PushConnectionChange( const RemoteSystemStruct* remoteSystem, MessageID messageId )
+{
+    Packet* packet = AllocPacket( sizeof( char ), _FILE_AND_LINE_ );
+    if( packet == 0 )
+        return;
+    packet->data[0] = messageId;
+    packet->guid = remoteSystem->guid;
+    packet->systemAddress = remoteSystem->systemAddress;
+    packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
+    packet->guid.systemIndex = packet->systemAddress.systemIndex;
+    AddPacketToProducer( packet );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::IsClosing( RemoteSystemStruct::ConnectMode connectMode )
@@ -5392,17 +5376,32 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 
             // Set the new connection state AFTER we call sendImmediate in case we are setting it to a disconnection state, which does not allow further sends
             // A closing record keeps the close it is in, so a DISCONNECT_ON_NO_ACK still sends the ack it owes.
+            // A record that never reached CONNECTED closes silently: its connection never opened, so it is owed no end message.
             if( bcs->connectionMode != RemoteSystemStruct::NO_ACTION )
             {
                 remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
                 if( remoteSystem && IsClosing( remoteSystem->connectMode ) == false )
-                    remoteSystem->connectMode = bcs->connectionMode;
+                {
+                    if( bcs->connectionMode == RemoteSystemStruct::DISCONNECT_ASAP && remoteSystem->connectMode != RemoteSystemStruct::CONNECTED )
+                        remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ASAP_SILENTLY;
+                    else
+                        remoteSystem->connectMode = bcs->connectionMode;
+                }
             }
         }
         else if( bcs->command == BufferedCommandStruct::BCS_CLOSE_CONNECTION )
         {
-            // A silent close still sends the acks a record in either ON_NO_ACK mode owes.
+            // The end message is decided here, from the record's mode, so a connection gets
+            // exactly one however many closes reach it. A silent close changes when the end
+            // is reported, never which message reports it.
             remoteSystem = GetRemoteSystem( bcs->systemIdentifier, true );
+            if( remoteSystem && remoteSystem->connectMode == RemoteSystemStruct::CONNECTED )
+                PushConnectionChange( remoteSystem, ID_CONNECTION_LOST );
+            else if( remoteSystem && ( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ASAP ||
+                                       remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK ) )
+                PushConnectionChange( remoteSystem, ID_DISCONNECTION_NOTIFICATION );
+
+            // A silent close still sends the acks a record in either ON_NO_ACK mode owes.
             if( remoteSystem && ( remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK ||
                                   remoteSystem->connectMode == RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY ) )
                 remoteSystem->connectMode = RemoteSystemStruct::DISCONNECT_ON_NO_ACK_SILENTLY;
