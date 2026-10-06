@@ -44,6 +44,8 @@ CMakeLists.txt text
 
 # --- Must be LF in the working tree ---------------------------------------
 *.sh     text eol=lf
+# Git hooks are run through their shebang line, which a CR breaks.
+tools/hooks/* text eol=lf
 
 # --- Binary ---------------------------------------------------------------
 # Present in the tree today:

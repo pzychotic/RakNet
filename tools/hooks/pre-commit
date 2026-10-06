@@ -1,0 +1,147 @@
+#!/usr/bin/env perl
+# Pre-commit checks for RakNet. Install once per clone:
+#
+#   git config core.hooksPath tools/hooks
+#
+# 1. A commit that stages a file under Source/ runs tools/lint-banned-apis.pl over Source/,
+#    as CI's banned-api-lint job does. It lints the working tree, not the index.
+# 2. A commit that stages tools/lint-banned-apis.* runs the lint's own tests.
+# 3. Every staged .cpp or .h under Source/ or Tests/ is run through clang-format
+#    --dry-run --Werror, on the staged contents and only on the lines the commit adds or
+#    changes. The tree is not clang-format clean, so the hook leaves untouched lines alone.
+#
+# clang-format is taken from $CLANG_FORMAT, then PATH, then the newest Visual Studio's x64
+# LLVM tools. If none is found the format check is skipped with a notice.
+#
+# Skip every check for one commit with `git commit --no-verify`.
+use strict;
+use warnings;
+use IPC::Open3 qw(open3);
+use Symbol qw(gensym);
+
+my @staged = split /\0/, `git diff --cached --name-only --diff-filter=ACMR -z`;
+die "pre-commit: git diff --cached failed\n" if $? != 0;
+
+my $failed = 0;
+
+if( grep { m{^Source/} } @staged )
+{
+    if( system( 'perl', 'tools/lint-banned-apis.pl', 'Source' ) != 0 )
+    {
+        print STDERR "pre-commit: Source/ calls an API that ADR-0004 bans (see above).\n";
+        $failed = 1;
+    }
+}
+
+if( grep { m{^tools/lint-banned-apis\.} } @staged )
+{
+    if( system( 'perl', 'tools/lint-banned-apis.t' ) != 0 )
+    {
+        print STDERR "pre-commit: tools/lint-banned-apis.t failed.\n";
+        $failed = 1;
+    }
+}
+
+my @formatted = grep { m{^(Source|Tests)/.*\.(cpp|h)$} } @staged;
+if( @formatted )
+{
+    my $clangFormat = FindClangFormat();
+    if( !defined $clangFormat )
+    {
+        print STDERR "pre-commit: clang-format not found, format check skipped. Set CLANG_FORMAT to its path.\n";
+    }
+    else
+    {
+        my $unformatted = 0;
+        for my $path ( @formatted )
+        {
+            my @lines = ChangedLines( $path );
+            next if !@lines;
+            my $blob = `git show ":$path"`;
+            die "pre-commit: git show :$path failed\n" if $? != 0;
+            my ( $output, $status ) = Run( $blob, $clangFormat, '--dry-run', '--Werror', "--assume-filename=$path",
+                                           map { "--lines=$_" } @lines );
+            if( $status != 0 )
+            {
+                print STDERR $output;
+                print STDERR "pre-commit: $path is not clang-format clean on the lines this commit changes.\n";
+                $unformatted = 1;
+            }
+        }
+        if( $unformatted )
+        {
+            print STDERR "pre-commit: fix the lines above by hand, or format only them with\n" .
+                         "  \"$clangFormat\" -i --lines=<first>:<last> <file>\n";
+            $failed = 1;
+        }
+    }
+}
+
+exit $failed;
+
+# The "first:last" line ranges, in the staged file, that the commit adds or changes.
+sub ChangedLines
+{
+    my ( $path ) = @_;
+    my @ranges;
+    for my $line ( split /\n/, `git diff --cached -U0 --no-color -- "$path"` )
+    {
+        next if $line !~ /^\@\@ -\S+ \+(\d+)(?:,(\d+))? \@\@/;
+        my ( $first, $count ) = ( $1, defined $2 ? $2 : 1 );
+        push @ranges, $first . ':' . ( $first + $count - 1 ) if $count > 0;
+    }
+    return @ranges;
+}
+
+# Runs a command with $input on its stdin. Returns its stdout and stderr together, and its
+# exit status.
+sub Run
+{
+    my ( $input, @command ) = @_;
+    my $err = gensym;
+    my $pid = open3( my $in, my $out, $err, @command );
+    binmode $in;
+    print $in $input;
+    close $in;
+    local $/;
+    my $output = ( <$out> // '' ) . ( <$err> // '' );
+    waitpid( $pid, 0 );
+    return ( $output, $? );
+}
+
+sub Works
+{
+    my ( $candidate ) = @_;
+    my ( undef, $status ) = Run( '', $candidate, '--version' );
+    return $status == 0;
+}
+
+# Visual Studio's install folders are named by year up to 2022, then by major version (18).
+sub VsMajor
+{
+    my ( $folder ) = @_;
+    my %byYear = ( 2017 => 15, 2019 => 16, 2022 => 17 );
+    return $byYear{$folder} // $folder;
+}
+
+sub FindClangFormat
+{
+    return $ENV{CLANG_FORMAT} if defined $ENV{CLANG_FORMAT} && $ENV{CLANG_FORMAT} ne '';
+    return 'clang-format' if eval { Works( 'clang-format' ) };
+
+    # Visual Studio installs an ARM64 copy beside the x64 one; only x64 runs on x64 Windows.
+    for my $root ( '/c/Program Files/Microsoft Visual Studio', 'C:/Program Files/Microsoft Visual Studio' )
+    {
+        opendir( my $versions, $root ) or next;
+        for my $version ( sort { VsMajor( $b ) <=> VsMajor( $a ) } grep { /^\d+$/ } readdir $versions )
+        {
+            opendir( my $editions, "$root/$version" ) or next;
+            for my $edition ( grep { !/^\./ } readdir $editions )
+            {
+                my $candidate = "$root/$version/$edition/VC/Tools/Llvm/x64/bin/clang-format.exe";
+                return $candidate if -x $candidate;
+            }
+        }
+    }
+    return undef;
+}
