@@ -22,17 +22,19 @@ Create a new file under `.scratch/<feature-slug>/` (creating the directory if ne
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.
 
-## Bug tickets
+## Bug and task tickets
 
-A ticket with `Type: bug` moves through the triage states in `triage-labels.md`, then:
+A ticket with `Type: bug` or `Type: task` moves through the triage states in
+`triage-labels.md`, then:
 
 - **Claim**: set `Status: claimed` and save before touching code.
-- **Measure** red-before and green-after rates with `tools/repeat-test.sh "<test name>" 20`
-  (add `--wsl` for GCC). For the red run, `git stash push -- Source/` first and
-  `git stash pop` after.
+- **Measure** (bugs only) red-before and green-after rates with
+  `tools/repeat-test.sh "<test name>" 20` (add `--wsl` for GCC). For the red run,
+  `git stash push -- Source/` first and `git stash pop` after.
 - **Resolve**: tick the acceptance criteria, set `Status: resolved`, and append
-  `- YYYY-MM-DD: Fixed in <sha>. <red-before/green-after evidence>. <ctest result>.` at the
-  bottom. `map.md` is unchanged.
+  `- YYYY-MM-DD: Fixed in <sha>. <evidence>. <ctest result>.` at the bottom. The evidence is
+  the red-before/green-after rates for a bug, and the checks run against the acceptance
+  criteria for a task. `map.md` is unchanged.
 
 ## Wayfinding operations
 
