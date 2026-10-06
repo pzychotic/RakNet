@@ -113,6 +113,14 @@ public:
     /// \param[in] orderingChannel See the parameter of the same name in RakPeerInterface::Send()
     void SendToParticipant( const RakNetGUID& relayPluginServerGuid, const std::string& destinationGuid, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel );
 
+    /// \brief Request that the server relay \a bitStream to every other member of the group you are in
+    /// \details The server forwards the message with \a priority, \a reliability and \a orderingChannel. It sends the group's join and leave
+    /// notices HIGH_PRIORITY, RELIABLE_ORDERED on channel 0, so a group message is ordered against them only when sent RELIABLE_ORDERED on channel 0.
+    /// \param[in] relayPluginServerGuid the RakNetGUID of the system running RelayPlugin
+    /// \param[in] bitStream The data to relay
+    /// \param[in] priority See the parameter of the same name in RakPeerInterface::Send()
+    /// \param[in] reliability See the parameter of the same name in RakPeerInterface::Send(). A receipt reliability covers only the hop to the server. The server forwards the message without a receipt.
+    /// \param[in] orderingChannel See the parameter of the same name in RakPeerInterface::Send()
     void SendGroupMessage( const RakNetGUID& relayPluginServerGuid, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel );
     void JoinGroupRequest( const RakNetGUID& relayPluginServerGuid, const std::string& groupName );
     void LeaveGroup( const RakNetGUID& relayPluginServerGuid );
@@ -147,7 +155,8 @@ protected:
     RelayPlugin::RP_Group* JoinGroup( RP_Group* room, StrAndGuidAndRoom* strAndGuidSender );
     void LeaveGroup( StrAndGuidAndRoom* strAndGuidSender );
     void NotifyUsersInRoom( RP_Group* room, int msg, const std::string& message );
-    void SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStream* message );
+    void SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStream* message, PacketPriority priority, PacketReliability reliability,
+                            char orderingChannel );
     void SendChatRoomsList( RakNetGUID target );
     void OnGroupMessageFromClient( Packet* packet );
     void OnJoinGroupRequestFromClient( Packet* packet );

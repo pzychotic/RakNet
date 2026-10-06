@@ -39,6 +39,20 @@ PacketReliability WithoutReceipt( PacketReliability reliability )
     }
 }
 
+// Reads the priority, reliability and ordering channel a client relays a message with.
+// Only a broken or hostile System sends them short or out of range, and then this returns false.
+bool ReadSendParameters( BitStream& bsIn, PacketPriority& priority, PacketReliability& reliability, char& orderingChannel )
+{
+    unsigned char priorityIn;
+    unsigned char reliabilityIn;
+    if( !bsIn.Read( priorityIn ) || !bsIn.Read( reliabilityIn ) || !bsIn.Read( orderingChannel ) )
+        return false;
+    priority = (PacketPriority)priorityIn;
+    reliability = (PacketReliability)reliabilityIn;
+    return priority < NUMBER_OF_PRIORITIES && reliability < NUMBER_OF_RELIABILITIES &&
+           (unsigned char)orderingChannel < NUMBER_OF_ORDERED_STREAMS;
+}
+
 } // namespace
 
 STATIC_FACTORY_DEFINITIONS( RelayPlugin, RelayPlugin );
@@ -192,15 +206,7 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             PacketPriority priority;
             PacketReliability reliability;
             char orderingChannel;
-            unsigned char cIn;
-            bsIn.Read( cIn );
-            priority = (PacketPriority)cIn;
-            bsIn.Read( cIn );
-            reliability = (PacketReliability)cIn;
-            bsIn.Read( orderingChannel );
-            // Only a broken or hostile System sends parameters out of range.
-            if( priority >= NUMBER_OF_PRIORITIES || reliability >= NUMBER_OF_RELIABILITIES ||
-                (unsigned char)orderingChannel >= NUMBER_OF_ORDERED_STREAMS )
+            if( !ReadSendParameters( bsIn, priority, reliability, orderingChannel ) )
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
             std::string key;
             bsIn.ReadCompressed( key );
@@ -385,7 +391,8 @@ void RelayPlugin::NotifyUsersInRoom( RP_Group* room, int msg, const std::string&
     }
 }
 
-void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStream* message )
+void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStream* message, PacketPriority priority, PacketReliability reliability,
+                                     char orderingChannel )
 {
     if( strAndGuidSender->currentRoom.empty() )
         return;
@@ -406,7 +413,7 @@ void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStr
             {
                 if( rUser.guid != strAndGuidSender->guid )
                 {
-                    SendUnified( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, rUser.guid, false );
+                    SendUnified( &bsOut, priority, WithoutReceipt( reliability ), orderingChannel, rUser.guid, false );
                 }
             }
 
@@ -437,18 +444,14 @@ void RelayPlugin::OnGroupMessageFromClient( Packet* packet )
     PacketPriority priority;
     PacketReliability reliability;
     char orderingChannel;
-    unsigned char cIn;
-    bsIn.Read( cIn );
-    priority = (PacketPriority)cIn;
-    bsIn.Read( cIn );
-    reliability = (PacketReliability)cIn;
-    bsIn.Read( orderingChannel );
+    if( !ReadSendParameters( bsIn, priority, reliability, orderingChannel ) )
+        return;
     BitStream bsData;
     bsIn.Read( &bsData );
 
     if( auto it = guidToStrHash.find( packet->guid ); it != guidToStrHash.end() )
     {
-        SendMessageToRoom( it->second, &bsData );
+        SendMessageToRoom( it->second, &bsData, priority, reliability, orderingChannel );
     }
 }
 

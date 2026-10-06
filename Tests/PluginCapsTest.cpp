@@ -9,8 +9,10 @@
 #include "BitStream.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
+#include "InternalPacket.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
+#include "PluginInterface2.h"
 #include "RakNetSocket2.h"
 #include "RakNetStringMakers.h"
 #include "RakNetTypes.h"
@@ -21,8 +23,10 @@
 
 #include <chrono>
 #include <deque>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 /*
@@ -34,7 +38,8 @@ Pins what a connected System can make a plugin hold (ADR-0005).
   message to a participant whose priority, reliability or channel is out of range is dropped,
   rather than sent on with a value that indexed the server's per-priority arrays past their end.
   A receipt reliability is forwarded without the receipt, so the server's application never
-  gets ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS for a send it did not make.
+  gets ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS for a send it did not make. A group message
+  is held to the same rules and forwarded with the sender's reliability and ordering channel.
 - UDPProxyCoordinator. Forwarding requests are capped per requesting System, and so is the
   server selection data each keeps. Past either the request is refused with
   ID_UDP_PROXY_ALL_SERVERS_BUSY.
@@ -218,13 +223,81 @@ BitStream* RelayToParticipant( std::deque<BitStream>& storage, const std::string
     return &bs;
 }
 
+// RPE_GROUP_MESSAGE_FROM_CLIENT, laid out as RelayPlugin::SendGroupMessage writes it, with the
+// forwarded copies' parameters as raw bytes. The payload is the single byte tag.
+BitStream* RelayGroupMessage( std::deque<BitStream>& storage, unsigned char priority, unsigned char reliability, unsigned char orderingChannel,
+                              unsigned char tag )
+{
+    BitStream payload;
+    payload.Write( tag );
+    storage.emplace_back();
+    BitStream& bs = storage.back();
+    bs.WriteCasted<MessageID>( ID_RELAY_PLUGIN );
+    bs.WriteCasted<MessageID>( RPE_GROUP_MESSAGE_FROM_CLIENT );
+    bs.Write( priority );
+    bs.Write( reliability );
+    bs.Write( orderingChannel );
+    bs.Write( &payload );
+    return &bs;
+}
+
+// Adds member as a participant named name and joins it to groupName.
+void JoinRelayGroup( RakPeerInterface* server, RelayProbe& relay, RakPeerInterface* member, std::deque<BitStream>& storage,
+                     const std::string& name, const std::string& groupName )
+{
+    Inject( member, server, std::vector<BitStream*>{ RelayAdd( storage, name ), RelayJoin( storage, groupName ) } );
+    REQUIRE( relay.IsParticipant( member->GetMyGUID() ) );
+}
+
+// Records the reliability and ordering channel of every RPE_GROUP_MSG_FROM_SERVER its peer
+// receives, as the reliability layer hands it up.
+class GroupMessageProbe : public PluginInterface2
+{
+public:
+    bool UsesReliabilityLayer( void ) const override { return true; }
+
+    void OnInternalPacket( InternalPacket* internalPacket, unsigned frameNumber, SystemAddress remoteSystemAddress, RakNet::TimeMS time, int isSend ) override
+    {
+        (void)frameNumber;
+        (void)remoteSystemAddress;
+        (void)time;
+        if( isSend || internalPacket->dataBitLength < 16 || internalPacket->data[0] != ID_RELAY_PLUGIN ||
+            internalPacket->data[1] != RPE_GROUP_MSG_FROM_SERVER )
+            return;
+        std::lock_guard<std::mutex> guard( m_mutex );
+        m_seen.emplace_back( internalPacket->reliability, internalPacket->orderingChannel );
+    }
+
+    std::vector<std::pair<PacketReliability, unsigned char>> Seen()
+    {
+        std::lock_guard<std::mutex> guard( m_mutex );
+        return m_seen;
+    }
+
+private:
+    std::mutex m_mutex;
+    std::vector<std::pair<PacketReliability, unsigned char>> m_seen;
+};
+
+// A started client with probe attached. A plugin that uses the reliability layer is attached
+// before Startup.
+RakPeerInterface* ProbedClient( PeerScope& peers, GroupMessageProbe& probe )
+{
+    RakPeerInterface* client = peers.Create();
+    client->AttachPlugin( &probe );
+    SocketDescriptor socketDescriptor( 0, 0 );
+    REQUIRE( client->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
+    return client;
+}
+
 // How long a forwarded copy that should not exist gets to show up after the one that should.
 constexpr TimeMS kStragglerWaitMs = 250;
 
 // Receives on server and on target until target has been forwarded a copy tagged until, then
-// for kStragglerWaitMs more, and returns the tag of every copy target was forwarded. If
-// serverIds is given, the first byte of every Message server receives meanwhile goes into it.
-std::vector<unsigned char> ForwardedTags( RakPeerInterface* server, RakPeerInterface* target, unsigned char until,
+// for kStragglerWaitMs more, and returns the tag of every copy target was forwarded. A
+// forwarded copy is a relay Message whose second byte is subId. If serverIds is given, the
+// first byte of every Message server receives meanwhile goes into it.
+std::vector<unsigned char> ForwardedTags( RakPeerInterface* server, RakPeerInterface* target, MessageID subId, unsigned char until,
                                           std::vector<MessageID>* serverIds = nullptr )
 {
     std::vector<unsigned char> tags;
@@ -240,7 +313,7 @@ std::vector<unsigned char> ForwardedTags( RakPeerInterface* server, RakPeerInter
         }
         for( Packet* packet = target->Receive(); packet != nullptr; packet = target->Receive() )
         {
-            if( packet->length > 2 && packet->data[0] == ID_RELAY_PLUGIN && packet->data[1] == RPE_MESSAGE_TO_CLIENT_FROM_SERVER )
+            if( packet->length > 2 && packet->data[0] == ID_RELAY_PLUGIN && packet->data[1] == subId )
             {
                 BitStream in( packet->data, packet->length, false );
                 in.IgnoreBytes( sizeof( MessageID ) * 2 );
@@ -502,7 +575,7 @@ TEST_CASE( "RelayPlugin drops a message to a participant whose send parameters a
 
     const bool allValid = priority == kTopPriority && reliability == kTopReliability && channel == kTopChannel;
     const std::vector<unsigned char> expected = allValid ? std::vector<unsigned char>{ kFirst, kSecond } : std::vector<unsigned char>{ kSecond };
-    CHECK( ForwardedTags( server, target, kSecond ) == expected );
+    CHECK( ForwardedTags( server, target, RPE_MESSAGE_TO_CLIENT_FROM_SERVER, kSecond ) == expected );
 
     server->DetachPlugin( &relay );
 }
@@ -536,7 +609,129 @@ TEST_CASE( "RelayPlugin forwards a message relayed with a receipt reliability wi
     Inject( sender, server, *RelayToParticipant( storage, "target", HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
 
     std::vector<MessageID> serverIds;
-    CHECK( ForwardedTags( server, target, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
+    CHECK( ForwardedTags( server, target, RPE_MESSAGE_TO_CLIENT_FROM_SERVER, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
+    for( MessageID id : serverIds )
+    {
+        CHECK( id != ID_SND_RECEIPT_ACKED );
+        CHECK( id != ID_SND_RECEIPT_LOSS );
+    }
+
+    server->DetachPlugin( &relay );
+}
+
+TEST_CASE( "RelayPlugin forwards a group message with the sender's reliability and ordering channel", "[relay][network]" )
+{
+    // Before the PeerScope, so they outlive the peers.
+    RelayProbe relay;
+    relay.SetAcceptAddParticipantRequests( true );
+    GroupMessageProbe firstProbe;
+    GroupMessageProbe secondProbe;
+
+    PeerScope peers;
+    RakPeerInterface* server = peers.Server( kRelayPort, 4 );
+    RakPeerInterface* sender = peers.Client();
+    RakPeerInterface* first = ProbedClient( peers, firstProbe );
+    RakPeerInterface* second = ProbedClient( peers, secondProbe );
+    server->AttachPlugin( &relay );
+
+    std::deque<BitStream> storage;
+    for( auto [member, name] : { std::pair{ sender, "sender" }, std::pair{ first, "first" }, std::pair{ second, "second" } } )
+    {
+        Connect( server, kRelayPort, member );
+        JoinRelayGroup( server, relay, member, storage, name, "group" );
+    }
+
+    constexpr unsigned char kTag = 1;
+    constexpr unsigned char kChannel = 3;
+    Inject( sender, server, *RelayGroupMessage( storage, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, kChannel, kTag ) );
+
+    // Priority does not cross the wire.
+    const std::vector<std::pair<PacketReliability, unsigned char>> expected{ { UNRELIABLE_SEQUENCED, kChannel } };
+    CHECK( ForwardedTags( server, first, RPE_GROUP_MSG_FROM_SERVER, kTag ) == std::vector<unsigned char>{ kTag } );
+    CHECK( firstProbe.Seen() == expected );
+    CHECK( ForwardedTags( server, second, RPE_GROUP_MSG_FROM_SERVER, kTag ) == std::vector<unsigned char>{ kTag } );
+    CHECK( secondProbe.Seen() == expected );
+
+    server->DetachPlugin( &relay );
+}
+
+TEST_CASE( "RelayPlugin drops a group message whose send parameters are out of range", "[relay][network]" )
+{
+    // Before the PeerScope, so it outlives the peers.
+    RelayProbe relay;
+    relay.SetAcceptAddParticipantRequests( true );
+
+    PeerScope peers;
+    RakPeerInterface* server = peers.Server( kRelayPort, 4 );
+    RakPeerInterface* sender = peers.Client();
+    RakPeerInterface* target = peers.Client();
+    server->AttachPlugin( &relay );
+    Connect( server, kRelayPort, sender );
+    Connect( server, kRelayPort, target );
+
+    std::deque<BitStream> storage;
+    JoinRelayGroup( server, relay, sender, storage, "sender", "group" );
+    JoinRelayGroup( server, relay, target, storage, "target", "group" );
+
+    constexpr unsigned char kFirst = 1;
+    constexpr unsigned char kSecond = 2;
+    // The highest valid values. RELIABLE_ORDERED_WITH_ACK_RECEIPT is the highest reliability.
+    constexpr unsigned char kTopPriority = NUMBER_OF_PRIORITIES - 1;
+    constexpr unsigned char kTopReliability = NUMBER_OF_RELIABILITIES - 1;
+    constexpr unsigned char kTopChannel = NUMBER_OF_ORDERED_STREAMS - 1;
+
+    unsigned char priority = kTopPriority;
+    unsigned char reliability = kTopReliability;
+    unsigned char channel = kTopChannel;
+    SECTION( "priority NUMBER_OF_PRIORITIES" ) { priority = NUMBER_OF_PRIORITIES; }
+    SECTION( "reliability NUMBER_OF_RELIABILITIES" ) { reliability = NUMBER_OF_RELIABILITIES; }
+    SECTION( "channel NUMBER_OF_ORDERED_STREAMS" ) { channel = NUMBER_OF_ORDERED_STREAMS; }
+    SECTION( "channel 128, a negative char" ) { channel = 128; }
+    SECTION( "the highest valid values still arrive" ) {}
+
+    // The second, always valid, bounds the wait for the first.
+    std::vector<BitStream*> messages{ RelayGroupMessage( storage, priority, reliability, channel, kFirst ),
+                                      RelayGroupMessage( storage, kTopPriority, kTopReliability, kTopChannel, kSecond ) };
+    Inject( sender, server, messages );
+
+    const bool allValid = priority == kTopPriority && reliability == kTopReliability && channel == kTopChannel;
+    const std::vector<unsigned char> expected = allValid ? std::vector<unsigned char>{ kFirst, kSecond } : std::vector<unsigned char>{ kSecond };
+    CHECK( ForwardedTags( server, target, RPE_GROUP_MSG_FROM_SERVER, kSecond ) == expected );
+
+    server->DetachPlugin( &relay );
+}
+
+TEST_CASE( "RelayPlugin forwards a group message sent with a receipt reliability without the receipt", "[relay][network]" )
+{
+    // Before the PeerScope, so it outlives the peers.
+    RelayProbe relay;
+    relay.SetAcceptAddParticipantRequests( true );
+
+    PeerScope peers;
+    RakPeerInterface* server = peers.Server( kRelayPort, 4 );
+    RakPeerInterface* sender = peers.Client();
+    RakPeerInterface* first = peers.Client();
+    RakPeerInterface* second = peers.Client();
+    server->AttachPlugin( &relay );
+
+    std::deque<BitStream> storage;
+    for( auto [member, name] : { std::pair{ sender, "sender" }, std::pair{ first, "first" }, std::pair{ second, "second" } } )
+    {
+        Connect( server, kRelayPort, member );
+        JoinRelayGroup( server, relay, member, storage, name, "group" );
+    }
+
+    PacketReliability reliability = UNRELIABLE_WITH_ACK_RECEIPT;
+    SECTION( "UNRELIABLE_WITH_ACK_RECEIPT" ) { reliability = UNRELIABLE_WITH_ACK_RECEIPT; }
+    SECTION( "RELIABLE_WITH_ACK_RECEIPT" ) { reliability = RELIABLE_WITH_ACK_RECEIPT; }
+    SECTION( "RELIABLE_ORDERED_WITH_ACK_RECEIPT" ) { reliability = RELIABLE_ORDERED_WITH_ACK_RECEIPT; }
+
+    constexpr unsigned char kTag = 1;
+    Inject( sender, server, *RelayGroupMessage( storage, HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
+
+    std::vector<MessageID> serverIds;
+    CHECK( ForwardedTags( server, first, RPE_GROUP_MSG_FROM_SERVER, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
+    CHECK( ForwardedTags( server, second, RPE_GROUP_MSG_FROM_SERVER, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
     for( MessageID id : serverIds )
     {
         CHECK( id != ID_SND_RECEIPT_ACKED );
