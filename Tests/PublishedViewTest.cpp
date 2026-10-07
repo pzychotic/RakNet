@@ -66,13 +66,6 @@ public:
         SetUserUpdateThread( &ViewedPeer::CountCycle, this );
     }
 
-    SystemAddress Address()
-    {
-        SystemAddress address = GetMyBoundAddress();
-        address.FromStringExplicitPort( "127.0.0.1", address.GetPort() );
-        return address;
-    }
-
     /// Blocks until an update cycle that started after this call has finished, so it has
     /// published whatever the connection records held at the call. The callback runs at the
     /// start of each cycle, so the second one counted after the call ends the first cycle
@@ -80,12 +73,7 @@ public:
     void WaitForAFullCycle()
     {
         const unsigned long long target = cycles.load() + 2;
-        const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-        while( cycles.load() < target )
-        {
-            REQUIRE_FALSE( ConnectionWaits::Expired( deadline ) );
-            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-        }
+        REQUIRE( ConnectionWaits::WaitUntil( [&] { return cycles.load() >= target; }, kWaitBudgetMs ) );
     }
 
     using RakPeer::GetPublishedByAddress;
@@ -140,8 +128,8 @@ TEST_CASE( "The published view finds a connected System by address, RakNetGUID a
     ViewedPeer client;
     client.Start( 0 );
 
-    const SystemAddress serverAddress = server.Address();
-    const SystemAddress clientAddress = client.Address();
+    const SystemAddress serverAddress = ConnectionWaits::LoopbackAddressOf( &server );
+    const SystemAddress clientAddress = ConnectionWaits::LoopbackAddressOf( &client );
 
     ConnectionWaits::ConnectAndWait( &client, &server );
 
@@ -194,7 +182,7 @@ TEST_CASE( "Shutdown empties the published view", "[network]" )
     ViewedPeer client;
     client.Start( 0 );
 
-    const SystemAddress serverAddress = server.Address();
+    const SystemAddress serverAddress = ConnectionWaits::LoopbackAddressOf( &server );
 
     ConnectionWaits::ConnectAndWait( &client, &server );
 
@@ -225,7 +213,7 @@ TEST_CASE( "Receive delivers a timestamped Message without going to the connecti
     message.Write( (MessageID)ID_TIMESTAMP );
     message.Write( RakNet::GetTime() );
     message.Write( (MessageID)ID_USER_PACKET_ENUM );
-    REQUIRE( client.Send( &message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, server.Address(), false ) != 0 );
+    REQUIRE( client.Send( &message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, ConnectionWaits::LoopbackAddressOf( &server ), false ) != 0 );
 
     bool received = false;
     const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;

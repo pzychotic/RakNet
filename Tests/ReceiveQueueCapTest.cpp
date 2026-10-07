@@ -73,13 +73,6 @@ public:
         REQUIRE( Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
     }
 
-    SystemAddress Address()
-    {
-        SystemAddress address = GetMyBoundAddress();
-        address.FromStringExplicitPort( "127.0.0.1", address.GetPort() );
-        return address;
-    }
-
     size_t BufferedDatagrams()
     {
         std::lock_guard<std::mutex> guard( bufferedPacketsQueueMutex );
@@ -175,7 +168,7 @@ TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_R
 {
     ObservedPeer peer;
     peer.Start();
-    RawSystem sender( peer.Address(), 0x51 );
+    RawSystem sender( ConnectionWaits::LoopbackAddressOf( &peer ), 0x51 );
 
     {
         UpdateThreadGate gate( &peer );
@@ -278,7 +271,7 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
     s_rejectedJunkDatagrams = 0;
     peer.SetIncomingDatagramEventHandler( &RejectEveryDatagram );
 
-    RawSystem sender( peer.Address(), 0x53 );
+    RawSystem sender( ConnectionWaits::LoopbackAddressOf( &peer ), 0x53 );
     const int kDatagrams = 100;
     for( int i = 0; i < kDatagrams; ++i )
         sender.SendJunkDatagram();

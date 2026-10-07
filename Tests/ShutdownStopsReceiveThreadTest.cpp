@@ -4,7 +4,6 @@
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "RawSystem.h"
-#include "RakPeer.h"
 #include "RakNetSocket2.h"
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
@@ -83,19 +82,8 @@ private:
     const SystemAddress m_dropped;
 };
 
-/// Runs one update cycle under RAKPEER_USER_THREADED.
-void Pump( RakPeerInterface* peer )
-{
-#if RAKPEER_USER_THREADED == 1
-    BitStream updateBitStream( MAXIMUM_MTU_SIZE );
-    static_cast<RakPeer*>( peer )->RunUpdateCycle( updateBitStream );
-#else
-    (void)peer;
-#endif
-}
-
 /// Pings target from pinger until the pong arrives. False at the deadline. Its own loop
-/// rather than ConnectionWaits::WaitForMessage, because both Peers are pumped every poll.
+/// rather than ConnectionWaits::WaitForMessage, because it runs both Peers' update cycles every poll.
 bool AnswersPing( RakPeerInterface* pinger, RakPeerInterface* target, unsigned short targetPort )
 {
     if( pinger->Ping( "127.0.0.1", targetPort, false ) == false )
@@ -103,8 +91,8 @@ bool AnswersPing( RakPeerInterface* pinger, RakPeerInterface* target, unsigned s
     const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
     while( ConnectionWaits::Expired( deadline ) == false )
     {
-        Pump( target );
-        Pump( pinger );
+        ConnectionWaits::RunUpdateCycle( target );
+        ConnectionWaits::RunUpdateCycle( pinger );
         if( Packet* pong = ConnectionWaits::TakeMessage( pinger, ID_UNCONNECTED_PONG ) )
         {
             pinger->DeallocatePacket( pong );

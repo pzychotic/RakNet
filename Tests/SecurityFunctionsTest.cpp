@@ -142,7 +142,7 @@ bool RefusedWith( RakPeerInterface* client, const SystemAddress& server, const c
     const ConnectionAttemptResult attempt = client->Connect( "127.0.0.1", server.GetPort(), password, passwordLength );
     if( attempt != CONNECTION_ATTEMPT_STARTED )
     {
-        UNSCOPED_INFO( "Connect returned " << static_cast<int>( attempt ) << ", state toward the server " << static_cast<int>( client->GetConnectionState( server ) ) );
+        UNSCOPED_INFO( "Connect returned " << static_cast<int>( attempt ) << ", state toward the server " << ConnectionStateName( client->GetConnectionState( server ) ) );
         return false;
     }
 
@@ -163,13 +163,13 @@ bool RefusedWith( RakPeerInterface* client, const SystemAddress& server, const c
 
     if( received < 0 )
     {
-        UNSCOPED_INFO( "no refusal within " << kRefusalArrivalBudgetMs << " ms, expected message " << static_cast<int>( refusal ) );
+        UNSCOPED_INFO( "no refusal within " << kRefusalArrivalBudgetMs << " ms, expected " << MessageIdName( refusal ) );
         return false;
     }
 
     if( received != refusal )
     {
-        UNSCOPED_INFO( "refused with message " << received << ", expected " << static_cast<int>( refusal ) );
+        UNSCOPED_INFO( "refused with " << MessageIdName( static_cast<MessageID>( received ) ) << ", expected " << MessageIdName( refusal ) );
         return false;
     }
 

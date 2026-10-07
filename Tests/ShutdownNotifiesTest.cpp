@@ -1,12 +1,9 @@
-#include "BitStream.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
-#include "RakNetDefines.h"
 #include "RakNetStringMakers.h"
 #include "RakNetTypes.h"
-#include "RakPeer.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -49,17 +46,6 @@ constexpr unsigned int kShutdownBlockMs = 500;
 // A Shutdown that waited for the ack rather than for the whole block duration.
 constexpr TimeMS kPromptShutdownMs = 400;
 
-/// Runs one update cycle under RAKPEER_USER_THREADED.
-void RunCycle( RakPeerInterface* peer )
-{
-#if RAKPEER_USER_THREADED == 1
-    BitStream updateBitStream( MAXIMUM_MTU_SIZE );
-    static_cast<RakPeer*>( peer )->RunUpdateCycle( updateBitStream );
-#else
-    (void)peer;
-#endif
-}
-
 } // namespace
 
 TEST_CASE( "A blocking Shutdown sends each connected System a disconnection notification", "[network]" )
@@ -77,8 +63,8 @@ TEST_CASE( "A blocking Shutdown sends each connected System a disconnection noti
     while( ( a->GetConnectionState( addressB ) != IS_CONNECTED || b->GetConnectionState( addressA ) != IS_CONNECTED ) &&
            ConnectionWaits::Expired( deadline ) == false )
     {
-        RunCycle( a );
-        RunCycle( b );
+        ConnectionWaits::RunUpdateCycle( a );
+        ConnectionWaits::RunUpdateCycle( b );
         std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
     }
     REQUIRE( a->GetConnectionState( addressB ) == IS_CONNECTED );
@@ -91,7 +77,7 @@ TEST_CASE( "A blocking Shutdown sends each connected System a disconnection noti
     std::thread pumpB( [&] {
         while( stop == false )
         {
-            RunCycle( b );
+            ConnectionWaits::RunUpdateCycle( b );
             for( Packet* packet = b->Receive(); packet != 0; packet = b->Receive() )
             {
                 if( packet->data[0] == ID_DISCONNECTION_NOTIFICATION && packet->systemAddress == addressA )

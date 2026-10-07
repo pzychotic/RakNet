@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MessageIdentifiers.h"
 #include "RakNetTypes.h"
 
 #include <catch2/catch_tostring.hpp>
@@ -63,9 +64,51 @@ struct StringMaker<RakNet::RakNetGUID>
  *
  *  would read "0 == 6". Registering it makes that "IS_PENDING ==
  *  IS_NOT_CONNECTED", which is the diagnosis rather than a lookup task.
- *  ConnectionWaits.cpp reads the same table by name, for the states it
- *  interpolates into FAIL messages of its own.
+ *  ConnectionStateName below reads the same table, for a state interpolated into
+ *  a message of the test's own.
  *
  *  Must be at global scope: the macro opens `namespace Catch` itself.
  */
 CATCH_REGISTER_ENUM( RakNet::ConnectionState, RakNet::IS_PENDING, RakNet::IS_CONNECTING, RakNet::IS_CONNECTED, RakNet::IS_DISCONNECTING, RakNet::IS_SILENTLY_DISCONNECTING, RakNet::IS_DISCONNECTED, RakNet::IS_NOT_CONNECTED )
+
+// The registered name of state, for a FAIL, INFO or report the test composes itself:
+// a stream insertion does not go through Catch2's stringification, so without this it
+// would print the number.
+inline std::string ConnectionStateName( RakNet::ConnectionState state )
+{
+    return Catch::StringMaker<RakNet::ConnectionState>::convert( state );
+}
+
+// The name of a Message ID that starts, refuses or ends a connection, and "ID <n>" for
+// any other. MessageID is a byte and DefaultMessageIDTypes is not its type, so this is a
+// function to call by name rather than a StringMaker.
+inline std::string MessageIdName( RakNet::MessageID id )
+{
+    switch( id )
+    {
+    case RakNet::ID_CONNECTION_REQUEST_ACCEPTED:
+        return "ID_CONNECTION_REQUEST_ACCEPTED";
+    case RakNet::ID_NEW_INCOMING_CONNECTION:
+        return "ID_NEW_INCOMING_CONNECTION";
+    case RakNet::ID_CONNECTION_ATTEMPT_FAILED:
+        return "ID_CONNECTION_ATTEMPT_FAILED";
+    case RakNet::ID_ALREADY_CONNECTED:
+        return "ID_ALREADY_CONNECTED";
+    case RakNet::ID_NO_FREE_INCOMING_CONNECTIONS:
+        return "ID_NO_FREE_INCOMING_CONNECTIONS";
+    case RakNet::ID_CONNECTION_BANNED:
+        return "ID_CONNECTION_BANNED";
+    case RakNet::ID_INVALID_PASSWORD:
+        return "ID_INVALID_PASSWORD";
+    case RakNet::ID_INCOMPATIBLE_PROTOCOL_VERSION:
+        return "ID_INCOMPATIBLE_PROTOCOL_VERSION";
+    case RakNet::ID_IP_RECENTLY_CONNECTED:
+        return "ID_IP_RECENTLY_CONNECTED";
+    case RakNet::ID_DISCONNECTION_NOTIFICATION:
+        return "ID_DISCONNECTION_NOTIFICATION";
+    case RakNet::ID_CONNECTION_LOST:
+        return "ID_CONNECTION_LOST";
+    default:
+        return "ID " + std::to_string( id );
+    }
+}

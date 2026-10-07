@@ -186,14 +186,7 @@ public:
     bool WaitForAFullCycle() const
     {
         const unsigned long long target = cycles.load() + 2;
-        const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-        while( cycles.load() < target )
-        {
-            if( ConnectionWaits::Expired( deadline ) )
-                return false;
-            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-        }
-        return true;
+        return ConnectionWaits::WaitUntil( [&] { return cycles.load() >= target; }, kWaitBudgetMs );
     }
 
     /// Runs \a work on the network thread, between two update cycles, and blocks until it

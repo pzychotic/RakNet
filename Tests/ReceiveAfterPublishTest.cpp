@@ -5,6 +5,7 @@
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "PluginInterface2.h"
+#include "RakNetStringMakers.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -122,25 +123,9 @@ bool ViewShowsClosed( RakPeerInterface* peer, const Packet* packet )
     return peer->GetConnectionState( packet->systemAddress ) == IS_NOT_CONNECTED;
 }
 
-/// The connection changes this test awaits by name, anything else by number.
-std::string MessageName( MessageID id )
-{
-    switch( id )
-    {
-    case ID_NEW_INCOMING_CONNECTION:
-        return "ID_NEW_INCOMING_CONNECTION";
-    case ID_CONNECTION_LOST:
-        return "ID_CONNECTION_LOST";
-    case ID_DISCONNECTION_NOTIFICATION:
-        return "ID_DISCONNECTION_NOTIFICATION";
-    default:
-        return "ID " + std::to_string( id );
-    }
-}
-
 std::string DescribeMessage( const Packet* packet )
 {
-    return MessageName( packet->data[0] ) + " from " + Catch::StringMaker<RakNetGUID>::convert( packet->guid );
+    return MessageIdName( packet->data[0] ) + " from " + Catch::StringMaker<RakNetGUID>::convert( packet->guid );
 }
 
 /// Receive on the server, checking the view in every connection-change handler, and
@@ -272,7 +257,7 @@ TEST_CASE( "Receive hands out a connection change only once the published view s
             notification.Write( (MessageID)ID_DISCONNECTION_NOTIFICATION );
             raw.SendUnreliable( notification );
         }
-        PollUntil( server, clients, observations, "the RawSystem's " + MessageName( closedWith ), [&]( const Packet* packet ) {
+        PollUntil( server, clients, observations, "the RawSystem's " + MessageIdName( closedWith ), [&]( const Packet* packet ) {
             return packet->data[0] == closedWith && packet->guid == rawGuid;
         } );
 

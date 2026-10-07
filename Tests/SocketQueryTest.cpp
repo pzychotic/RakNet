@@ -1,9 +1,8 @@
-#include "BitStream.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
+#include "PeerScope.h"
 #include "RakNetSocket2.h"
 #include "RakNetStringMakers.h"
-#include "RakPeer.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -50,49 +49,16 @@ constexpr unsigned short kIndexSecondPort = 32321;
 // Hang guard for the connection wait.
 constexpr TimeMS kWaitBudgetMs = 10000;
 
-/// A RakPeer that isn't started until the test says so.
-class Peer
+/// Binds one socket of \a peer to 127.0.0.1 per port, in order.
+StartupResult Start( RakPeerInterface* peer, std::vector<unsigned short> ports, unsigned int maxConnections = 1 )
 {
-public:
-    Peer()
-    : peer( static_cast<RakPeer*>( RakPeerInterface::GetInstance() ) )
-    {
-    }
-
-    ~Peer()
-    {
-        RakPeerInterface::DestroyInstance( peer );
-    }
-
-    Peer( const Peer& ) = delete;
-    Peer& operator=( const Peer& ) = delete;
-
-    RakPeer* operator->() const { return peer; }
-
-    /// Binds one socket to 127.0.0.1 per port, in order.
-    StartupResult Start( std::vector<unsigned short> ports, unsigned int maxConnections = 1 )
-    {
-        std::vector<SocketDescriptor> socketDescriptors;
-        for( unsigned short port : ports )
-            socketDescriptors.emplace_back( port, "127.0.0.1" );
-        const StartupResult result = peer->Startup( maxConnections, socketDescriptors.data(), (unsigned)socketDescriptors.size() );
-        peer->SetMaximumIncomingConnections( (unsigned short)maxConnections );
-        return result;
-    }
-
-    /// Runs one update cycle under RAKPEER_USER_THREADED, then throws away every Packet waiting.
-    void Pump()
-    {
-#if RAKPEER_USER_THREADED == 1
-        BitStream updateBitStream( MAXIMUM_MTU_SIZE );
-        peer->RunUpdateCycle( updateBitStream );
-#endif
-        ConnectionWaits::Drain( peer );
-    }
-
-private:
-    RakPeer* peer;
-};
+    std::vector<SocketDescriptor> socketDescriptors;
+    for( unsigned short port : ports )
+        socketDescriptors.emplace_back( port, "127.0.0.1" );
+    const StartupResult result = peer->Startup( maxConnections, socketDescriptors.data(), (unsigned)socketDescriptors.size() );
+    peer->SetMaximumIncomingConnections( (unsigned short)maxConnections );
+    return result;
+}
 
 SystemAddress Loopback( unsigned short port )
 {
@@ -113,14 +79,15 @@ std::vector<unsigned short> PortsOf( const std::vector<RakNetSocket2*>& sockets 
 
 TEST_CASE( "GetSockets holds every bound socket from the moment Startup returns until Shutdown", "[network]" )
 {
-    Peer peer;
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Create();
     std::vector<RakNetSocket2*> sockets;
 
     peer->GetSockets( sockets );
     CHECK( sockets.empty() );
     CHECK( peer->GetSocket( UNASSIGNED_SYSTEM_ADDRESS ) == nullptr );
 
-    REQUIRE( peer.Start( { kListFirstPort, kListSecondPort } ) == RAKNET_STARTED );
+    REQUIRE( Start( peer, { kListFirstPort, kListSecondPort } ) == RAKNET_STARTED );
 
     // No update cycle has run under RAKPEER_USER_THREADED, and none is waited for otherwise.
     peer->GetSockets( sockets );
@@ -137,10 +104,11 @@ TEST_CASE( "GetSockets holds every bound socket from the moment Startup returns 
 
 TEST_CASE( "GetSocket returns the socket a connection uses, and null for an address with no connection", "[network]" )
 {
-    Peer server;
-    Peer client;
-    REQUIRE( server.Start( { kConnectionServerFirstPort, kConnectionServerSecondPort } ) == RAKNET_STARTED );
-    REQUIRE( client.Start( { kConnectionClientPort } ) == RAKNET_STARTED );
+    PeerScope peers;
+    RakPeerInterface* server = peers.Create();
+    RakPeerInterface* client = peers.Create();
+    REQUIRE( Start( server, { kConnectionServerFirstPort, kConnectionServerSecondPort } ) == RAKNET_STARTED );
+    REQUIRE( Start( client, { kConnectionClientPort } ) == RAKNET_STARTED );
 
     // To the server's second socket, so its answer can't be the first bound socket by chance.
     const SystemAddress serverAddress = Loopback( kConnectionServerSecondPort );
@@ -148,13 +116,15 @@ TEST_CASE( "GetSocket returns the socket a connection uses, and null for an addr
     REQUIRE( client->Connect( "127.0.0.1", kConnectionServerSecondPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
 
     // Not ConnectionWaits::ConnectAndWait, which connects to the first socket and runs no
-    // update cycle: under RAKPEER_USER_THREADED the wait has to pump both peers itself.
+    // update cycle: under RAKPEER_USER_THREADED the wait has to run both peers' update cycles itself.
     const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
     while( client->GetConnectionState( serverAddress ) != IS_CONNECTED || server->GetConnectionState( clientAddress ) != IS_CONNECTED )
     {
         REQUIRE( ConnectionWaits::Expired( deadline ) == false );
-        server.Pump();
-        client.Pump();
+        ConnectionWaits::RunUpdateCycle( server );
+        ConnectionWaits::Drain( server );
+        ConnectionWaits::RunUpdateCycle( client );
+        ConnectionWaits::Drain( client );
         std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
     }
 
@@ -175,10 +145,11 @@ TEST_CASE( "GetSocket returns the socket a connection uses, and null for an addr
 
 TEST_CASE( "GetMyBoundAddress answers UNASSIGNED_SYSTEM_ADDRESS for an index outside the bound sockets", "[network]" )
 {
-    Peer peer;
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Create();
     CHECK( peer->GetMyBoundAddress( 0 ) == UNASSIGNED_SYSTEM_ADDRESS );
 
-    REQUIRE( peer.Start( { kIndexFirstPort, kIndexSecondPort } ) == RAKNET_STARTED );
+    REQUIRE( Start( peer, { kIndexFirstPort, kIndexSecondPort } ) == RAKNET_STARTED );
 
     CHECK( peer->GetMyBoundAddress( 0 ).GetPort() == kIndexFirstPort );
     CHECK( peer->GetMyBoundAddress( 1 ).GetPort() == kIndexSecondPort );

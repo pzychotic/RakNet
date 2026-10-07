@@ -3,7 +3,11 @@
 #include "CommonFunctions.h"
 #include "RakNetStringMakers.h"
 
+#include "BitStream.h"
 #include "GetTime.h"
+#include "MTUSize.h"
+#include "RakNetDefines.h"
+#include "RakPeer.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -14,19 +18,6 @@
 #include <vector>
 
 using namespace RakNet;
-
-namespace {
-
-// The state goes into a FAIL message composed here rather than into a comparison
-// inside a REQUIRE, and a stream insertion does not go through Catch2's
-// stringification, so the registered names have to be asked for by name. Same
-// table either way - see RakNetStringMakers.h.
-std::string ToString( ConnectionState state )
-{
-    return Catch::StringMaker<ConnectionState>::convert( state );
-}
-
-} // namespace
 
 bool ConnectionWaits::Expired( TimeMS deadline )
 {
@@ -44,7 +35,7 @@ void ConnectionWaits::WaitForRequestToSettle( RakPeerInterface* peer, SystemAddr
         {
             // FAIL rather than a REQUIRE on the predicate, which would print a
             // naked `false`. The state is the whole diagnosis.
-            FAIL( "connection request never settled: stuck in " << ToString( peer->GetConnectionState( addr ) ) );
+            FAIL( "connection request never settled: stuck in " << ConnectionStateName( peer->GetConnectionState( addr ) ) );
         }
 
         std::this_thread::sleep_for( std::chrono::milliseconds( kPollInterval ) );
@@ -162,11 +153,11 @@ void ConnectionWaits::ConnectAndWait( RakPeerInterface* client, RakPeerInterface
             std::ostringstream report;
             if( clientState != IS_CONNECTED )
             {
-                report << "\n  client toward server: " << ToString( clientState );
+                report << "\n  client toward server: " << ConnectionStateName( clientState );
             }
             if( serverState != IS_CONNECTED )
             {
-                report << "\n  server toward client: " << ToString( serverState );
+                report << "\n  server toward client: " << ConnectionStateName( serverState );
             }
 
             FAIL( "connection to port " << serverPort << " not open at both ends after "
@@ -220,7 +211,7 @@ void ConnectionWaits::WaitForDisconnect( RakPeerInterface* peer, SystemAddress a
             // the connection would not finish leaving, which is a different fault
             // from IS_CONNECTED, where it was never applied at all.
             FAIL( "connection toward port " << addr.GetPort() << " never closed - still "
-                                            << ToString( peer->GetConnectionState( addr ) ) << " after "
+                                            << ConnectionStateName( peer->GetConnectionState( addr ) ) << " after "
                                             << kDisconnectBudget << " ms" );
         }
 
@@ -241,6 +232,23 @@ void ConnectionWaits::DrainAll( RakPeerInterface* const* peers, int count )
     {
         Drain( peers[i] );
     }
+}
+
+void ConnectionWaits::RunUpdateCycle( RakPeerInterface* peer )
+{
+#if RAKPEER_USER_THREADED == 1
+    BitStream updateBitStream( MAXIMUM_MTU_SIZE );
+    static_cast<RakPeer*>( peer )->RunUpdateCycle( updateBitStream );
+#else
+    (void)peer;
+#endif
+}
+
+SystemAddress ConnectionWaits::LoopbackAddressOf( RakPeerInterface* peer )
+{
+    SystemAddress address;
+    address.FromStringExplicitPort( "127.0.0.1", peer->GetMyBoundAddress().GetPort() );
+    return address;
 }
 
 bool ConnectionWaits::WaitUntil( const std::function<bool()>& condition, TimeMS budget )

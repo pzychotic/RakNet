@@ -1,6 +1,7 @@
 #include "Plugins/PacketLogger.h"
 #include "Plugins/ThreadsafePacketLogger.h"
 
+#include "ConnectionWaits.h"
 #include "InternalPacket.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
@@ -302,12 +303,6 @@ std::vector<std::string> FieldsOfRawLine( const std::string& line )
     return fields;
 }
 
-void DrainReceive( RakPeerInterface* peer )
-{
-    for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        peer->DeallocatePacket( packet );
-}
-
 } // namespace
 
 TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thread and the user thread at once", "[packetlogger][network]" )
@@ -333,7 +328,7 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
         while( !stop.load() )
         {
             pinger->Ping( "127.0.0.1", loggedPort, false );
-            DrainReceive( pinger );
+            ConnectionWaits::Drain( pinger );
             std::this_thread::yield();
         }
     } );
@@ -343,8 +338,8 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
     {
         if( logged->Ping( "127.0.0.1", heldPort, false ) )
             ++pingsSent;
-        DrainReceive( logged );
-        DrainReceive( held );
+        ConnectionWaits::Drain( logged );
+        ConnectionWaits::Drain( held );
     }
 
     stop = true;
@@ -428,7 +423,7 @@ TEST_CASE( "PacketLogger's setters may be called while the network thread logs",
     for( int i = 0; i < 100000 && logger.LineCount() < kLines; ++i )
     {
         pinger->Ping( "127.0.0.1", loggedPort, false );
-        DrainReceive( pinger );
+        ConnectionWaits::Drain( pinger );
         logger.SetPrefix( ( i % 2 == 0 ? longPrefix : shortPrefix ).c_str() );
         logger.SetLogDirectMessages( false );
         logger.SetLogDirectMessages( true );
@@ -494,7 +489,7 @@ void FillPastCapThenDrain( CountingThreadsafePacketLogger& logger )
     for( int i = 0; i < 10000 && logger.GetLinesRefused() == 0; ++i )
     {
         pinger->Ping( "127.0.0.1", loggedPort, false );
-        DrainReceive( pinger );
+        ConnectionWaits::Drain( pinger );
         std::this_thread::yield();
     }
     REQUIRE( logger.GetLinesRefused() > 0 );

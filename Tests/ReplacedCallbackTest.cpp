@@ -118,13 +118,6 @@ ClearOutcome ClearWhileHeld( HeldCallback& held, Clear clear )
     return outcome;
 }
 
-SystemAddress LoopbackAddressOf( RakPeerInterface* peer )
-{
-    SystemAddress address;
-    address.FromStringExplicitPort( "127.0.0.1", peer->GetMyBoundAddress().GetPort() );
-    return address;
-}
-
 void HeldUpdateCallback( RakPeerInterface*, void* data )
 {
     static_cast<HeldCallback*>( data )->Run();
@@ -192,7 +185,7 @@ TEST_CASE( "SetIncomingDatagramEventHandler returns only once the handler it rep
 {
     PeerScope peers;
     RakPeerInterface* peer = peers.Client();
-    RawSystem sender( LoopbackAddressOf( peer ), 0x61 );
+    RawSystem sender( ConnectionWaits::LoopbackAddressOf( peer ), 0x61 );
 
     HeldCallback held;
     s_heldHandler = &held;
@@ -229,7 +222,7 @@ TEST_CASE( "A datagram handler can clear itself from inside its own call", "[net
 {
     PeerScope peers;
     RakPeerInterface* peer = peers.Client();
-    RawSystem sender( LoopbackAddressOf( peer ), 0x62 );
+    RawSystem sender( ConnectionWaits::LoopbackAddressOf( peer ), 0x62 );
 
     s_selfClearingPeer = peer;
     s_selfClearingCalls = 0;

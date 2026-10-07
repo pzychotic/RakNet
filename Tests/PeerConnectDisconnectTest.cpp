@@ -14,6 +14,7 @@
 
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
+#include "RakNetStringMakers.h"
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
@@ -22,6 +23,7 @@
 
 #include <chrono>
 #include <sstream>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -88,32 +90,10 @@ constexpr TimeMS kCloseSettlePause = 100;
 // seconds of closing and reopening, so it should fail if it did not do that.
 constexpr int kMinimumChurnRounds = 10;
 
-// The connection-result messages a pair's last attempt can end in, by name.
-const char* ConnectionResultName( unsigned char id )
+// The connection-result message a pair's last attempt ended in, by name; 0 is none yet.
+std::string ConnectionResultName( unsigned char id )
 {
-    switch( id )
-    {
-    case 0:
-        return "none";
-    case ID_CONNECTION_REQUEST_ACCEPTED:
-        return "ID_CONNECTION_REQUEST_ACCEPTED";
-    case ID_NEW_INCOMING_CONNECTION:
-        return "ID_NEW_INCOMING_CONNECTION";
-    case ID_CONNECTION_ATTEMPT_FAILED:
-        return "ID_CONNECTION_ATTEMPT_FAILED";
-    case ID_ALREADY_CONNECTED:
-        return "ID_ALREADY_CONNECTED";
-    case ID_NO_FREE_INCOMING_CONNECTIONS:
-        return "ID_NO_FREE_INCOMING_CONNECTIONS";
-    case ID_IP_RECENTLY_CONNECTED:
-        return "ID_IP_RECENTLY_CONNECTED";
-    case ID_DISCONNECTION_NOTIFICATION:
-        return "ID_DISCONNECTION_NOTIFICATION";
-    case ID_CONNECTION_LOST:
-        return "ID_CONNECTION_LOST";
-    default:
-        return "another message";
-    }
+    return id == 0 ? "none" : MessageIdName( id );
 }
 
 bool IsConnectionResult( unsigned char id )
@@ -244,13 +224,13 @@ TEST_CASE( "Eight peers closing and reopening every connection for ten seconds a
             const ConnectionState jState = peerList[j]->GetConnectionState( toI );
             if( iState != IS_CONNECTED || jState != IS_CONNECTED )
             {
-                missingPairs << "\n  " << i << "-" << j << ": peer " << i << " state " << (int)iState << ", last "
-                             << ConnectionResultName( lastResult[i][j] ) << "; peer " << j << " state " << (int)jState
-                             << ", last " << ConnectionResultName( lastResult[j][i] );
+                missingPairs << "\n  " << i << "-" << j << ": peer " << i << " " << ConnectionStateName( iState ) << ", last "
+                             << ConnectionResultName( lastResult[i][j] ) << "; peer " << j << " "
+                             << ConnectionStateName( jState ) << ", last " << ConnectionResultName( lastResult[j][i] );
             }
         }
     }
-    INFO( "pairs not connected after the final attempts (state 2 is IS_CONNECTED):" << missingPairs.str() );
+    INFO( "pairs not connected after the final attempts:" << missingPairs.str() );
 
     // The test's verdict, and a polled predicate rather than a reading taken after
     // a wait - taking it once is half of what made this test flaky. It fails if

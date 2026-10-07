@@ -14,7 +14,9 @@ class RakPeerInterface;
  *  receive-and-deallocate primitive, which any polling loop needs whether or
  *  not it is polling for a connection - and WaitUntil/DrainUntil, the bounded
  *  wait on any condition, for the polls the named waits do not cover - and
- *  TakeMessage/ReceiveMessage/WaitForMessage, the wait for one Message.
+ *  TakeMessage/ReceiveMessage/WaitForMessage, the wait for one Message - and
+ *  RunUpdateCycle and LoopbackAddressOf, which every such loop under
+ *  RAKPEER_USER_THREADED, or toward a peer on an ephemeral port, needs too.
  *
  *  Split out of PeerScope deliberately: PeerScope is about ownership, this is
  *  about time.
@@ -261,6 +263,16 @@ void Drain( RakNet::RakPeerInterface* peer );
 // distinct role in a drain - it is a peer with a queue, like every other, and
 // only the caller's variable names say otherwise.
 void DrainAll( RakNet::RakPeerInterface* const* peers, int count );
+
+// Runs one of peer's update cycles under RAKPEER_USER_THREADED, and does nothing
+// otherwise, where the network thread runs them. For a test that passes in both
+// modes: it calls this wherever the network thread would have had a cycle, and
+// receives on its own terms afterwards - draining, counting, or taking one Message.
+void RunUpdateCycle( RakNet::RakPeerInterface* peer );
+
+// peer's first bound port on 127.0.0.1: the address a System on loopback reaches
+// it at.
+RakNet::SystemAddress LoopbackAddressOf( RakNet::RakPeerInterface* peer );
 
 // The suite's poll-a-condition primitive, for every wait the named shapes above
 // do not cover: calls condition every kPollInterval until it returns true or

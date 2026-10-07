@@ -1,4 +1,3 @@
-#include "BitStream.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
@@ -97,10 +96,7 @@ public:
     /// Runs one update cycle under RAKPEER_USER_THREADED, then takes every Packet waiting.
     void Pump()
     {
-#if RAKPEER_USER_THREADED == 1
-        BitStream updateBitStream( MAXIMUM_MTU_SIZE );
-        peer->RunUpdateCycle( updateBitStream );
-#endif
+        ConnectionWaits::RunUpdateCycle( peer );
         for( Packet* packet = peer->Receive(); packet != 0; packet = peer->Receive() )
         {
             if( packet->length > 0 && packet->data[0] == ID_USER_PACKET_ENUM )
