@@ -113,24 +113,6 @@ std::vector<MessageID> ReceiveUntilMarker( RakPeerInterface* peer )
     return received;
 }
 
-// Receives until Receive hands out id, which is after every plugin has seen it.
-bool WaitForMessage( RakPeerInterface* peer, MessageID id )
-{
-    const TimeMS deadline = GetTimeMS() + kMarkerBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            const bool found = packet->data[0] == id;
-            peer->DeallocatePacket( packet );
-            if( found )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
 // Returns once peer's getters show every command queued before the call. Buffered commands
 // are applied in the order they were queued, so once a timeout change queued after them shows
 // on peer's connection to other, they have all been applied.
@@ -322,7 +304,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
 
         intermediary->CloseConnection( Loopback( kServerPort ), true );
         ConnectionWaits::WaitForDisconnect( intermediary, Loopback( kServerPort ) );
-        REQUIRE( WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION, kMarkerBudgetMs ) );
 
         // The closed connection's entry for an endpoint that never connected goes with it.
         CHECK( router.ForwardedCount() == 0 );

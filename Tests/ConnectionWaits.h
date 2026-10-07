@@ -13,7 +13,8 @@ class RakPeerInterface;
  *  Bounded waits on a peer's connection state, plus Drain - the suite's
  *  receive-and-deallocate primitive, which any polling loop needs whether or
  *  not it is polling for a connection - and WaitUntil/DrainUntil, the bounded
- *  wait on any condition, for the polls the named waits do not cover.
+ *  wait on any condition, for the polls the named waits do not cover - and
+ *  TakeMessage/ReceiveMessage/WaitForMessage, the wait for one Message.
  *
  *  Split out of PeerScope deliberately: PeerScope is about ownership, this is
  *  about time.
@@ -282,5 +283,37 @@ bool WaitUntil( const std::function<bool()>& condition, RakNet::TimeMS budget );
 // reads none of what arrives. A condition that never returns true makes it a
 // drain for the whole budget.
 bool DrainUntil( RakNet::RakPeerInterface* const* peers, int count, const std::function<bool()>& condition, RakNet::TimeMS budget );
+
+// What the Message waits below look for beyond the ID: a sender GUID, a payload. An
+// empty one accepts every Packet carrying the ID.
+using MessageMatch = std::function<bool( const RakNet::Packet& )>;
+
+// One pass over peer's receive queue, no waiting: returns the first Packet whose first
+// byte is id and that match accepts, deallocating every Packet before it, or nullptr
+// once the queue is empty. Packets after it stay queued. The caller deallocates it.
+//
+// The building block of the waits below, and the form for a loop that does more on
+// each poll than wait - running update cycles, or waking the network thread without
+// sleeping.
+RakNet::Packet* TakeMessage( RakNet::RakPeerInterface* peer, RakNet::MessageID id, const MessageMatch& match = {} );
+
+// The receive-until-a-Message shape: TakeMessage every kPollInterval until it returns
+// a Packet or budget ms have passed, under one deadline checked with Expired. Returns
+// the Packet, which the caller deallocates, or nullptr at expiry.
+//
+// Returns rather than FAILs, like WaitUntil: some callers expect expiry, a wait that a
+// Message does NOT arrive.
+//
+// Drains as it waits, unlike the state waits above: every Packet ahead of the match
+// is deallocated, because a caller waiting for one Message reads none of the others.
+// Only peer is received on; any other peer polled meanwhile grows its queue.
+//
+// Receive hands a Message out after every attached plugin has seen it, so a wait for
+// one is also a wait for the plugins' handlers to have run.
+RakNet::Packet* ReceiveMessage( RakNet::RakPeerInterface* peer, RakNet::MessageID id, RakNet::TimeMS budget, const MessageMatch& match = {} );
+
+// ReceiveMessage for a caller that reads nothing of the Packet: deallocates it and
+// says whether it came.
+bool WaitForMessage( RakNet::RakPeerInterface* peer, RakNet::MessageID id, RakNet::TimeMS budget, const MessageMatch& match = {} );
 
 } // namespace ConnectionWaits

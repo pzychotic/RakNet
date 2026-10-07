@@ -70,24 +70,6 @@ public:
     unsigned int RequestCount() const { return forwardingRequestList.Size(); }
 };
 
-// Receives on the coordinator, which runs its plugin, until the marker comes out.
-bool ReceiveUntilMarker( RakPeerInterface* coordinator )
-{
-    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = coordinator->Receive(); packet != nullptr; packet = coordinator->Receive() )
-        {
-            const bool marker = packet->data[0] == kMarker;
-            coordinator->DeallocatePacket( packet );
-            if( marker )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
 // Sends message from sender to the coordinator, then the marker, and receives on the
 // coordinator until the marker comes out.
 void Inject( RakPeerInterface* sender, RakPeerInterface* coordinator, BitStream& message )
@@ -98,7 +80,7 @@ void Inject( RakPeerInterface* sender, RakPeerInterface* coordinator, BitStream&
     marker.Write( kMarker );
     sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, kCoordinatorAddress, false );
 
-    REQUIRE( ReceiveUntilMarker( coordinator ) );
+    REQUIRE( ConnectionWaits::WaitForMessage( coordinator, kMarker, kStepBudgetMs ) );
 }
 
 // Receives on the coordinator and on peer until peer's Receive hands out the ID_UDP_PROXY_GENERAL

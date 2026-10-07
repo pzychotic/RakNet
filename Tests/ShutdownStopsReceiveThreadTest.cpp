@@ -94,7 +94,8 @@ void Pump( RakPeerInterface* peer )
 #endif
 }
 
-/// Pings target from pinger until the pong arrives. False at the deadline.
+/// Pings target from pinger until the pong arrives. False at the deadline. Its own loop
+/// rather than ConnectionWaits::WaitForMessage, because both Peers are pumped every poll.
 bool AnswersPing( RakPeerInterface* pinger, RakPeerInterface* target, unsigned short targetPort )
 {
     if( pinger->Ping( "127.0.0.1", targetPort, false ) == false )
@@ -104,12 +105,10 @@ bool AnswersPing( RakPeerInterface* pinger, RakPeerInterface* target, unsigned s
     {
         Pump( target );
         Pump( pinger );
-        for( Packet* packet = pinger->Receive(); packet != 0; packet = pinger->Receive() )
+        if( Packet* pong = ConnectionWaits::TakeMessage( pinger, ID_UNCONNECTED_PONG ) )
         {
-            const bool pong = packet->data[0] == ID_UNCONNECTED_PONG;
-            pinger->DeallocatePacket( packet );
-            if( pong )
-                return true;
+            pinger->DeallocatePacket( pong );
+            return true;
         }
         std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
     }

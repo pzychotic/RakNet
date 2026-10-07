@@ -10,7 +10,7 @@
 
 #include "PeerScope.h"
 
-#include "CommonFunctions.h"
+#include "ConnectionWaits.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 
@@ -49,5 +49,5 @@ TEST_CASE( "An unconnected client's AdvertiseSystem reaches a server as ID_ADVER
 
     client->AdvertiseSystem( "127.0.0.1", kServerPort, 0, 0 );
 
-    CHECK( CommonFunctions::WaitForMessageWithID( server, ID_ADVERTISE_SYSTEM, 5000 ) );
+    CHECK( ConnectionWaits::WaitForMessage( server, ID_ADVERTISE_SYSTEM, 5000 ) );
 }

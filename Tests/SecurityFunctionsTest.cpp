@@ -269,7 +269,8 @@ const char kWrongPassword[] = "badpass";
 // thread cycling meanwhile: GetStatistics is answered on that thread and wakes it. Cycles
 // that come faster than the reliability layer holds an ack back (one SYN, 10 ms) are what
 // let a client drop its record before acking the refusal. Left to the 10 ms timer, a client
-// mostly gets the ack out first.
+// mostly gets the ack out first. Hence a spin rather than ConnectionWaits::WaitForMessage,
+// whose sleep between polls leaves the thread to that timer.
 bool RefuseWhileBusy( RakPeerInterface* client, const SystemAddress& server )
 {
     if( client->Connect( "127.0.0.1", server.GetPort(), kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) ) != CONNECTION_ATTEMPT_STARTED )
@@ -281,12 +282,10 @@ bool RefuseWhileBusy( RakPeerInterface* client, const SystemAddress& server )
         RakNetStatistics statistics;
         client->GetStatistics( server, &statistics );
 
-        for( Packet* packet = client->Receive(); packet != nullptr; packet = client->Receive() )
+        if( Packet* refusal = ConnectionWaits::TakeMessage( client, ID_INVALID_PASSWORD ) )
         {
-            const bool refused = packet->data[0] == ID_INVALID_PASSWORD;
-            client->DeallocatePacket( packet );
-            if( refused )
-                return true;
+            client->DeallocatePacket( refusal );
+            return true;
         }
     }
 

@@ -118,42 +118,6 @@ bool ReceiveUntilMarker( RakPeerInterface* peer, bool* sawPong )
     return false;
 }
 
-// Receives for up to budget, and reports whether an ID_UNCONNECTED_PONG came out.
-bool PongWithin( RakPeerInterface* peer, TimeMS budget )
-{
-    const TimeMS deadline = GetTimeMS() + budget;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            const bool pong = packet->data[0] == ID_UNCONNECTED_PONG;
-            peer->DeallocatePacket( packet );
-            if( pong )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
-// Receives until Receive hands out id, which is after every plugin has seen it.
-bool WaitForMessage( RakPeerInterface* peer, MessageID id )
-{
-    const TimeMS deadline = GetTimeMS() + kMarkerBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            const bool found = packet->data[0] == id;
-            peer->DeallocatePacket( packet );
-            if( found )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
 // Sends message from sender to target, then the marker, and receives on target until the
 // marker comes out. Returns whether an ID_UNCONNECTED_PONG came out on the way.
 bool Inject( RakPeerInterface* sender, RakPeerInterface* target, BitStream& message )
@@ -239,7 +203,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         const bool pongBeforeMarker = Inject( coordinator, client, notification );
         CHECK( handler.notifications == 0 );
         CHECK( !pongBeforeMarker );
-        CHECK( !PongWithin( client, kNoPongWindowMs ) );
+        CHECK( !ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kNoPongWindowMs ) );
     }
 
     SECTION( "A Designated coordinator is acted on, and no one else" )
@@ -261,13 +225,13 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         const bool forgedPong = Inject( other, client, forgedNotification );
         CHECK( handler.notifications == 0 );
         CHECK( !forgedPong );
-        CHECK( !PongWithin( client, kNoPongWindowMs ) );
+        CHECK( !ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kNoPongWindowMs ) );
 
         BitStream notification;
         WriteResult( notification, ID_UDP_PROXY_FORWARDING_NOTIFICATION, kTargetAddress, Loopback( kClientPort ), kTargetGuid );
         const bool pong = Inject( coordinator, client, notification );
         CHECK( handler.notifications == 1 );
-        CHECK( ( pong || PongWithin( client, kMarkerBudgetMs ) ) );
+        CHECK( ( pong || ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kMarkerBudgetMs ) ) );
     }
 
     SECTION( "RemoveCoordinator withdraws the designation" )
@@ -292,7 +256,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
 
         coordinator->CloseConnection( Loopback( kClientPort ), true );
         ConnectionWaits::WaitForDisconnect( coordinator, Loopback( kClientPort ) );
-        REQUIRE( WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION, kMarkerBudgetMs ) );
 
         // The same address again, but not the same designation.
         ConnectionWaits::ConnectAndWait( coordinator, client );
@@ -468,7 +432,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
 
         coordinator->CloseConnection( Loopback( kClientPort ), true );
         ConnectionWaits::WaitForDisconnect( coordinator, Loopback( kClientPort ) );
-        REQUIRE( WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION, kMarkerBudgetMs ) );
 
         ConnectionWaits::ConnectAndWait( coordinator, client );
         REQUIRE( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) == coordinatorAddress );

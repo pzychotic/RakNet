@@ -2,7 +2,6 @@
 #include "RawSystem.h"
 
 #include "BitStream.h"
-#include "CommonFunctions.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
@@ -93,7 +92,7 @@ TEST_CASE( "A rejected password produces an ID_INVALID_PASSWORD carrying the ser
 
     REQUIRE( client->Connect( "127.0.0.1", kServerPort, kWrongPassword, (int)strlen( kWrongPassword ) ) == CONNECTION_ATTEMPT_STARTED );
 
-    Packet* rejection = CommonFunctions::WaitAndReturnMessageWithID( client, ID_INVALID_PASSWORD, kRejectBudgetMs );
+    Packet* rejection = ConnectionWaits::ReceiveMessage( client, ID_INVALID_PASSWORD, kRejectBudgetMs );
 
     // REQUIRE: everything below reads through it, and its absence is its own
     // diagnosis - the server never reached the password comparison.
@@ -134,9 +133,7 @@ TEST_CASE( "The correct password connects, so the rejection above is a rejection
     // Waits for the acceptance itself rather than for the connection state to
     // settle: IS_NOT_CONNECTED satisfies a settle wait, so a settle wait here
     // would pass on the very outcome this case exists to rule out.
-    Packet* accepted = CommonFunctions::WaitAndReturnMessageWithID( client, ID_CONNECTION_REQUEST_ACCEPTED, kConnectBudgetMs );
-    REQUIRE( accepted != nullptr );
-    client->DeallocatePacket( accepted );
+    REQUIRE( ConnectionWaits::WaitForMessage( client, ID_CONNECTION_REQUEST_ACCEPTED, kConnectBudgetMs ) );
 }
 
 TEST_CASE( "Connection requests are checked against a password that changes as they arrive", "[network]" )

@@ -1,16 +1,12 @@
 #include "Plugins/TwoWayAuthentication.h"
 
 #include "ConnectionWaits.h"
-#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <chrono>
-#include <thread>
 
 /*
 TwoWayAuthentication::OnClosedConnection drops the closed System's pending
@@ -38,25 +34,6 @@ using namespace RakNet;
 namespace {
 
 constexpr unsigned short kServerPort = 30000;
-
-// Polls server until it hands up an ID_DISCONNECTION_NOTIFICATION from guid,
-// deallocating everything else, or the deadline passes.
-bool WaitForDisconnectionNotification( RakPeerInterface* server, RakNetGUID guid )
-{
-    const TimeMS deadline = GetTimeMS() + ConnectionWaits::kDisconnectBudget;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = server->Receive(); packet != nullptr; packet = server->Receive() )
-        {
-            const bool found = packet->data[0] == ID_DISCONNECTION_NOTIFICATION && packet->guid == guid;
-            server->DeallocatePacket( packet );
-            if( found )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
 
 } // namespace
 
@@ -90,7 +67,8 @@ TEST_CASE( "TwoWayAuthentication drops only the closed System's pending challeng
     REQUIRE( auth.outgoingChallenges.size() == 2 );
 
     closing->CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
-    REQUIRE( WaitForDisconnectionNotification( server, closingGuid ) );
+    REQUIRE( ConnectionWaits::WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION, ConnectionWaits::kDisconnectBudget,
+                                              [&]( const Packet& packet ) { return packet.guid == closingGuid; } ) );
 
     REQUIRE( auth.outgoingChallenges.size() == 1 );
     CHECK( auth.outgoingChallenges.front().remoteSystem.rakNetGuid == stayingGuid );

@@ -10,6 +10,8 @@
 
 #include "TestHelpers.h"
 
+#include "ConnectionWaits.h"
+
 TestHelpers::TestHelpers( void )
 {
 }
@@ -36,22 +38,5 @@ bool TestHelpers::BroadCastTestPacket( RakPeerInterface* sender, PacketReliabili
 
 bool TestHelpers::WaitForTestPacket( RakPeerInterface* reciever, int millisecondsToWait )
 {
-
-    RakTimer timer( millisecondsToWait );
-
-    Packet* packet;
-    while( !timer.IsExpired() )
-    {
-        for( packet = reciever->Receive(); packet; reciever->DeallocatePacket( packet ), packet = reciever->Receive() )
-        {
-
-            if( packet->data[0] == ID_USER_PACKET_ENUM + 1 )
-            {
-                reciever->DeallocatePacket( packet );
-                return true;
-            }
-        }
-    }
-
-    return false;
+    return ConnectionWaits::WaitForMessage( reciever, ID_USER_PACKET_ENUM + 1, millisecondsToWait );
 }

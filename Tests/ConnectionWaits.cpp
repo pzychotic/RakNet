@@ -272,3 +272,42 @@ bool ConnectionWaits::DrainUntil( RakPeerInterface* const* peers, int count, con
         },
         budget );
 }
+
+Packet* ConnectionWaits::TakeMessage( RakPeerInterface* peer, MessageID id, const MessageMatch& match )
+{
+    for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
+    {
+        if( packet->length > 0 && packet->data[0] == id && ( !match || match( *packet ) ) )
+        {
+            return packet;
+        }
+
+        peer->DeallocatePacket( packet );
+    }
+
+    return nullptr;
+}
+
+Packet* ConnectionWaits::ReceiveMessage( RakPeerInterface* peer, MessageID id, TimeMS budget, const MessageMatch& match )
+{
+    Packet* packet = nullptr;
+    WaitUntil(
+        [&] {
+            packet = TakeMessage( peer, id, match );
+            return packet != nullptr;
+        },
+        budget );
+    return packet;
+}
+
+bool ConnectionWaits::WaitForMessage( RakPeerInterface* peer, MessageID id, TimeMS budget, const MessageMatch& match )
+{
+    Packet* packet = ReceiveMessage( peer, id, budget, match );
+    if( packet == nullptr )
+    {
+        return false;
+    }
+
+    peer->DeallocatePacket( packet );
+    return true;
+}

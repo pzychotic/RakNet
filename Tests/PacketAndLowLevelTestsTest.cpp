@@ -10,7 +10,7 @@
 
 #include "PeerScope.h"
 
-#include "CommonFunctions.h"
+#include "ConnectionWaits.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 #include "TestHelpers.h"
@@ -84,7 +84,7 @@ TEST_CASE( "SendList, split packets and PushBackPacket deliver without breaking 
 
     client->SendList( (const char**)dataList, lengths, kSendListMessages, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true );
 
-    Packet* packet = CommonFunctions::WaitAndReturnMessageWithID( server, ID_USER_PACKET_ENUM + 1, 1000 );
+    Packet* packet = ConnectionWaits::ReceiveMessage( server, ID_USER_PACKET_ENUM + 1, 1000 );
 
     // REQUIRE: packet->length below dereferences it.
     REQUIRE( packet != nullptr );
@@ -113,11 +113,11 @@ TEST_CASE( "SendList, split packets and PushBackPacket deliver without breaking 
     // REQUIRE: with nothing sent there is no split to report progress on.
     REQUIRE( client->Send( (const char*)hugePacket->data, kHugePacketSize, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true ) > 0 );
 
-    CHECK( CommonFunctions::WaitForMessageWithID( server, ID_DOWNLOAD_PROGRESS, 2000 ) );
+    CHECK( ConnectionWaits::WaitForMessage( server, ID_DOWNLOAD_PROGRESS, 2000 ) );
 
     // Drain the rest of the progress reports, so the checks below are looking at
     // their own traffic.
-    while( CommonFunctions::WaitForMessageWithID( server, ID_DOWNLOAD_PROGRESS, 500 ) )
+    while( ConnectionWaits::WaitForMessage( server, ID_DOWNLOAD_PROGRESS, 500 ) )
     {
     }
 

@@ -2,14 +2,10 @@
 
 #include "BitStream.h"
 #include "ConnectionWaits.h"
-#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <chrono>
-#include <thread>
 
 /*
 Pins the value Receive hands out for a Timestamped Message: the RakNet::Time after the
@@ -55,28 +51,17 @@ TEST_CASE( "Receive shifts a Timestamped Message's time by the sender's clock di
     REQUIRE( client->Send( &message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, serverAddress, false ) != 0 );
 
     // A ping can change the differential while the Message is in flight, so it is read on
-    // both sides of the receive loop and the shift must match one of them.
+    // both sides of the receive and the shift must match one of them.
     const RakNet::Time differentialBefore = server->GetClockDifferential( clientAddress );
 
-    bool received = false;
+    Packet* packet = ConnectionWaits::ReceiveMessage( server, ID_TIMESTAMP, kWaitBudgetMs );
+    REQUIRE( packet != nullptr );
     RakNet::Time receivedTime = 0;
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( received == false && ConnectionWaits::Expired( deadline ) == false )
-    {
-        for( Packet* packet = server->Receive(); packet != 0; packet = server->Receive() )
-        {
-            if( received == false && packet->data[0] == ID_TIMESTAMP )
-            {
-                BitStream in( packet->data, packet->length, false );
-                in.IgnoreBytes( sizeof( MessageID ) );
-                REQUIRE( in.Read( receivedTime ) );
-                received = true;
-            }
-            server->DeallocatePacket( packet );
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    REQUIRE( received );
+    BitStream in( packet->data, packet->length, false );
+    in.IgnoreBytes( sizeof( MessageID ) );
+    const bool read = in.Read( receivedTime );
+    server->DeallocatePacket( packet );
+    REQUIRE( read );
 
     const RakNet::Time differentialAfter = server->GetClockDifferential( clientAddress );
 

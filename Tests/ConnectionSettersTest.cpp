@@ -1,5 +1,4 @@
 #include "ConnectionWaits.h"
-#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakNetStringMakers.h"
 #include "RakPeerInterface.h"
@@ -88,24 +87,6 @@ private:
     SystemAddress address;
 };
 
-/// Receives on \a peer until a Message with \a id arrives, or the budget is spent.
-bool WaitForMessage( RakPeerInterface* peer, unsigned char id )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            const bool found = packet->length > 0 && packet->data[0] == id;
-            peer->DeallocatePacket( packet );
-            if( found )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return false;
-}
-
 /// Sends a message large enough to be split from \a client to every connection.
 void SendSplitMessage( BoundPeer& client )
 {
@@ -190,7 +171,7 @@ TEST_CASE( "A split-message progress interval reaches connections opened before 
     }
 
     SendSplitMessage( client );
-    CHECK( WaitForMessage( server.Get(), ID_DOWNLOAD_PROGRESS ) );
+    CHECK( ConnectionWaits::WaitForMessage( server.Get(), ID_DOWNLOAD_PROGRESS, kWaitBudgetMs ) );
 }
 
 TEST_CASE( "ApplyNetworkSimulator reaches an open connection", "[network]" )

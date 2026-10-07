@@ -1,5 +1,6 @@
 #include "PeerScope.h"
 
+#include "ConnectionWaits.h"
 #include "DS_MemoryPool.h"
 #include "MessageIdentifiers.h"
 #include "RakAssert.h"
@@ -9,10 +10,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
 #include <cstddef>
 #include <cstring>
-#include <thread>
 #include <vector>
 
 /*
@@ -104,21 +103,12 @@ std::vector<char> LoopbackPayload( size_t size, char fill )
 }
 
 /// Receive for up to \a millisecondsToWait; true if a packet of exactly \a payload
-/// arrived. Every other packet is discarded.
-bool ReceivesPayload( RakPeerInterface* peer, const std::vector<char>& payload, int millisecondsToWait )
+/// arrived. Every packet ahead of it is discarded.
+bool ReceivesPayload( RakPeerInterface* peer, const std::vector<char>& payload, TimeMS millisecondsToWait )
 {
-    for( int waited = 0; waited < millisecondsToWait; waited += 10 )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            const bool match = packet->length == payload.size() && memcmp( packet->data, payload.data(), payload.size() ) == 0;
-            peer->DeallocatePacket( packet );
-            if( match )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-    return false;
+    return ConnectionWaits::WaitForMessage( peer, (MessageID)payload[0], millisecondsToWait, [&]( const Packet& packet ) {
+        return packet.length == payload.size() && memcmp( packet.data, payload.data(), payload.size() ) == 0;
+    } );
 }
 
 // Odd sizes no other allocation in a Peer asks for.

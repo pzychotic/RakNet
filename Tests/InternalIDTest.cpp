@@ -1,6 +1,5 @@
 #include "PeerScope.h"
 
-#include "CommonFunctions.h"
 #include "ConnectionWaits.h"
 #include "MessageIdentifiers.h"
 #include "RakNetDefines.h"
@@ -119,9 +118,7 @@ TEST_CASE( "An internal ID index outside the list reads and writes nothing", "[n
 
     // A connected System's list is checked too.
     REQUIRE( client->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    Packet* accepted = CommonFunctions::WaitAndReturnMessageWithID( client, ID_CONNECTION_REQUEST_ACCEPTED, kWaitBudgetMs );
-    REQUIRE( accepted != nullptr );
-    client->DeallocatePacket( accepted );
+    REQUIRE( ConnectionWaits::WaitForMessage( client, ID_CONNECTION_REQUEST_ACCEPTED, kWaitBudgetMs ) );
 
     ConnectionWaits::WaitUntil( [&] { return client->GetInternalID( serverAddress, 1 ) == kSecondAddress; }, kWaitBudgetMs );
     REQUIRE( client->GetInternalID( serverAddress, 1 ) == kSecondAddress );
@@ -179,20 +176,13 @@ TEST_CASE( "Connections open while the internal IDs change", "[network]" )
     {
         INFO( "connection " << i );
         REQUIRE( client->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-        Packet* accepted = CommonFunctions::WaitAndReturnMessageWithID( client, ID_CONNECTION_REQUEST_ACCEPTED, kWaitBudgetMs );
-        REQUIRE( accepted != nullptr );
-        client->DeallocatePacket( accepted );
-
-        Packet* incoming = CommonFunctions::WaitAndReturnMessageWithID( server, ID_NEW_INCOMING_CONNECTION, kWaitBudgetMs );
-        REQUIRE( incoming != nullptr );
-        server->DeallocatePacket( incoming );
+        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_CONNECTION_REQUEST_ACCEPTED, kWaitBudgetMs ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( server, ID_NEW_INCOMING_CONNECTION, kWaitBudgetMs ) );
 
         client->CloseConnection( serverAddress, true );
-        Packet* closed = CommonFunctions::WaitAndReturnMessageWithID( server, ID_DISCONNECTION_NOTIFICATION, kWaitBudgetMs );
-        REQUIRE( closed != nullptr );
-        server->DeallocatePacket( closed );
+        REQUIRE( ConnectionWaits::WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION, kWaitBudgetMs ) );
 
-        ConnectionWaits::WaitUntil( [&] { return client->GetConnectionState( serverAddress ) == IS_NOT_CONNECTED; }, kWaitBudgetMs );
+        ConnectionWaits::WaitForDisconnect( client, serverAddress );
         REQUIRE( client->GetConnectionState( serverAddress ) == IS_NOT_CONNECTED );
     }
 

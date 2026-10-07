@@ -172,7 +172,7 @@ TEST_CASE( "A connection request arriving on an established connection is echoed
     // loopback send and would push this onto the client's own receive queue.
     REQUIRE( client->Send( &request, IMMEDIATE_PRIORITY, RELIABLE_ORDERED, 0, serverGuid, false ) != 0 );
 
-    Packet* reply = CommonFunctions::WaitAndReturnMessageWithID( client, ID_CONNECTION_REQUEST_ACCEPTED, kReplyBudgetMs );
+    Packet* reply = ConnectionWaits::ReceiveMessage( client, ID_CONNECTION_REQUEST_ACCEPTED, kReplyBudgetMs );
 
     // REQUIRE: everything below reads through it, and its absence is its own
     // diagnosis - the server took a different branch, or none.

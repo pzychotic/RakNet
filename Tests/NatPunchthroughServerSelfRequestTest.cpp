@@ -76,25 +76,6 @@ std::vector<MessageID> CollectNatAnswers( RakPeerInterface* server, RakPeerInter
     return answers;
 }
 
-// Drains the server until it hands out ID_DISCONNECTION_NOTIFICATION, which it does after
-// every plugin's OnClosedConnection has run. Returns whether it did before the deadline.
-bool WaitForDisconnectionNotification( RakPeerInterface* server )
-{
-    const TimeMS deadline = GetTimeMS() + kAnswerBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = server->Receive(); packet != nullptr; packet = server->Receive() )
-        {
-            const bool disconnected = packet->data[0] == ID_DISCONNECTION_NOTIFICATION;
-            server->DeallocatePacket( packet );
-            if( disconnected )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
 } // namespace
 
 TEST_CASE( "NatPunchthroughServer refuses a punchthrough request to the sender's own guid", "[natpunchthrough][network]" )
@@ -115,9 +96,10 @@ TEST_CASE( "NatPunchthroughServer refuses a punchthrough request to the sender's
 
     // Disconnect before checking, so OnClosedConnection walks the sender's attempts whatever
     // the answer was. The plugin sees the disconnect from Receive, so the server is drained
-    // until the notification comes out of it.
+    // until the notification comes out of it, which is after every plugin's
+    // OnClosedConnection has run.
     client->CloseConnection( serverAddress, true );
-    REQUIRE( WaitForDisconnectionNotification( server ) );
+    REQUIRE( ConnectionWaits::WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION, kAnswerBudgetMs ) );
 
     REQUIRE( !answers.empty() );
     CHECK( answers[0] == ID_NAT_TARGET_NOT_CONNECTED );

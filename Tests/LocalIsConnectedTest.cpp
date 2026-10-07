@@ -11,6 +11,7 @@
 #include "PeerScope.h"
 
 #include "CommonFunctions.h"
+#include "ConnectionWaits.h"
 #include "MessageIdentifiers.h"
 #include "RakPeerInterface.h"
 
@@ -95,7 +96,7 @@ TEST_CASE( "GetConnectionState follows a client through connect, close and recon
     loopbackMessage[0] = static_cast<char>( kLoopbackMessageId );
     client->SendLoopback( loopbackMessage, static_cast<int>( strlen( loopbackMessage ) ) + 1 );
 
-    CHECK( CommonFunctions::WaitForMessageWithID( client, kLoopbackMessageId, 1000 ) );
+    CHECK( ConnectionWaits::WaitForMessage( client, kLoopbackMessageId, 1000 ) );
 
     const char* localIp = client->GetLocalIP( 0 );
 
