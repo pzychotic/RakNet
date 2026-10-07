@@ -1,3 +1,5 @@
+#include "ConnectionWaits.h"
+#include "GetTime.h"
 #include "LoopbackTCP.h"
 #include "PacketizedTCP.h"
 #include "RakNetTypes.h"
@@ -211,15 +213,17 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     } senderScope{ sender, client };
 
     // The application does not poll. The sender has to stall well short of the stream.
+    // Stalled means no progress for kStallWindow; every byte sent moves the deadline on.
+    constexpr TimeMS kStallWindow = 500;
     size_t lastSentLength = 0;
-    auto lastProgress = std::chrono::steady_clock::now();
-    while( std::chrono::steady_clock::now() - lastProgress < std::chrono::milliseconds( 500 ) && sentLength < kStreamLength )
+    TimeMS stallDeadline = GetTimeMS() + kStallWindow;
+    while( !ConnectionWaits::Expired( stallDeadline ) && sentLength < kStreamLength )
     {
         std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
         if( sentLength != lastSentLength )
         {
             lastSentLength = sentLength;
-            lastProgress = std::chrono::steady_clock::now();
+            stallDeadline = GetTimeMS() + kStallWindow;
         }
     }
     REQUIRE( sentLength < kStreamLength );
@@ -231,8 +235,8 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     // Draining lets the stream through, every byte in order.
     size_t receivedLength = 0;
     bool isIntact = true;
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 30 );
-    while( receivedLength < streamEnd && std::chrono::steady_clock::now() < deadline )
+    const TimeMS deadline = GetTimeMS() + 30000;
+    while( receivedLength < streamEnd && !ConnectionWaits::Expired( deadline ) )
     {
         Packet* packet = server.Receive();
         if( packet == 0 )
@@ -268,17 +272,21 @@ TEST_CASE( "TCPInterface closes a client that never reads at the outgoing cap", 
 
     // The client never reads, so once the kernel buffers are full everything sent waits in
     // outgoingData. Bounded, so an uncapped server fails here rather than exhausting memory.
+    // Several chunks a poll, so the wait sends far more than any autotuned send buffer holds:
+    // eight 16 KiB chunks every 30 ms is about 20 MiB inside the wait.
+    constexpr size_t kSendBound = 256u * 1024 * 1024;
+    constexpr int kChunksPerPoll = 8;
     const std::vector<char> chunk( 16 * 1024, 'x' );
     SystemAddress lostAddress = UNASSIGNED_SYSTEM_ADDRESS;
     size_t sentLength = 0;
     unsigned int largestBuffered = 0;
     CHECK( WaitFor( [&] {
-        if( sentLength < 256u * 1024 * 1024 )
+        for( int i = 0; i < kChunksPerPoll && sentLength < kSendBound; i++ )
         {
             server.Send( chunk.data(), (unsigned int)chunk.size(), clientAddress, false );
             sentLength += chunk.size();
+            largestBuffered = (std::max)( largestBuffered, server.GetOutgoingDataBufferSize( clientAddress ) );
         }
-        largestBuffered = ( std::max )( largestBuffered, server.GetOutgoingDataBufferSize( clientAddress ) );
         return ( lostAddress = server.HasLostConnection() ) != UNASSIGNED_SYSTEM_ADDRESS;
     } ) );
     CHECK( largestBuffered <= kOutgoingCap );
