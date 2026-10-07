@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "LoopbackTCP.h"
 #include "MessageIdentifiers.h"
 #include "PacketizedTCP.h"
@@ -25,7 +26,6 @@ The client is a raw socket, as in TCPCapsTest.cpp, so it can send a header annou
 than it then sends.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -92,8 +92,8 @@ TEST_CASE( "PacketizedTCP's first ID_DOWNLOAD_PROGRESS reports only the bytes bu
     PacketizedTCP server;
     REQUIRE( server.Start( kShortFirstChunkListenPort, 1 ) );
 
-    Client client( kShortFirstChunkListenPort );
-    REQUIRE( WaitFor( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    LoopbackTCP::Client client( kShortFirstChunkListenPort );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     // A header announcing 200000 bytes, then 65532 of them: 65536 buffered in all, so the
     // first 65536-byte boundary is crossed on the last byte however TCP segments the stream.
@@ -108,7 +108,7 @@ TEST_CASE( "PacketizedTCP's first ID_DOWNLOAD_PROGRESS reports only the bytes bu
     client.SendAll( stream.data(), stream.size() );
 
     Packet* progress = 0;
-    REQUIRE( WaitFor( [&] { return ( progress = server.Receive() ) != 0; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( progress = server.Receive() ) != 0; }, LoopbackTCP::kWaitBudget ) );
 
     constexpr unsigned int kPrefixLength = sizeof( MessageID ) + 3 * sizeof( unsigned int );
     REQUIRE( progress->length >= kPrefixLength );

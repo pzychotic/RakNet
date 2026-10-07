@@ -39,7 +39,6 @@ a fixed port. They close abortively - SO_LINGER with a zero timeout sends a RST 
 leaves no TIME_WAIT behind and lets a reconnect bind the same port again.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -52,6 +51,10 @@ constexpr unsigned short kBackpressureListenPort = 31052;
 constexpr unsigned short kNeverReadsListenPort = 31053;
 constexpr unsigned short kReconnectListenPort = 31054;
 constexpr unsigned short kReconnectClientPort = 31055;
+
+// The raw clients' SO_SNDBUF and SO_RCVBUF in the cap cases, so the sender stalls and the
+// never-reading client's buffer fills after little data.
+constexpr int kSmallClientBuffers = 16 * 1024;
 
 // connections is protected; the reconnect case needs its size.
 class InspectablePacketizedTCP : public PacketizedTCP
@@ -91,7 +94,7 @@ TEST_CASE( "PacketizedTCP closes a sender announcing a message longer than the m
     REQUIRE( serverAddress != UNASSIGNED_SYSTEM_ADDRESS );
 
     SystemAddress clientAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    REQUIRE( WaitFor( [&] { return ( clientAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( clientAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     const std::vector<char> message( 1025, 'x' );
     client.Send( message.data(), (unsigned int)message.size(), serverAddress, false );
@@ -99,18 +102,20 @@ TEST_CASE( "PacketizedTCP closes a sender announcing a message longer than the m
     // The header alone decides it: the server closes before the message could complete,
     // reports the loss to its application, and delivers nothing.
     SystemAddress lostAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    CHECK( WaitFor( [&] {
-        Packet* packet = server.Receive();
-        const bool isDelivered = packet != 0;
-        server.DeallocatePacket( packet );
-        REQUIRE_FALSE( isDelivered );
-        return ( lostAddress = server.HasLostConnection() ) != UNASSIGNED_SYSTEM_ADDRESS;
-    } ) );
+    CHECK( ConnectionWaits::WaitUntil(
+        [&] {
+            Packet* packet = server.Receive();
+            const bool isDelivered = packet != 0;
+            server.DeallocatePacket( packet );
+            REQUIRE_FALSE( isDelivered );
+            return ( lostAddress = server.HasLostConnection() ) != UNASSIGNED_SYSTEM_ADDRESS;
+        },
+        LoopbackTCP::kWaitBudget ) );
     CHECK( lostAddress == clientAddress );
     CHECK( server.GetMessageLengthCapCloseCount() == 1 );
 
     // And the client sees its connection end.
-    CHECK( WaitFor( [&] { return client.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return client.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     client.Stop();
     server.Stop();
@@ -127,7 +132,7 @@ TEST_CASE( "PacketizedTCP delivers a message of exactly the maximum length", "[p
     REQUIRE( client.Start( 0, 0, 1 ) );
     const SystemAddress serverAddress = client.Connect( "127.0.0.1", kExactMaximumListenPort, true, AF_INET );
     REQUIRE( serverAddress != UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( WaitFor( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     std::vector<char> message( 1024 );
     for( size_t i = 0; i < message.size(); i++ )
@@ -135,7 +140,7 @@ TEST_CASE( "PacketizedTCP delivers a message of exactly the maximum length", "[p
     client.Send( message.data(), (unsigned int)message.size(), serverAddress, false );
 
     Packet* packet = 0;
-    REQUIRE( WaitFor( [&] { return ( packet = server.Receive() ) != 0; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( packet = server.Receive() ) != 0; }, LoopbackTCP::kWaitBudget ) );
     CHECK( packet->length == message.size() );
     CHECK( memcmp( packet->data, message.data(), message.size() ) == 0 );
     server.DeallocatePacket( packet );
@@ -175,8 +180,8 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     server.SetMaxIncomingBytesPerClient( kIncomingCap );
     CHECK( server.GetMaxIncomingBytesPerClient() == kIncomingCap );
 
-    Client client( kBackpressureListenPort, 0, 16 * 1024 );
-    REQUIRE( WaitFor( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    LoopbackTCP::Client client( kBackpressureListenPort, LoopbackTCP::kAnyPort, kSmallClientBuffers );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     // Blocking sends on their own thread: a send that stops returning is the stall.
     std::atomic<size_t> sentLength( 0 );
@@ -204,7 +209,7 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     struct SenderScope
     {
         std::thread& sender;
-        Client& client;
+        LoopbackTCP::Client& client;
         ~SenderScope()
         {
             client.Abort();
@@ -266,9 +271,9 @@ TEST_CASE( "TCPInterface closes a client that never reads at the outgoing cap", 
     server.SetMaxOutgoingBytesPerClient( kOutgoingCap );
     CHECK( server.GetMaxOutgoingBytesPerClient() == kOutgoingCap );
 
-    Client client( kNeverReadsListenPort, 0, 16 * 1024 );
+    LoopbackTCP::Client client( kNeverReadsListenPort, LoopbackTCP::kAnyPort, kSmallClientBuffers );
     SystemAddress clientAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    REQUIRE( WaitFor( [&] { return ( clientAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( clientAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     // The client never reads, so once the kernel buffers are full everything sent waits in
     // outgoingData. Bounded, so an uncapped server fails here rather than exhausting memory.
@@ -280,15 +285,17 @@ TEST_CASE( "TCPInterface closes a client that never reads at the outgoing cap", 
     SystemAddress lostAddress = UNASSIGNED_SYSTEM_ADDRESS;
     size_t sentLength = 0;
     unsigned int largestBuffered = 0;
-    CHECK( WaitFor( [&] {
-        for( int i = 0; i < kChunksPerPoll && sentLength < kSendBound; i++ )
-        {
-            server.Send( chunk.data(), (unsigned int)chunk.size(), clientAddress, false );
-            sentLength += chunk.size();
-            largestBuffered = (std::max)( largestBuffered, server.GetOutgoingDataBufferSize( clientAddress ) );
-        }
-        return ( lostAddress = server.HasLostConnection() ) != UNASSIGNED_SYSTEM_ADDRESS;
-    } ) );
+    CHECK( ConnectionWaits::WaitUntil(
+        [&] {
+            for( int i = 0; i < kChunksPerPoll && sentLength < kSendBound; i++ )
+            {
+                server.Send( chunk.data(), (unsigned int)chunk.size(), clientAddress, false );
+                sentLength += chunk.size();
+                largestBuffered = (std::max)( largestBuffered, server.GetOutgoingDataBufferSize( clientAddress ) );
+            }
+            return ( lostAddress = server.HasLostConnection() ) != UNASSIGNED_SYSTEM_ADDRESS;
+        },
+        LoopbackTCP::kWaitBudget ) );
     CHECK( largestBuffered <= kOutgoingCap );
     CHECK( lostAddress == clientAddress );
     CHECK( server.GetOutgoingBytesCapCloseCount() == 1 );
@@ -305,28 +312,28 @@ TEST_CASE( "PacketizedTCP keeps a client reconnecting from the same address befo
     InspectablePacketizedTCP server;
     REQUIRE( server.Start( kReconnectListenPort, 4 ) );
 
-    Client first( kReconnectListenPort, kReconnectClientPort );
+    LoopbackTCP::Client first( kReconnectListenPort, kReconnectClientPort );
     SystemAddress firstAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    REQUIRE( WaitFor( [&] { return ( firstAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( firstAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
     REQUIRE( server.ConnectionEntryCount() == 1 );
 
     // The first connection goes, and TCPInterface has queued its lost event - its slot is
     // free - before the reconnect arrives. The application has not polled since.
     first.Abort();
-    REQUIRE( WaitFor( [&] { return server.GetConnectionCount() == 0; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.GetConnectionCount() == 0; }, LoopbackTCP::kWaitBudget ) );
 
-    Client second( kReconnectListenPort, kReconnectClientPort );
-    REQUIRE( WaitFor( [&] { return server.GetConnectionCount() == 1; } ) );
+    LoopbackTCP::Client second( kReconnectListenPort, kReconnectClientPort );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.GetConnectionCount() == 1; }, LoopbackTCP::kWaitBudget ) );
 
     const std::vector<char> message( 100, 'y' );
     const std::vector<char> framed = Frame( message );
     second.SendAll( framed.data(), framed.size() );
-    REQUIRE( WaitFor( [&] { return server.ReceiveHasPackets(); } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.ReceiveHasPackets(); }, LoopbackTCP::kWaitBudget ) );
 
     // Both events and the message are queued now: the new event is processed first, then
     // the lost one, then the message. The entry has to survive the lost event.
     Packet* packet = 0;
-    CHECK( WaitFor( [&] { return ( packet = server.Receive() ) != 0; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return ( packet = server.Receive() ) != 0; }, LoopbackTCP::kWaitBudget ) );
     if( packet != 0 )
     {
         CHECK( packet->systemAddress == firstAddress );
@@ -341,7 +348,7 @@ TEST_CASE( "PacketizedTCP keeps a client reconnecting from the same address befo
 
     // And the reconnect's own loss frees the entry.
     second.Abort();
-    CHECK( WaitFor( [&] { return server.HasLostConnection() == firstAddress; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return server.HasLostConnection() == firstAddress; }, LoopbackTCP::kWaitBudget ) );
     CHECK( server.ConnectionEntryCount() == 0 );
 
     server.Stop();

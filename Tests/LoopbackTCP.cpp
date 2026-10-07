@@ -1,6 +1,5 @@
 #include "LoopbackTCP.h"
 
-#include "ConnectionWaits.h"
 #include "SocketDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -21,11 +20,6 @@ sockaddr_in LoopbackAddress( unsigned short port )
 
 } // namespace
 
-bool LoopbackTCP::WaitFor( const std::function<bool()>& condition, RakNet::TimeMS budget )
-{
-    return ConnectionWaits::WaitUntil( condition, budget );
-}
-
 bool LoopbackTCP::IsSocket( __TCPSOCKET__ descriptor )
 {
     int type = 0;
@@ -38,7 +32,7 @@ LoopbackTCP::Client::Client( unsigned short listenPort, unsigned short clientPor
 {
     REQUIRE( descriptor != INVALID_SOCKET );
 
-    if( bufferSize != 0 )
+    if( bufferSize != kDefaultBuffers )
     {
         setsockopt__( descriptor, SOL_SOCKET, SO_SNDBUF, (const char*)&bufferSize, sizeof( bufferSize ) );
         setsockopt__( descriptor, SOL_SOCKET, SO_RCVBUF, (const char*)&bufferSize, sizeof( bufferSize ) );
@@ -46,7 +40,7 @@ LoopbackTCP::Client::Client( unsigned short listenPort, unsigned short clientPor
 
     // A constructor that throws runs no destructor, so a failed step closes the
     // socket itself before it FAILs.
-    if( clientPort != 0 )
+    if( clientPort != kAnyPort )
     {
         const int reuse = 1;
         if( setsockopt__( descriptor, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof( reuse ) ) != 0 )

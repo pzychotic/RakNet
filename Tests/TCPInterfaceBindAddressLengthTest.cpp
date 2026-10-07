@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
@@ -33,7 +34,6 @@ observable - the non-blocking arm returns UNASSIGNED_SYSTEM_ADDRESS whether it a
 argument or not, so a completed connection attempt is the only proof it got that far.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -54,10 +54,12 @@ const std::string kFirstRejected( TCPInterface::MAXIMUM_BIND_ADDRESS_LENGTH + 1,
 SystemAddress WaitForCompletedConnectionAttempt( TCPInterface& tcpInterface )
 {
     SystemAddress completed = UNASSIGNED_SYSTEM_ADDRESS;
-    WaitFor( [&] {
-        completed = tcpInterface.HasCompletedConnectionAttempt();
-        return completed != UNASSIGNED_SYSTEM_ADDRESS || tcpInterface.HasFailedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS;
-    } );
+    ConnectionWaits::WaitUntil(
+        [&] {
+            completed = tcpInterface.HasCompletedConnectionAttempt();
+            return completed != UNASSIGNED_SYSTEM_ADDRESS || tcpInterface.HasFailedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS;
+        },
+        LoopbackTCP::kWaitBudget );
     return completed;
 }
 

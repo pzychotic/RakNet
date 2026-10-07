@@ -1,5 +1,6 @@
 #if !defined( _WIN32 )
 
+#include "ConnectionWaits.h"
 #include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
@@ -25,7 +26,6 @@ and requires that fd 0 is a socket before it requires that data flows. POSIX onl
 never hands out 0.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -65,14 +65,16 @@ private:
 std::string ReceiveString( TCPInterface& tcpInterface )
 {
     std::string received;
-    WaitFor( [&] {
-        Packet* packet = tcpInterface.Receive();
-        if( packet == 0 )
-            return false;
-        received.assign( (const char*)packet->data, packet->length );
-        tcpInterface.DeallocatePacket( packet );
-        return true;
-    } );
+    ConnectionWaits::WaitUntil(
+        [&] {
+            Packet* packet = tcpInterface.Receive();
+            if( packet == 0 )
+                return false;
+            received.assign( (const char*)packet->data, packet->length );
+            tcpInterface.DeallocatePacket( packet );
+            return true;
+        },
+        LoopbackTCP::kWaitBudget );
     return received;
 }
 
@@ -90,7 +92,7 @@ TEST_CASE( "TCPInterface accepts on a listen socket numbered 0", "[tcpinterface]
 
     TCPInterface server;
     REQUIRE( server.Start( kListenOnZeroPort, 4 ) );
-    REQUIRE( IsSocket( 0 ) );
+    REQUIRE( LoopbackTCP::IsSocket( 0 ) );
 
     TCPInterface client;
     REQUIRE( client.Start( 0, 0, 1 ) );
@@ -124,7 +126,7 @@ TEST_CASE( "TCPInterface connects on a socket numbered 0", "[tcpinterface][netwo
     REQUIRE( client.Start( 0, 0, 1 ) );
 
     const SystemAddress serverAddress = client.Connect( "127.0.0.1", kConnectOnZeroPort, true, AF_INET );
-    REQUIRE( IsSocket( 0 ) );
+    REQUIRE( LoopbackTCP::IsSocket( 0 ) );
     REQUIRE( serverAddress != UNASSIGNED_SYSTEM_ADDRESS );
 
     Send( client, "ping", serverAddress );

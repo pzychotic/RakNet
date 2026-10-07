@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
@@ -35,7 +36,6 @@ closesocket__, takes the listener down on the first connection past capacity and
 connect never completes.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -125,7 +125,7 @@ TEST_CASE( "A connection arriving at a full table is closed and the listener sur
     TCPInterface occupant;
     REQUIRE( occupant.Start( 0, 0, 1 ) );
     REQUIRE( occupant.Connect( "127.0.0.1", kAcceptListenPort, true, AF_INET ) != UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( WaitFor( [&server] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&server] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     {
         // The server's table is full. accept__ still succeeds - the listen backlog is not
@@ -137,14 +137,14 @@ TEST_CASE( "A connection arriving at a full table is closed and the listener sur
 
         // The fix closes that socket, which the far end sees as the connection ending. The
         // unfixed code holds it open with no owner and no way to ever close it.
-        CHECK( WaitFor( [&refused] { return refused.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+        CHECK( ConnectionWaits::WaitUntil( [&refused] { return refused.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
         refused.Stop();
     }
 
     // Free the slot, and the interface has to accept again.
     occupant.Stop();
-    REQUIRE( WaitFor( [&server] { return server.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&server] { return server.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     // The assertion the half fix fails: closing listenSocket instead of the accepted socket
     // ends the server's ability to accept anything the moment one connection arrives past
@@ -152,7 +152,7 @@ TEST_CASE( "A connection arriving at a full table is closed and the listener sur
     TCPInterface late;
     REQUIRE( late.Start( 0, 0, 1 ) );
     REQUIRE( late.Connect( "127.0.0.1", kAcceptListenPort, true, AF_INET ) != UNASSIGNED_SYSTEM_ADDRESS );
-    CHECK( WaitFor( [&server] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&server] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     late.Stop();
     server.Stop();

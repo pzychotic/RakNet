@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "InspectableTelnetTransport.h"
 #include "LoopbackTCP.h"
 #include "RakNetTypes.h"
@@ -35,7 +36,6 @@ to fixed local ports. They close abortively - SO_LINGER with a zero timeout send
 which leaves no TIME_WAIT behind and lets a reconnect bind the same port again.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -59,8 +59,8 @@ TEST_CASE( "TelnetTransport keeps a client reconnecting from the same address", 
     REQUIRE( telnet.Start( kReconnectListenPort, true ) );
 
     SystemAddress firstAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    Client first( kReconnectListenPort, kReconnectClientPort );
-    REQUIRE( WaitFor( [&] { return ( firstAddress = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    LoopbackTCP::Client first( kReconnectListenPort, kReconnectClientPort );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( firstAddress = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
     REQUIRE( telnet.ClientCount() == 1 );
 
     first.Abort();
@@ -68,8 +68,8 @@ TEST_CASE( "TelnetTransport keeps a client reconnecting from the same address", 
     // The lost event for the first connection is queued, or soon will be; it is deliberately
     // not drained until the reconnect's new event has been.
     SystemAddress secondAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    Client second( kReconnectListenPort, kReconnectClientPort );
-    REQUIRE( WaitFor( [&] { return ( secondAddress = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    LoopbackTCP::Client second( kReconnectListenPort, kReconnectClientPort );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return ( secondAddress = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
     REQUIRE( secondAddress == firstAddress );
 
     // The reused TelnetClient is already listed, so it is not listed again.
@@ -77,14 +77,14 @@ TEST_CASE( "TelnetTransport keeps a client reconnecting from the same address", 
 
     // The first connection's lost event. It frees the TelnetClient once at most, and - the
     // second connection being open at the same address - not at all.
-    REQUIRE( WaitFor( [&] { return telnet.HasLostConnection() == firstAddress; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return telnet.HasLostConnection() == firstAddress; }, LoopbackTCP::kWaitBudget ) );
     CHECK( telnet.ClientCount() == 1 );
 
     // The live connection's input still reassembles into a line.
     const char line[] = "hello\n";
     second.SendAll( line, strlen( line ) );
     Packet* received = 0;
-    CHECK( WaitFor( [&] { return ( received = telnet.Receive() ) != 0; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return ( received = telnet.Receive() ) != 0; }, LoopbackTCP::kWaitBudget ) );
     if( received )
     {
         CHECK( received->systemAddress == secondAddress );
@@ -94,7 +94,7 @@ TEST_CASE( "TelnetTransport keeps a client reconnecting from the same address", 
 
     // The second connection's own lost event frees it.
     second.Abort();
-    CHECK( WaitFor( [&] { return telnet.HasLostConnection() == secondAddress; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return telnet.HasLostConnection() == secondAddress; }, LoopbackTCP::kWaitBudget ) );
     CHECK( telnet.ClientCount() == 0 );
 
     telnet.Stop();
@@ -112,13 +112,13 @@ TEST_CASE( "TelnetTransport frees nothing twice and keeps nothing when a lost ev
 
     // Accepted, but its new event left in the queue. Aborting before the accept could lose
     // the connection before TCPInterface ever reports it.
-    Client client( kLostFirstListenPort, kLostFirstClientPort );
-    REQUIRE( WaitFor( [&] { return telnet.ConnectionCount() == 1; } ) );
+    LoopbackTCP::Client client( kLostFirstListenPort, kLostFirstClientPort );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return telnet.ConnectionCount() == 1; }, LoopbackTCP::kWaitBudget ) );
     client.Abort();
 
     // What ConsoleServer::Update does to a short-lived connection queued behind another: it
     // takes the lost event on one tick and the new event on a later one.
-    REQUIRE( WaitFor( [&] { return telnet.HasLostConnection() == address; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return telnet.HasLostConnection() == address; }, LoopbackTCP::kWaitBudget ) );
     REQUIRE( telnet.HasNewIncomingConnection() == address );
 
     // Unfixed, the lost event found no entry and the new one created an entry nothing frees.

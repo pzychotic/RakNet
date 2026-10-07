@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "InspectableTelnetTransport.h"
 #include "LoopbackTCP.h"
 #include "Plugins/TelnetTransport.h"
@@ -38,7 +39,6 @@ line buffer: a second line was lost, and a partial one lost its beginning.
 The client is a raw socket, as in TelnetTransportReconnectTest.cpp.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -56,11 +56,11 @@ constexpr unsigned short kQueuedAtStopListenPort = 31047;
 const char kUpArrow[] = { 27, 91, 65 };
 
 // Starts a transport on port, connects a client and drains its new event.
-Client StartAndConnect( TelnetTransport& telnet, unsigned short port )
+LoopbackTCP::Client StartAndConnect( TelnetTransport& telnet, unsigned short port )
 {
     REQUIRE( telnet.Start( port, true ) );
-    Client client( port );
-    REQUIRE( WaitFor( [&] { return telnet.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    LoopbackTCP::Client client( port );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return telnet.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
     return client;
 }
 
@@ -68,7 +68,7 @@ Client StartAndConnect( TelnetTransport& telnet, unsigned short port )
 std::string ReceiveLine( TelnetTransport& telnet )
 {
     Packet* received = 0;
-    if( !WaitFor( [&] { return ( received = telnet.Receive() ) != 0; } ) )
+    if( !ConnectionWaits::WaitUntil( [&] { return ( received = telnet.Receive() ) != 0; }, LoopbackTCP::kWaitBudget ) )
         return std::string();
 
     const std::string line( (const char*)received->data, received->length );
@@ -78,7 +78,7 @@ std::string ReceiveLine( TelnetTransport& telnet )
 
 // Sends text and returns the line Receive reassembles from it, or an empty string if none
 // came before the deadline.
-std::string SendLine( TelnetTransport& telnet, Client& client, const std::string& text )
+std::string SendLine( TelnetTransport& telnet, LoopbackTCP::Client& client, const std::string& text )
 {
     client.SendAll( text );
     return ReceiveLine( telnet );
@@ -169,20 +169,22 @@ std::set<void*> LiveBlocks::s_live;
 
 // Sends ESC [ A in a segment of its own - Receive only recognises the up arrow as a whole
 // 3-byte packet - and has Receive take it. Returns whether the packet was freed after.
-bool SendUpArrow( TelnetTransport& telnet, Client& client, LiveBlocks& blocks )
+bool SendUpArrow( TelnetTransport& telnet, LoopbackTCP::Client& client, LiveBlocks& blocks )
 {
     blocks.Arm( sizeof( kUpArrow ) + 1 );
     client.SendAll( kUpArrow, sizeof( kUpArrow ) );
 
     // Received by TCPInterface's thread...
-    REQUIRE( WaitFor( [&] { return blocks.Count() == 1; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return blocks.Count() == 1; }, LoopbackTCP::kWaitBudget ) );
 
     // ...and freed once Receive has taken it. Receive returns nothing for it.
     bool returnedNothing = true;
-    const bool freed = WaitFor( [&] {
-        returnedNothing = returnedNothing && telnet.Receive() == 0;
-        return blocks.Count() == 0;
-    } );
+    const bool freed = ConnectionWaits::WaitUntil(
+        [&] {
+            returnedNothing = returnedNothing && telnet.Receive() == 0;
+            return blocks.Count() == 0;
+        },
+        LoopbackTCP::kWaitBudget );
     blocks.Disarm();
     CHECK( returnedNothing );
     return freed;
@@ -196,7 +198,7 @@ TEST_CASE( "TelnetTransport recalls a long line with the up arrow without overru
 
     LiveBlocks blocks;
     TelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kUpArrowListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kUpArrowListenPort );
 
     // Nearly a full buffer, so the old walk-then-strcat built about twice REMOTE_MAX_TEXT_INPUT:
     // past textInput and across the lastSentTextInput it was copying from, which corrupted
@@ -218,7 +220,7 @@ TEST_CASE( "TelnetTransport keeps a full line and its terminator inside the line
     WinsockScope winsock;
 
     InspectableTelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kFullLineListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kFullLineListenPort );
 
     // One printable character more than fits beside a terminator.
     const std::string fullLine( REMOTE_MAX_TEXT_INPUT, 'y' );
@@ -244,7 +246,7 @@ TEST_CASE( "TelnetTransport frees an up-arrow packet", "[telnettransport][networ
 
     LiveBlocks blocks;
     TelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kUpArrowLeakListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kUpArrowLeakListenPort );
 
     // One with nothing to recall, and one with a line to recall: both branches.
     for( const bool withLastLine : { false, true } )
@@ -264,7 +266,7 @@ TEST_CASE( "TelnetTransport delivers every line in a segment", "[telnettransport
     WinsockScope winsock;
 
     TelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kTwoLinesListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kTwoLinesListenPort );
 
     // One send on loopback, so one segment and one TCPInterface packet.
     const char twoLines[] = "a\nb\n";
@@ -283,7 +285,7 @@ TEST_CASE( "TelnetTransport keeps the start of a line that follows another in a 
     WinsockScope winsock;
 
     TelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kSplitLineListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kSplitLineListenPort );
 
     const char lineAndStart[] = "a\nbc";
     client.SendAll( lineAndStart, sizeof( lineAndStart ) - 1 );
@@ -300,7 +302,7 @@ TEST_CASE( "TelnetTransport delivers a segment full of lines in order", "[telnet
     WinsockScope winsock;
 
     TelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kManyLinesListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kManyLinesListenPort );
 
     // As many one-character lines as fit in an Ethernet-sized segment, each a different
     // letter from the one before, so a line out of order shows.
@@ -327,7 +329,7 @@ TEST_CASE( "TelnetTransport frees lines still queued when it stops", "[telnettra
 
     LiveBlocks blocks;
     TelnetTransport telnet;
-    Client client = StartAndConnect( telnet, kQueuedAtStopListenPort );
+    LoopbackTCP::Client client = StartAndConnect( telnet, kQueuedAtStopListenPort );
 
     // A queued line's data is its length plus a terminator. Nothing else allocated while
     // armed is that size: the TCP packet's data is the whole segment plus a terminator.

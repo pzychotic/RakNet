@@ -4,13 +4,12 @@
 #include "SocketIncludes.h"
 
 #include <cstddef>
-#include <functional>
 #include <string>
 
 /*
  *  What a TCPInterface, PacketizedTCP or TelnetTransport test needs beyond the
- *  interface under test: a bounded wait, a raw client socket on loopback, and a
- *  probe for whether a descriptor is a socket.
+ *  interface under test: the budget its waits run under, a raw client socket on
+ *  loopback, and a probe for whether a descriptor is a socket.
  *
  *  The client is a raw socket rather than a second TCPInterface so a test can
  *  make it misbehave: send a header announcing more than follows, stop reading,
@@ -18,15 +17,16 @@
  */
 namespace LoopbackTCP {
 
-// Loopback, so every wait is over as soon as the threads have been scheduled
-// once. Generous so a loaded machine cannot turn a pass into a failure.
+// The budget a TCP test hands ConnectionWaits::WaitUntil. Loopback, so every
+// wait is over as soon as the threads have been scheduled once. Generous so a
+// loaded machine cannot turn a pass into a failure.
 constexpr RakNet::TimeMS kWaitBudget = 5000;
 
-// ConnectionWaits::WaitUntil under kWaitBudget unless told otherwise: calls
-// condition until it returns true or budget ms have passed, and returns its last
-// answer. A short budget with a condition that must stay false is a quiet-period
-// check.
-bool WaitFor( const std::function<bool()>& condition, RakNet::TimeMS budget = kWaitBudget );
+// A Client's clientPort when any ephemeral port will do.
+constexpr unsigned short kAnyPort = 0;
+
+// A Client's bufferSize when the operating system's buffers will do.
+constexpr int kDefaultBuffers = 0;
 
 // Whether descriptor is an open socket.
 bool IsSocket( __TCPSOCKET__ descriptor );
@@ -43,10 +43,11 @@ bool IsSocket( __TCPSOCKET__ descriptor );
 class Client
 {
 public:
-    // From clientPort, with SO_REUSEADDR, or from an ephemeral port if 0. A
-    // nonzero bufferSize sets SO_SNDBUF and SO_RCVBUF, so a stall arrives after
-    // little data rather than after whatever autotuned loopback buffers absorb.
-    explicit Client( unsigned short listenPort, unsigned short clientPort = 0, int bufferSize = 0 );
+    // From clientPort, with SO_REUSEADDR, or from an ephemeral port for kAnyPort.
+    // Any bufferSize but kDefaultBuffers sets SO_SNDBUF and SO_RCVBUF, so a stall
+    // arrives after little data rather than after whatever autotuned loopback
+    // buffers absorb.
+    explicit Client( unsigned short listenPort, unsigned short clientPort = kAnyPort, int bufferSize = kDefaultBuffers );
     ~Client();
 
     Client( Client&& other ) noexcept;

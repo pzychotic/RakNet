@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
@@ -33,7 +34,6 @@ constructed, so it fails by whatever means the allocator or the operating system
 before it can reach the assertion.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -118,7 +118,7 @@ TEST_CASE( "CloseConnection by an address with no systemIndex", "[tcpinterface][
 
     REQUIRE( client.Connect( "127.0.0.1", kUnsetIndexPort, true, AF_INET ) != UNASSIGNED_SYSTEM_ADDRESS );
     REQUIRE( client.GetConnectionCount() == 1 );
-    REQUIRE( WaitFor( [&server] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&server] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     // Built from a string rather than kept from Connect, which is the other ordinary way to
     // hold an address for a connection you have. systemIndex is whatever SystemAddress's
@@ -138,7 +138,7 @@ TEST_CASE( "CloseConnection by an address with no systemIndex", "[tcpinterface][
 
     // And the connection really is gone rather than merely unlisted: the far end sees the
     // socket close.
-    CHECK( WaitFor( [&server] { return server.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&server] { return server.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, LoopbackTCP::kWaitBudget ) );
 
     client.Stop();
     server.Stop();

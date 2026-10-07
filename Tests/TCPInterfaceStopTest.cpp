@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
@@ -20,7 +21,6 @@ The test makes that somebody the test itself: it opens sockets right after Close
 so one of them takes the freed number, and requires all of them to be open after Stop.
 */
 
-using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -46,7 +46,7 @@ TEST_CASE( "TCPInterface Stop leaves alone a descriptor a closed blocking connec
 
     const SystemAddress address = client.Connect( "127.0.0.1", kListenPort, true, AF_INET );
     REQUIRE( address != UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( WaitFor( [&] { return server.GetConnectionCount() == 1; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server.GetConnectionCount() == 1; }, LoopbackTCP::kWaitBudget ) );
 
     // Closes the connection's descriptor now, on this thread, so the opens below are the
     // next to hand out numbers.
@@ -56,14 +56,14 @@ TEST_CASE( "TCPInterface Stop leaves alone a descriptor a closed blocking connec
     for( int i = 0; i < kBystanderCount; i++ )
     {
         const __TCPSOCKET__ bystander = socket__( AF_INET, SOCK_STREAM, 0 );
-        REQUIRE( IsSocket( bystander ) );
+        REQUIRE( LoopbackTCP::IsSocket( bystander ) );
         bystanders.push_back( bystander );
     }
 
     client.Stop();
 
     for( __TCPSOCKET__ bystander : bystanders )
-        CHECK( IsSocket( bystander ) );
+        CHECK( LoopbackTCP::IsSocket( bystander ) );
 
     for( __TCPSOCKET__ bystander : bystanders )
         closesocket__( bystander );
