@@ -2,9 +2,6 @@
 #include "PeerScope.h"
 #include "RawSystem.h"
 
-#include "BitStream.h"
-#include "GetTime.h"
-#include "MessageIdentifiers.h"
 #include "RakNetSocket2.h"
 #include "RakPeerInterface.h"
 
@@ -128,28 +125,6 @@ SystemAddress LoopbackAddressOf( RakPeerInterface* peer )
     return address;
 }
 
-/// Two bytes that are no RakNet message, so the Peer discards them once the handler lets
-/// them through.
-void SendJunkDatagram( RawSystem& sender )
-{
-    BitStream junk;
-    junk.Write( (MessageID)ID_USER_PACKET_ENUM );
-    junk.Write( (MessageID)0 );
-    sender.Send( junk );
-}
-
-/// An ID_UNCONNECTED_PING, field for field as RakPeer::Ping writes it. The Peer passes it
-/// to Receive, so a test can count which datagrams got through.
-void SendUnconnectedPing( RawSystem& sender )
-{
-    BitStream ping;
-    ping.Write( (MessageID)ID_UNCONNECTED_PING );
-    ping.Write( RakNet::GetTime() );
-    ping.WriteAlignedBytes( RawSystemHarness::OFFLINE_MESSAGE_DATA_ID, sizeof( RawSystemHarness::OFFLINE_MESSAGE_DATA_ID ) );
-    ping.Write( RakNetGUID( 0x5eed ) );
-    sender.Send( ping );
-}
-
 void HeldUpdateCallback( RakPeerInterface*, void* data )
 {
     static_cast<HeldCallback*>( data )->Run();
@@ -222,12 +197,12 @@ TEST_CASE( "SetIncomingDatagramEventHandler returns only once the handler it rep
     HeldCallback held;
     s_heldHandler = &held;
     peer->SetIncomingDatagramEventHandler( &HeldDatagramHandler );
-    SendJunkDatagram( sender );
+    sender.SendJunkDatagram();
 
     const ClearOutcome outcome = ClearWhileHeld( held, [&] { peer->SetIncomingDatagramEventHandler( nullptr ); } );
     CHECK( outcome.callbackExitedFirst );
 
-    SendJunkDatagram( sender );
+    sender.SendJunkDatagram();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     CHECK( held.Calls() == outcome.callsAtReturn );
     s_heldHandler = nullptr;
@@ -260,13 +235,13 @@ TEST_CASE( "A datagram handler can clear itself from inside its own call", "[net
     s_selfClearingCalls = 0;
     peer->SetIncomingDatagramEventHandler( &SelfClearingDatagramHandler );
 
-    SendJunkDatagram( sender );
+    sender.SendJunkDatagram();
     REQUIRE( ConnectionWaits::WaitUntil( [&] { return s_selfClearingCalls.load() > 0; }, kWaitBudgetMs ) );
 
     // The receive thread is still running: later datagrams reach the Peer, past no handler.
     constexpr unsigned int kPings = 5;
     for( unsigned int i = 0; i < kPings; ++i )
-        SendUnconnectedPing( sender );
+        sender.SendUnconnectedPing();
     CHECK( ConnectionWaits::WaitUntil( [&] { return peer->GetReceiveBufferSize() == kPings; }, kWaitBudgetMs ) );
     CHECK( s_selfClearingCalls == 1 );
     s_selfClearingPeer = nullptr;

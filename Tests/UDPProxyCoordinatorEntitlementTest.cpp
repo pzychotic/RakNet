@@ -10,13 +10,13 @@
 #include "RakNetStringMakers.h"
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
+#include "UDPProxyWire.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <string>
 #include <thread>
-#include <vector>
 
 /*
 UDPProxyCoordinator does not honour a claim about a third party (ADR-0006).
@@ -33,6 +33,7 @@ UDPProxyServer would. Each injected Message is checked through MarkerInjection.
 */
 
 using namespace RakNet;
+using namespace UDPProxyWire;
 
 namespace {
 
@@ -41,8 +42,6 @@ constexpr unsigned short kCoordinatorPort = 30000;
 // Hang guard for a reply. On loopback it arrives a few update cycles after the send, tens of
 // milliseconds.
 constexpr TimeMS kStepBudgetMs = 5000;
-
-constexpr TimeMS kForwardingTimeoutMs = 10000;
 
 const char* const kPassword = "password";
 
@@ -120,54 +119,6 @@ ServerRequest AwaitServerRequest( RakPeerInterface* coordinator, RakPeerInterfac
     return request;
 }
 
-// ID_UDP_PROXY_FORWARDING_REQUEST_FROM_CLIENT_TO_COORDINATOR, laid out as UDPProxyClient
-// writes it.
-void WriteRequestByAddress( BitStream& bs, const SystemAddress& source, const SystemAddress& target )
-{
-    bs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
-    bs.Write( (MessageID)ID_UDP_PROXY_FORWARDING_REQUEST_FROM_CLIENT_TO_COORDINATOR );
-    bs.Write( source );
-    bs.Write( true );
-    bs.Write( target );
-    bs.Write( kForwardingTimeoutMs );
-    bs.Write( false );
-}
-
-void WriteRequestByGuid( BitStream& bs, const SystemAddress& source, RakNetGUID target )
-{
-    bs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
-    bs.Write( (MessageID)ID_UDP_PROXY_FORWARDING_REQUEST_FROM_CLIENT_TO_COORDINATOR );
-    bs.Write( source );
-    bs.Write( false );
-    bs.Write( target );
-    bs.Write( kForwardingTimeoutMs );
-    bs.Write( false );
-}
-
-// ID_UDP_PROXY_PING_SERVERS_REPLY_FROM_CLIENT_TO_COORDINATOR for the (source, target) pair,
-// laid out as UDPProxyClient writes it.
-void WritePingReply( BitStream& bs, const SystemAddress& source, const SystemAddress& target, const std::vector<UDPProxyCoordinator::ServerWithPing>& pings )
-{
-    bs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
-    bs.Write( (MessageID)ID_UDP_PROXY_PING_SERVERS_REPLY_FROM_CLIENT_TO_COORDINATOR );
-    bs.Write( source );
-    bs.Write( target );
-    bs.Write( (unsigned short)pings.size() );
-    for( const UDPProxyCoordinator::ServerWithPing& swp : pings )
-    {
-        bs.Write( swp.serverAddress );
-        bs.Write( swp.ping );
-    }
-}
-
-UDPProxyCoordinator::ServerWithPing Ping( const SystemAddress& serverAddress, unsigned short ping )
-{
-    UDPProxyCoordinator::ServerWithPing swp;
-    swp.serverAddress = serverAddress;
-    swp.ping = ping;
-    return swp;
-}
-
 } // namespace
 
 TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[udpproxy][network]" )
@@ -200,7 +151,7 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
 
         // The target is not connected, which a request by address allows.
         BitStream request;
-        WriteRequestByAddress( request, kForeignSource, kUnconnectedTarget );
+        WriteForwardingRequest( request, kForeignSource, kUnconnectedTarget );
         MarkerInjection::Inject( source, coordinator, request );
 
         const ServerRequest forwarded = AwaitServerRequest( coordinator, serverA );
@@ -216,7 +167,7 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
         Login( coordinator, serverB );
 
         BitStream request;
-        WriteRequestByGuid( request, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID() );
+        WriteForwardingRequest( request, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID() );
         MarkerInjection::Inject( source, coordinator, request );
         UDPProxyCoordinator::ForwardingRequest* fw = coordinatorPlugin.Find( sourceAddress, targetAddress );
         REQUIRE( fw != nullptr );
@@ -224,20 +175,20 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
 
         // B looks far better, to a System that is neither end.
         BitStream forged;
-        WritePingReply( forged, sourceAddress, targetAddress, { Ping( serverAAddress, 900 ), Ping( serverBAddress, 1 ) } );
+        WritePingReply( forged, sourceAddress, targetAddress, { ServerPing( serverAAddress, 900 ), ServerPing( serverBAddress, 1 ) } );
         MarkerInjection::Inject( other, coordinator, forged );
         CHECK( fw->sourceServerPings.empty() );
         CHECK( fw->targetServerPings.empty() );
 
         BitStream fromSource;
-        WritePingReply( fromSource, sourceAddress, targetAddress, { Ping( serverAAddress, 10 ), Ping( serverBAddress, 50 ) } );
+        WritePingReply( fromSource, sourceAddress, targetAddress, { ServerPing( serverAAddress, 10 ), ServerPing( serverBAddress, 50 ) } );
         MarkerInjection::Inject( source, coordinator, fromSource );
         CHECK( fw->sourceServerPings.size() == 2 );
         CHECK( fw->targetServerPings.empty() );
 
         // With both ends in, the coordinator tries the server with the lower summed ping.
         BitStream fromTarget;
-        WritePingReply( fromTarget, sourceAddress, targetAddress, { Ping( serverAAddress, 20 ), Ping( serverBAddress, 60 ) } );
+        WritePingReply( fromTarget, sourceAddress, targetAddress, { ServerPing( serverAAddress, 20 ), ServerPing( serverBAddress, 60 ) } );
         MarkerInjection::Inject( target, coordinator, fromTarget );
         CHECK( fw->targetServerPings.size() == 2 );
 

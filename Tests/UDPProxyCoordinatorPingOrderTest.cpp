@@ -6,6 +6,7 @@
 #include "RakMemoryOverride.h"
 #include "RakNetStringMakers.h"
 #include "RakNetTypes.h"
+#include "UDPProxyWire.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -26,6 +27,7 @@ reply could grow a ping list by 65535 entries and a repeated reply grew it again
 */
 
 using namespace RakNet;
+using namespace UDPProxyWire;
 
 namespace {
 
@@ -38,14 +40,6 @@ const SystemAddress kServerC( "10.0.0.3", 1003 );
 const SystemAddress kUnknownServer( "10.0.0.9", 1009 );
 const SystemAddress kSourceClient( "10.0.1.1", 2001 );
 const SystemAddress kTargetClient( "10.0.1.2", 2002 );
-
-ServerWithPing Ping( const SystemAddress& serverAddress, unsigned short ping )
-{
-    ServerWithPing swp;
-    swp.serverAddress = serverAddress;
-    swp.ping = ping;
-    return swp;
-}
 
 std::vector<SystemAddress> RemainingServers( const ForwardingRequest& fw )
 {
@@ -86,16 +80,7 @@ public:
     void ReceivePingReply( const SystemAddress& from, const std::vector<ServerWithPing>& pings )
     {
         BitStream reply;
-        reply.Write( (MessageID)ID_UDP_PROXY_GENERAL );
-        reply.Write( (MessageID)ID_UDP_PROXY_PING_SERVERS_REPLY_FROM_CLIENT_TO_COORDINATOR );
-        reply.Write( kSourceClient );
-        reply.Write( kTargetClient );
-        reply.Write( (unsigned short)pings.size() );
-        for( const ServerWithPing& swp : pings )
-        {
-            reply.Write( swp.serverAddress );
-            reply.Write( swp.ping );
-        }
+        WritePingReply( reply, kSourceClient, kTargetClient, pings );
 
         Packet packet{};
         packet.systemAddress = from;
@@ -113,8 +98,8 @@ TEST_CASE( "A short ping reply orders the servers without reading past it", "[UD
     ForwardingRequest fw;
     fw.remainingServersToTry = { kServerA, kServerB, kServerC };
     // The source client answered for one server of three.
-    fw.sourceServerPings = { Ping( kServerC, 10 ) };
-    fw.targetServerPings = { Ping( kServerB, 50 ), Ping( kServerC, 60 ), Ping( kServerA, 70 ) };
+    fw.sourceServerPings = { ServerPing( kServerC, 10 ) };
+    fw.targetServerPings = { ServerPing( kServerB, 50 ), ServerPing( kServerC, 60 ), ServerPing( kServerA, 70 ) };
 
     fw.OrderRemainingServersToTry();
 
@@ -127,8 +112,8 @@ TEST_CASE( "Servers are tried in order of their own summed ping", "[UDPProxyCoor
     ForwardingRequest fw;
     fw.remainingServersToTry = { kServerA, kServerB, kServerC };
     // In ping order, as the reply handler used to keep them, which is not server order.
-    fw.sourceServerPings = { Ping( kServerB, 10 ), Ping( kServerC, 100 ), Ping( kServerA, 300 ) };
-    fw.targetServerPings = { Ping( kServerB, 20 ), Ping( kServerC, 200 ), Ping( kServerA, 400 ) };
+    fw.sourceServerPings = { ServerPing( kServerB, 10 ), ServerPing( kServerC, 100 ), ServerPing( kServerA, 300 ) };
+    fw.targetServerPings = { ServerPing( kServerB, 20 ), ServerPing( kServerC, 200 ), ServerPing( kServerA, 400 ) };
 
     fw.OrderRemainingServersToTry();
 
@@ -140,9 +125,9 @@ TEST_CASE( "A ping reply only records servers the coordinator asked about, once 
     CoordinatorProbe coordinator;
     ForwardingRequest* fw = coordinator.AddRequestAwaitingPings( { kServerA, kServerB } );
 
-    coordinator.ReceivePingReply( kSourceClient, { Ping( kUnknownServer, 1 ), Ping( kServerB, 30 ), Ping( kServerA, 20 ), Ping( kServerB, 5 ) } );
+    coordinator.ReceivePingReply( kSourceClient, { ServerPing( kUnknownServer, 1 ), ServerPing( kServerB, 30 ), ServerPing( kServerA, 20 ), ServerPing( kServerB, 5 ) } );
     // A repeated reply replaces what the first one said rather than adding to it.
-    coordinator.ReceivePingReply( kSourceClient, { Ping( kServerA, 40 ) } );
+    coordinator.ReceivePingReply( kSourceClient, { ServerPing( kServerA, 40 ) } );
 
     // The target has not answered, so the request is still waiting and nothing was tried.
     REQUIRE( fw->targetServerPings.empty() );

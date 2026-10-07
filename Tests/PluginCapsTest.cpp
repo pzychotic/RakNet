@@ -19,6 +19,7 @@
 #include "RakNetTypes.h"
 #include "RakPeerInterface.h"
 #include "ReliabilityLayer.h"
+#include "UDPProxyWire.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -290,27 +291,6 @@ public:
 };
 
 const char* const kProxyPassword = "password";
-constexpr TimeMS kForwardingTimeoutMs = 10000;
-
-// ID_UDP_PROXY_FORWARDING_REQUEST_FROM_CLIENT_TO_COORDINATOR by address, laid out as
-// UDPProxyClient writes it, with selectionBytes bytes of server selection data if not 0.
-void WriteForwardingRequest( BitStream& bs, const SystemAddress& target, unsigned int selectionBytes = 0 )
-{
-    bs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
-    bs.Write( (MessageID)ID_UDP_PROXY_FORWARDING_REQUEST_FROM_CLIENT_TO_COORDINATOR );
-    bs.Write( UNASSIGNED_SYSTEM_ADDRESS );
-    bs.Write( true );
-    bs.Write( target );
-    bs.Write( kForwardingTimeoutMs );
-    bs.Write( selectionBytes > 0 );
-    if( selectionBytes > 0 )
-    {
-        BitStream selection;
-        for( unsigned int i = 0; i < selectionBytes; i++ )
-            selection.Write( (unsigned char)i );
-        bs.Write( &selection );
-    }
-}
 
 // Neither is connected to the coordinator; a request by address allows that.
 SystemAddress UnconnectedTarget( unsigned int index )
@@ -717,7 +697,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
         std::vector<BitStream*> flood;
         for( unsigned int i = 0; i < requests.size(); i++ )
         {
-            WriteForwardingRequest( requests[i], UnconnectedTarget( i ) );
+            UDPProxyWire::WriteForwardingRequest( requests[i], UNASSIGNED_SYSTEM_ADDRESS, UnconnectedTarget( i ) );
             flood.push_back( &requests[i] );
         }
         MarkerInjection::Inject( requester, coordinator, flood );
@@ -735,7 +715,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
 
         // The plugin still serves another System
         BitStream otherRequest;
-        WriteForwardingRequest( otherRequest, UnconnectedTarget( 20 ) );
+        UDPProxyWire::WriteForwardingRequest( otherRequest, UNASSIGNED_SYSTEM_ADDRESS, UnconnectedTarget( 20 ) );
         MarkerInjection::Inject( other, coordinator, otherRequest );
         CHECK( coordinatorPlugin.RequestsFrom( otherAddress ) == 1 );
 
@@ -747,7 +727,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
     SECTION( "Server selection data over the cap is answered all servers busy" )
     {
         BitStream tooLong;
-        WriteForwardingRequest( tooLong, UnconnectedTarget( 0 ), 1025 );
+        UDPProxyWire::WriteForwardingRequest( tooLong, UNASSIGNED_SYSTEM_ADDRESS, UnconnectedTarget( 0 ), 1025 );
         MarkerInjection::Inject( requester, coordinator, tooLong );
         BitStream busy;
         REQUIRE( AwaitMessage( coordinator, requester, ID_UDP_PROXY_GENERAL, ID_UDP_PROXY_ALL_SERVERS_BUSY, busy ) );
@@ -755,7 +735,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
         CHECK( coordinatorPlugin.GetServerSelectionBitstreamsRefused() == 1 );
 
         BitStream atCap;
-        WriteForwardingRequest( atCap, UnconnectedTarget( 1 ), 1024 );
+        UDPProxyWire::WriteForwardingRequest( atCap, UNASSIGNED_SYSTEM_ADDRESS, UnconnectedTarget( 1 ), 1024 );
         MarkerInjection::Inject( requester, coordinator, atCap );
         CHECK( coordinatorPlugin.RequestsFrom( requesterAddress ) == 1 );
         CHECK( coordinatorPlugin.GetServerSelectionBitstreamsRefused() == 1 );

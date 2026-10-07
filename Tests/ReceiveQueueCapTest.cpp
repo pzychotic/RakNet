@@ -2,7 +2,6 @@
 #include "RawSystem.h"
 
 #include "ConnectionWaits.h"
-#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakNetDefines.h"
 #include "RakPeer.h"
@@ -159,33 +158,13 @@ private:
     bool m_waiting = false;
 };
 
-constexpr int kJunkDatagramBytes = 2;
-
-/// Two bytes that are no RakNet message: ProcessNetworkPacket treats them as offline and
-/// discards them, so a flood of them costs the update thread nothing once it runs.
-void WriteJunkDatagram( BitStream& datagram )
-{
-    datagram.Write( (MessageID)ID_USER_PACKET_ENUM );
-    datagram.Write( (MessageID)0 );
-    REQUIRE( datagram.GetNumberOfBytesUsed() == kJunkDatagramBytes );
-}
-
-/// An ID_UNCONNECTED_PING, field for field as RakPeer::Ping writes it.
-void WriteUnconnectedPing( BitStream& datagram )
-{
-    datagram.Write( (MessageID)ID_UNCONNECTED_PING );
-    datagram.Write( RakNet::GetTime() );
-    datagram.WriteAlignedBytes( RawSystemHarness::OFFLINE_MESSAGE_DATA_ID, sizeof( RawSystemHarness::OFFLINE_MESSAGE_DATA_ID ) );
-    datagram.Write( RakNetGUID( 0x5eed ) );
-}
-
 std::atomic<int> s_rejectedJunkDatagrams{ 0 };
 
 /// Counts only the junk datagrams the test sends. Startup's own bind-test datagram can still be
 /// waiting in the socket when the handler is installed, and is rejected uncounted.
 bool RejectEveryDatagram( RNS2RecvStruct* recvStruct )
 {
-    if( recvStruct->bytesRead == kJunkDatagramBytes )
+    if( recvStruct->bytesRead == RawSystem::kJunkDatagramBytes )
         ++s_rejectedJunkDatagrams;
     return false;
 }
@@ -202,13 +181,12 @@ TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_R
         UpdateThreadGate gate( &peer );
 
         // Batches, not one burst, so the receive thread keeps up and it is the cap that
-        // drops rather than the socket buffer. Until the cap has dropped something.
-        BitStream junk;
-        WriteJunkDatagram( junk );
+        // drops rather than the socket buffer. Until the cap has dropped something. Junk
+        // datagrams cost the update thread nothing once it runs.
         for( int batch = 0; batch < 64 && peer.GetReceivedDatagramsDroppedAtCap() == 0; ++batch )
         {
             for( int i = 0; i < MAX_BUFFERED_RECEIVED_DATAGRAMS / 16; ++i )
-                sender.Send( junk );
+                sender.SendJunkDatagram();
             std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
         }
         REQUIRE( ConnectionWaits::WaitUntil( [&] { return peer.GetReceivedDatagramsDroppedAtCap() > 0; }, kWaitBudgetMs ) );
@@ -218,7 +196,7 @@ TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_R
         // More arrivals are dropped as they come, and the queue stays where it is.
         const uint64_t droppedBefore = peer.GetReceivedDatagramsDroppedAtCap();
         for( int i = 0; i < 16; ++i )
-            sender.Send( junk );
+            sender.SendJunkDatagram();
         REQUIRE( ConnectionWaits::WaitUntil( [&] { return peer.GetReceivedDatagramsDroppedAtCap() >= droppedBefore + 16; }, kWaitBudgetMs ) );
         CHECK( peer.BufferedDatagrams() == (size_t)MAX_BUFFERED_RECEIVED_DATAGRAMS );
 
@@ -239,8 +217,6 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
     REQUIRE( ConnectionWaits::WaitUntil( [&] { return server->GetReceiveBufferSize() == 0; }, kWaitBudgetMs ) );
 
     RawSystem pinger( SystemAddress( "127.0.0.1", 30000 ), 0x52 );
-    BitStream ping;
-    WriteUnconnectedPing( ping );
 
     // Receive is not called on the server from here until the counts are read. The
     // client's Messages go out between the batches, so they arrive during the flood.
@@ -249,7 +225,7 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
     for( int batch = 0; batch < 64 && ( server->GetOfflineMessagesDroppedAtCap() == 0 || connectedSent < kConnectedMessages ); ++batch )
     {
         for( int i = 0; i < MAX_PENDING_OFFLINE_MESSAGES / 8; ++i )
-            pinger.Send( ping );
+            pinger.SendUnconnectedPing();
 
         for( int i = 0; i < kConnectedMessages / 20 && connectedSent < kConnectedMessages; ++i, ++connectedSent )
         {
@@ -290,7 +266,7 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
 
     // Draining frees the slots: the next ping is queued again.
     const uint64_t droppedBefore = server->GetOfflineMessagesDroppedAtCap();
-    pinger.Send( ping );
+    pinger.SendUnconnectedPing();
     REQUIRE( ConnectionWaits::WaitUntil( [&] { return server->GetReceiveBufferSize() == 1; }, kWaitBudgetMs ) );
     CHECK( server->GetOfflineMessagesDroppedAtCap() == droppedBefore );
 }
@@ -303,11 +279,9 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
     peer.SetIncomingDatagramEventHandler( &RejectEveryDatagram );
 
     RawSystem sender( peer.Address(), 0x53 );
-    BitStream junk;
-    WriteJunkDatagram( junk );
     const int kDatagrams = 100;
     for( int i = 0; i < kDatagrams; ++i )
-        sender.Send( junk );
+        sender.SendJunkDatagram();
 
     REQUIRE( ConnectionWaits::WaitUntil( [&] { return s_rejectedJunkDatagrams.load() == kDatagrams; }, kWaitBudgetMs ) );
     CHECK( ConnectionWaits::WaitUntil( [&] { return peer.BuffersOutstanding() == 1; }, kWaitBudgetMs ) );

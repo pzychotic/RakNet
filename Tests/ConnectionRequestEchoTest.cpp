@@ -1,4 +1,5 @@
 #include "PeerScope.h"
+#include "RawSystem.h"
 
 #include "BitStream.h"
 #include "CommonFunctions.h"
@@ -93,18 +94,6 @@ void WaitForBackdatingToBePossible()
         std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
 }
 
-// MessageID | RakNetGUID | RakNet::Time | doSecurity, field for field as
-// ProcessOfflineNetworkPacket writes it (RakPeer.cpp). Kept in that order so a
-// wire-format change shows up here as a diff. The trailing password bytes the
-// writer appends are omitted: this Peer connected without one.
-void WriteConnectionRequest( BitStream& out, RakNetGUID senderGuid, Time timestamp )
-{
-    out.Write( (MessageID)ID_CONNECTION_REQUEST );
-    out.Write( senderGuid );
-    out.Write( timestamp );
-    out.Write( (unsigned char)0 ); // doSecurity
-}
-
 // The send-ping time out of ID_CONNECTION_REQUEST_ACCEPTED, read with the same
 // sequence RakPeer::OnConnectionRequest writes and RunUpdateCycle reads back.
 // Offsets are never computed by hand here: SystemAddress has a serialised form
@@ -165,8 +154,9 @@ TEST_CASE( "A connection request arriving on an established connection is echoed
     BitStream request;
     // GetMyGUID, where the writer in Source/ spells the same thing
     // GetGuidFromSystemAddress( UNASSIGNED_SYSTEM_ADDRESS ). Same value, and the
-    // sentinel-address walk is an idiom a test should not depend on.
-    WriteConnectionRequest( request, client->GetMyGUID(), sentTimestamp );
+    // sentinel-address walk is an idiom a test should not depend on. No password: this
+    // Peer connected without one.
+    RawSystemHarness::WriteConnectionRequest( request, client->GetMyGUID(), sentTimestamp );
 
     // Addressed by GUID, not by address: Send treats one of our own addresses as a
     // loopback send and would push this onto the client's own receive queue.

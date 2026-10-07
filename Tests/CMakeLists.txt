@@ -149,6 +149,7 @@ set( RAKNET_TEST_SUPPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorScope.h
     ${CMAKE_CURRENT_SOURCE_DIR}/TestHelpers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/TestHelpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyWire.h
     ${CMAKE_CURRENT_SOURCE_DIR}/WinsockScope.h
 )
 

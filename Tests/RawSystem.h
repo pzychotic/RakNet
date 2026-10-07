@@ -47,6 +47,19 @@ constexpr int kHandshakeBudgetMs = 5000;
 // spell it out; kept byte for byte against that one.
 const unsigned char OFFLINE_MESSAGE_DATA_ID[16] = { 0x00, 0xFF, 0xFF, 0x00, 0xFE, 0xFE, 0xFE, 0xFE, 0xFD, 0xFD, 0xFD, 0xFD, 0x12, 0x34, 0x56, 0x78 };
 
+/// ID_CONNECTION_REQUEST: MessageID | RakNetGUID | RakNet::Time | doSecurity | password,
+/// field for field as ProcessOfflineNetworkPacket writes it (RakPeer.cpp), and in that
+/// order so a wire-format change shows up here as a diff.
+inline void WriteConnectionRequest( BitStream& out, RakNetGUID senderGuid, RakNet::Time timestamp, const char* password = nullptr, int passwordLength = 0 )
+{
+    out.Write( (MessageID)ID_CONNECTION_REQUEST );
+    out.Write( senderGuid );
+    out.Write( timestamp );
+    out.Write( (unsigned char)0 ); // doSecurity
+    if( passwordLength > 0 )
+        out.WriteAlignedBytes( (const unsigned char*)password, (unsigned int)passwordLength );
+}
+
 /// Whether any message in a datagram starts with \a messageId, mirroring
 /// ReliabilityLayer::CreateInternalPacketFromBitStream far enough to walk from one
 /// message to the next. False for an ACK or NAK datagram, which carries no message at all.
@@ -362,13 +375,35 @@ public:
     void SendConnectionRequest( const char* password, int passwordLength )
     {
         BitStream request;
-        request.Write( (MessageID)ID_CONNECTION_REQUEST );
-        request.Write( RakNetGUID( m_guid ) );
-        request.Write( RakNet::GetTime() );
-        request.Write( (unsigned char)0 ); // doSecurity
-        if( passwordLength > 0 )
-            request.WriteAlignedBytes( (const unsigned char*)password, (unsigned int)passwordLength );
+        WriteConnectionRequest( request, RakNetGUID( m_guid ), RakNet::GetTime(), password, passwordLength );
         SendUnreliable( request );
+    }
+
+    /// The length of the datagram SendJunkDatagram sends, which is how a datagram handler
+    /// tells it apart.
+    static constexpr int kJunkDatagramBytes = 2;
+
+    /// Two bytes that are no RakNet message: ProcessNetworkPacket treats them as offline
+    /// and discards them.
+    void SendJunkDatagram()
+    {
+        BitStream junk;
+        junk.Write( (MessageID)ID_USER_PACKET_ENUM );
+        junk.Write( (MessageID)0 );
+        REQUIRE( junk.GetNumberOfBytesUsed() == kJunkDatagramBytes );
+        Send( junk );
+    }
+
+    /// An ID_UNCONNECTED_PING, field for field as RakPeer::Ping writes it. The Peer passes
+    /// it to Receive.
+    void SendUnconnectedPing()
+    {
+        BitStream ping;
+        ping.Write( (MessageID)ID_UNCONNECTED_PING );
+        ping.Write( RakNet::GetTime() );
+        ping.WriteAlignedBytes( OFFLINE_MESSAGE_DATA_ID, sizeof( OFFLINE_MESSAGE_DATA_ID ) );
+        ping.Write( RakNetGUID( m_guid ) );
+        Send( ping );
     }
 
     /// The OS-assigned port, which is how the server knows this System.
