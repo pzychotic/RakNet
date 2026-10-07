@@ -1,14 +1,10 @@
-#include "PeerScope.h"
 #include "ReliabilityLayerHarness.h"
-#include "WinsockScope.h"
 
 #include "RakMemoryOverride.h"
 #include "ReliabilityLayer.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-
-#include <cstring>
 
 /*
 Drives ReliabilityLayer's split-packet reassembly path with hand-built datagrams,
@@ -58,8 +54,8 @@ using SplitChunk = WireMessage;
 ///
 /// SetMalloc_Ex is RakNet's own documented hook, so this drives the real allocator
 /// rather than a test-only seam. It is global and not thread-safe, so every case below
-/// installs it with no RakNet thread running: no Peer at all, and a BoundSocket where the
-/// layer needs one. The one that injects a failure fails an *exact* byte count - a size
+/// installs it with no RakNet thread running: no Peer at all, and the layer's own
+/// BoundSocket starts none. The one that injects a failure fails an *exact* byte count - a size
 /// nothing else the layer allocates asks for - rather than everything above a threshold.
 class MallocProbe
 {
@@ -109,41 +105,6 @@ private:
 void* ( *MallocProbe::s_previous )( size_t, const char*, unsigned int ) = nullptr;
 size_t MallocProbe::s_largest = 0;
 size_t MallocProbe::s_failSize = 0;
-
-/// A UDP socket bound on loopback with no polling thread, for a layer that has to send.
-/// Nothing reads it, and it starts no RakNet thread, unlike a started Peer's socket.
-class BoundSocket
-{
-public:
-    BoundSocket()
-    {
-        char hostAddress[] = "127.0.0.1";
-
-        RNS2_BerkleyBindParameters bindParameters;
-        memset( &bindParameters, 0, sizeof( bindParameters ) );
-        bindParameters.port = 0;
-        bindParameters.hostAddress = hostAddress;
-        bindParameters.addressFamily = AF_INET;
-        bindParameters.type = SOCK_DGRAM;
-        bindParameters.protocol = 0;
-        bindParameters.nonBlockingSocket = false;
-        bindParameters.eventHandler = 0;
-
-        m_bound = m_socket.Bind( &bindParameters, _FILE_AND_LINE_ ) == BR_SUCCESS;
-    }
-
-    BoundSocket( const BoundSocket& ) = delete;
-    BoundSocket& operator=( const BoundSocket& ) = delete;
-
-    /// The socket, or null if it could not be bound.
-    RakNetSocket2* Get() { return m_bound ? &m_socket : nullptr; }
-
-private:
-    // No RakPeer holds Winsock for this socket. First, so it outlives the socket.
-    WinsockScope m_winsock;
-    RNS2_Berkley m_socket;
-    bool m_bound = false;
-};
 
 // What a channel at exactly the cap costs: one pointer per chunk.
 constexpr size_t kCapCost = sizeof( InternalPacket* ) * (size_t)MAXIMUM_SPLIT_PACKET_COUNT;
@@ -225,8 +186,6 @@ TEST_CASE( "A split packet count above the cap is dropped without allocating", "
 
     SECTION( "nothing is allocated for it" )
     {
-        // No Peer in this section: the probe is global, so nothing else in the process
-        // may be allocating through RakNet while it is installed.
         LayerUnderTest layer;
 
         size_t largest = 0;
@@ -248,11 +207,7 @@ TEST_CASE( "A split packet count above the cap is dropped without allocating", "
         // the probe does not see". This can: an accepted chunk would have opened a
         // 65,537-slot channel under kSplitPacketId, and the ordinary two-chunk message
         // that follows would land in that channel and never complete it.
-        PeerScope peers;
-        RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-        REQUIRE( socket != nullptr );
-
-        LayerUnderTest layer( socket );
+        LayerUnderTest layer;
 
         CHECK( layer.DeliverChunk( chunk ) );
 
@@ -278,8 +233,6 @@ TEST_CASE( "An enormous split packet count is dropped rather than allocated", "[
 
     SECTION( "nothing is allocated for it" )
     {
-        // No Peer in this section: the probe is global, so nothing else in the process
-        // may be allocating through RakNet while it is installed.
         LayerUnderTest layer;
 
         size_t largest = 0;
@@ -296,14 +249,7 @@ TEST_CASE( "An enormous split packet count is dropped rather than allocated", "[
 
     SECTION( "the layer stays up and still reassembles afterwards" )
     {
-        // Completing a message acks immediately, which needs a socket. A started Peer's
-        // own socket is the least ceremonious way to get one; the address the layer sends
-        // to is a port nothing is listening on, so the traffic goes nowhere.
-        PeerScope peers;
-        RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-        REQUIRE( socket != nullptr );
-
-        LayerUnderTest layer( socket );
+        LayerUnderTest layer;
 
         CHECK( layer.DeliverChunk( chunk ) );
         CHECK( layer.ReceiveBits() == 0 );
@@ -321,13 +267,7 @@ TEST_CASE( "A chunk disagreeing with its channel's split packet count is dropped
     // datagrams that each pass every parse gate, and are each under
     // MAXIMUM_SPLIT_PACKET_COUNT, put SortedSplittedPackets::Add far past the end of an
     // array it sized from the first of them. The cap does not close this.
-    //
-    // Completing the well-formed message at the end acks, which needs a socket.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( socket != nullptr );
-
-    LayerUnderTest layer( socket );
+    LayerUnderTest layer;
 
     // Sizes the channel at two slots.
     SplitChunk first;
@@ -373,15 +313,7 @@ TEST_CASE( "A failed channel allocation drops the datagram instead of the proces
     //
     // The chunk is at the cap, so its channel array is exactly kCapCost bytes, and the
     // probe fails that one exact size.
-    //
-    // Completing a message acks immediately, which needs a socket. A BoundSocket starts no
-    // thread that could call the probe while it is installed. The address the layer sends
-    // to is a port nothing is listening on, so the traffic goes nowhere.
-    BoundSocket boundSocket;
-    RakNetSocket2* socket = boundSocket.Get();
-    REQUIRE( socket != nullptr );
-
-    LayerUnderTest layer( socket );
+    LayerUnderTest layer;
 
     SplitChunk chunk;
     chunk.splitPacketCount = MAXIMUM_SPLIT_PACKET_COUNT;
@@ -408,13 +340,6 @@ TEST_CASE( "A split packet channel that stalls is reaped, whatever its reliabili
     const PacketReliability reliability = GENERATE( UNRELIABLE, UNRELIABLE_SEQUENCED, RELIABLE,
                                                     RELIABLE_ORDERED, RELIABLE_SEQUENCED );
 
-    // Update needs a real socket to flush acks through. A started Peer's own socket is
-    // the least ceremonious way to get one; the address the layer sends to is a port
-    // nothing is listening on, so the traffic goes nowhere.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( socket != nullptr );
-
     SplitChunk first;
     first.reliability = reliability;
     first.reliableMessageNumber = 0;
@@ -431,7 +356,7 @@ TEST_CASE( "A split packet channel that stalls is reaped, whatever its reliabili
     {
         // The control. Without it, the reaped case below could pass because the fixture
         // never delivers anything at all.
-        LayerUnderTest layer( socket );
+        LayerUnderTest layer;
 
         CHECK( layer.DeliverChunk( first ) );
         CHECK( layer.ReceiveBits() == 0 );
@@ -442,7 +367,7 @@ TEST_CASE( "A split packet channel that stalls is reaped, whatever its reliabili
 
     SECTION( "the second chunk after the timeout finds nothing to complete" )
     {
-        LayerUnderTest layer( socket );
+        LayerUnderTest layer;
 
         CHECK( layer.DeliverChunk( first ) );
         CHECK( layer.ReceiveBits() == 0 );
@@ -472,15 +397,7 @@ TEST_CASE( "A partial split message reports download progress only when an inter
     // AssignSystemAddressToRemoteSystemList, which pushes the interval in right after
     // Reset, made a RakPeer connection defined. InitializeVariables now sets it to the
     // documented default of 0, so the default is the layer's rather than the caller's.
-    //
-    // Completing the message at the end acks, which needs a socket. A started Peer's own
-    // socket is the least ceremonious way to get one; the address the layer sends to is a
-    // port nothing is listening on, so the traffic goes nowhere.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( socket != nullptr );
-
-    LayerUnderTest layer( socket );
+    LayerUnderTest layer;
 
     // Three chunks, so there are two arrivals that leave the message incomplete - enough
     // for an interval of 1 to fire twice, and for an interval of 2 to fire once.

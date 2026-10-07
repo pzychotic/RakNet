@@ -364,9 +364,7 @@ TEST_CASE( "A Peer restarted on a Refused System's port gets in although the ref
         refused.CompleteOfflineHandshake();
         refused.SendConnectionRequest( kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) );
 
-        char refusal[MAXIMUM_MTU_SIZE];
-        int refusalLength = 0;
-        REQUIRE( refused.WaitForMessage( ID_INVALID_PASSWORD, RawSystem::Framing::Connected, static_cast<int>( kRefusalArrivalBudgetMs ), refusal, refusalLength ) );
+        REQUIRE( refused.WaitForMessage( ID_INVALID_PASSWORD, RawSystem::Framing::Connected, static_cast<int>( kRefusalArrivalBudgetMs ) ) );
 
         refusedPort = refused.GetBoundPort();
     }

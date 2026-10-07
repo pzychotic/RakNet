@@ -20,7 +20,8 @@
  *          ...
  *      }
  *
- *  RawSystem holds one, so a test built on a RawSystem needs none of its own.
+ *  BoundSocket holds one, so a test built on a RawSystem or a LayerUnderTest needs
+ *  none of its own.
  */
 class WinsockScope
 {

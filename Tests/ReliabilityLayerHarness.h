@@ -5,7 +5,11 @@
 #include "RakMemoryOverride.h"
 #include "RakNetSocket2.h"
 #include "ReliabilityLayer.h"
+#include "WinsockScope.h"
 
+#include <catch2/catch_test_macros.hpp>
+
+#include <cstring>
 #include <vector>
 
 /*
@@ -137,13 +141,52 @@ inline void WriteWireMessage( BitStream& out, const WireMessage& message )
 // Harness
 // ---------------------------------------------------------------------------
 
+/// A UDP socket bound on loopback at an OS-assigned port, with no polling thread: every
+/// read from it is explicit, and it starts no RakNet thread, unlike a started Peer's
+/// socket.
+class BoundSocket
+{
+public:
+    BoundSocket()
+    {
+        char hostAddress[] = "127.0.0.1";
+
+        RNS2_BerkleyBindParameters bindParameters;
+        memset( &bindParameters, 0, sizeof( bindParameters ) );
+        bindParameters.port = 0;
+        bindParameters.hostAddress = hostAddress;
+        bindParameters.addressFamily = AF_INET;
+        bindParameters.type = SOCK_DGRAM;
+        bindParameters.protocol = 0;
+        bindParameters.nonBlockingSocket = false;
+        bindParameters.eventHandler = 0;
+
+        REQUIRE( m_socket.Bind( &bindParameters, _FILE_AND_LINE_ ) == BR_SUCCESS );
+    }
+
+    BoundSocket( const BoundSocket& ) = delete;
+    BoundSocket& operator=( const BoundSocket& ) = delete;
+
+    RNS2_Berkley& Get() { return m_socket; }
+    const RNS2_Berkley& Get() const { return m_socket; }
+
+private:
+    // No RakPeer holds Winsock for this socket. First, so it outlives the socket.
+    WinsockScope m_winsock;
+    RNS2_Berkley m_socket;
+};
+
 /// A ReliabilityLayer plus the arguments its public entry points demand, so a test
 /// body reads as Deliver()/Tick()/Receive() and nothing else.
+///
+/// The layer sends through a BoundSocket of its own - acks once a message completes,
+/// acks and resends on Update - to kUnusedPeerPort, so the traffic goes nowhere. It
+/// starts no RakNet thread.
 class LayerUnderTest
 {
 public:
-    explicit LayerUnderTest( RakNetSocket2* socket = nullptr )
-    : m_socket( socket )
+    LayerUnderTest()
+    : m_socket( &m_boundSocket.Get() )
     , m_address( "127.0.0.1", kUnusedPeerPort )
     {
         ResetForReuse();
@@ -234,6 +277,7 @@ public:
     ReliabilityLayer& Layer() { return m_layer; }
 
 private:
+    BoundSocket m_boundSocket;
     ReliabilityLayer m_layer;
     RakNetSocket2* m_socket;
     SystemAddress m_address;

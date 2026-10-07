@@ -2,7 +2,6 @@
 
 #include "ConnectionWaits.h"
 #include "ReliabilityLayerHarness.h"
-#include "WinsockScope.h"
 
 #include "BitStream.h"
 #include "GetTime.h"
@@ -11,11 +10,12 @@
 #include "RakNetSocket2.h"
 #include "RakNetTypes.h"
 #include "RakNetVersion.h"
+#include "RakPeerInterface.h"
 #include "SocketDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstring>
+#include <initializer_list>
 #include <vector>
 
 /*
@@ -38,8 +38,9 @@ namespace RawSystemHarness {
 using namespace RakNet;
 using ReliabilityLayerHarness::WireMessage;
 
-// One handshake datagram out, one reply back, no retries. Generous by two orders of
-// magnitude, and a hang guard rather than a tuning knob.
+// One handshake datagram out, one reply back, no retries; or the server's next update
+// cycle reporting the result. Generous by two orders of magnitude, and a hang guard
+// rather than a tuning knob.
 constexpr int kHandshakeBudgetMs = 5000;
 
 // The 16-byte cookie every offline handshake message carries. Its only declaration in
@@ -159,23 +160,11 @@ inline bool DatagramCarriesMessage( const char* data, int length, MessageID mess
 class RawSystem
 {
 public:
+    /// The port is OS-assigned; the server reads it off the datagram.
     RawSystem( const SystemAddress& serverAddress, uint64_t guid )
     : m_serverAddress( serverAddress )
     , m_guid( guid )
     {
-        char hostAddress[] = "127.0.0.1";
-
-        RNS2_BerkleyBindParameters bindParameters;
-        memset( &bindParameters, 0, sizeof( bindParameters ) );
-        bindParameters.port = 0; // OS-assigned; the server reads it off the datagram
-        bindParameters.hostAddress = hostAddress;
-        bindParameters.addressFamily = AF_INET;
-        bindParameters.type = SOCK_DGRAM;
-        bindParameters.protocol = 0;
-        bindParameters.nonBlockingSocket = false;
-        bindParameters.eventHandler = 0; // No polling thread: every read here is explicit
-
-        REQUIRE( m_socket.Bind( &bindParameters, _FILE_AND_LINE_ ) == BR_SUCCESS );
     }
 
     void Send( const BitStream& datagram )
@@ -185,7 +174,7 @@ public:
         sendParameters.length = (int)datagram.GetNumberOfBytesUsed();
         sendParameters.systemAddress = m_serverAddress;
 
-        REQUIRE( m_socket.Send( &sendParameters, _FILE_AND_LINE_ ) == (RNS2SendResult)sendParameters.length );
+        REQUIRE( m_socket.Get().Send( &sendParameters, _FILE_AND_LINE_ ) == (RNS2SendResult)sendParameters.length );
     }
 
     /// One connected datagram carrying \a messages, with the next datagram number.
@@ -219,30 +208,6 @@ public:
         Connected
     };
 
-    /// The next datagram to arrive, or false once millisecondsToWait is spent.
-    bool WaitForDatagram( int millisecondsToWait, char* dataOut, int& lengthOut )
-    {
-        timeval timeout;
-        timeout.tv_sec = (long)( millisecondsToWait / 1000 );
-        timeout.tv_usec = (long)( ( millisecondsToWait % 1000 ) * 1000 );
-
-        fd_set readable;
-        FD_ZERO( &readable );
-        FD_SET( m_socket.GetSocket(), &readable );
-
-        if( select__( (int)m_socket.GetSocket() + 1, &readable, 0, 0, &timeout ) <= 0 )
-            return false;
-
-        sockaddr_storage from;
-        socklen_t fromLength = sizeof( from );
-        const int received = recvfrom__( m_socket.GetSocket(), dataOut, MAXIMUM_MTU_SIZE, 0, (sockaddr*)&from, &fromLength );
-        if( received <= 0 )
-            return false;
-
-        lengthOut = received;
-        return true;
-    }
-
     /// Whether an offline message is the server refusing the handshake. Nothing follows a
     /// refusal, so a wait for the next handshake reply has already failed when one arrives.
     static bool IsHandshakeRefusal( MessageID messageId )
@@ -252,34 +217,38 @@ public:
                messageId == ID_INCOMPATIBLE_PROTOCOL_VERSION;
     }
 
-    /// The next datagram carrying this message id, or false once the budget is spent.
-    /// Anything else is discarded and the wait continues: the server resends handshake
-    /// replies, and none of them are what a caller here is waiting for. An Offline wait
-    /// ends early, and false, on a handshake refusal, which is left in dataOut.
-    bool WaitForMessage( MessageID messageId, Framing framing, int millisecondsToWait, char* dataOut, int& lengthOut )
+    /// Whether the next datagram carrying any of these message ids arrives before the
+    /// budget is spent. Anything else is discarded and the wait continues: the server
+    /// resends handshake replies, and none of them are what a caller here is waiting for.
+    /// An Offline wait ends early, and false, on a handshake refusal.
+    bool WaitForMessage( std::initializer_list<MessageID> messageIds, Framing framing, int millisecondsToWait )
     {
         const RakNet::TimeMS deadline = RakNet::GetTimeMS() + (RakNet::TimeMS)millisecondsToWait;
+        m_received[0] = 0;
+        m_receivedLength = 0;
 
         while( !ConnectionWaits::Expired( deadline ) )
         {
             const int remaining = (int)( deadline - RakNet::GetTimeMS() );
-            if( WaitForDatagram( remaining, dataOut, lengthOut ) == false )
+            if( WaitForDatagram( remaining ) == false )
                 return false;
 
-            if( framing == Framing::Offline )
+            for( MessageID messageId : messageIds )
             {
-                if( (unsigned char)dataOut[0] == messageId )
+                if( framing == Framing::Offline ? (MessageID)m_received[0] == messageId
+                                                : DatagramCarriesMessage( m_received, m_receivedLength, messageId ) )
                     return true;
-                if( IsHandshakeRefusal( (MessageID)dataOut[0] ) )
-                    return false;
             }
-            else if( DatagramCarriesMessage( dataOut, lengthOut, messageId ) )
-            {
-                return true;
-            }
+            if( framing == Framing::Offline && IsHandshakeRefusal( (MessageID)m_received[0] ) )
+                return false;
         }
 
         return false;
+    }
+
+    bool WaitForMessage( MessageID messageId, Framing framing, int millisecondsToWait )
+    {
+        return WaitForMessage( { messageId }, framing, millisecondsToWait );
     }
 
     /// ID_OPEN_CONNECTION_REQUEST_1 and _2 and their replies, field for field as
@@ -301,11 +270,9 @@ public:
         request1.PadWithZeroToByteLength( MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
         Send( request1 );
 
-        char reply1[MAXIMUM_MTU_SIZE];
-        int reply1Length = 0;
-        REQUIRE( WaitForMessage( ID_OPEN_CONNECTION_REPLY_1, Framing::Offline, kHandshakeBudgetMs, reply1, reply1Length ) );
+        REQUIRE( WaitForMessage( ID_OPEN_CONNECTION_REPLY_1, Framing::Offline, kHandshakeBudgetMs ) );
 
-        BitStream reply1Stream( (unsigned char*)reply1, (unsigned int)reply1Length, false );
+        BitStream reply1Stream( (unsigned char*)m_received, (unsigned int)m_receivedLength, false );
         reply1Stream.IgnoreBytes( sizeof( MessageID ) );
         reply1Stream.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
 
@@ -330,10 +297,8 @@ public:
 
         // A record the server still holds for this port under another GUID is refused here
         // with ID_ALREADY_CONNECTED, so the port is part of the report.
-        char reply2[MAXIMUM_MTU_SIZE] = {};
-        int reply2Length = 0;
-        const bool replied = WaitForMessage( ID_OPEN_CONNECTION_REPLY_2, Framing::Offline, kHandshakeBudgetMs, reply2, reply2Length );
-        INFO( "from port " << GetBoundPort() << ", the last offline message id was " << (int)(unsigned char)reply2[0] );
+        const bool replied = WaitForMessage( ID_OPEN_CONNECTION_REPLY_2, Framing::Offline, kHandshakeBudgetMs );
+        INFO( "from port " << GetBoundPort() << ", the last offline message id was " << (int)(unsigned char)m_received[0] );
         REQUIRE( replied );
     }
 
@@ -342,23 +307,42 @@ public:
     /// ID_NEW_INCOMING_CONNECTION, field for field as RakPeer writes and reads them. Sent
     /// UNRELIABLE, which the server does not check, so nothing here waits for an ack.
     ///
-    /// The server reports ID_NEW_INCOMING_CONNECTION to its application once this lands;
-    /// waiting for that is the caller's, since only the caller holds the server.
-    void CompleteConnection()
+    /// Returns once \a server reports this System's ID_NEW_INCOMING_CONNECTION to its
+    /// application, and every Message queued ahead of it is gone.
+    void CompleteConnection( RakPeerInterface* server )
     {
         CompleteOfflineHandshake();
         CompleteConnectionRequest();
+
+        REQUIRE( ConnectionWaits::WaitForMessage( server, ID_NEW_INCOMING_CONNECTION, kHandshakeBudgetMs,
+                                                  [this]( const Packet& packet ) { return packet.guid == RakNetGUID( m_guid ); } ) );
     }
 
-    /// The part of CompleteConnection after CompleteOfflineHandshake, for a caller that
-    /// wants the Half-open record to exist a while before it goes on.
+    /// The address \a server holds this System's record under, once the record exists.
+    ///
+    /// The server sends ID_OPEN_CONNECTION_REPLY_2 during an update cycle and publishes the
+    /// record only at the cycle's end, so after CompleteOfflineHandshake returns the record
+    /// may not be visible yet.
+    SystemAddress WaitForServerRecord( RakPeerInterface* server )
+    {
+        SystemAddress address = UNASSIGNED_SYSTEM_ADDRESS;
+        REQUIRE( ConnectionWaits::WaitUntil(
+            [&] {
+                address = server->GetSystemAddressFromGuid( RakNetGUID( m_guid ) );
+                return address != UNASSIGNED_SYSTEM_ADDRESS;
+            },
+            kHandshakeBudgetMs ) );
+        return address;
+    }
+
+    /// What CompleteConnection sends after CompleteOfflineHandshake, without its wait on
+    /// the server, for a caller that wants the Half-open record to exist a while before
+    /// it goes on.
     void CompleteConnectionRequest()
     {
         SendConnectionRequest( nullptr, 0 );
 
-        char accepted[MAXIMUM_MTU_SIZE];
-        int acceptedLength = 0;
-        REQUIRE( WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, Framing::Connected, kHandshakeBudgetMs, accepted, acceptedLength ) );
+        REQUIRE( WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, Framing::Connected, kHandshakeBudgetMs ) );
 
         BitStream newIncoming;
         newIncoming.Write( (MessageID)ID_NEW_INCOMING_CONNECTION );
@@ -407,15 +391,43 @@ public:
     }
 
     /// The OS-assigned port, which is how the server knows this System.
-    unsigned short GetBoundPort() const { return m_socket.GetBoundAddress().GetPort(); }
+    unsigned short GetBoundPort() const { return m_socket.Get().GetBoundAddress().GetPort(); }
 
 private:
-    // No RakPeer holds Winsock for this socket. First, so it outlives the socket.
-    WinsockScope m_winsock;
-    RNS2_Berkley m_socket;
+    /// The next datagram to arrive, into m_received, or false once millisecondsToWait is
+    /// spent.
+    bool WaitForDatagram( int millisecondsToWait )
+    {
+        const RNS2Socket socket = m_socket.Get().GetSocket();
+
+        timeval timeout;
+        timeout.tv_sec = (long)( millisecondsToWait / 1000 );
+        timeout.tv_usec = (long)( ( millisecondsToWait % 1000 ) * 1000 );
+
+        fd_set readable;
+        FD_ZERO( &readable );
+        FD_SET( socket, &readable );
+
+        if( select__( (int)socket + 1, &readable, 0, 0, &timeout ) <= 0 )
+            return false;
+
+        sockaddr_storage from;
+        socklen_t fromLength = sizeof( from );
+        const int received = recvfrom__( socket, m_received, sizeof( m_received ), 0, (sockaddr*)&from, &fromLength );
+        if( received <= 0 )
+            return false;
+
+        m_receivedLength = received;
+        return true;
+    }
+
+    ReliabilityLayerHarness::BoundSocket m_socket;
     SystemAddress m_serverAddress;
     uint64_t m_guid;
     DatagramSequenceNumberType m_datagramNumber = 0;
+    // The last datagram WaitForDatagram read.
+    char m_received[MAXIMUM_MTU_SIZE];
+    int m_receivedLength = 0;
 };
 
 } // namespace RawSystemHarness

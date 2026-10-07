@@ -271,14 +271,8 @@ TEST_CASE( "What a stalled split channel held is released when it is reaped", "[
 {
     // Charges are released wherever a channel is freed, not only on reassembly and close. A
     // reaped channel that kept its charge would shrink the budget for good.
-    //
-    // Update acks what arrived, which needs a socket.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( socket != nullptr );
-
     ReliabilityBufferBudget peerBudget;
-    LayerUnderTest layer( socket );
+    LayerUnderTest layer;
     peerBudget.Attach( &layer.Layer() );
 
     CHECK( layer.DeliverChunk( WidestChannelChunk( kSplitPacketId, RELIABLE, 0 ) ) );
@@ -297,11 +291,7 @@ TEST_CASE( "A System closed at its byte budget cannot keep the connection alive 
     // notification or the ack timeout gives up. That timeout runs from the last datagram to
     // arrive, so a System that kept sending without acknowledging would never reach it. Real
     // time rather than simulated: the layer stamps arrivals from the real clock.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( socket != nullptr );
-
-    LayerUnderTest layer( socket );
+    LayerUnderTest layer;
     layer.Layer().SetConnectionByteBudget( 1 ); // Anything held closes it
 
     WireMessage aheadOfTheReadIndex = UnsplitMessage( RELIABLE_ORDERED, 0 );
@@ -331,16 +321,11 @@ TEST_CASE( "At the Peer-wide byte budget the heaviest connection is closed, not 
     // Room for four widest channels and a little more, but not five.
     constexpr uint64_t kPeerBudget = 4 * ( kWidestChannelCost + kOneByteChunkCost ) + kWidestChannelCost / 2;
 
-    // Completing a message acks, which needs a socket.
-    PeerScope peers;
-    RakNetSocket2* socket = peers.Client()->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
-    REQUIRE( socket != nullptr );
-
     // Declared first, so the layers are destroyed - and release what they hold - while it
     // still exists.
     ReliabilityBufferBudget peerBudget( kPeerBudget );
-    LayerUnderTest heavy( socket );
-    LayerUnderTest light( socket );
+    LayerUnderTest heavy;
+    LayerUnderTest light;
     peerBudget.Attach( &heavy.Layer() );
     peerBudget.Attach( &light.Layer() );
 
@@ -402,8 +387,8 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
 
     constexpr unsigned short kServerPort = 30000;
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF12345679ull;
-    // Hang guard for each wait below: the connection, the first lost report, and the
-    // disconnection notification.
+    // Hang guard for each wait below: the first lost report and the disconnection
+    // notification.
     constexpr RakNet::TimeMS kBudgetMs = 5000;
     // How long the test keeps receiving after the first lost report, for a second one.
     constexpr RakNet::TimeMS kSecondReportWindowMs = 1000;
@@ -412,16 +397,7 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
     RakPeerInterface* server = peers.Server( kServerPort );
 
     RawSystem rawSystem( SystemAddress( "127.0.0.1", kServerPort ), kRawSystemGuid );
-    rawSystem.CompleteConnection();
-
-    bool connected = false;
-    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + kBudgetMs; !connected && !ConnectionWaits::Expired( deadline ); )
-    {
-        for( Packet* packet = server->Receive(); packet != nullptr; server->DeallocatePacket( packet ), packet = server->Receive() )
-            connected = connected || packet->data[0] == ID_NEW_INCOMING_CONNECTION;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-    REQUIRE( connected );
+    rawSystem.CompleteConnection( server );
 
     // Reliable chunks, each opening a widest channel, until the default budget is passed.
     // Everything the System sent before was unreliable, so its reliable message numbers
@@ -447,9 +423,7 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
     }
     CHECK( lostReports == 1 );
 
-    char datagram[MAXIMUM_MTU_SIZE];
-    int datagramLength = 0;
-    CHECK( rawSystem.WaitForMessage( ID_DISCONNECTION_NOTIFICATION, RawSystem::Framing::Connected, kBudgetMs, datagram, datagramLength ) );
+    CHECK( rawSystem.WaitForMessage( ID_DISCONNECTION_NOTIFICATION, RawSystem::Framing::Connected, kBudgetMs ) );
 }
 
 TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" )
@@ -459,7 +433,7 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
     constexpr unsigned short kServerPort = 30000;
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF1234567Aull;
     constexpr unsigned int kChunks = 20;
-    // Hang guard for each wait below: the System's record, and the Peer reading every chunk.
+    // Hang guard for the Peer reading every chunk.
     constexpr RakNet::TimeMS kBudgetMs = 5000;
 
     PeerScope peers;
@@ -479,16 +453,7 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
     WriteWireMessage( sample, WidestChannelChunk( 0, UNRELIABLE, 0 ) );
     const uint64_t bytesSent = (uint64_t)kChunks * sample.GetNumberOfBytesUsed();
 
-    // The Peer sends ID_OPEN_CONNECTION_REPLY_2 during an update cycle and publishes the
-    // System's record only at the cycle's end, so the reply can arrive before the record.
-    SystemAddress rawAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    ConnectionWaits::WaitUntil(
-        [&] {
-            rawAddress = server->GetSystemAddressFromGuid( RakNetGUID( kRawSystemGuid ) );
-            return rawAddress != UNASSIGNED_SYSTEM_ADDRESS;
-        },
-        kBudgetMs );
-    REQUIRE( rawAddress != UNASSIGNED_SYSTEM_ADDRESS );
+    const SystemAddress rawAddress = rawSystem.WaitForServerRecord( server );
 
     RakNetStatistics statistics;
     REQUIRE( ConnectionWaits::WaitUntil(

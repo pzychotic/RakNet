@@ -104,9 +104,7 @@ TEST_CASE( "A truncated connection request from an unverified sender draws no re
     // back, carrying an echoed timestamp read from nothing. Stated as "not that message"
     // rather than "no datagram at all" so that a Peer which one day answers a stranger
     // with something honest - an error, a disconnection - would not fail it.
-    char reply[MAXIMUM_MTU_SIZE];
-    int replyLength = 0;
-    CHECK_FALSE( rawSystem.WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, RawSystem::Framing::Connected, static_cast<int>( kReplyWindowMs ), reply, replyLength ) );
+    CHECK_FALSE( rawSystem.WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, RawSystem::Framing::Connected, static_cast<int>( kReplyWindowMs ) ) );
 
     // And the sender is turned away rather than merely unanswered. UNVERIFIED_SENDER is the
     // state in which a Peer decides whether a stranger is talking sense, and a first message

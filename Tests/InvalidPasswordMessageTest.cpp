@@ -195,18 +195,9 @@ TEST_CASE( "Connection requests are checked against a password that changes as t
         requester.CompleteOfflineHandshake();
         requester.SendConnectionRequest( kServerPassword, (int)strlen( kServerPassword ) );
 
-        const TimeMS deadline = GetTimeMS() + kRejectBudgetMs;
-        char data[MAXIMUM_MTU_SIZE];
-        int length = 0;
-        while( !ConnectionWaits::Expired( deadline ) && requester.WaitForDatagram( (int)( deadline - GetTimeMS() ), data, length ) )
-        {
-            if( RawSystemHarness::DatagramCarriesMessage( data, length, ID_CONNECTION_REQUEST_ACCEPTED ) ||
-                RawSystemHarness::DatagramCarriesMessage( data, length, ID_INVALID_PASSWORD ) )
-            {
-                ++answered;
-                break;
-            }
-        }
+        if( requester.WaitForMessage( { ID_CONNECTION_REQUEST_ACCEPTED, ID_INVALID_PASSWORD }, RawSystemHarness::RawSystem::Framing::Connected,
+                                      kRejectBudgetMs ) )
+            ++answered;
     }
 
     churning = false;
