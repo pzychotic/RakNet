@@ -38,7 +38,6 @@ RakPeerInterface functions explicitly tested:
 
 using namespace RakNet;
 using RawSystemHarness::RawSystem;
-using RawSystemHarness::WinsockFixture;
 
 namespace {
 
@@ -229,7 +228,6 @@ TEST_CASE( "SetUserUpdateThread returns only once the callback it replaces has e
 
 TEST_CASE( "SetIncomingDatagramEventHandler returns only once the handler it replaces has exited", "[network]" )
 {
-    WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* peer = peers.Client();
     RawSystem sender( LoopbackAddressOf( peer ), 0x61 );
@@ -267,7 +265,6 @@ TEST_CASE( "A user-update callback can replace and then clear itself from inside
 
 TEST_CASE( "A datagram handler can clear itself from inside its own call", "[network]" )
 {
-    WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* peer = peers.Client();
     RawSystem sender( LoopbackAddressOf( peer ), 0x62 );

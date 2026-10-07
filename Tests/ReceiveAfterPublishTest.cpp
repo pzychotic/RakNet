@@ -47,7 +47,6 @@ RakPeerInterface functions explicitly tested:
 
 using namespace RakNet;
 using RawSystemHarness::RawSystem;
-using RawSystemHarness::WinsockFixture;
 
 namespace {
 
@@ -189,7 +188,6 @@ void PollUntil( RakPeerInterface* server, RakPeerInterface* const* clients, Obse
 
 TEST_CASE( "Receive hands out a connection change only once the published view shows it", "[network]" )
 {
-    WinsockFixture winsock;
     StallOnSendPlugin stall;
     PeerScope peers;
 

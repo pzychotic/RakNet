@@ -33,7 +33,6 @@ RakPeerInterface functions explicitly tested:
 
 using namespace RakNet;
 using RawSystemHarness::RawSystem;
-using RawSystemHarness::WinsockFixture;
 
 namespace {
 
@@ -251,7 +250,6 @@ TEST_CASE( "Silently closing a connection twice reports it once", "[network]" )
 
 TEST_CASE( "Closing a connection that never opened reports nothing", "[network]" )
 {
-    WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* b = peers.Server( kPortB );
 

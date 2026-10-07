@@ -144,7 +144,6 @@ TEST_CASE( "Connection requests are checked against a password that changes as t
     // the getter reads back exactly what was set.
     constexpr int kRequests = 16;
 
-    RawSystemHarness::WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* server = peers.Server( kServerPort, kRequests );
     server->SetIncomingPassword( kServerPassword, (int)strlen( kServerPassword ) );

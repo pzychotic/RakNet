@@ -1,9 +1,9 @@
 #include "PeerScope.h"
 #include "ReliabilityLayerHarness.h"
+#include "WinsockScope.h"
 
 #include "RakMemoryOverride.h"
 #include "ReliabilityLayer.h"
-#include "WSAStartupSingleton.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -117,10 +117,6 @@ class BoundSocket
 public:
     BoundSocket()
     {
-        // Nothing here goes through RakPeer::Startup, so this takes the same Winsock
-        // refcount RakNet itself does. A no-op off Windows.
-        WSAStartupSingleton::AddRef();
-
         char hostAddress[] = "127.0.0.1";
 
         RNS2_BerkleyBindParameters bindParameters;
@@ -136,8 +132,6 @@ public:
         m_bound = m_socket.Bind( &bindParameters, _FILE_AND_LINE_ ) == BR_SUCCESS;
     }
 
-    ~BoundSocket() { WSAStartupSingleton::Deref(); }
-
     BoundSocket( const BoundSocket& ) = delete;
     BoundSocket& operator=( const BoundSocket& ) = delete;
 
@@ -145,6 +139,8 @@ public:
     RakNetSocket2* Get() { return m_bound ? &m_socket : nullptr; }
 
 private:
+    // No RakPeer holds Winsock for this socket. First, so it outlives the socket.
+    WinsockScope m_winsock;
     RNS2_Berkley m_socket;
     bool m_bound = false;
 };

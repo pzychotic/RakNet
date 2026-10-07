@@ -77,7 +77,6 @@ constexpr uint64_t kRawSystemGuid = 0x00ABCDEF12345678ull;
 
 TEST_CASE( "A truncated connection request from an unverified sender draws no reply", "[network]" )
 {
-    WinsockFixture winsock;
     PeerScope peers;
 
     RakPeerInterface* server = peers.Server( kServerPort );

@@ -2,7 +2,7 @@
 #include "RakNetSocket2.h"
 #include "RakNetTypes.h"
 #include "SocketDefines.h"
-#include "WSAStartupSingleton.h"
+#include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -52,14 +52,6 @@ TEST_CASE( "IsWildcardAddress recognises INADDR_ANY and nothing else", "[socket]
 
 #if RAKNET_SUPPORT_IPV6 == 1
 namespace {
-
-// Nothing here goes through RakPeer::Startup, so these take the same Winsock refcount
-// RakNet itself does. A no-op off Windows.
-struct WinsockFixture
-{
-    WinsockFixture() { WSAStartupSingleton::AddRef(); }
-    ~WinsockFixture() { WSAStartupSingleton::Deref(); }
-};
 
 SystemAddress IPv6Address( const char* address, unsigned int flowInfo = 0 )
 {
@@ -123,7 +115,7 @@ TEST_CASE( "IsWildcardAddress recognises :: and nothing else", "[socket]" )
 TEST_CASE( "An IPv6 socket bound to :: reports loopback", "[socket]" )
 {
 #if RAKNET_SUPPORT_IPV6 == 1
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     RNS2_Berkley berkleySocket;
     char hostAddress[] = "::";
@@ -144,7 +136,7 @@ TEST_CASE( "An IPv6 socket bound to :: reports loopback", "[socket]" )
 TEST_CASE( "An IPv6 socket bound to ::127.0.0.2 reports that address", "[socket]" )
 {
 #if RAKNET_SUPPORT_IPV6 == 1
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     RNS2_Berkley berkleySocket;
     char hostAddress[] = "::127.0.0.2";

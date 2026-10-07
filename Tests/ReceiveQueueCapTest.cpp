@@ -46,7 +46,6 @@ RakPeerInterface functions explicitly tested:
 
 using namespace RakNet;
 using RawSystemHarness::RawSystem;
-using RawSystemHarness::WinsockFixture;
 
 namespace
 {
@@ -209,7 +208,6 @@ bool RejectEveryDatagram( RNS2RecvStruct* recvStruct )
 
 TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_RECEIVED_DATAGRAMS", "[network]" )
 {
-    WinsockFixture winsock;
     ObservedPeer peer;
     peer.Start();
     RawSystem sender( peer.Address(), 0x51 );
@@ -247,7 +245,6 @@ TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_R
 
 TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES and a connected System's Messages all arrive", "[network]" )
 {
-    WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* server = peers.Server( 30000, 1 );
     RakPeerInterface* client = peers.Client();
@@ -316,7 +313,6 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
 
 TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer back", "[network]" )
 {
-    WinsockFixture winsock;
     ObservedPeer peer;
     peer.Start();
     s_rejectedJunkDatagrams = 0;
@@ -338,7 +334,6 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
 
 TEST_CASE( "Shutdown gives every receive buffer back through DeallocRNS2RecvStruct", "[network]" )
 {
-    WinsockFixture winsock;
     ObservedPeer peer;
     peer.Start();
     REQUIRE( WaitFor( [&] { return peer.BuffersOutstanding() == 1; } ) );

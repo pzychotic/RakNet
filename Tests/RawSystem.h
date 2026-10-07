@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReliabilityLayerHarness.h"
+#include "WinsockScope.h"
 
 #include "BitStream.h"
 #include "GetTime.h"
@@ -10,7 +11,6 @@
 #include "RakNetTypes.h"
 #include "RakNetVersion.h"
 #include "SocketDefines.h"
-#include "WSAStartupSingleton.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -45,14 +45,6 @@ constexpr int kHandshakeBudgetMs = 5000;
 // Source/ is a file-static in RakPeer.cpp, so a test that speaks the handshake has to
 // spell it out; kept byte for byte against that one.
 const unsigned char OFFLINE_MESSAGE_DATA_ID[16] = { 0x00, 0xFF, 0xFF, 0x00, 0xFE, 0xFE, 0xFE, 0xFE, 0xFD, 0xFD, 0xFD, 0xFD, 0x12, 0x34, 0x56, 0x78 };
-
-// Nothing here goes through RakPeer::Startup, so this takes the same Winsock refcount
-// RakNet itself does. A no-op off Windows.
-struct WinsockFixture
-{
-    WinsockFixture() { WSAStartupSingleton::AddRef(); }
-    ~WinsockFixture() { WSAStartupSingleton::Deref(); }
-};
 
 /// Whether any message in a datagram starts with \a messageId, mirroring
 /// ReliabilityLayer::CreateInternalPacketFromBitStream far enough to walk from one
@@ -382,6 +374,8 @@ public:
     unsigned short GetBoundPort() const { return m_socket.GetBoundAddress().GetPort(); }
 
 private:
+    // No RakPeer holds Winsock for this socket. First, so it outlives the socket.
+    WinsockScope m_winsock;
     RNS2_Berkley m_socket;
     SystemAddress m_serverAddress;
     uint64_t m_guid;

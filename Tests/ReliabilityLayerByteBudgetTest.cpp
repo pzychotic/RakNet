@@ -401,7 +401,6 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF12345679ull;
     constexpr RakNet::TimeMS kBudgetMs = 5000;
 
-    WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* server = peers.Server( kServerPort );
 
@@ -455,7 +454,6 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF1234567Aull;
     constexpr unsigned int kChunks = 20;
 
-    WinsockFixture winsock;
     PeerScope peers;
     RakPeerInterface* server = peers.Server( kServerPort );
 

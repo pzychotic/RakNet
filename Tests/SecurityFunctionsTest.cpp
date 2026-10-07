@@ -349,7 +349,6 @@ TEST_CASE( "A Peer restarted on a Refused System's port gets in although the ref
 {
     using namespace RawSystemHarness;
 
-    WinsockFixture winsock;
     PeerScope peers;
 
     RakPeerInterface* server = peers.Server( kServerPort );

@@ -2,7 +2,7 @@
 #include "RakNetSocket2.h"
 #include "RakNetTypes.h"
 #include "SocketDefines.h"
-#include "WSAStartupSingleton.h"
+#include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -40,14 +40,6 @@ than kept file-static next to its call sites.
 using namespace RakNet;
 
 namespace {
-
-// Nothing here goes through RakPeer::Startup, so these take the same Winsock refcount
-// RakNet itself does. A no-op off Windows.
-struct WinsockFixture
-{
-    WinsockFixture() { WSAStartupSingleton::AddRef(); }
-    ~WinsockFixture() { WSAStartupSingleton::Deref(); }
-};
 
 SystemAddress AddressOfFamily( int addressFamily )
 {
@@ -140,7 +132,7 @@ TEST_CASE( "The TTL option name follows the level GetIPPROTO returns", "[socket]
 
 TEST_CASE( "Sending with a TTL over IPv4 succeeds and restores the option", "[socket]" )
 {
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     RNS2_Berkley berkleySocket;
     char hostAddress[] = "127.0.0.1";
@@ -157,7 +149,7 @@ TEST_CASE( "Sending with a TTL over IPv4 succeeds and restores the option", "[so
 TEST_CASE( "Sending with a TTL over IPv6 succeeds and restores the option", "[socket]" )
 {
 #if RAKNET_SUPPORT_IPV6 == 1
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     RNS2_Berkley berkleySocket;
     char hostAddress[] = "::1";

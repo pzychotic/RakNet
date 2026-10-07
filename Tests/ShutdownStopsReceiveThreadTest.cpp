@@ -137,7 +137,6 @@ TEST_CASE( "Shutdown waits for the receive thread when its wake-up datagram is l
 
     peer->Shutdown( 0 );
 
-    RawSystemHarness::WinsockFixture winsock;
     RawSystemHarness::RawSystem sender( peerAddress, 0 );
     BitStream datagram;
     datagram.Write( (uint32_t)0 );

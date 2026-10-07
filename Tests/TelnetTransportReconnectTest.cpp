@@ -3,7 +3,7 @@
 #include "SocketDefines.h"
 #include "SocketIncludes.h"
 #include "TCPInterface.h"
-#include "WSAStartupSingleton.h"
+#include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -71,14 +71,6 @@ bool WaitFor( Predicate predicate )
 
     return predicate();
 }
-
-// Nothing here goes through RakPeer::Startup, so the raw sockets take the same Winsock
-// refcount RakNet itself does. A no-op off Windows.
-struct WinsockScope
-{
-    WinsockScope() { WSAStartupSingleton::AddRef(); }
-    ~WinsockScope() { WSAStartupSingleton::Deref(); }
-};
 
 // remoteClients and tcpInterface are protected; the test needs a count from each.
 class InspectableTelnetTransport : public TelnetTransport

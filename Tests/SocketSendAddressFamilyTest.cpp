@@ -1,7 +1,7 @@
 #include "RakNetDefines.h"
 #include "RakNetSocket2.h"
 #include "RakNetTypes.h"
-#include "WSAStartupSingleton.h"
+#include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -42,16 +42,6 @@ namespace {
 // rejected branch or one failing syscall - so anything near this bound is the hang,
 // not a slow machine.
 constexpr std::chrono::milliseconds kSendDeadline( 5000 );
-
-// Nothing here opens a socket, but sendto on Windows is documented as requiring
-// WSAStartup, and the AF_INET case does reach it. Other tests get that for free from
-// RakPeer::Startup; these have no peer, so they take the same refcount RakNet itself
-// uses. A no-op off Windows.
-struct WinsockFixture
-{
-    WinsockFixture() { WSAStartupSingleton::AddRef(); }
-    ~WinsockFixture() { WSAStartupSingleton::Deref(); }
-};
 
 // Runs body on its own thread and waits at most timeout for it to finish. Returns false
 // if it was still running at the deadline.
@@ -114,7 +104,7 @@ std::shared_ptr<SendCase> SendWithinDeadline( int addressFamily )
 
 TEST_CASE( "Sending to an address of no family returns instead of spinning", "[socket]" )
 {
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     // AF_UNSPEC is unsendable in every configuration, so this case holds whether or not
     // RAKNET_SUPPORT_IPV6 is set.
@@ -126,7 +116,7 @@ TEST_CASE( "Sending to an address of no family returns instead of spinning", "[s
 
 TEST_CASE( "Sending to an IPv6 address returns instead of spinning", "[socket]" )
 {
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     // Deliberately not guarded on RAKNET_SUPPORT_IPV6, because both configurations owe
     // the same answer for opposite reasons and both are worth pinning. At 0 this is the
@@ -143,7 +133,7 @@ TEST_CASE( "Sending to an IPv6 address returns instead of spinning", "[socket]" 
 
 TEST_CASE( "A failing send to an AF_INET address returns the failure once", "[socket]" )
 {
-    WinsockFixture winsock;
+    WinsockScope winsock;
 
     // The other half of the backwards loop. sendto on an invalid socket fails, and a
     // failure must leave Send, not be swallowed or retried.
