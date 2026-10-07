@@ -1,15 +1,13 @@
 #if !defined( _WIN32 )
 
+#include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
-#include "SocketDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
 #include <cstring>
 #include <string>
-#include <thread>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -27,6 +25,7 @@ and requires that fd 0 is a socket before it requires that data flows. POSIX onl
 never hands out 0.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -36,10 +35,6 @@ namespace {
 // about which test left it. One per case, since the listen socket gets no SO_REUSEADDR.
 constexpr unsigned short kListenOnZeroPort = 31015;
 constexpr unsigned short kConnectOnZeroPort = 31016;
-
-// Loopback, so every wait here is over as soon as the threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
 
 // Closes fd 0 and puts it back on scope exit, so a failed assertion doesn't leave the
 // process without stdin.
@@ -66,32 +61,19 @@ private:
     int saved;
 };
 
-bool IsSocket( int descriptor )
-{
-    int type = 0;
-    socklen_t length = sizeof( type );
-    return getsockopt__( descriptor, SOL_SOCKET, SO_TYPE, (char*)&type, &length ) == 0;
-}
-
-// The first packet the interface receives within the deadline, as a string; empty if none.
+// The first packet the interface receives within the wait, as a string; empty if none.
 std::string ReceiveString( TCPInterface& tcpInterface )
 {
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
+    std::string received;
+    WaitFor( [&] {
         Packet* packet = tcpInterface.Receive();
-        if( packet != 0 )
-        {
-            const std::string received( (const char*)packet->data, packet->length );
-            tcpInterface.DeallocatePacket( packet );
-            return received;
-        }
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return std::string();
+        if( packet == 0 )
+            return false;
+        received.assign( (const char*)packet->data, packet->length );
+        tcpInterface.DeallocatePacket( packet );
+        return true;
+    } );
+    return received;
 }
 
 void Send( TCPInterface& tcpInterface, const char* text, const SystemAddress& address, bool broadcast = false )

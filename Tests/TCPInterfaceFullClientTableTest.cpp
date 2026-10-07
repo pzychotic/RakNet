@@ -1,3 +1,4 @@
+#include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
 
@@ -34,6 +35,7 @@ closesocket__, takes the listener down on the first connection past capacity and
 connect never completes.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -48,31 +50,10 @@ constexpr unsigned short kBlockingListenPort = 31011;
 constexpr unsigned short kNonBlockingListenPort = 31012;
 constexpr unsigned short kAcceptListenPort = 31013;
 
-// Loopback, so every wait here is over as soon as the two threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
-
 // Long enough that the connect thread the unfixed code spawns would have finished and
 // reported; short enough to pay once. Only used where the expected answer is "nothing
 // happens", so it is a lower bound on patience rather than a timeout.
 constexpr std::chrono::milliseconds kQuietPeriod( 500 );
-
-// Runs until the predicate holds or the deadline passes; returns whether it held.
-template <typename Predicate>
-bool WaitFor( Predicate predicate )
-{
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( predicate() )
-            return true;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return predicate();
-}
 
 } // namespace
 

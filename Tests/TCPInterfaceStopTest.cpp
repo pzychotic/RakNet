@@ -1,11 +1,10 @@
+#include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
 #include "SocketDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
-#include <thread>
 #include <vector>
 
 /*
@@ -21,6 +20,7 @@ The test makes that somebody the test itself: it opens sockets right after Close
 so one of them takes the freed number, and requires all of them to be open after Stop.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -33,34 +33,6 @@ constexpr unsigned short kListenPort = 31014;
 // More than the descriptors that can be freed between CloseConnection and the opens below:
 // the client's connection, and the server's end of it if the server has noticed the close.
 constexpr int kBystanderCount = 4;
-
-// Loopback, so every wait here is over as soon as the threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
-
-// Runs until the predicate holds or the deadline passes; returns whether it held.
-template<typename Predicate>
-bool WaitFor( Predicate predicate )
-{
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( predicate() )
-            return true;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return predicate();
-}
-
-bool IsOpen( __TCPSOCKET__ socket )
-{
-    int type = 0;
-    socklen_t length = sizeof( type );
-    return getsockopt__( socket, SOL_SOCKET, SO_TYPE, (char*)&type, &length ) == 0;
-}
 
 } // namespace
 
@@ -84,14 +56,14 @@ TEST_CASE( "TCPInterface Stop leaves alone a descriptor a closed blocking connec
     for( int i = 0; i < kBystanderCount; i++ )
     {
         const __TCPSOCKET__ bystander = socket__( AF_INET, SOCK_STREAM, 0 );
-        REQUIRE( IsOpen( bystander ) );
+        REQUIRE( IsSocket( bystander ) );
         bystanders.push_back( bystander );
     }
 
     client.Stop();
 
     for( __TCPSOCKET__ bystander : bystanders )
-        CHECK( IsOpen( bystander ) );
+        CHECK( IsSocket( bystander ) );
 
     for( __TCPSOCKET__ bystander : bystanders )
         closesocket__( bystander );

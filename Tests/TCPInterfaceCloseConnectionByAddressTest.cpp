@@ -1,11 +1,10 @@
+#include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
-#include <chrono>
-#include <thread>
 #include <vector>
 
 /*
@@ -34,6 +33,7 @@ constructed, so it fails by whatever means the allocator or the operating system
 before it can reach the assertion.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -47,27 +47,6 @@ namespace {
 constexpr unsigned short kStaleIndexPortA = 31021;
 constexpr unsigned short kStaleIndexPortB = 31022;
 constexpr unsigned short kUnsetIndexPort = 31023;
-
-// Loopback, so every wait here is over as soon as the two threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
-
-// Runs until the predicate holds or the deadline passes; returns whether it held.
-template <typename Predicate>
-bool WaitFor( Predicate predicate )
-{
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( predicate() )
-            return true;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return predicate();
-}
 
 // The addresses of every connection the interface still holds open.
 std::vector<SystemAddress> ConnectionList( const TCPInterface& tcpInterface )

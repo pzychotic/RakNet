@@ -1,17 +1,15 @@
+#include "LoopbackTCP.h"
 #include "MessageIdentifiers.h"
 #include "PacketizedTCP.h"
 #include "RakAssert.h"
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
-#include "SocketDefines.h"
 #include "SocketIncludes.h"
 #include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
 #include <cstring>
-#include <thread>
 #include <vector>
 
 /*
@@ -27,6 +25,7 @@ The client is a raw socket, as in TCPCapsTest.cpp, so it can send a header annou
 than it then sends.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -35,29 +34,8 @@ namespace {
 // SO_REUSEADDR before it binds, so no port is shared between cases.
 constexpr unsigned short kShortFirstChunkListenPort = 31056;
 
-// Loopback, so every wait here is over as soon as the threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
-
 // Every rakMalloc_Ex block starts as this, so a byte never written shows up as it.
 constexpr unsigned char kFill = 0xA5;
-
-// Runs until the predicate holds or the deadline passes; returns whether it held.
-template <typename Predicate>
-bool WaitFor( Predicate predicate )
-{
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( predicate() )
-            return true;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return predicate();
-}
 
 // Fills every rakMalloc_Ex block with kFill while in scope, so an uninitialised read does
 // not sample zero.
@@ -98,32 +76,6 @@ private:
 
 void* ( *FilledMalloc::s_previous )( size_t size, const char* file, unsigned int line ) = 0;
 
-// A blocking TCP connection to the listener on loopback.
-__TCPSOCKET__ Connect( unsigned short listenPort )
-{
-    const __TCPSOCKET__ s = socket__( AF_INET, SOCK_STREAM, IPPROTO_TCP );
-    REQUIRE( s != (__TCPSOCKET__)-1 );
-
-    sockaddr_in remote;
-    memset( &remote, 0, sizeof( remote ) );
-    remote.sin_family = AF_INET;
-    remote.sin_port = htons( listenPort );
-    remote.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
-    REQUIRE( connect__( s, (const sockaddr*)&remote, sizeof( remote ) ) == 0 );
-    return s;
-}
-
-void SendAll( __TCPSOCKET__ s, const char* data, size_t length )
-{
-    while( length != 0 )
-    {
-        const int sent = send__( s, data, (int)length, 0 );
-        REQUIRE( sent > 0 );
-        data += sent;
-        length -= (size_t)sent;
-    }
-}
-
 // Below 0x80, so never kFill.
 unsigned char PatternByte( size_t offset )
 {
@@ -140,7 +92,7 @@ TEST_CASE( "PacketizedTCP's first ID_DOWNLOAD_PROGRESS reports only the bytes bu
     PacketizedTCP server;
     REQUIRE( server.Start( kShortFirstChunkListenPort, 1 ) );
 
-    const __TCPSOCKET__ client = Connect( kShortFirstChunkListenPort );
+    Client client( kShortFirstChunkListenPort );
     REQUIRE( WaitFor( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
 
     // A header announcing 200000 bytes, then 65532 of them: 65536 buffered in all, so the
@@ -153,7 +105,7 @@ TEST_CASE( "PacketizedTCP's first ID_DOWNLOAD_PROGRESS reports only the bytes bu
     for( size_t i = 0; i < payload.size(); ++i )
         payload[i] = PatternByte( i );
     stream.insert( stream.end(), payload.begin(), payload.end() );
-    SendAll( client, stream.data(), stream.size() );
+    client.SendAll( stream.data(), stream.size() );
 
     Packet* progress = 0;
     REQUIRE( WaitFor( [&] { return ( progress = server.Receive() ) != 0; } ) );
@@ -174,6 +126,6 @@ TEST_CASE( "PacketizedTCP's first ID_DOWNLOAD_PROGRESS reports only the bytes bu
     CHECK( isChunkThePayload );
 
     server.DeallocatePacket( progress );
-    closesocket__( client );
+    client.Abort();
     server.Stop();
 }

@@ -1,11 +1,10 @@
+#include "LoopbackTCP.h"
 #include "TCPInterface.h"
 #include "RakNetTypes.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
 #include <string>
-#include <thread>
 
 /*
 Pins the length contract of TCPInterface::Connect's bindAddress parameter.
@@ -34,6 +33,7 @@ observable - the non-blocking arm returns UNASSIGNED_SYSTEM_ADDRESS whether it a
 argument or not, so a completed connection attempt is the only proof it got that far.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -42,10 +42,6 @@ namespace {
 // from them regardless, so a stray listener is never ambiguous about which test left it.
 constexpr unsigned short kListenPort = 31010;
 
-// A connect to a listening socket on loopback is immediate; this only has to be longer than
-// a scheduler hiccup, and is generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kConnectDeadline( 5000 );
-
 // Both lengths are derived from the bound rather than written out, so a change to the array
 // moves the boundary this file tests with it.
 const std::string kLongestAccepted( TCPInterface::MAXIMUM_BIND_ADDRESS_LENGTH, '1' );
@@ -53,25 +49,16 @@ const std::string kLongestAccepted( TCPInterface::MAXIMUM_BIND_ADDRESS_LENGTH, '
 // One over: the string that overran the array before the fix.
 const std::string kFirstRejected( TCPInterface::MAXIMUM_BIND_ADDRESS_LENGTH + 1, '1' );
 
-// Runs the interface's update thread until the connection attempt completes or the deadline
-// passes. Returns the completed address, or UNASSIGNED_SYSTEM_ADDRESS on the deadline.
+// Waits until the connection attempt completes or fails. Returns the completed address, or
+// UNASSIGNED_SYSTEM_ADDRESS on a failure or at the end of the wait.
 SystemAddress WaitForCompletedConnectionAttempt( TCPInterface& tcpInterface )
 {
-    const auto deadline = std::chrono::steady_clock::now() + kConnectDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        const SystemAddress completed = tcpInterface.HasCompletedConnectionAttempt();
-        if( completed != UNASSIGNED_SYSTEM_ADDRESS )
-            return completed;
-
-        if( tcpInterface.HasFailedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS )
-            return UNASSIGNED_SYSTEM_ADDRESS;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return UNASSIGNED_SYSTEM_ADDRESS;
+    SystemAddress completed = UNASSIGNED_SYSTEM_ADDRESS;
+    WaitFor( [&] {
+        completed = tcpInterface.HasCompletedConnectionAttempt();
+        return completed != UNASSIGNED_SYSTEM_ADDRESS || tcpInterface.HasFailedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS;
+    } );
+    return completed;
 }
 
 } // namespace

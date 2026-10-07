@@ -1,15 +1,12 @@
-#include "Plugins/TelnetTransport.h"
+#include "InspectableTelnetTransport.h"
+#include "LoopbackTCP.h"
 #include "RakNetTypes.h"
-#include "SocketDefines.h"
-#include "SocketIncludes.h"
 #include "TCPInterface.h"
 #include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
 #include <cstring>
-#include <thread>
 
 /*
 Pins that a connection the user closes frees its TelnetClient, and frees it once.
@@ -32,6 +29,7 @@ it binds a fixed local port and closes abortively - SO_LINGER with a zero timeou
 RST - which leaves no TIME_WAIT behind.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -46,89 +44,14 @@ constexpr unsigned short kReturnValueListenPort = 31041;
 constexpr unsigned short kReturnValueClientPortA = 31042;
 constexpr unsigned short kReturnValueClientPortB = 31043;
 
-// Loopback, so every wait here is over as soon as the threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
-
 // How long a case watches for an event that must not come. The update thread polls every
 // 30 ms, so this spans several of its passes.
-constexpr std::chrono::milliseconds kQuietPeriod( 300 );
-
-// Runs until the predicate holds or the deadline passes; returns whether it held.
-template <typename Predicate>
-bool WaitFor( Predicate predicate )
-{
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( predicate() )
-            return true;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return predicate();
-}
-
-// remoteClients and tcpInterface are protected; the test needs a count from each.
-class InspectableTelnetTransport : public TelnetTransport
-{
-public:
-    size_t ClientCount() const { return remoteClients.size(); }
-
-    // Connections TCPInterface holds active, whether or not their events were drained.
-    unsigned short ActiveCount() const { return tcpInterface->GetConnectionCount(); }
-};
-
-sockaddr_in LoopbackAddress( unsigned short port )
-{
-    sockaddr_in address;
-    memset( &address, 0, sizeof( address ) );
-    address.sin_family = AF_INET;
-    address.sin_port = htons( port );
-    address.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
-    return address;
-}
-
-// A blocking TCP connection to the listener, made from a fixed local port.
-__TCPSOCKET__ ConnectFromFixedPort( unsigned short listenPort, unsigned short clientPort )
-{
-    const __TCPSOCKET__ s = socket__( AF_INET, SOCK_STREAM, IPPROTO_TCP );
-    REQUIRE( s != (__TCPSOCKET__)-1 );
-
-    const int reuse = 1;
-    REQUIRE( setsockopt__( s, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof( reuse ) ) == 0 );
-
-    const sockaddr_in local = LoopbackAddress( clientPort );
-    REQUIRE( bind__( s, (const sockaddr*)&local, sizeof( local ) ) == 0 );
-
-    const sockaddr_in remote = LoopbackAddress( listenPort );
-    REQUIRE( connect__( s, (const sockaddr*)&remote, sizeof( remote ) ) == 0 );
-    return s;
-}
-
-// Closes with a RST rather than a FIN, so the local port is free to bind again at once.
-void Abort( __TCPSOCKET__ s )
-{
-    linger abortive;
-    abortive.l_onoff = 1;
-    abortive.l_linger = 0;
-    setsockopt__( s, SOL_SOCKET, SO_LINGER, (const char*)&abortive, sizeof( abortive ) );
-    closesocket__( s );
-}
+constexpr TimeMS kQuietPeriod = 300;
 
 // True if no lost event is drained within kQuietPeriod.
 bool NoLostEventFollows( InspectableTelnetTransport& telnet )
 {
-    const auto deadline = std::chrono::steady_clock::now() + kQuietPeriod;
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( telnet.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS )
-            return false;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-    return true;
+    return !WaitFor( [&] { return telnet.HasLostConnection() != UNASSIGNED_SYSTEM_ADDRESS; }, kQuietPeriod );
 }
 
 } // namespace
@@ -141,7 +64,7 @@ TEST_CASE( "TelnetTransport frees a client whose connection the user closes", "[
     REQUIRE( telnet.Start( kUserCloseListenPort, true ) );
 
     SystemAddress address = UNASSIGNED_SYSTEM_ADDRESS;
-    const __TCPSOCKET__ client = ConnectFromFixedPort( kUserCloseListenPort, kUserCloseClientPort );
+    Client client( kUserCloseListenPort, kUserCloseClientPort );
     REQUIRE( WaitFor( [&] { return ( address = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
     REQUIRE( telnet.ClientCount() == 1 );
 
@@ -155,7 +78,7 @@ TEST_CASE( "TelnetTransport frees a client whose connection the user closes", "[
     CHECK( NoLostEventFollows( telnet ) );
     CHECK( telnet.ClientCount() == 0 );
 
-    Abort( client );
+    client.Abort();
     telnet.Stop();
 }
 
@@ -167,13 +90,13 @@ TEST_CASE( "TelnetTransport frees a client once when its lost event is queued be
     REQUIRE( telnet.Start( kLostQueuedListenPort, true ) );
 
     SystemAddress address = UNASSIGNED_SYSTEM_ADDRESS;
-    const __TCPSOCKET__ first = ConnectFromFixedPort( kLostQueuedListenPort, kLostQueuedClientPort );
+    Client first( kLostQueuedListenPort, kLostQueuedClientPort );
     REQUIRE( WaitFor( [&] { return ( address = telnet.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
     REQUIRE( telnet.ClientCount() == 1 );
 
     // The update thread detects the loss and queues its lost event; it is not drained yet.
-    Abort( first );
-    REQUIRE( WaitFor( [&] { return telnet.ActiveCount() == 0; } ) );
+    first.Abort();
+    REQUIRE( WaitFor( [&] { return telnet.ConnectionCount() == 0; } ) );
 
     // The connection is already gone, so this close does not count it.
     telnet.CloseConnection( address );
@@ -185,12 +108,12 @@ TEST_CASE( "TelnetTransport frees a client once when its lost event is queued be
 
     // A reconnect from the same address keeps its entry: nothing counted the first
     // connection twice and left the reconnect's count one short.
-    const __TCPSOCKET__ second = ConnectFromFixedPort( kLostQueuedListenPort, kLostQueuedClientPort );
+    Client second( kLostQueuedListenPort, kLostQueuedClientPort );
     REQUIRE( WaitFor( [&] { return telnet.HasNewIncomingConnection() == address; } ) );
     CHECK( telnet.ClientCount() == 1 );
 
     const char line[] = "hello\n";
-    REQUIRE( send__( second, line, (int)strlen( line ), 0 ) == (int)strlen( line ) );
+    second.SendAll( line, strlen( line ) );
     Packet* received = 0;
     CHECK( WaitFor( [&] { return ( received = telnet.Receive() ) != 0; } ) );
     if( received )
@@ -199,7 +122,7 @@ TEST_CASE( "TelnetTransport frees a client once when its lost event is queued be
         telnet.DeallocatePacket( received );
     }
 
-    Abort( second );
+    second.Abort();
     CHECK( WaitFor( [&] { return telnet.HasLostConnection() == address; } ) );
     CHECK( telnet.ClientCount() == 0 );
 
@@ -214,14 +137,14 @@ TEST_CASE( "TCPInterface::CloseConnection reports whether it closed the connecti
     REQUIRE( tcp.Start( kReturnValueListenPort, 4 ) );
 
     SystemAddress open = UNASSIGNED_SYSTEM_ADDRESS;
-    const __TCPSOCKET__ openClient = ConnectFromFixedPort( kReturnValueListenPort, kReturnValueClientPortA );
+    Client openClient( kReturnValueListenPort, kReturnValueClientPortA );
     REQUIRE( WaitFor( [&] { return ( open = tcp.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
 
     SystemAddress lost = UNASSIGNED_SYSTEM_ADDRESS;
-    const __TCPSOCKET__ lostClient = ConnectFromFixedPort( kReturnValueListenPort, kReturnValueClientPortB );
+    Client lostClient( kReturnValueListenPort, kReturnValueClientPortB );
     REQUIRE( WaitFor( [&] { return ( lost = tcp.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
 
-    Abort( lostClient );
+    lostClient.Abort();
     REQUIRE( WaitFor( [&] { return tcp.GetConnectionCount() == 1; } ) );
 
     // Detected lost by the update thread, whether or not its event was drained.
@@ -238,6 +161,6 @@ TEST_CASE( "TCPInterface::CloseConnection reports whether it closed the connecti
     // Already closed by the call above.
     CHECK_FALSE( tcp.CloseConnection( open ) );
 
-    Abort( openClient );
+    openClient.Abort();
     tcp.Stop();
 }

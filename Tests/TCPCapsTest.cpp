@@ -1,3 +1,4 @@
+#include "LoopbackTCP.h"
 #include "PacketizedTCP.h"
 #include "RakNetTypes.h"
 #include "SocketDefines.h"
@@ -36,6 +37,7 @@ a fixed port. They close abortively - SO_LINGER with a zero timeout sends a RST 
 leaves no TIME_WAIT behind and lets a reconnect bind the same port again.
 */
 
+using namespace LoopbackTCP;
 using namespace RakNet;
 
 namespace {
@@ -49,81 +51,12 @@ constexpr unsigned short kNeverReadsListenPort = 31053;
 constexpr unsigned short kReconnectListenPort = 31054;
 constexpr unsigned short kReconnectClientPort = 31055;
 
-// Loopback, so every wait here is over as soon as the threads have been scheduled once.
-// Generous so a loaded machine cannot turn a pass into a failure.
-constexpr std::chrono::milliseconds kDeadline( 5000 );
-
-// Runs until the predicate holds or the deadline passes; returns whether it held.
-template <typename Predicate>
-bool WaitFor( Predicate predicate )
-{
-    const auto deadline = std::chrono::steady_clock::now() + kDeadline;
-
-    while( std::chrono::steady_clock::now() < deadline )
-    {
-        if( predicate() )
-            return true;
-
-        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    }
-
-    return predicate();
-}
-
 // connections is protected; the reconnect case needs its size.
 class InspectablePacketizedTCP : public PacketizedTCP
 {
 public:
     size_t ConnectionEntryCount() const { return connections.size(); }
 };
-
-sockaddr_in LoopbackAddress( unsigned short port )
-{
-    sockaddr_in address;
-    memset( &address, 0, sizeof( address ) );
-    address.sin_family = AF_INET;
-    address.sin_port = htons( port );
-    address.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
-    return address;
-}
-
-// A blocking TCP connection to the listener, from \a clientPort, or from any port if 0.
-__TCPSOCKET__ ConnectFromPort( unsigned short listenPort, unsigned short clientPort, int bufferSize = 0 )
-{
-    const __TCPSOCKET__ s = socket__( AF_INET, SOCK_STREAM, IPPROTO_TCP );
-    REQUIRE( s != (__TCPSOCKET__)-1 );
-
-    // Small buffers make the stall arrive after little data, not after however much a
-    // loopback connection's autotuned buffers would absorb.
-    if( bufferSize != 0 )
-    {
-        setsockopt__( s, SOL_SOCKET, SO_SNDBUF, (const char*)&bufferSize, sizeof( bufferSize ) );
-        setsockopt__( s, SOL_SOCKET, SO_RCVBUF, (const char*)&bufferSize, sizeof( bufferSize ) );
-    }
-
-    if( clientPort != 0 )
-    {
-        const int reuse = 1;
-        REQUIRE( setsockopt__( s, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof( reuse ) ) == 0 );
-
-        const sockaddr_in local = LoopbackAddress( clientPort );
-        REQUIRE( bind__( s, (const sockaddr*)&local, sizeof( local ) ) == 0 );
-    }
-
-    const sockaddr_in remote = LoopbackAddress( listenPort );
-    REQUIRE( connect__( s, (const sockaddr*)&remote, sizeof( remote ) ) == 0 );
-    return s;
-}
-
-// Closes with a RST rather than a FIN, so the local port is free to bind again at once.
-void Abort( __TCPSOCKET__ s )
-{
-    linger abortive;
-    abortive.l_onoff = 1;
-    abortive.l_linger = 0;
-    setsockopt__( s, SOL_SOCKET, SO_LINGER, (const char*)&abortive, sizeof( abortive ) );
-    closesocket__( s );
-}
 
 // The byte at \a offset of the stream the backpressure case sends, so a byte dropped,
 // repeated or reordered anywhere shows up as a mismatch.
@@ -240,13 +173,13 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     server.SetMaxIncomingBytesPerClient( kIncomingCap );
     CHECK( server.GetMaxIncomingBytesPerClient() == kIncomingCap );
 
-    const __TCPSOCKET__ client = ConnectFromPort( kBackpressureListenPort, 0, 16 * 1024 );
+    Client client( kBackpressureListenPort, 0, 16 * 1024 );
     REQUIRE( WaitFor( [&] { return server.HasNewIncomingConnection() != UNASSIGNED_SYSTEM_ADDRESS; } ) );
 
     // Blocking sends on their own thread: a send that stops returning is the stall.
     std::atomic<size_t> sentLength( 0 );
     std::atomic<size_t> streamEnd( kStreamLength );
-    const auto sendStream = [&sentLength, &streamEnd, client]() {
+    const auto sendStream = [&sentLength, &streamEnd, clientSocket = client.Socket()]() {
         std::vector<char> chunk( kChunkLength );
         for( ;; )
         {
@@ -257,7 +190,7 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
             const size_t length = ( std::min )( chunk.size(), end - offset );
             for( size_t i = 0; i < length; i++ )
                 chunk[i] = (char)PatternByte( offset + i );
-            const int sent = send__( client, chunk.data(), (int)length, 0 );
+            const int sent = send__( clientSocket, chunk.data(), (int)length, 0 );
             if( sent <= 0 )
                 return;
             sentLength += (size_t)sent;
@@ -269,10 +202,10 @@ TEST_CASE( "TCPInterface stops reading a client at the incoming cap, and drops n
     struct SenderScope
     {
         std::thread& sender;
-        __TCPSOCKET__ client;
+        Client& client;
         ~SenderScope()
         {
-            Abort( client );
+            client.Abort();
             sender.join();
         }
     } senderScope{ sender, client };
@@ -329,7 +262,7 @@ TEST_CASE( "TCPInterface closes a client that never reads at the outgoing cap", 
     server.SetMaxOutgoingBytesPerClient( kOutgoingCap );
     CHECK( server.GetMaxOutgoingBytesPerClient() == kOutgoingCap );
 
-    const __TCPSOCKET__ client = ConnectFromPort( kNeverReadsListenPort, 0, 16 * 1024 );
+    Client client( kNeverReadsListenPort, 0, 16 * 1024 );
     SystemAddress clientAddress = UNASSIGNED_SYSTEM_ADDRESS;
     REQUIRE( WaitFor( [&] { return ( clientAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
 
@@ -353,7 +286,7 @@ TEST_CASE( "TCPInterface closes a client that never reads at the outgoing cap", 
     CHECK( server.GetOutgoingBytesCapCloseCount() == 1 );
     CHECK( server.GetConnectionCount() == 0 );
 
-    Abort( client );
+    client.Abort();
     server.Stop();
 }
 
@@ -364,22 +297,22 @@ TEST_CASE( "PacketizedTCP keeps a client reconnecting from the same address befo
     InspectablePacketizedTCP server;
     REQUIRE( server.Start( kReconnectListenPort, 4 ) );
 
-    const __TCPSOCKET__ first = ConnectFromPort( kReconnectListenPort, kReconnectClientPort );
+    Client first( kReconnectListenPort, kReconnectClientPort );
     SystemAddress firstAddress = UNASSIGNED_SYSTEM_ADDRESS;
     REQUIRE( WaitFor( [&] { return ( firstAddress = server.HasNewIncomingConnection() ) != UNASSIGNED_SYSTEM_ADDRESS; } ) );
     REQUIRE( server.ConnectionEntryCount() == 1 );
 
     // The first connection goes, and TCPInterface has queued its lost event - its slot is
     // free - before the reconnect arrives. The application has not polled since.
-    Abort( first );
+    first.Abort();
     REQUIRE( WaitFor( [&] { return server.GetConnectionCount() == 0; } ) );
 
-    const __TCPSOCKET__ second = ConnectFromPort( kReconnectListenPort, kReconnectClientPort );
+    Client second( kReconnectListenPort, kReconnectClientPort );
     REQUIRE( WaitFor( [&] { return server.GetConnectionCount() == 1; } ) );
 
     const std::vector<char> message( 100, 'y' );
     const std::vector<char> framed = Frame( message );
-    REQUIRE( send__( second, framed.data(), (int)framed.size(), 0 ) == (int)framed.size() );
+    second.SendAll( framed.data(), framed.size() );
     REQUIRE( WaitFor( [&] { return server.ReceiveHasPackets(); } ) );
 
     // Both events and the message are queued now: the new event is processed first, then
@@ -399,7 +332,7 @@ TEST_CASE( "PacketizedTCP keeps a client reconnecting from the same address befo
     CHECK( server.HasLostConnection() == firstAddress );
 
     // And the reconnect's own loss frees the entry.
-    Abort( second );
+    second.Abort();
     CHECK( WaitFor( [&] { return server.HasLostConnection() == firstAddress; } ) );
     CHECK( server.ConnectionEntryCount() == 0 );
 
