@@ -46,11 +46,7 @@ TEST_CASE( "Receive shifts a Timestamped Message's time by the sender's clock di
 
     const SystemAddress serverAddress( "127.0.0.1", kServerPort );
     const SystemAddress clientAddress( "127.0.0.1", kClientPort );
-    REQUIRE( client->Connect( "127.0.0.1", kServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    ConnectionWaits::WaitForRequestToSettle( client, serverAddress, GetTimeMS() + kWaitBudgetMs );
-    REQUIRE( client->GetConnectionState( serverAddress ) == IS_CONNECTED );
-    ConnectionWaits::WaitForRequestToSettle( server, clientAddress, GetTimeMS() + kWaitBudgetMs );
-    REQUIRE( server->GetConnectionState( clientAddress ) == IS_CONNECTED );
+    ConnectionWaits::ConnectAndWait( client, server );
 
     BitStream message;
     message.Write( (MessageID)ID_TIMESTAMP );

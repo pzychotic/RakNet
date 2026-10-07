@@ -106,13 +106,7 @@ void Wake( RakPeerInterface* peer, const SystemAddress& system )
 // Connects A to B and lets the connect's traffic, its pings and their acks, die down.
 void Connect( RakPeerInterface* a, RakPeerInterface* b )
 {
-    REQUIRE( a->Connect( "127.0.0.1", kPortB, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ( a->GetConnectionState( kAddressB ) != IS_CONNECTED || b->GetConnectionState( kAddressA ) != IS_CONNECTED ) &&
-           ConnectionWaits::Expired( deadline ) == false )
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    REQUIRE( a->GetConnectionState( kAddressB ) == IS_CONNECTED );
-    REQUIRE( b->GetConnectionState( kAddressA ) == IS_CONNECTED );
+    ConnectionWaits::ConnectAndWait( a, b );
     std::this_thread::sleep_for( std::chrono::milliseconds( kQuietMs ) );
     ConnectionWaits::Drain( a );
     ConnectionWaits::Drain( b );

@@ -83,10 +83,7 @@ TEST_CASE( "Router2 consumes a forwarding success for an endpoint it never asked
     RakPeerInterface* client = peers.Client();
     server->AttachPlugin( &router );
 
-    REQUIRE( client->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    ConnectionWaits::WaitForConnectionCounts( &client, 1, 1 );
-    ConnectionWaits::WaitForConnectionCounts( &server, 1, 1 );
-    ConnectionWaits::Drain( server );
+    ConnectionWaits::ConnectAndWait( client, server );
 
     const SystemAddress clientAddressBefore = server->GetSystemAddressFromGuid( client->GetMyGUID() );
     const SystemAddress serverAddress( "127.0.0.1", kServerPort );

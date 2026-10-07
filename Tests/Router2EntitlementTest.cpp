@@ -185,21 +185,6 @@ std::vector<MessageID> Inject( RakPeerInterface* sender, RakPeerInterface* targe
     return received;
 }
 
-void Connect( RakPeerInterface* client, RakPeerInterface* server )
-{
-    REQUIRE( client->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    const TimeMS deadline = GetTimeMS() + ConnectionWaits::kConnectionCountBudget;
-    while( server->GetConnectionState( client->GetMyGUID() ) != IS_CONNECTED ||
-           client->GetConnectionState( server->GetMyGUID() ) != IS_CONNECTED )
-    {
-        REQUIRE( !ConnectionWaits::Expired( deadline ) );
-        ConnectionWaits::Drain( server );
-        ConnectionWaits::Drain( client );
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    ConnectionWaits::Drain( server );
-}
-
 SystemAddress Loopback( unsigned short port )
 {
     return SystemAddress( "127.0.0.1", port );
@@ -218,12 +203,12 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     RakPeerInterface* endpoint = peers.Client( kEndpointPort );
     server->AttachPlugin( &router );
 
-    Connect( intermediary, server );
+    ConnectionWaits::ConnectAndWait( intermediary, server );
     const SystemAddress intermediaryAddress = server->GetSystemAddressFromGuid( intermediary->GetMyGUID() );
 
     SECTION( "An undesignated System cannot move a connection or add an entry" )
     {
-        Connect( endpoint, server );
+        ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
         const std::vector<MessageID> live = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
@@ -240,7 +225,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     SECTION( "A Designated intermediary cannot move a direct connection" )
     {
         router.AddIntermediary( intermediaryAddress );
-        Connect( endpoint, server );
+        ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
         const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
@@ -270,7 +255,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         REQUIRE( Contains( announced, kMarker ) );
         REQUIRE( router.ForwardedCount() == 1 );
 
-        Connect( endpoint, server );
+        ConnectionWaits::ConnectAndWait( endpoint, server );
         REQUIRE( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( kEndpointPort ) );
 
         const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
@@ -283,7 +268,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     SECTION( "A Designated intermediary's announcement that arrives after its connection still counts" )
     {
         router.AddIntermediary( intermediaryAddress );
-        Connect( endpoint, server );
+        ConnectionWaits::ConnectAndWait( endpoint, server );
 
         // Already at the announced address, so nothing moves, but the entry is recorded.
         const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort );
@@ -307,7 +292,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         REQUIRE( Contains( announced, kMarker ) );
         REQUIRE( router.ForwardedCount() == 1 );
 
-        Connect( endpoint, server );
+        ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
         const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
@@ -343,7 +328,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         CHECK( router.ForwardedCount() == 0 );
 
         // The same address again, but not the same designation.
-        Connect( intermediary, server );
+        ConnectionWaits::ConnectAndWait( intermediary, server );
         REQUIRE( server->GetSystemAddressFromGuid( intermediary->GetMyGUID() ) == intermediaryAddress );
 
         const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1002 ), 25001 );
@@ -364,7 +349,7 @@ TEST_CASE( "Router2 caps the connections a Designated intermediary announces ahe
     RakPeerInterface* intermediary = peers.Client( kIntermediaryPort );
     server->AttachPlugin( &router );
 
-    Connect( intermediary, server );
+    ConnectionWaits::ConnectAndWait( intermediary, server );
     router.AddIntermediary( server->GetSystemAddressFromGuid( intermediary->GetMyGUID() ) );
     router.SetMaxPendingForwardsPerIntermediary( 2 );
     CHECK( router.GetMaxPendingForwardsPerIntermediary() == 2 );
@@ -398,8 +383,8 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
     RakPeerInterface* endpoint = peers.Client( kEndpointPort );
     server->AttachPlugin( &router );
 
-    Connect( asked, server );
-    Connect( other, server );
+    ConnectionWaits::ConnectAndWait( asked, server );
+    ConnectionWaits::ConnectAndWait( other, server );
 
     SECTION( "for a new forwarded connection" )
     {
@@ -420,7 +405,7 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
 
     SECTION( "for a live forwarded connection" )
     {
-        Connect( endpoint, server );
+        ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
         router.AddInitiatedForwarding( endpoint->GetMyGUID(), asked->GetMyGUID(), endpointAddress );
 

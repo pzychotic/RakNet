@@ -258,14 +258,7 @@ TEST_CASE( "The identity and state getters describe an open connection, and stop
     const SystemAddress clientAddress = client.Address();
     const RakNetGUID clientGuid = client.Guid();
 
-    REQUIRE( client->Connect( "127.0.0.1", kClosedServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( ConnectionWaits::DrainUntil(
-        both, 2,
-        [&] {
-            return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
-                   server->GetConnectionState( clientAddress ) == IS_CONNECTED;
-        },
-        kWaitBudgetMs ) );
+    ConnectionWaits::ConnectAndWait( client.Get(), server.Get() );
 
     const int index = server->GetIndexFromSystemAddress( clientAddress );
     REQUIRE( index >= 0 );
@@ -350,14 +343,7 @@ TEST_CASE( "The ping and clock getters answer on the user thread what the networ
     // The simulator only runs in Debug builds.
     client->ApplyNetworkSimulator( 0.0f, 10, 20 );
 
-    REQUIRE( client->Connect( "127.0.0.1", kPingServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( ConnectionWaits::DrainUntil(
-        both, 2,
-        [&] {
-            return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
-                   server->GetConnectionState( clientAddress ) == IS_CONNECTED;
-        },
-        kWaitBudgetMs ) );
+    ConnectionWaits::ConnectAndWait( client.Get(), server.Get() );
 
     // Occasional pings are off, so once these pongs are back the server's ping records hold
     // still.

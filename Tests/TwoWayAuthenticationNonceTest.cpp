@@ -63,22 +63,6 @@ public:
     size_t NonceCount() const { return nonceGenerator.generatedNonces.size(); }
 };
 
-void Connect( RakPeerInterface* server, RakPeerInterface* client )
-{
-    REQUIRE( client->Connect( "127.0.0.1", kAuthPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    const SystemAddress serverAddress( "127.0.0.1", kAuthPort );
-    const TimeMS deadline = GetTimeMS() + ConnectionWaits::kConnectionCountBudget;
-    while( server->GetConnectionState( client->GetMyGUID() ) != IS_CONNECTED ||
-           client->GetConnectionState( serverAddress ) != IS_CONNECTED )
-    {
-        REQUIRE( !ConnectionWaits::Expired( deadline ) );
-        ConnectionWaits::Drain( server );
-        ConnectionWaits::Drain( client );
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    ConnectionWaits::Drain( client );
-}
-
 void SendMarker( RakPeerInterface* from, RakNetGUID to )
 {
     BitStream marker;
@@ -173,7 +157,7 @@ TEST_CASE( "TwoWayAuthentication sends no nonce it could not draw", "[twowayauth
     RakPeerInterface* server = peers.Server( kAuthPort, 1 );
     RakPeerInterface* requester = peers.Client();
     server->AttachPlugin( &auth );
-    Connect( server, requester );
+    ConnectionWaits::ConnectAndWait( requester, server );
 
     bool drawFails = false;
     SECTION( "A nonce it drew is sent" ) {}

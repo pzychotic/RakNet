@@ -68,9 +68,7 @@ TEST_CASE( "NatPunchthroughClient sends each queued OpenNAT once and in order", 
     RakPeerInterface* client = peers.Client();
     client->AttachPlugin( &punch );
 
-    REQUIRE( client->Connect( "127.0.0.1", kFacilitatorPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    ConnectionWaits::WaitForConnectionCounts( &client, 1, 1 );
-    ConnectionWaits::WaitForConnectionCounts( &facilitator, 1, 1 );
+    ConnectionWaits::ConnectAndWait( client, facilitator );
 
     const SystemAddress facilitatorAddress( "127.0.0.1", kFacilitatorPort );
     const RakNetGUID queued[] = { RakNetGUID( 1001 ), RakNetGUID( 1002 ), RakNetGUID( 1003 ) };

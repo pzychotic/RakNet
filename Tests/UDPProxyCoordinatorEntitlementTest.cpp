@@ -70,21 +70,6 @@ public:
     unsigned int RequestCount() const { return forwardingRequestList.Size(); }
 };
 
-void Connect( RakPeerInterface* coordinator, RakPeerInterface* client )
-{
-    REQUIRE( client->Connect( "127.0.0.1", kCoordinatorPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    const TimeMS deadline = GetTimeMS() + ConnectionWaits::kConnectionCountBudget;
-    while( coordinator->GetConnectionState( client->GetMyGUID() ) != IS_CONNECTED ||
-           client->GetConnectionState( kCoordinatorAddress ) != IS_CONNECTED )
-    {
-        REQUIRE( !ConnectionWaits::Expired( deadline ) );
-        ConnectionWaits::Drain( coordinator );
-        ConnectionWaits::Drain( client );
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    ConnectionWaits::Drain( client );
-}
-
 // Receives on the coordinator, which runs its plugin, until the marker comes out.
 bool ReceiveUntilMarker( RakPeerInterface* coordinator )
 {
@@ -235,7 +220,7 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
     coordinator->AttachPlugin( &coordinatorPlugin );
 
     for( RakPeerInterface* peer : { serverA, serverB, source, target, other } )
-        Connect( coordinator, peer );
+        ConnectionWaits::ConnectAndWait( peer, coordinator );
     // Each as the coordinator sees it, which is what it writes and keys on.
     const SystemAddress serverAAddress = coordinator->GetSystemAddressFromGuid( serverA->GetMyGUID() );
     const SystemAddress serverBAddress = coordinator->GetSystemAddressFromGuid( serverB->GetMyGUID() );

@@ -107,9 +107,7 @@ TEST_CASE( "NatPunchthroughServer refuses a punchthrough request to the sender's
     RakPeerInterface* client = peers.Client();
     server->AttachPlugin( &punchServer );
 
-    REQUIRE( client->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    ConnectionWaits::WaitForConnectionCounts( &client, 1, 1 );
-    ConnectionWaits::WaitForConnectionCounts( &server, 1, 1 );
+    ConnectionWaits::ConnectAndWait( client, server );
 
     const SystemAddress serverAddress( "127.0.0.1", kServerPort );
     SendPunchthroughRequest( client, client->GetMyGUID(), serverAddress );
@@ -135,13 +133,10 @@ TEST_CASE( "NatPunchthroughServer ignores a punchthrough request from a system i
     RakPeerInterface* server = peers.Server( kServerPort );
     RakPeerInterface* client = peers.Client();
 
-    REQUIRE( client->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    ConnectionWaits::WaitForConnectionCounts( &client, 1, 1 );
-    ConnectionWaits::WaitForConnectionCounts( &server, 1, 1 );
+    ConnectionWaits::ConnectAndWait( client, server );
 
-    // Attached after the connection, and after Receive has handed out its
+    // Attached after the connection, and after ConnectAndWait's drain has handed out its
     // ID_NEW_INCOMING_CONNECTION, so OnNewConnection never runs and the client has no User.
-    ConnectionWaits::Drain( server );
     server->AttachPlugin( &punchServer );
 
     const SystemAddress serverAddress( "127.0.0.1", kServerPort );

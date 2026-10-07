@@ -235,10 +235,7 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
     RakPeerInterface* server = peers.Server( 30000, 1 );
     RakPeerInterface* client = peers.Client();
 
-    REQUIRE( client->Connect( "127.0.0.1", 30000, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    RakPeerInterface* both[] = { server, client };
-    ConnectionWaits::WaitForConnectionCounts( both, 2, 1 );
-    ConnectionWaits::Drain( server );
+    ConnectionWaits::ConnectAndWait( client, server );
     REQUIRE( ConnectionWaits::WaitUntil( [&] { return server->GetReceiveBufferSize() == 0; }, kWaitBudgetMs ) );
 
     RawSystem pinger( SystemAddress( "127.0.0.1", 30000 ), 0x52 );

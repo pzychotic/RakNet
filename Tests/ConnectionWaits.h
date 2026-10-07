@@ -26,8 +26,8 @@ class RakPeerInterface;
  *  IS_NOT_CONNECTED - a peer whose connection attempt just failed satisfies this
  *  wait immediately. Reading these names as "wait until connected" is what made
  *  the suite's one flaky test flaky. If a test needs peers to actually be
- *  connected, it must assert that separately - WaitForConnectionCounts below is
- *  the wait that does it.
+ *  connected, it must assert that separately - WaitForConnectionCounts and
+ *  ConnectAndWait below are the waits that do it.
  *
  *  The bound is an absolute deadline, not a per-call budget. Handing each of 256
  *  clients its own budget makes the worst case 256 x budget, which bounds nothing.
@@ -43,7 +43,8 @@ constexpr RakNet::TimeMS kSettleBudget = 60000;
 
 // The count wait's own hang guard, tighter than the settle budget because the
 // counts come good in one poll or not at all: the 256-client callers reach their
-// counts inside the first poll.
+// counts inside the first poll. ConnectAndWait shares it: one loopback handshake
+// is a few update cycles, tens of milliseconds.
 // Not scaled by peer count either.
 constexpr RakNet::TimeMS kConnectionCountBudget = 10000;
 
@@ -211,6 +212,23 @@ void WaitForAttemptsToBeCancelled( RakNet::RakPeerInterface* const* peers, int c
 // wait that quietly ate their packets would be a worse surprise than the queue a
 // sub-second bounded wait can accumulate.
 void WaitForDisconnect( RakNet::RakPeerInterface* peer, RakNet::SystemAddress addr );
+
+// The connected-pair shape: client connects to 127.0.0.1 on the port of server's
+// first bound socket, then this blocks until each end reports IS_CONNECTED toward
+// the other, under a deadline at now + kConnectionCountBudget. Both ends are keyed
+// by GUID: the server toward client->GetMyGUID(), the client toward
+// server->GetMyGUID(), so neither depends on which address the other sees.
+//
+// Unlike every wait above, it drains: both peers every poll, client first, and
+// both once more after the wait, so the connect's own Messages are gone when it
+// returns. Plugins attached before the call see them through that Receive.
+//
+// Not for a test that runs its own update cycles under RAKPEER_USER_THREADED:
+// this runs none.
+//
+// Its own loop rather than DrainUntil, whose bool cannot say which end was behind.
+// Expiry FAILs naming each end that was not connected and the state it was in.
+void ConnectAndWait( RakNet::RakPeerInterface* client, RakNet::RakPeerInterface* server );
 
 // Has the absolute deadline passed? TimeMS is uint32_t and wraps roughly every
 // 49 days, so a deadline cannot be compared with a plain >=; the signed

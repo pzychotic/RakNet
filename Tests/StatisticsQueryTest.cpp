@@ -115,6 +115,8 @@ private:
     int userMessagesReceived = 0;
 };
 
+// Not ConnectionWaits::ConnectAndWait, which runs no update cycle: under
+// RAKPEER_USER_THREADED the wait has to pump both peers itself.
 bool Connect( Peer& client, Peer& server )
 {
     if( client->Connect( "127.0.0.1", server.Address().GetPort(), 0, 0 ) != CONNECTION_ATTEMPT_STARTED )

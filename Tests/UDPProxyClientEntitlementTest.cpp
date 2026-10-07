@@ -201,21 +201,6 @@ void WriteResult( BitStream& bs, MessageID resultId, const SystemAddress& source
     }
 }
 
-void Connect( RakPeerInterface* client, RakPeerInterface* server )
-{
-    REQUIRE( client->Connect( "127.0.0.1", kClientPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    const TimeMS deadline = GetTimeMS() + ConnectionWaits::kConnectionCountBudget;
-    while( server->GetConnectionState( client->GetMyGUID() ) != IS_CONNECTED ||
-           client->GetConnectionState( server->GetMyGUID() ) != IS_CONNECTED )
-    {
-        REQUIRE( !ConnectionWaits::Expired( deadline ) );
-        ConnectionWaits::Drain( server );
-        ConnectionWaits::Drain( client );
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    ConnectionWaits::Drain( server );
-}
-
 SystemAddress Loopback( unsigned short port )
 {
     return SystemAddress( "127.0.0.1", port );
@@ -238,8 +223,8 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
     peers.Client( kListenerPort );
     client->AttachPlugin( &proxyClient );
 
-    Connect( coordinator, client );
-    Connect( other, client );
+    ConnectionWaits::ConnectAndWait( coordinator, client );
+    ConnectionWaits::ConnectAndWait( other, client );
     const SystemAddress coordinatorAddress = client->GetSystemAddressFromGuid( coordinator->GetMyGUID() );
 
     SECTION( "With nothing designated, nothing is acted on" )
@@ -310,7 +295,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
         REQUIRE( WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION ) );
 
         // The same address again, but not the same designation.
-        Connect( coordinator, client );
+        ConnectionWaits::ConnectAndWait( coordinator, client );
         REQUIRE( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) == coordinatorAddress );
 
         BitStream pingServers;
@@ -336,7 +321,7 @@ TEST_CASE( "UDPProxyClient pings exactly the servers a ping-servers Message list
     RakPeerInterface* coordinator = peers.Client( kCoordinatorPort );
     client->AttachPlugin( &proxyClient );
 
-    Connect( coordinator, client );
+    ConnectionWaits::ConnectAndWait( coordinator, client );
     proxyClient.AddCoordinator( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) );
 
     // Nothing listens on either, so no pong completes the group before it is looked at.
@@ -367,8 +352,8 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
     RakPeerInterface* other = peers.Client();
     client->AttachPlugin( &proxyClient );
 
-    Connect( coordinator, client );
-    Connect( other, client );
+    ConnectionWaits::ConnectAndWait( coordinator, client );
+    ConnectionWaits::ConnectAndWait( other, client );
     const SystemAddress coordinatorAddress = client->GetSystemAddressFromGuid( coordinator->GetMyGUID() );
     // What the coordinator writes as the source, whatever source was passed.
     const SystemAddress requester = coordinator->GetSystemAddressFromGuid( client->GetMyGUID() );
@@ -485,7 +470,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
         ConnectionWaits::WaitForDisconnect( coordinator, Loopback( kClientPort ) );
         REQUIRE( WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION ) );
 
-        Connect( coordinator, client );
+        ConnectionWaits::ConnectAndWait( coordinator, client );
         REQUIRE( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) == coordinatorAddress );
 
         BitStream result;
@@ -508,7 +493,7 @@ TEST_CASE( "UDPProxyClient times out and caps its outstanding requests", "[udppr
     RakPeerInterface* coordinator = peers.Client( kCoordinatorPort );
     client->AttachPlugin( &proxyClient );
 
-    Connect( coordinator, client );
+    ConnectionWaits::ConnectAndWait( coordinator, client );
     const SystemAddress coordinatorAddress = client->GetSystemAddressFromGuid( coordinator->GetMyGUID() );
     const SystemAddress requester = coordinator->GetSystemAddressFromGuid( client->GetMyGUID() );
 

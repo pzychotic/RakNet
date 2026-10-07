@@ -70,6 +70,8 @@ TEST_CASE( "A blocking Shutdown sends each connected System a disconnection noti
     const SystemAddress addressA( "127.0.0.1", kPortA );
     const SystemAddress addressB( "127.0.0.1", kPortB );
 
+    // Not ConnectionWaits::ConnectAndWait, which runs no update cycle: under
+    // RAKPEER_USER_THREADED the wait has to run both peers' cycles itself.
     REQUIRE( a->Connect( "127.0.0.1", kPortB, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
     TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
     while( ( a->GetConnectionState( addressB ) != IS_CONNECTED || b->GetConnectionState( addressA ) != IS_CONNECTED ) &&

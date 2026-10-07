@@ -101,22 +101,6 @@ private:
     std::atomic<unsigned long long> cycles{ 0 };
 };
 
-/// Connects \a client to \a server and waits until each connection record says so.
-void Connect( ViewedPeer& client, ViewedPeer& server )
-{
-    const SystemAddress serverAddress = server.Address();
-    const SystemAddress clientAddress = client.Address();
-    REQUIRE( client.Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    RakPeerInterface* const both[] = { &client, &server };
-    REQUIRE( ConnectionWaits::DrainUntil(
-        both, 2,
-        [&] {
-            return client.GetConnectionState( serverAddress ) == IS_CONNECTED &&
-                   server.GetConnectionState( clientAddress ) == IS_CONNECTED;
-        },
-        kWaitBudgetMs ) );
-}
-
 /// Checks that \a peer's view finds \a other by address, by RakNetGUID and at \a index,
 /// connected, and that all three lookups agree.
 void CheckViewFinds( const ViewedPeer& peer, const SystemAddress& otherAddress, const RakNetGUID& otherGuid, unsigned int index )
@@ -159,7 +143,7 @@ TEST_CASE( "The published view finds a connected System by address, RakNetGUID a
     const SystemAddress serverAddress = server.Address();
     const SystemAddress clientAddress = client.Address();
 
-    Connect( client, server );
+    ConnectionWaits::ConnectAndWait( &client, &server );
 
     const int serverIndex = client.GetIndexFromSystemAddress( serverAddress );
     const int clientIndex = server.GetIndexFromSystemAddress( clientAddress );
@@ -212,7 +196,7 @@ TEST_CASE( "Shutdown empties the published view", "[network]" )
 
     const SystemAddress serverAddress = server.Address();
 
-    Connect( client, server );
+    ConnectionWaits::ConnectAndWait( &client, &server );
 
     const int serverIndex = client.GetIndexFromSystemAddress( serverAddress );
     REQUIRE( serverIndex >= 0 );
@@ -235,7 +219,7 @@ TEST_CASE( "Receive delivers a timestamped Message without going to the connecti
     ViewedPeer client;
     client.Start( 0 );
 
-    Connect( client, server );
+    ConnectionWaits::ConnectAndWait( &client, &server );
 
     BitStream message;
     message.Write( (MessageID)ID_TIMESTAMP );

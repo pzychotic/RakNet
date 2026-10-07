@@ -186,9 +186,7 @@ TEST_CASE( "NatTypeDetectionServer answers NAT_TYPE_UNKNOWN when one of its sock
 
     server.Startup( unbound == 2 ? kUnboundIP : "127.0.0.1", unbound == 3 ? kUnboundIP : "127.0.0.1", unbound == 4 ? kUnboundIP : "127.0.0.1" );
 
-    REQUIRE( clientPeer->Connect( "127.0.0.1", kServerPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    ConnectionWaits::WaitForConnectionCounts( &clientPeer, 1, 1 );
-    ConnectionWaits::WaitForConnectionCounts( &serverPeer, 1, 1 );
+    ConnectionWaits::ConnectAndWait( clientPeer, serverPeer );
 
     client.DetectNATType( SystemAddress( "127.0.0.1", kServerPort ) );
 

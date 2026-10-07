@@ -147,6 +147,8 @@ TEST_CASE( "GetSocket returns the socket a connection uses, and null for an addr
     const SystemAddress clientAddress = Loopback( kConnectionClientPort );
     REQUIRE( client->Connect( "127.0.0.1", kConnectionServerSecondPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
 
+    // Not ConnectionWaits::ConnectAndWait, which connects to the first socket and runs no
+    // update cycle: under RAKPEER_USER_THREADED the wait has to pump both peers itself.
     const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
     while( client->GetConnectionState( serverAddress ) != IS_CONNECTED || server->GetConnectionState( clientAddress ) != IS_CONNECTED )
     {

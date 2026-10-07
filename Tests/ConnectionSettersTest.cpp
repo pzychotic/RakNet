@@ -88,18 +88,6 @@ private:
     SystemAddress address;
 };
 
-/// Connects \a client to \a server and waits until both views show it.
-bool ConnectAndWait( BoundPeer& client, BoundPeer& server )
-{
-    if( client->Connect( "127.0.0.1", server.Address().GetPort(), 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
-        return false;
-    RakPeerInterface* const both[] = { client.Get(), server.Get() };
-    return ConnectionWaits::DrainUntil(
-        both, 2,
-        [&] { return client->GetConnectionState( server.Address() ) == IS_CONNECTED && server->GetConnectionState( client.Address() ) == IS_CONNECTED; },
-        kWaitBudgetMs );
-}
-
 /// Receives on \a peer until a Message with \a id arrives, or the budget is spent.
 bool WaitForMessage( RakPeerInterface* peer, unsigned char id )
 {
@@ -133,8 +121,8 @@ TEST_CASE( "SetTimeoutTime reaches an open connection a few cycles later", "[net
     BoundPeer server( kTimeoutServerPort, 2 );
     BoundPeer first( kTimeoutClientBasePort, 1 );
     BoundPeer second( (unsigned short)( kTimeoutClientBasePort + 1 ), 1 );
-    REQUIRE( ConnectAndWait( first, server ) );
-    REQUIRE( ConnectAndWait( second, server ) );
+    ConnectionWaits::ConnectAndWait( first.Get(), server.Get() );
+    ConnectionWaits::ConnectAndWait( second.Get(), server.Get() );
 
     const TimeMS defaultTimeout = server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS );
     REQUIRE( defaultTimeout != kOneConnectionTimeout );
@@ -188,12 +176,12 @@ TEST_CASE( "A split-message progress interval reaches connections opened before 
     {
         server->SetSplitMessageProgressInterval( 1 );
         CHECK( server->GetSplitMessageProgressInterval() == 1 );
-        REQUIRE( ConnectAndWait( client, server ) );
+        ConnectionWaits::ConnectAndWait( client.Get(), server.Get() );
     }
 
     SECTION( "set while the connection is open" )
     {
-        REQUIRE( ConnectAndWait( client, server ) );
+        ConnectionWaits::ConnectAndWait( client.Get(), server.Get() );
         server->SetSplitMessageProgressInterval( 1 );
         CHECK( server->GetSplitMessageProgressInterval() == 1 );
         // The setter only queues a command, and nothing the user thread can read shows when
@@ -209,7 +197,7 @@ TEST_CASE( "ApplyNetworkSimulator reaches an open connection", "[network]" )
 {
     BoundPeer server( kSimulatorServerPort, 1 );
     BoundPeer client( kSimulatorClientPort, 1 );
-    REQUIRE( ConnectAndWait( client, server ) );
+    ConnectionWaits::ConnectAndWait( client.Get(), server.Get() );
 
     client->ApplyNetworkSimulator( 0.0f, kSimulatedPingMs, 0 );
     if( client->IsNetworkSimulatorActive() == false )

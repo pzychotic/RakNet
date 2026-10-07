@@ -75,23 +75,6 @@ constexpr TimeMS kStepBudgetMs = 5000;
 
 constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
 
-// Connects client to 127.0.0.1:port and waits until both ends say so.
-void Connect( RakPeerInterface* server, unsigned short port, RakPeerInterface* client )
-{
-    REQUIRE( client->Connect( "127.0.0.1", port, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    const SystemAddress serverAddress( "127.0.0.1", port );
-    const TimeMS deadline = GetTimeMS() + ConnectionWaits::kConnectionCountBudget;
-    while( server->GetConnectionState( client->GetMyGUID() ) != IS_CONNECTED ||
-           client->GetConnectionState( serverAddress ) != IS_CONNECTED )
-    {
-        REQUIRE( !ConnectionWaits::Expired( deadline ) );
-        ConnectionWaits::Drain( server );
-        ConnectionWaits::Drain( client );
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    ConnectionWaits::Drain( client );
-}
-
 // Receives on receiver, which runs its plugins, until the marker comes out.
 bool ReceiveUntilMarker( RakPeerInterface* receiver )
 {
@@ -467,8 +450,8 @@ TEST_CASE( "RelayPlugin holds one group per participant", "[relay][network]" )
     RakPeerInterface* looper = peers.Client();
     RakPeerInterface* other = peers.Client();
     server->AttachPlugin( &relay );
-    Connect( server, kRelayPort, looper );
-    Connect( server, kRelayPort, other );
+    ConnectionWaits::ConnectAndWait( looper, server );
+    ConnectionWaits::ConnectAndWait( other, server );
 
     std::deque<BitStream> storage;
 
@@ -543,8 +526,8 @@ TEST_CASE( "RelayPlugin drops a message to a participant whose send parameters a
     RakPeerInterface* sender = peers.Client();
     RakPeerInterface* target = peers.Client();
     server->AttachPlugin( &relay );
-    Connect( server, kRelayPort, sender );
-    Connect( server, kRelayPort, target );
+    ConnectionWaits::ConnectAndWait( sender, server );
+    ConnectionWaits::ConnectAndWait( target, server );
 
     std::deque<BitStream> storage;
     Inject( sender, server, *RelayAdd( storage, "sender" ) );
@@ -591,8 +574,8 @@ TEST_CASE( "RelayPlugin forwards a message relayed with a receipt reliability wi
     RakPeerInterface* sender = peers.Client();
     RakPeerInterface* target = peers.Client();
     server->AttachPlugin( &relay );
-    Connect( server, kRelayPort, sender );
-    Connect( server, kRelayPort, target );
+    ConnectionWaits::ConnectAndWait( sender, server );
+    ConnectionWaits::ConnectAndWait( target, server );
 
     std::deque<BitStream> storage;
     Inject( sender, server, *RelayAdd( storage, "sender" ) );
@@ -637,7 +620,7 @@ TEST_CASE( "RelayPlugin forwards a group message with the sender's reliability a
     std::deque<BitStream> storage;
     for( auto [member, name] : { std::pair{ sender, "sender" }, std::pair{ first, "first" }, std::pair{ second, "second" } } )
     {
-        Connect( server, kRelayPort, member );
+        ConnectionWaits::ConnectAndWait( member, server );
         JoinRelayGroup( server, relay, member, storage, name, "group" );
     }
 
@@ -666,8 +649,8 @@ TEST_CASE( "RelayPlugin drops a group message whose send parameters are out of r
     RakPeerInterface* sender = peers.Client();
     RakPeerInterface* target = peers.Client();
     server->AttachPlugin( &relay );
-    Connect( server, kRelayPort, sender );
-    Connect( server, kRelayPort, target );
+    ConnectionWaits::ConnectAndWait( sender, server );
+    ConnectionWaits::ConnectAndWait( target, server );
 
     std::deque<BitStream> storage;
     JoinRelayGroup( server, relay, sender, storage, "sender", "group" );
@@ -717,7 +700,7 @@ TEST_CASE( "RelayPlugin forwards a group message sent with a receipt reliability
     std::deque<BitStream> storage;
     for( auto [member, name] : { std::pair{ sender, "sender" }, std::pair{ first, "first" }, std::pair{ second, "second" } } )
     {
-        Connect( server, kRelayPort, member );
+        ConnectionWaits::ConnectAndWait( member, server );
         JoinRelayGroup( server, relay, member, storage, name, "group" );
     }
 
@@ -754,7 +737,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
     RakPeerInterface* other = peers.Client();
     coordinator->AttachPlugin( &coordinatorPlugin );
     for( RakPeerInterface* peer : { proxyServer, requester, other } )
-        Connect( coordinator, kCoordinatorPort, peer );
+        ConnectionWaits::ConnectAndWait( peer, coordinator );
     const SystemAddress requesterAddress = coordinator->GetSystemAddressFromGuid( requester->GetMyGUID() );
     const SystemAddress otherAddress = coordinator->GetSystemAddressFromGuid( other->GetMyGUID() );
 
@@ -831,8 +814,8 @@ TEST_CASE( "UDPProxyClient holds one bounded ping group per coordinator", "[udpp
     RakPeerInterface* coordinator = peers.Client();
     RakPeerInterface* otherCoordinator = peers.Client();
     client->AttachPlugin( &proxyClient );
-    Connect( client, kProxyClientPort, coordinator );
-    Connect( client, kProxyClientPort, otherCoordinator );
+    ConnectionWaits::ConnectAndWait( coordinator, client );
+    ConnectionWaits::ConnectAndWait( otherCoordinator, client );
     const SystemAddress coordinatorAddress = client->GetSystemAddressFromGuid( coordinator->GetMyGUID() );
     proxyClient.AddCoordinator( coordinatorAddress );
     proxyClient.AddCoordinator( client->GetSystemAddressFromGuid( otherCoordinator->GetMyGUID() ) );
@@ -907,8 +890,8 @@ TEST_CASE( "TwoWayAuthentication caps the nonces a System holds", "[twowayauth][
     RakPeerInterface* challenger = peers.Client();
     server->AttachPlugin( &auth );
     challenger->AttachPlugin( &challengerAuth );
-    Connect( server, kAuthPort, flooder );
-    Connect( server, kAuthPort, challenger );
+    ConnectionWaits::ConnectAndWait( flooder, server );
+    ConnectionWaits::ConnectAndWait( challenger, server );
     const RakNetGUID flooderGuid = flooder->GetMyGUID();
 
     CHECK( auth.GetMaxNoncesPerSystem() == 4 );

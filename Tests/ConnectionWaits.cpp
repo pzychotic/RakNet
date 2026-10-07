@@ -138,6 +138,48 @@ void ConnectionWaits::WaitForConnectionCounts( RakPeerInterface* const* peers, i
     }
 }
 
+void ConnectionWaits::ConnectAndWait( RakPeerInterface* client, RakPeerInterface* server )
+{
+    const unsigned short serverPort = server->GetMyBoundAddress().GetPort();
+    REQUIRE( client->Connect( "127.0.0.1", serverPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
+
+    const TimeMS deadline = GetTimeMS() + kConnectionCountBudget;
+
+    for( ;; )
+    {
+        Drain( client );
+        Drain( server );
+
+        const ConnectionState clientState = client->GetConnectionState( server->GetMyGUID() );
+        const ConnectionState serverState = server->GetConnectionState( client->GetMyGUID() );
+        if( clientState == IS_CONNECTED && serverState == IS_CONNECTED )
+        {
+            break;
+        }
+
+        if( Expired( deadline ) )
+        {
+            std::ostringstream report;
+            if( clientState != IS_CONNECTED )
+            {
+                report << "\n  client toward server: " << ToString( clientState );
+            }
+            if( serverState != IS_CONNECTED )
+            {
+                report << "\n  server toward client: " << ToString( serverState );
+            }
+
+            FAIL( "connection to port " << serverPort << " not open at both ends after "
+                                        << kConnectionCountBudget << " ms:" << report.str() );
+        }
+
+        std::this_thread::sleep_for( std::chrono::milliseconds( kPollInterval ) );
+    }
+
+    Drain( client );
+    Drain( server );
+}
+
 void ConnectionWaits::WaitForAttemptsToBeCancelled( RakPeerInterface* const* peers, int count, SystemAddress addr )
 {
     const TimeMS deadline = GetTimeMS() + kCancelBudget;
