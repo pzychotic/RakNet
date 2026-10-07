@@ -3,7 +3,7 @@
 
 #include "BitStream.h"
 #include "ConnectionWaits.h"
-#include "GetTime.h"
+#include "MarkerInjection.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "RakNetStringMakers.h"
@@ -27,11 +27,11 @@ only if it answers a request this Peer made, from the coordinator it asked. Stoc
 them from any connected System: a ping-servers Message made the Peer ping every address it
 listed, and a notification made it ping an address of the sender's choosing.
 
-Each injected Message is followed by a user Message on the same ordered channel, so once the
-user Message comes out of Receive the injected one has been through the plugin.
+Each forged Message is checked through MarkerInjection.
 */
 
 using namespace RakNet;
+using MarkerInjection::Contains;
 
 namespace {
 
@@ -41,15 +41,13 @@ constexpr unsigned short kListenerPort = 30003;
 // Nothing listens here or on the port after it.
 constexpr unsigned short kSilentPort = 30010;
 
-// Hang guard for the marker Message and for a pong. On loopback each arrives a few update
-// cycles after the send, tens of milliseconds.
-constexpr TimeMS kMarkerBudgetMs = 5000;
+// Hang guard for a pong and for a disconnection notification. On loopback each arrives a
+// few update cycles after the send, tens of milliseconds.
+constexpr TimeMS kReplyBudgetMs = 5000;
 
 // How long a test watches for a pong that must not come. A ping to loopback is answered
 // within a few update cycles.
 constexpr TimeMS kNoPongWindowMs = 300;
-
-constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
 
 constexpr TimeMS kRequestTimeoutMs = 10000;
 
@@ -96,44 +94,6 @@ struct RecordingHandler : public UDPProxyClientResultHandler
         inProgress++;
     }
 };
-
-// Receives until the marker comes out, and reports whether an ID_UNCONNECTED_PONG came
-// out before it.
-bool ReceiveUntilMarker( RakPeerInterface* peer, bool* sawPong )
-{
-    const TimeMS deadline = GetTimeMS() + kMarkerBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            const MessageID id = packet->data[0];
-            peer->DeallocatePacket( packet );
-            if( id == ID_UNCONNECTED_PONG && sawPong != nullptr )
-                *sawPong = true;
-            if( id == kMarker )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
-// Sends message from sender to target, then the marker, and receives on target until the
-// marker comes out. Returns whether an ID_UNCONNECTED_PONG came out on the way.
-bool Inject( RakPeerInterface* sender, RakPeerInterface* target, BitStream& message )
-{
-    const SystemAddress targetAddress = sender->GetSystemAddressFromGuid( target->GetMyGUID() );
-    sender->Send( &message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetAddress, false );
-
-    BitStream marker;
-    marker.Write( kMarker );
-    sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetAddress, false );
-
-    bool sawPong = false;
-    REQUIRE( ReceiveUntilMarker( target, &sawPong ) );
-    ConnectionWaits::Drain( sender );
-    return sawPong;
-}
 
 // ID_UDP_PROXY_PING_SERVERS_FROM_COORDINATOR_TO_CLIENT, laid out as UDPProxyCoordinator
 // writes it.
@@ -195,14 +155,14 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
     {
         BitStream pingServers;
         WritePingServers( pingServers, { Loopback( kListenerPort ) } );
-        Inject( coordinator, client, pingServers );
+        MarkerInjection::Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
         BitStream notification;
         WriteResult( notification, ID_UDP_PROXY_FORWARDING_NOTIFICATION, kTargetAddress, Loopback( kClientPort ), kTargetGuid );
-        const bool pongBeforeMarker = Inject( coordinator, client, notification );
+        const std::vector<MessageID> received = MarkerInjection::Inject( coordinator, client, notification );
         CHECK( handler.notifications == 0 );
-        CHECK( !pongBeforeMarker );
+        CHECK( !Contains( received, ID_UNCONNECTED_PONG ) );
         CHECK( !ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kNoPongWindowMs ) );
     }
 
@@ -212,26 +172,26 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
 
         BitStream forgedPingServers;
         WritePingServers( forgedPingServers, { Loopback( kListenerPort ) } );
-        Inject( other, client, forgedPingServers );
+        MarkerInjection::Inject( other, client, forgedPingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
         BitStream pingServers;
         WritePingServers( pingServers, { Loopback( kListenerPort ) } );
-        Inject( coordinator, client, pingServers );
+        MarkerInjection::Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.size() == 1 );
 
         BitStream forgedNotification;
         WriteResult( forgedNotification, ID_UDP_PROXY_FORWARDING_NOTIFICATION, kTargetAddress, Loopback( kClientPort ), kTargetGuid );
-        const bool forgedPong = Inject( other, client, forgedNotification );
+        const std::vector<MessageID> forged = MarkerInjection::Inject( other, client, forgedNotification );
         CHECK( handler.notifications == 0 );
-        CHECK( !forgedPong );
+        CHECK( !Contains( forged, ID_UNCONNECTED_PONG ) );
         CHECK( !ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kNoPongWindowMs ) );
 
         BitStream notification;
         WriteResult( notification, ID_UDP_PROXY_FORWARDING_NOTIFICATION, kTargetAddress, Loopback( kClientPort ), kTargetGuid );
-        const bool pong = Inject( coordinator, client, notification );
+        const std::vector<MessageID> genuine = MarkerInjection::Inject( coordinator, client, notification );
         CHECK( handler.notifications == 1 );
-        CHECK( ( pong || ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kMarkerBudgetMs ) ) );
+        CHECK( ( Contains( genuine, ID_UNCONNECTED_PONG ) || ConnectionWaits::WaitForMessage( client, ID_UNCONNECTED_PONG, kReplyBudgetMs ) ) );
     }
 
     SECTION( "RemoveCoordinator withdraws the designation" )
@@ -241,12 +201,12 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
 
         BitStream pingServers;
         WritePingServers( pingServers, { Loopback( kListenerPort ) } );
-        Inject( coordinator, client, pingServers );
+        MarkerInjection::Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
         BitStream notification;
         WriteResult( notification, ID_UDP_PROXY_FORWARDING_NOTIFICATION, kTargetAddress, Loopback( kClientPort ), kTargetGuid );
-        Inject( coordinator, client, notification );
+        MarkerInjection::Inject( coordinator, client, notification );
         CHECK( handler.notifications == 0 );
     }
 
@@ -256,7 +216,7 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
 
         coordinator->CloseConnection( Loopback( kClientPort ), true );
         ConnectionWaits::WaitForDisconnect( coordinator, Loopback( kClientPort ) );
-        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION, kMarkerBudgetMs ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION, kReplyBudgetMs ) );
 
         // The same address again, but not the same designation.
         ConnectionWaits::ConnectAndWait( coordinator, client );
@@ -264,12 +224,12 @@ TEST_CASE( "UDPProxyClient pings only for a Designated coordinator", "[udpproxy]
 
         BitStream pingServers;
         WritePingServers( pingServers, { Loopback( kListenerPort ) } );
-        Inject( coordinator, client, pingServers );
+        MarkerInjection::Inject( coordinator, client, pingServers );
         CHECK( proxyClient.pingServerGroups.empty() );
 
         BitStream notification;
         WriteResult( notification, ID_UDP_PROXY_FORWARDING_NOTIFICATION, kTargetAddress, Loopback( kClientPort ), kTargetGuid );
-        Inject( coordinator, client, notification );
+        MarkerInjection::Inject( coordinator, client, notification );
         CHECK( handler.notifications == 0 );
     }
 
@@ -293,7 +253,7 @@ TEST_CASE( "UDPProxyClient pings exactly the servers a ping-servers Message list
     // A reader that skips the GUID takes its top 16 bits as the server count.
     BitStream pingServers;
     WritePingServers( pingServers, servers, RakNetGUID( 0xFFFF000000000001ull ) );
-    Inject( coordinator, client, pingServers );
+    MarkerInjection::Inject( coordinator, client, pingServers );
 
     REQUIRE( proxyClient.pingServerGroups.size() == 1 );
     std::vector<SystemAddress> pinged;
@@ -329,7 +289,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
         {
             BitStream result;
             WriteResult( result, resultId, requester, kTargetAddress, kTargetGuid );
-            Inject( coordinator, client, result );
+            MarkerInjection::Inject( coordinator, client, result );
         }
         CHECK( handler.Total() == 0 );
     }
@@ -340,13 +300,13 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
 
         BitStream forged;
         WriteResult( forged, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
-        Inject( other, client, forged );
+        MarkerInjection::Inject( other, client, forged );
         CHECK( handler.Total() == 0 );
 
         // The request is still outstanding.
         BitStream genuine;
         WriteResult( genuine, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
-        Inject( coordinator, client, genuine );
+        MarkerInjection::Inject( coordinator, client, genuine );
         CHECK( handler.successes == 1 );
     }
 
@@ -356,7 +316,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
 
         BitStream otherGuid;
         WriteResult( otherGuid, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, RakNetGUID( 2002 ) );
-        Inject( coordinator, client, otherGuid );
+        MarkerInjection::Inject( coordinator, client, otherGuid );
         CHECK( handler.Total() == 0 );
     }
 
@@ -367,7 +327,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
 
         BitStream genuine;
         WriteResult( genuine, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
-        Inject( coordinator, client, genuine );
+        MarkerInjection::Inject( coordinator, client, genuine );
         CHECK( handler.successes == 1 );
     }
 
@@ -377,12 +337,12 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
 
         BitStream otherAddress;
         WriteResult( otherAddress, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, SystemAddress( "10.0.1.3", 2003 ), UNASSIGNED_RAKNET_GUID );
-        Inject( coordinator, client, otherAddress );
+        MarkerInjection::Inject( coordinator, client, otherAddress );
         CHECK( handler.Total() == 0 );
 
         BitStream genuine;
         WriteResult( genuine, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, UNASSIGNED_RAKNET_GUID );
-        Inject( coordinator, client, genuine );
+        MarkerInjection::Inject( coordinator, client, genuine );
         CHECK( handler.successes == 1 );
     }
 
@@ -394,7 +354,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
         {
             BitStream inProgress;
             WriteResult( inProgress, ID_UDP_PROXY_IN_PROGRESS, requester, kTargetAddress, kTargetGuid );
-            Inject( coordinator, client, inProgress );
+            MarkerInjection::Inject( coordinator, client, inProgress );
         }
         CHECK( handler.inProgress == 2 );
 
@@ -402,7 +362,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
         {
             BitStream success;
             WriteResult( success, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
-            Inject( coordinator, client, success );
+            MarkerInjection::Inject( coordinator, client, success );
         }
         CHECK( handler.successes == 1 );
         CHECK( handler.Total() == 3 );
@@ -417,7 +377,7 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
             {
                 BitStream result;
                 WriteResult( result, resultId, requester, kTargetAddress, kTargetGuid );
-                Inject( coordinator, client, result );
+                MarkerInjection::Inject( coordinator, client, result );
             }
         }
         CHECK( handler.allServersBusy == 1 );
@@ -432,14 +392,14 @@ TEST_CASE( "UDPProxyClient takes a result only for a request it made, from the c
 
         coordinator->CloseConnection( Loopback( kClientPort ), true );
         ConnectionWaits::WaitForDisconnect( coordinator, Loopback( kClientPort ) );
-        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION, kMarkerBudgetMs ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( client, ID_DISCONNECTION_NOTIFICATION, kReplyBudgetMs ) );
 
         ConnectionWaits::ConnectAndWait( coordinator, client );
         REQUIRE( client->GetSystemAddressFromGuid( coordinator->GetMyGUID() ) == coordinatorAddress );
 
         BitStream result;
         WriteResult( result, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
-        Inject( coordinator, client, result );
+        MarkerInjection::Inject( coordinator, client, result );
         CHECK( handler.Total() == 0 );
     }
 
@@ -469,7 +429,7 @@ TEST_CASE( "UDPProxyClient times out and caps its outstanding requests", "[udppr
 
         BitStream late;
         WriteResult( late, ID_UDP_PROXY_FORWARDING_SUCCEEDED, requester, kTargetAddress, kTargetGuid );
-        Inject( coordinator, client, late );
+        MarkerInjection::Inject( coordinator, client, late );
         CHECK( handler.Total() == 0 );
     }
 
@@ -484,7 +444,7 @@ TEST_CASE( "UDPProxyClient times out and caps its outstanding requests", "[udppr
 
         BitStream final;
         WriteResult( final, ID_UDP_PROXY_NO_SERVERS_ONLINE, requester, kTargetAddress, RakNetGUID( 3000 ) );
-        Inject( coordinator, client, final );
+        MarkerInjection::Inject( coordinator, client, final );
         CHECK( handler.noServersOnline == 1 );
         CHECK( proxyClient.RequestForwarding( coordinatorAddress, UNASSIGNED_SYSTEM_ADDRESS, kTargetGuid, kRequestTimeoutMs ) );
     }

@@ -134,6 +134,8 @@ set( RAKNET_TEST_SUPPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/CommonFunctions.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectionWaits.h
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectionWaits.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MarkerInjection.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/MarkerInjection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerScope.h
     ${CMAKE_CURRENT_SOURCE_DIR}/PeerScope.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakNetStringMakers.h

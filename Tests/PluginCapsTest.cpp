@@ -10,6 +10,7 @@
 #include "ConnectionWaits.h"
 #include "GetTime.h"
 #include "InternalPacket.h"
+#include "MarkerInjection.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "PluginInterface2.h"
@@ -54,8 +55,7 @@ Pins what a connected System can make a plugin hold (ADR-0005).
 
 Router2's cap is pinned in Router2EntitlementTest.
 
-Each injected Message is followed by a user Message on the same ordered channel, so once the
-user Message comes out of the receiver's Receive the injected one has been through its plugin.
+Each injected Message is checked through MarkerInjection.
 */
 
 using namespace RakNet;
@@ -69,49 +69,9 @@ constexpr unsigned short kAuthPort = 31063;
 // Nothing listens here.
 constexpr unsigned short kSilentPort = 31069;
 
-// Hang guard for the marker Message and for a reply. On loopback each arrives a few update
-// cycles after the send, tens of milliseconds.
+// Hang guard for a reply. On loopback it arrives a few update cycles after the send, tens of
+// milliseconds.
 constexpr TimeMS kStepBudgetMs = 5000;
-
-constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
-
-// Receives on receiver, which runs its plugins, until the marker comes out.
-bool ReceiveUntilMarker( RakPeerInterface* receiver )
-{
-    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = receiver->Receive(); packet != nullptr; packet = receiver->Receive() )
-        {
-            const bool marker = packet->data[0] == kMarker;
-            receiver->DeallocatePacket( packet );
-            if( marker )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
-
-// Sends each of messages from sender to receiver in order, then the marker, and receives on
-// receiver until the marker comes out.
-void Inject( RakPeerInterface* sender, RakPeerInterface* receiver, const std::vector<BitStream*>& messages )
-{
-    const SystemAddress receiverAddress = sender->GetSystemAddressFromGuid( receiver->GetMyGUID() );
-    for( BitStream* message : messages )
-        sender->Send( message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, receiverAddress, false );
-
-    BitStream marker;
-    marker.Write( kMarker );
-    sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, receiverAddress, false );
-
-    REQUIRE( ReceiveUntilMarker( receiver ) );
-}
-
-void Inject( RakPeerInterface* sender, RakPeerInterface* receiver, BitStream& message )
-{
-    Inject( sender, receiver, std::vector<BitStream*>{ &message } );
-}
 
 // Receives on server and on peer until peer's Receive hands out a Message whose first two
 // bytes are id and subId, and copies it into out. Anything else peer receives is dropped.
@@ -228,7 +188,7 @@ BitStream* RelayGroupMessage( std::deque<BitStream>& storage, unsigned char prio
 void JoinRelayGroup( RakPeerInterface* server, RelayProbe& relay, RakPeerInterface* member, std::deque<BitStream>& storage,
                      const std::string& name, const std::string& groupName )
 {
-    Inject( member, server, std::vector<BitStream*>{ RelayAdd( storage, name ), RelayJoin( storage, groupName ) } );
+    MarkerInjection::Inject( member, server, std::vector<BitStream*>{ RelayAdd( storage, name ), RelayJoin( storage, groupName ) } );
     REQUIRE( relay.IsParticipant( member->GetMyGUID() ) );
 }
 
@@ -463,12 +423,12 @@ TEST_CASE( "RelayPlugin holds one group per participant", "[relay][network]" )
             loop.push_back( RelayAdd( storage, "looper" + std::to_string( i ) ) );
             loop.push_back( RelayJoin( storage, "group" + std::to_string( i ) ) );
         }
-        Inject( looper, server, loop );
+        MarkerInjection::Inject( looper, server, loop );
         CHECK( relay.GroupCount() == 1 );
 
         // The plugin still serves another System
         std::vector<BitStream*> join{ RelayAdd( storage, "other" ), RelayJoin( storage, "shared" ) };
-        Inject( other, server, join );
+        MarkerInjection::Inject( other, server, join );
         BitStream reply;
         REQUIRE( AwaitMessage( server, other, ID_RELAY_PLUGIN, RPE_JOIN_GROUP_SUCCESS, reply ) );
         CHECK( relay.GroupCount() == 2 );
@@ -482,13 +442,13 @@ TEST_CASE( "RelayPlugin holds one group per participant", "[relay][network]" )
     {
         CHECK( relay.GetMaxNameLength() == 256 );
 
-        Inject( looper, server, *RelayAdd( storage, std::string( 257, 'n' ) ) );
+        MarkerInjection::Inject( looper, server, *RelayAdd( storage, std::string( 257, 'n' ) ) );
         BitStream refused;
         REQUIRE( AwaitMessage( server, looper, ID_RELAY_PLUGIN, RPE_ADD_CLIENT_NOT_ALLOWED, refused ) );
         CHECK( !relay.IsParticipant( looper->GetMyGUID() ) );
         CHECK( relay.GetNamesRefused() == 1 );
 
-        Inject( looper, server, *RelayAdd( storage, std::string( 256, 'n' ) ) );
+        MarkerInjection::Inject( looper, server, *RelayAdd( storage, std::string( 256, 'n' ) ) );
         BitStream added;
         REQUIRE( AwaitMessage( server, looper, ID_RELAY_PLUGIN, RPE_ADD_CLIENT_SUCCESS, added ) );
         CHECK( relay.IsParticipant( looper->GetMyGUID() ) );
@@ -500,13 +460,13 @@ TEST_CASE( "RelayPlugin holds one group per participant", "[relay][network]" )
         CHECK( relay.GetMaxNameLength() == 8 );
 
         std::vector<BitStream*> join{ RelayAdd( storage, "looper" ), RelayJoin( storage, "ninechars" ) };
-        Inject( looper, server, join );
+        MarkerInjection::Inject( looper, server, join );
         BitStream refused;
         REQUIRE( AwaitMessage( server, looper, ID_RELAY_PLUGIN, RPE_JOIN_GROUP_FAILURE, refused ) );
         CHECK( relay.GroupCount() == 0 );
         CHECK( relay.GetNamesRefused() == 1 );
 
-        Inject( looper, server, *RelayJoin( storage, "eightchr" ) );
+        MarkerInjection::Inject( looper, server, *RelayJoin( storage, "eightchr" ) );
         BitStream joined;
         REQUIRE( AwaitMessage( server, looper, ID_RELAY_PLUGIN, RPE_JOIN_GROUP_SUCCESS, joined ) );
         CHECK( relay.GroupCount() == 1 );
@@ -530,8 +490,8 @@ TEST_CASE( "RelayPlugin drops a message to a participant whose send parameters a
     ConnectionWaits::ConnectAndWait( target, server );
 
     std::deque<BitStream> storage;
-    Inject( sender, server, *RelayAdd( storage, "sender" ) );
-    Inject( target, server, *RelayAdd( storage, "target" ) );
+    MarkerInjection::Inject( sender, server, *RelayAdd( storage, "sender" ) );
+    MarkerInjection::Inject( target, server, *RelayAdd( storage, "target" ) );
     REQUIRE( relay.IsParticipant( sender->GetMyGUID() ) );
     REQUIRE( relay.IsParticipant( target->GetMyGUID() ) );
 
@@ -554,7 +514,7 @@ TEST_CASE( "RelayPlugin drops a message to a participant whose send parameters a
     // The second, always valid, bounds the wait for the first.
     std::vector<BitStream*> messages{ RelayToParticipant( storage, "target", priority, reliability, channel, kFirst ),
                                       RelayToParticipant( storage, "target", kTopPriority, kTopReliability, kTopChannel, kSecond ) };
-    Inject( sender, server, messages );
+    MarkerInjection::Inject( sender, server, messages );
 
     const bool allValid = priority == kTopPriority && reliability == kTopReliability && channel == kTopChannel;
     const std::vector<unsigned char> expected = allValid ? std::vector<unsigned char>{ kFirst, kSecond } : std::vector<unsigned char>{ kSecond };
@@ -578,8 +538,8 @@ TEST_CASE( "RelayPlugin forwards a message relayed with a receipt reliability wi
     ConnectionWaits::ConnectAndWait( target, server );
 
     std::deque<BitStream> storage;
-    Inject( sender, server, *RelayAdd( storage, "sender" ) );
-    Inject( target, server, *RelayAdd( storage, "target" ) );
+    MarkerInjection::Inject( sender, server, *RelayAdd( storage, "sender" ) );
+    MarkerInjection::Inject( target, server, *RelayAdd( storage, "target" ) );
     REQUIRE( relay.IsParticipant( sender->GetMyGUID() ) );
     REQUIRE( relay.IsParticipant( target->GetMyGUID() ) );
 
@@ -589,7 +549,7 @@ TEST_CASE( "RelayPlugin forwards a message relayed with a receipt reliability wi
     SECTION( "RELIABLE_ORDERED_WITH_ACK_RECEIPT" ) { reliability = RELIABLE_ORDERED_WITH_ACK_RECEIPT; }
 
     constexpr unsigned char kTag = 1;
-    Inject( sender, server, *RelayToParticipant( storage, "target", HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
+    MarkerInjection::Inject( sender, server, *RelayToParticipant( storage, "target", HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
 
     std::vector<MessageID> serverIds;
     CHECK( ForwardedTags( server, target, RPE_MESSAGE_TO_CLIENT_FROM_SERVER, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
@@ -626,7 +586,7 @@ TEST_CASE( "RelayPlugin forwards a group message with the sender's reliability a
 
     constexpr unsigned char kTag = 1;
     constexpr unsigned char kChannel = 3;
-    Inject( sender, server, *RelayGroupMessage( storage, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, kChannel, kTag ) );
+    MarkerInjection::Inject( sender, server, *RelayGroupMessage( storage, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, kChannel, kTag ) );
 
     // Priority does not cross the wire.
     const std::vector<std::pair<PacketReliability, unsigned char>> expected{ { UNRELIABLE_SEQUENCED, kChannel } };
@@ -675,7 +635,7 @@ TEST_CASE( "RelayPlugin drops a group message whose send parameters are out of r
     // The second, always valid, bounds the wait for the first.
     std::vector<BitStream*> messages{ RelayGroupMessage( storage, priority, reliability, channel, kFirst ),
                                       RelayGroupMessage( storage, kTopPriority, kTopReliability, kTopChannel, kSecond ) };
-    Inject( sender, server, messages );
+    MarkerInjection::Inject( sender, server, messages );
 
     const bool allValid = priority == kTopPriority && reliability == kTopReliability && channel == kTopChannel;
     const std::vector<unsigned char> expected = allValid ? std::vector<unsigned char>{ kFirst, kSecond } : std::vector<unsigned char>{ kSecond };
@@ -710,7 +670,7 @@ TEST_CASE( "RelayPlugin forwards a group message sent with a receipt reliability
     SECTION( "RELIABLE_ORDERED_WITH_ACK_RECEIPT" ) { reliability = RELIABLE_ORDERED_WITH_ACK_RECEIPT; }
 
     constexpr unsigned char kTag = 1;
-    Inject( sender, server, *RelayGroupMessage( storage, HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
+    MarkerInjection::Inject( sender, server, *RelayGroupMessage( storage, HIGH_PRIORITY, (unsigned char)reliability, 0, kTag ) );
 
     std::vector<MessageID> serverIds;
     CHECK( ForwardedTags( server, first, RPE_GROUP_MSG_FROM_SERVER, kTag, &serverIds ) == std::vector<unsigned char>{ kTag } );
@@ -746,7 +706,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
     login.Write( (MessageID)ID_UDP_PROXY_GENERAL );
     login.Write( (MessageID)ID_UDP_PROXY_LOGIN_REQUEST_FROM_SERVER_TO_COORDINATOR );
     login.Write( std::string( kProxyPassword ) );
-    Inject( proxyServer, coordinator, login );
+    MarkerInjection::Inject( proxyServer, coordinator, login );
 
     CHECK( coordinatorPlugin.GetMaxForwardingRequestsPerSystem() == 8 );
     CHECK( coordinatorPlugin.GetMaxServerSelectionBitstreamBytes() == 1024 );
@@ -760,7 +720,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
             WriteForwardingRequest( requests[i], UnconnectedTarget( i ) );
             flood.push_back( &requests[i] );
         }
-        Inject( requester, coordinator, flood );
+        MarkerInjection::Inject( requester, coordinator, flood );
 
         CHECK( coordinatorPlugin.RequestsFrom( requesterAddress ) == 8 );
         CHECK( coordinatorPlugin.GetForwardingRequestsRefused() == 2 );
@@ -776,7 +736,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
         // The plugin still serves another System
         BitStream otherRequest;
         WriteForwardingRequest( otherRequest, UnconnectedTarget( 20 ) );
-        Inject( other, coordinator, otherRequest );
+        MarkerInjection::Inject( other, coordinator, otherRequest );
         CHECK( coordinatorPlugin.RequestsFrom( otherAddress ) == 1 );
 
         Disconnect( coordinator, kCoordinatorPort, requester );
@@ -788,7 +748,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
     {
         BitStream tooLong;
         WriteForwardingRequest( tooLong, UnconnectedTarget( 0 ), 1025 );
-        Inject( requester, coordinator, tooLong );
+        MarkerInjection::Inject( requester, coordinator, tooLong );
         BitStream busy;
         REQUIRE( AwaitMessage( coordinator, requester, ID_UDP_PROXY_GENERAL, ID_UDP_PROXY_ALL_SERVERS_BUSY, busy ) );
         CHECK( coordinatorPlugin.RequestsFrom( requesterAddress ) == 0 );
@@ -796,7 +756,7 @@ TEST_CASE( "UDPProxyCoordinator refuses a System's requests past its cap", "[udp
 
         BitStream atCap;
         WriteForwardingRequest( atCap, UnconnectedTarget( 1 ), 1024 );
-        Inject( requester, coordinator, atCap );
+        MarkerInjection::Inject( requester, coordinator, atCap );
         CHECK( coordinatorPlugin.RequestsFrom( requesterAddress ) == 1 );
         CHECK( coordinatorPlugin.GetServerSelectionBitstreamsRefused() == 1 );
     }
@@ -826,7 +786,7 @@ TEST_CASE( "UDPProxyClient holds one bounded ping group per coordinator", "[udpp
     {
         BitStream empty;
         WritePingServers( empty, 0, 0 );
-        Inject( coordinator, client, empty );
+        MarkerInjection::Inject( coordinator, client, empty );
         CHECK( proxyClient.pingServerGroups.empty() );
     }
 
@@ -834,7 +794,7 @@ TEST_CASE( "UDPProxyClient holds one bounded ping group per coordinator", "[udpp
     {
         BitStream shortMessage;
         WritePingServers( shortMessage, 65535, 2 );
-        Inject( coordinator, client, shortMessage );
+        MarkerInjection::Inject( coordinator, client, shortMessage );
         REQUIRE( proxyClient.pingServerGroups.size() == 1 );
         CHECK( proxyClient.pingServerGroups.front()->serversToPing.size() == 2 );
     }
@@ -843,7 +803,7 @@ TEST_CASE( "UDPProxyClient holds one bounded ping group per coordinator", "[udpp
     {
         BitStream oversized;
         WritePingServers( oversized, 100, 100 );
-        Inject( coordinator, client, oversized );
+        MarkerInjection::Inject( coordinator, client, oversized );
         REQUIRE( proxyClient.pingServerGroups.size() == 1 );
         CHECK( proxyClient.pingServerGroups.front()->serversToPing.size() == 64 );
         CHECK( proxyClient.GetPingServersTruncated() == 1 );
@@ -858,13 +818,13 @@ TEST_CASE( "UDPProxyClient holds one bounded ping group per coordinator", "[udpp
             WritePingServers( message, 3, 3 );
             flood.push_back( &message );
         }
-        Inject( coordinator, client, flood );
+        MarkerInjection::Inject( coordinator, client, flood );
         CHECK( proxyClient.pingServerGroups.size() == 1 );
         CHECK( proxyClient.GetPingServerGroupsReplaced() == 19 );
 
         BitStream fromOther;
         WritePingServers( fromOther, 2, 2 );
-        Inject( otherCoordinator, client, fromOther );
+        MarkerInjection::Inject( otherCoordinator, client, fromOther );
         CHECK( proxyClient.pingServerGroups.size() == 2 );
 
         // A group goes with its coordinator's connection
@@ -903,7 +863,7 @@ TEST_CASE( "TwoWayAuthentication caps the nonces a System holds", "[twowayauth][
         std::vector<BitStream*> flood;
         for( int i = 0; i < 6; i++ )
             flood.push_back( NonceRequest( storage ) );
-        Inject( flooder, server, flood );
+        MarkerInjection::Inject( flooder, server, flood );
 
         CHECK( auth.NonceIdsFor( flooderGuid ) == std::vector<unsigned short>{ 2, 3, 4, 5 } );
         CHECK( auth.GetNoncesEvicted() == 2 );
@@ -913,8 +873,9 @@ TEST_CASE( "TwoWayAuthentication caps the nonces a System holds", "[twowayauth][
     {
         REQUIRE( challengerAuth.Challenge( "identifier", server->GetMyGUID() ) );
 
-        // The server's plugin runs inside Inject's Receive. It sends the challenger a success only
-        // once the challenger's hash matched the nonce the server kept for it.
+        // The server's plugin runs inside MarkerInjection::Inject's Receive. It sends the
+        // challenger a success only once the challenger's hash matched the nonce the server
+        // kept for it.
         bool challengerPassed = false;
         const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
         while( !challengerPassed && !ConnectionWaits::Expired( deadline ) )
@@ -922,7 +883,7 @@ TEST_CASE( "TwoWayAuthentication caps the nonces a System holds", "[twowayauth][
             std::vector<BitStream*> flood;
             for( int i = 0; i < 8; i++ )
                 flood.push_back( NonceRequest( storage ) );
-            Inject( flooder, server, flood );
+            MarkerInjection::Inject( flooder, server, flood );
             CHECK( auth.NonceIdsFor( flooderGuid ).size() <= 4 );
             storage.clear();
 
@@ -940,7 +901,7 @@ TEST_CASE( "TwoWayAuthentication caps the nonces a System holds", "[twowayauth][
     SECTION( "Update frees every nonce older than NONCE_TIMEOUT_MS, and only those" )
     {
         std::vector<BitStream*> requests{ NonceRequest( storage ), NonceRequest( storage ), NonceRequest( storage ) };
-        Inject( flooder, server, requests );
+        MarkerInjection::Inject( flooder, server, requests );
         REQUIRE( auth.NonceCount() == 3 );
         const Time oldest = auth.OldestNonceTime();
         const Time newest = auth.NewestNonceTime();

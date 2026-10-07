@@ -2,7 +2,7 @@
 
 #include "BitStream.h"
 #include "ConnectionWaits.h"
-#include "GetTime.h"
+#include "MarkerInjection.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "RakNetTypes.h"
@@ -10,11 +10,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
+#include <algorithm>
 #include <cstring>
 #include <set>
 #include <string>
-#include <thread>
+#include <vector>
 
 /*
 TwoWayAuthentication's nonces are the challenge a Peer issues, so they must be
@@ -24,9 +24,9 @@ The source is NonceGenerator::fillRandomBytes. With the real CSPRNG behind it th
 failure path is unreachable, so the failing sources below stand in for it. A nonce
 that could not be drawn is never stored and never sent; the challenger times out.
 
-The wire case is ordered: the server answers a nonce request on channel 0,
-RELIABLE_ORDERED, and the marker it sends afterwards goes the same way, so once the
-marker reaches the requester any reply would have come out before it.
+The wire case is checked through MarkerInjection: the server answers a nonce request on
+channel 0, RELIABLE_ORDERED, so a marker it sends afterwards reaches the requester after
+any reply.
 */
 
 using namespace RakNet;
@@ -34,11 +34,8 @@ using namespace RakNet;
 namespace {
 
 constexpr unsigned short kAuthPort = 31070;
-constexpr TimeMS kStepBudgetMs = 5000;
-constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
 // TwoWayAuthentication.cpp's NegotiationIdentifiers
 constexpr MessageID kNonceRequest = 0;
-constexpr MessageID kNonceReply = 1;
 
 int fillCallCount = 0;
 
@@ -62,34 +59,6 @@ public:
     void SetNonceSource( bool ( *source )( void*, size_t ) ) { nonceGenerator.fillRandomBytes = source; }
     size_t NonceCount() const { return nonceGenerator.generatedNonces.size(); }
 };
-
-void SendMarker( RakPeerInterface* from, RakNetGUID to )
-{
-    BitStream marker;
-    marker.Write( kMarker );
-    from->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, to, false );
-}
-
-// Receives on receiver, which runs its plugins, until the marker comes out. Counts the nonce
-// replies that came out before it.
-bool ReceiveUntilMarker( RakPeerInterface* receiver, int* nonceReplies )
-{
-    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = receiver->Receive(); packet != nullptr; packet = receiver->Receive() )
-        {
-            const bool marker = packet->data[0] == kMarker;
-            if( packet->data[0] == ID_TWO_WAY_AUTHENTICATION_NEGOTIATION && packet->length >= 2 && packet->data[1] == kNonceReply )
-                ( *nonceReplies )++;
-            receiver->DeallocatePacket( packet );
-            if( marker )
-                return true;
-        }
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return false;
-}
 
 } // namespace
 
@@ -170,16 +139,13 @@ TEST_CASE( "TwoWayAuthentication sends no nonce it could not draw", "[twowayauth
     BitStream request;
     request.Write( (MessageID)ID_TWO_WAY_AUTHENTICATION_NEGOTIATION );
     request.Write( kNonceRequest );
-    requester->Send( &request, HIGH_PRIORITY, RELIABLE_ORDERED, 0, server->GetMyGUID(), false );
-    SendMarker( requester, server->GetMyGUID() );
-    int ignored = 0;
-    REQUIRE( ReceiveUntilMarker( server, &ignored ) );
+    MarkerInjection::Inject( requester, server, request );
+    // A marker alone, back the other way, so any reply comes out ahead of it.
+    const std::vector<MessageID> received = MarkerInjection::Inject( server, requester, {} );
 
-    SendMarker( server, requester->GetMyGUID() );
-    int nonceReplies = 0;
-    REQUIRE( ReceiveUntilMarker( requester, &nonceReplies ) );
-
-    CHECK( nonceReplies == ( drawFails ? 0 : 1 ) );
+    // The requester runs no plugin, so the only negotiation Message the server sends it is the
+    // nonce reply.
+    CHECK( std::count( received.begin(), received.end(), ID_TWO_WAY_AUTHENTICATION_NEGOTIATION ) == ( drawFails ? 0 : 1 ) );
     CHECK( auth.NonceCount() == ( drawFails ? 0u : 1u ) );
 
     server->DetachPlugin( &auth );

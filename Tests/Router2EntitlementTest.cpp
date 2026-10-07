@@ -3,6 +3,7 @@
 #include "BitStream.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
+#include "MarkerInjection.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "RakMemoryOverride.h"
@@ -26,13 +27,13 @@ only from a System the application designated with AddIntermediary, and moves a 
 connection only if that connection is already forwarded. Stock took both from any connected
 System and moved any connection to <sender's IP>:<port of its choosing>.
 
-Each injected Message is followed by a user Message on the same ordered channel, so once the
-user Message comes out of Receive the injected one has been through the plugin.
+Each claim is checked through MarkerInjection.
 ChangeSystemAddress only queues a command for the update thread, so every check on an address
 first waits until a command queued behind it shows in the getters.
 */
 
 using namespace RakNet;
+using MarkerInjection::Contains;
 
 namespace {
 
@@ -40,11 +41,9 @@ constexpr unsigned short kServerPort = 30000;
 constexpr unsigned short kIntermediaryPort = 30001;
 constexpr unsigned short kEndpointPort = 30002;
 
-// Hang guard for the marker Message. On loopback it arrives a few update cycles after the
-// send, tens of milliseconds.
-constexpr TimeMS kMarkerBudgetMs = 5000;
-
-constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
+// Hang guard for a queued command and for a disconnection notification. On loopback each
+// shows a few update cycles after it is queued or sent, tens of milliseconds.
+constexpr TimeMS kStepBudgetMs = 5000;
 
 const RakNetGUID kUnconnectedGuid( 1001 );
 
@@ -93,26 +92,6 @@ public:
     }
 };
 
-// Returns the message ids the peer's Receive hands out up to and including the marker, or
-// up to the deadline if the marker never comes.
-std::vector<MessageID> ReceiveUntilMarker( RakPeerInterface* peer )
-{
-    std::vector<MessageID> received;
-    const TimeMS deadline = GetTimeMS() + kMarkerBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        for( Packet* packet = peer->Receive(); packet != nullptr; packet = peer->Receive() )
-        {
-            received.push_back( packet->data[0] );
-            peer->DeallocatePacket( packet );
-        }
-        if( !received.empty() && received.back() == kMarker )
-            break;
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return received;
-}
-
 // Returns once peer's getters show every command queued before the call. Buffered commands
 // are applied in the order they were queued, so once a timeout change queued after them shows
 // on peer's connection to other, they have all been applied.
@@ -125,7 +104,7 @@ bool WaitForQueuedCommands( RakPeerInterface* peer, RakNetGUID other )
     const TimeMS timeout = peer->GetTimeoutTime( otherAddress ) ^ 1;
     peer->SetTimeoutTime( timeout, otherAddress );
 
-    const TimeMS deadline = GetTimeMS() + kMarkerBudgetMs;
+    const TimeMS deadline = GetTimeMS() + kStepBudgetMs;
     while( peer->GetTimeoutTime( otherAddress ) != timeout )
     {
         if( ConnectionWaits::Expired( deadline ) )
@@ -135,34 +114,16 @@ bool WaitForQueuedCommands( RakPeerInterface* peer, RakNetGUID other )
     return true;
 }
 
-bool Contains( const std::vector<MessageID>& ids, MessageID id )
+// Injects messageId, endpointGuid, port from sender into target, and returns what target's
+// Receive handed out before the marker. Returns once every address change the Message
+// queued has been applied.
+std::vector<MessageID> Claim( RakPeerInterface* sender, RakPeerInterface* target, MessageID messageId, RakNetGUID endpointGuid, unsigned short port )
 {
-    for( MessageID each : ids )
-    {
-        if( each == id )
-            return true;
-    }
-    return false;
-}
-
-// Sends messageId, endpointGuid, port from sender to target, then the marker, and returns
-// what target's Receive handed out. Returns once every address change the Message queued
-// has been applied.
-std::vector<MessageID> Inject( RakPeerInterface* sender, RakPeerInterface* target, MessageID messageId, RakNetGUID endpointGuid, unsigned short port )
-{
-    const SystemAddress targetAddress = sender->GetSystemAddressFromGuid( target->GetMyGUID() );
-
-    BitStream forged;
-    forged.Write( messageId );
-    forged.Write( endpointGuid );
-    forged.Write( port );
-    sender->Send( &forged, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetAddress, false );
-
-    BitStream marker;
-    marker.Write( kMarker );
-    sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetAddress, false );
-
-    std::vector<MessageID> received = ReceiveUntilMarker( target );
+    BitStream claim;
+    claim.Write( messageId );
+    claim.Write( endpointGuid );
+    claim.Write( port );
+    std::vector<MessageID> received = MarkerInjection::Inject( sender, target, claim );
     REQUIRE( WaitForQueuedCommands( target, sender->GetMyGUID() ) );
     return received;
 }
@@ -193,13 +154,11 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
-        const std::vector<MessageID> live = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
-        REQUIRE( Contains( live, kMarker ) );
+        const std::vector<MessageID> live = Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
         CHECK( !Contains( live, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
 
-        const std::vector<MessageID> fresh = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
-        REQUIRE( Contains( fresh, kMarker ) );
+        const std::vector<MessageID> fresh = Claim( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         CHECK( !Contains( fresh, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 0 );
     }
@@ -210,8 +169,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
-        REQUIRE( Contains( received, kMarker ) );
+        const std::vector<MessageID> received = Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25000 );
         CHECK( !Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
         CHECK( router.ForwardedCount() == 0 );
@@ -221,8 +179,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     {
         router.AddIntermediary( intermediaryAddress );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
-        REQUIRE( Contains( received, kMarker ) );
+        const std::vector<MessageID> received = Claim( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         CHECK( Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 1 );
     }
@@ -233,15 +190,13 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
 
         // Announced before it connects, at the address it will connect from: that is what a
         // connection forwarded by this intermediary looks like from here.
-        const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort );
-        REQUIRE( Contains( announced, kMarker ) );
+        Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort );
         REQUIRE( router.ForwardedCount() == 1 );
 
         ConnectionWaits::ConnectAndWait( endpoint, server );
         REQUIRE( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( kEndpointPort ) );
 
-        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
-        REQUIRE( Contains( rerouted, kMarker ) );
+        const std::vector<MessageID> rerouted = Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
         CHECK( Contains( rerouted, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 25002 ) );
         CHECK( router.ForwardedCount() == 1 );
@@ -253,14 +208,12 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         ConnectionWaits::ConnectAndWait( endpoint, server );
 
         // Already at the announced address, so nothing moves, but the entry is recorded.
-        const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort );
-        REQUIRE( Contains( announced, kMarker ) );
+        const std::vector<MessageID> announced = Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort );
         CHECK( Contains( announced, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( kEndpointPort ) );
         CHECK( router.ForwardedCount() == 1 );
 
-        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
-        REQUIRE( Contains( rerouted, kMarker ) );
+        const std::vector<MessageID> rerouted = Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
         CHECK( Contains( rerouted, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 25002 ) );
     }
@@ -270,15 +223,13 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         router.AddIntermediary( intermediaryAddress );
 
         // Announced at a port the endpoint then does not connect from.
-        const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort + 1 );
-        REQUIRE( Contains( announced, kMarker ) );
+        Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), kEndpointPort + 1 );
         REQUIRE( router.ForwardedCount() == 1 );
 
         ConnectionWaits::ConnectAndWait( endpoint, server );
         const SystemAddress endpointAddress = server->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
 
-        const std::vector<MessageID> rerouted = Inject( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
-        REQUIRE( Contains( rerouted, kMarker ) );
+        const std::vector<MessageID> rerouted = Claim( intermediary, server, ID_ROUTER_2_REROUTED, endpoint->GetMyGUID(), 25002 );
         CHECK( !Contains( rerouted, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
     }
@@ -288,8 +239,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         router.AddIntermediary( intermediaryAddress );
         router.RemoveIntermediary( intermediaryAddress );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
-        REQUIRE( Contains( received, kMarker ) );
+        const std::vector<MessageID> received = Claim( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         CHECK( !Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 0 );
     }
@@ -298,13 +248,12 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
     {
         router.AddIntermediary( intermediaryAddress );
 
-        const std::vector<MessageID> announced = Inject( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
-        REQUIRE( Contains( announced, kMarker ) );
+        Claim( intermediary, server, ID_ROUTER_2_REROUTED, kUnconnectedGuid, 25001 );
         REQUIRE( router.ForwardedCount() == 1 );
 
         intermediary->CloseConnection( Loopback( kServerPort ), true );
         ConnectionWaits::WaitForDisconnect( intermediary, Loopback( kServerPort ) );
-        REQUIRE( ConnectionWaits::WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION, kMarkerBudgetMs ) );
+        REQUIRE( ConnectionWaits::WaitForMessage( server, ID_DISCONNECTION_NOTIFICATION, kStepBudgetMs ) );
 
         // The closed connection's entry for an endpoint that never connected goes with it.
         CHECK( router.ForwardedCount() == 0 );
@@ -313,8 +262,7 @@ TEST_CASE( "Router2 takes a reroute only from a Designated intermediary", "[rout
         ConnectionWaits::ConnectAndWait( intermediary, server );
         REQUIRE( server->GetSystemAddressFromGuid( intermediary->GetMyGUID() ) == intermediaryAddress );
 
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1002 ), 25001 );
-        REQUIRE( Contains( received, kMarker ) );
+        const std::vector<MessageID> received = Claim( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1002 ), 25001 );
         CHECK( !Contains( received, ID_ROUTER_2_REROUTED ) );
         CHECK( router.ForwardedCount() == 0 );
     }
@@ -338,16 +286,14 @@ TEST_CASE( "Router2 caps the connections a Designated intermediary announces ahe
 
     for( uint64_t g = 1; g <= 3; g++ )
     {
-        const std::vector<MessageID> received = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1000 + g ), 25000 );
-        REQUIRE( Contains( received, kMarker ) );
+        const std::vector<MessageID> received = Claim( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1000 + g ), 25000 );
         CHECK( Contains( received, ID_ROUTER_2_REROUTED ) == ( g <= 2 ) );
     }
     CHECK( router.ForwardedCount() == 2 );
     CHECK( router.GetPendingForwardsRefused() == 1 );
 
     // A repeat announcement of an entry it already holds is not a new one.
-    const std::vector<MessageID> repeated = Inject( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1001 ), 25005 );
-    REQUIRE( Contains( repeated, kMarker ) );
+    const std::vector<MessageID> repeated = Claim( intermediary, server, ID_ROUTER_2_REROUTED, RakNetGUID( 1001 ), 25005 );
     CHECK( Contains( repeated, ID_ROUTER_2_REROUTED ) );
     CHECK( router.ForwardedCount() == 2 );
 
@@ -372,14 +318,12 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
     {
         router.AddRequest( kUnconnectedGuid, asked->GetMyGUID() );
 
-        const std::vector<MessageID> forged = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 25000 );
-        REQUIRE( Contains( forged, kMarker ) );
+        const std::vector<MessageID> forged = Claim( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 25000 );
         CHECK( !Contains( forged, ID_ROUTER_2_FORWARDING_ESTABLISHED ) );
         CHECK( router.HasRequest( kUnconnectedGuid ) );
         CHECK( router.ForwardedCount() == 0 );
 
-        const std::vector<MessageID> genuine = Inject( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 25000 );
-        REQUIRE( Contains( genuine, kMarker ) );
+        const std::vector<MessageID> genuine = Claim( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, kUnconnectedGuid, 25000 );
         CHECK( Contains( genuine, ID_ROUTER_2_FORWARDING_ESTABLISHED ) );
         CHECK( !router.HasRequest( kUnconnectedGuid ) );
         CHECK( router.ForwardedCount() == 1 );
@@ -392,22 +336,19 @@ TEST_CASE( "Router2 takes a forwarding success only from the router it asked", "
         router.AddInitiatedForwarding( endpoint->GetMyGUID(), asked->GetMyGUID(), endpointAddress );
 
         // Nothing asked at all.
-        const std::vector<MessageID> unasked = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25000 );
-        REQUIRE( Contains( unasked, kMarker ) );
+        const std::vector<MessageID> unasked = Claim( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25000 );
         CHECK( !Contains( unasked, ID_ROUTER_2_FORWARDING_ESTABLISHED ) );
         CHECK( !Contains( unasked, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
 
         // A re-route in progress, answered by a System that was not asked.
         router.AddRequest( endpoint->GetMyGUID(), asked->GetMyGUID() );
-        const std::vector<MessageID> forged = Inject( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25000 );
-        REQUIRE( Contains( forged, kMarker ) );
+        const std::vector<MessageID> forged = Claim( other, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25000 );
         CHECK( !Contains( forged, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == endpointAddress );
         CHECK( router.HasRequest( endpoint->GetMyGUID() ) );
 
-        const std::vector<MessageID> genuine = Inject( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25003 );
-        REQUIRE( Contains( genuine, kMarker ) );
+        const std::vector<MessageID> genuine = Claim( asked, server, ID_ROUTER_2_FORWARDING_ESTABLISHED, endpoint->GetMyGUID(), 25003 );
         CHECK( Contains( genuine, ID_ROUTER_2_REROUTED ) );
         CHECK( server->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == Loopback( 25003 ) );
         CHECK( !router.HasRequest( endpoint->GetMyGUID() ) );

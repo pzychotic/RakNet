@@ -4,6 +4,7 @@
 #include "BitStream.h"
 #include "ConnectionWaits.h"
 #include "GetTime.h"
+#include "MarkerInjection.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
 #include "RakNetStringMakers.h"
@@ -28,9 +29,7 @@ connected System could choose which proxy server another pair was given. A reply
 only from one of the pair's own ends.
 
 The clients and proxy servers are plain Peers that write the Messages UDPProxyClient and
-UDPProxyServer would. Each injected Message is followed by a user Message on the same ordered
-channel, so once the user Message comes out of the coordinator's Receive the injected one has
-been through the plugin.
+UDPProxyServer would. Each injected Message is checked through MarkerInjection.
 */
 
 using namespace RakNet;
@@ -39,11 +38,9 @@ namespace {
 
 constexpr unsigned short kCoordinatorPort = 30000;
 
-// Hang guard for the marker Message and for a reply. On loopback each arrives a few update
-// cycles after the send, tens of milliseconds.
+// Hang guard for a reply. On loopback it arrives a few update cycles after the send, tens of
+// milliseconds.
 constexpr TimeMS kStepBudgetMs = 5000;
-
-constexpr MessageID kMarker = ID_USER_PACKET_ENUM;
 
 constexpr TimeMS kForwardingTimeoutMs = 10000;
 
@@ -69,19 +66,6 @@ public:
     }
     unsigned int RequestCount() const { return forwardingRequestList.Size(); }
 };
-
-// Sends message from sender to the coordinator, then the marker, and receives on the
-// coordinator until the marker comes out.
-void Inject( RakPeerInterface* sender, RakPeerInterface* coordinator, BitStream& message )
-{
-    sender->Send( &message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, kCoordinatorAddress, false );
-
-    BitStream marker;
-    marker.Write( kMarker );
-    sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, kCoordinatorAddress, false );
-
-    REQUIRE( ConnectionWaits::WaitForMessage( coordinator, kMarker, kStepBudgetMs ) );
-}
 
 // Receives on the coordinator and on peer until peer's Receive hands out the ID_UDP_PROXY_GENERAL
 // Message with subId, and copies it into out. Anything else peer receives is dropped.
@@ -217,7 +201,7 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
         // The target is not connected, which a request by address allows.
         BitStream request;
         WriteRequestByAddress( request, kForeignSource, kUnconnectedTarget );
-        Inject( source, coordinator, request );
+        MarkerInjection::Inject( source, coordinator, request );
 
         const ServerRequest forwarded = AwaitServerRequest( coordinator, serverA );
         CHECK( forwarded.source == sourceAddress );
@@ -233,7 +217,7 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
 
         BitStream request;
         WriteRequestByGuid( request, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID() );
-        Inject( source, coordinator, request );
+        MarkerInjection::Inject( source, coordinator, request );
         UDPProxyCoordinator::ForwardingRequest* fw = coordinatorPlugin.Find( sourceAddress, targetAddress );
         REQUIRE( fw != nullptr );
         REQUIRE( fw->timeRequestedPings != 0 );
@@ -241,20 +225,20 @@ TEST_CASE( "UDPProxyCoordinator does not honour a claim about a third party", "[
         // B looks far better, to a System that is neither end.
         BitStream forged;
         WritePingReply( forged, sourceAddress, targetAddress, { Ping( serverAAddress, 900 ), Ping( serverBAddress, 1 ) } );
-        Inject( other, coordinator, forged );
+        MarkerInjection::Inject( other, coordinator, forged );
         CHECK( fw->sourceServerPings.empty() );
         CHECK( fw->targetServerPings.empty() );
 
         BitStream fromSource;
         WritePingReply( fromSource, sourceAddress, targetAddress, { Ping( serverAAddress, 10 ), Ping( serverBAddress, 50 ) } );
-        Inject( source, coordinator, fromSource );
+        MarkerInjection::Inject( source, coordinator, fromSource );
         CHECK( fw->sourceServerPings.size() == 2 );
         CHECK( fw->targetServerPings.empty() );
 
         // With both ends in, the coordinator tries the server with the lower summed ping.
         BitStream fromTarget;
         WritePingReply( fromTarget, sourceAddress, targetAddress, { Ping( serverAAddress, 20 ), Ping( serverBAddress, 60 ) } );
-        Inject( target, coordinator, fromTarget );
+        MarkerInjection::Inject( target, coordinator, fromTarget );
         CHECK( fw->targetServerPings.size() == 2 );
 
         const ServerRequest forwarded = AwaitServerRequest( coordinator, serverA );
