@@ -88,30 +88,16 @@ private:
     SystemAddress address;
 };
 
-/// Polls \a condition, draining \a peers, until it holds or the budget is spent.
-template<class Condition>
-bool WaitFor( const std::vector<RakPeerInterface*>& peers, Condition condition )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        for( RakPeerInterface* peer : peers )
-            ConnectionWaits::Drain( peer );
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
-
 /// Connects \a client to \a server and waits until both views show it.
 bool ConnectAndWait( BoundPeer& client, BoundPeer& server )
 {
     if( client->Connect( "127.0.0.1", server.Address().GetPort(), 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
         return false;
-    return WaitFor( { client.Get(), server.Get() }, [&] {
-        return client->GetConnectionState( server.Address() ) == IS_CONNECTED && server->GetConnectionState( client.Address() ) == IS_CONNECTED;
-    } );
+    RakPeerInterface* const both[] = { client.Get(), server.Get() };
+    return ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] { return client->GetConnectionState( server.Address() ) == IS_CONNECTED && server->GetConnectionState( client.Address() ) == IS_CONNECTED; },
+        kWaitBudgetMs );
 }
 
 /// Receives on \a peer until a Message with \a id arrives, or the budget is spent.
@@ -153,11 +139,13 @@ TEST_CASE( "SetTimeoutTime reaches an open connection a few cycles later", "[net
     const TimeMS defaultTimeout = server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS );
     REQUIRE( defaultTimeout != kOneConnectionTimeout );
     REQUIRE( server->GetTimeoutTime( first.Address() ) == defaultTimeout );
+    RakPeerInterface* const serverOnly[] = { server.Get() };
 
     SECTION( "on one connection" )
     {
         server->SetTimeoutTime( kOneConnectionTimeout, first.Address() );
-        CHECK( WaitFor( { server.Get() }, [&] { return server->GetTimeoutTime( first.Address() ) == kOneConnectionTimeout; } ) );
+        CHECK( ConnectionWaits::DrainUntil(
+            serverOnly, 1, [&] { return server->GetTimeoutTime( first.Address() ) == kOneConnectionTimeout; }, kWaitBudgetMs ) );
         CHECK( server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS ) == defaultTimeout );
         CHECK( server->GetTimeoutTime( second.Address() ) == defaultTimeout );
     }
@@ -167,10 +155,13 @@ TEST_CASE( "SetTimeoutTime reaches an open connection a few cycles later", "[net
         server->SetTimeoutTime( kEveryConnectionTimeout, UNASSIGNED_SYSTEM_ADDRESS );
         // The default is the setter's own, so it changes straight away.
         CHECK( server->GetTimeoutTime( UNASSIGNED_SYSTEM_ADDRESS ) == kEveryConnectionTimeout );
-        CHECK( WaitFor( { server.Get() }, [&] {
-            return server->GetTimeoutTime( first.Address() ) == kEveryConnectionTimeout &&
-                   server->GetTimeoutTime( second.Address() ) == kEveryConnectionTimeout;
-        } ) );
+        CHECK( ConnectionWaits::DrainUntil(
+            serverOnly, 1,
+            [&] {
+                return server->GetTimeoutTime( first.Address() ) == kEveryConnectionTimeout &&
+                       server->GetTimeoutTime( second.Address() ) == kEveryConnectionTimeout;
+            },
+            kWaitBudgetMs ) );
     }
 
     SECTION( "on one connection, then on every connection" )
@@ -178,10 +169,13 @@ TEST_CASE( "SetTimeoutTime reaches an open connection a few cycles later", "[net
         // Applied in the order they were called, so the second one wins.
         server->SetTimeoutTime( kOneConnectionTimeout, first.Address() );
         server->SetTimeoutTime( kEveryConnectionTimeout, UNASSIGNED_SYSTEM_ADDRESS );
-        CHECK( WaitFor( { server.Get() }, [&] {
-            return server->GetTimeoutTime( first.Address() ) == kEveryConnectionTimeout &&
-                   server->GetTimeoutTime( second.Address() ) == kEveryConnectionTimeout;
-        } ) );
+        CHECK( ConnectionWaits::DrainUntil(
+            serverOnly, 1,
+            [&] {
+                return server->GetTimeoutTime( first.Address() ) == kEveryConnectionTimeout &&
+                       server->GetTimeoutTime( second.Address() ) == kEveryConnectionTimeout;
+            },
+            kWaitBudgetMs ) );
     }
 }
 
@@ -226,9 +220,12 @@ TEST_CASE( "ApplyNetworkSimulator reaches an open connection", "[network]" )
 
     // Pongs from before the simulator took effect may still arrive, so wait for a ping
     // that shows the delay rather than reading one.
-    CHECK( WaitFor( { client.Get(), server.Get() }, [&] {
-        server->Ping( client.Address() );
-        std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
-        return server->GetLastPing( client.Address() ) >= kSimulatedPingMs;
-    } ) );
+    RakPeerInterface* const both[] = { client.Get(), server.Get() };
+    CHECK( ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] {
+            server->Ping( client.Address() );
+            return server->GetLastPing( client.Address() ) >= kSimulatedPingMs;
+        },
+        kWaitBudgetMs ) );
 }

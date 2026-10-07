@@ -200,3 +200,33 @@ void ConnectionWaits::DrainAll( RakPeerInterface* const* peers, int count )
         Drain( peers[i] );
     }
 }
+
+bool ConnectionWaits::WaitUntil( const std::function<bool()>& condition, TimeMS budget )
+{
+    const TimeMS deadline = GetTimeMS() + budget;
+
+    for( ;; )
+    {
+        if( condition() )
+        {
+            return true;
+        }
+
+        if( Expired( deadline ) )
+        {
+            return false;
+        }
+
+        std::this_thread::sleep_for( std::chrono::milliseconds( kPollInterval ) );
+    }
+}
+
+bool ConnectionWaits::DrainUntil( RakPeerInterface* const* peers, int count, const std::function<bool()>& condition, TimeMS budget )
+{
+    return WaitUntil(
+        [&] {
+            DrainAll( peers, count );
+            return condition();
+        },
+        budget );
+}

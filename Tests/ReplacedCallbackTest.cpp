@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "PeerScope.h"
 #include "RawSystem.h"
 
@@ -48,21 +49,7 @@ constexpr TimeMS kWaitBudgetMs = 10000;
 // How long a setter that doesn't wait gets to return before the callback is let go. A
 // setter that does wait can't return in it, so a slow machine can only make a broken
 // setter look correct, never the reverse.
-constexpr int kSetterGraceMs = 200;
-
-/// Polls \a condition until it holds or the budget is spent.
-template<class Condition>
-bool WaitFor( Condition condition, TimeMS budgetMs = kWaitBudgetMs )
-{
-    const TimeMS deadline = GetTimeMS() + budgetMs;
-    while( GetTimeMS() < deadline )
-    {
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
+constexpr TimeMS kSetterGraceMs = 200;
 
 /// A callback body that blocks its first call until released, and counts every call.
 class HeldCallback
@@ -128,7 +115,7 @@ ClearOutcome ClearWhileHeld( HeldCallback& held, Clear clear )
         returned = true;
     } );
 
-    WaitFor( [&] { return returned.load(); }, kSetterGraceMs );
+    ConnectionWaits::WaitUntil( [&] { return returned.load(); }, kSetterGraceMs );
     held.Release();
     clearer.join();
     return outcome;
@@ -255,7 +242,7 @@ TEST_CASE( "A user-update callback can replace and then clear itself from inside
     callbacks.peer = peer;
     peer->SetUserUpdateThread( &SelfReplacing::First, &callbacks );
 
-    REQUIRE( WaitFor( [&] { return callbacks.secondCalls.load() > 0; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return callbacks.secondCalls.load() > 0; }, kWaitBudgetMs ) );
 
     // Several network-thread passes, each of which would call a callback still installed.
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
@@ -274,13 +261,13 @@ TEST_CASE( "A datagram handler can clear itself from inside its own call", "[net
     peer->SetIncomingDatagramEventHandler( &SelfClearingDatagramHandler );
 
     SendJunkDatagram( sender );
-    REQUIRE( WaitFor( [&] { return s_selfClearingCalls.load() > 0; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return s_selfClearingCalls.load() > 0; }, kWaitBudgetMs ) );
 
     // The receive thread is still running: later datagrams reach the Peer, past no handler.
     constexpr unsigned int kPings = 5;
     for( unsigned int i = 0; i < kPings; ++i )
         SendUnconnectedPing( sender );
-    CHECK( WaitFor( [&] { return peer->GetReceiveBufferSize() == kPings; } ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return peer->GetReceiveBufferSize() == kPings; }, kWaitBudgetMs ) );
     CHECK( s_selfClearingCalls == 1 );
     s_selfClearingPeer = nullptr;
 }

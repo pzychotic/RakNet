@@ -3,6 +3,7 @@
 
 #include "BitStream.h"
 #include "CommonFunctions.h"
+#include "ConnectionWaits.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakNetStringMakers.h"
@@ -61,6 +62,7 @@ constexpr unsigned short kServerPort = 30000;
 // that the machine was busy.
 constexpr int kRejectBudgetMs = 5000;
 
+// The correct password's handshake on loopback. A hang guard like the one above.
 constexpr int kConnectBudgetMs = 5000;
 
 const char kServerPassword[] = "correct horse";
@@ -199,7 +201,7 @@ TEST_CASE( "Connection requests are checked against a password that changes as t
         const TimeMS deadline = GetTimeMS() + kRejectBudgetMs;
         char data[MAXIMUM_MTU_SIZE];
         int length = 0;
-        while( GetTimeMS() < deadline && requester.WaitForDatagram( (int)( deadline - GetTimeMS() ), data, length ) )
+        while( !ConnectionWaits::Expired( deadline ) && requester.WaitForDatagram( (int)( deadline - GetTimeMS() ), data, length ) )
         {
             if( RawSystemHarness::DatagramCarriesMessage( data, length, ID_CONNECTION_REQUEST_ACCEPTED ) ||
                 RawSystemHarness::DatagramCarriesMessage( data, length, ID_INVALID_PASSWORD ) )

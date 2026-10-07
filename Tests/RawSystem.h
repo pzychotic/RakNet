@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ConnectionWaits.h"
 #include "ReliabilityLayerHarness.h"
 #include "WinsockScope.h"
 
@@ -246,7 +247,7 @@ public:
     {
         const RakNet::TimeMS deadline = RakNet::GetTimeMS() + (RakNet::TimeMS)millisecondsToWait;
 
-        while( RakNet::GetTimeMS() < deadline )
+        while( !ConnectionWaits::Expired( deadline ) )
         {
             const int remaining = (int)( deadline - RakNet::GetTimeMS() );
             if( WaitForDatagram( remaining, dataOut, lengthOut ) == false )

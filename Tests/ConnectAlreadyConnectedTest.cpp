@@ -1,5 +1,4 @@
 #include "ConnectionWaits.h"
-#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakNetStringMakers.h"
 #include "RakPeer.h"
@@ -51,6 +50,10 @@ constexpr TimeMS kWaitBudgetMs = 10000;
 // The second attempt's lifetime: short, so the test waits little for it to run out.
 constexpr unsigned kAttemptCount = 4;
 constexpr unsigned kAttemptIntervalMs = 100;
+
+// Past the second attempt's last send, plus room for B's answer to arrive and reach
+// Receive. A settle time, not a hang guard: the test receives for all of it.
+constexpr TimeMS kSecondAttemptSettleMs = kAttemptCount * kAttemptIntervalMs + 500;
 
 /// A RakPeer bound to 127.0.0.1 that can stop its network thread in the window between
 /// opening a connection record and publishing it, which is protected in RakPeer. Shut
@@ -191,22 +194,6 @@ struct Received
     }
 };
 
-/// Polls \a condition, draining both Peers, until it holds or the budget is spent.
-template<class Condition>
-bool WaitFor( PausingPeer& a, Received& aReceived, PausingPeer& b, Received& bReceived, Condition condition )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        aReceived.Drain( a );
-        bReceived.Drain( b );
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
-
 } // namespace
 
 TEST_CASE( "Connect to a System the view shows connected returns ALREADY_CONNECTED_TO_ENDPOINT", "[network]" )
@@ -219,7 +206,13 @@ TEST_CASE( "Connect to a System the view shows connected returns ALREADY_CONNECT
     Received bReceived;
 
     REQUIRE( a.Connect( "127.0.0.1", kConnectedServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( WaitFor( a, aReceived, b, bReceived, [&] { return a.GetConnectionState( b.Address() ) == IS_CONNECTED; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            aReceived.Drain( a );
+            bReceived.Drain( b );
+            return a.GetConnectionState( b.Address() ) == IS_CONNECTED;
+        },
+        kWaitBudgetMs ) );
 
     CHECK( a.Connect( "127.0.0.1", kConnectedServerPort, 0, 0 ) == ALREADY_CONNECTED_TO_ENDPOINT );
 
@@ -249,16 +242,29 @@ TEST_CASE( "Connect accepted while the view lags leaves one connection and one I
     a.Release();
     REQUIRE( second == CONNECTION_ATTEMPT_STARTED );
 
-    REQUIRE( WaitFor( a, aReceived, b, bReceived, [&] {
-        return a.GetConnectionState( b.Address() ) == IS_CONNECTED && b.GetConnectionState( a.Address() ) == IS_CONNECTED;
-    } ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            aReceived.Drain( a );
+            bReceived.Drain( b );
+            return a.GetConnectionState( b.Address() ) == IS_CONNECTED && b.GetConnectionState( a.Address() ) == IS_CONNECTED;
+        },
+        kWaitBudgetMs ) );
     // The second attempt leaves the queue once the network thread has acted on it or
     // given up on it.
-    REQUIRE( WaitFor( a, aReceived, b, bReceived, [&] { return a.AttemptQueued( b.Address() ) == false; } ) );
-    // Past the second attempt's last send, plus room for B's answer to arrive and reach
-    // Receive.
-    const TimeMS settleUntil = GetTimeMS() + kAttemptCount * kAttemptIntervalMs + 500;
-    WaitFor( a, aReceived, b, bReceived, [&] { return ConnectionWaits::Expired( settleUntil ); } );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            aReceived.Drain( a );
+            bReceived.Drain( b );
+            return a.AttemptQueued( b.Address() ) == false;
+        },
+        kWaitBudgetMs ) );
+    ConnectionWaits::WaitUntil(
+        [&] {
+            aReceived.Drain( a );
+            bReceived.Drain( b );
+            return false;
+        },
+        kSecondAttemptSettleMs );
 
     CHECK( a.NumberOfConnections() == 1 );
     CHECK( b.NumberOfConnections() == 1 );

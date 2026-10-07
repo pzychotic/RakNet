@@ -1,3 +1,4 @@
+#include "ConnectionWaits.h"
 #include "PeerScope.h"
 #include "RawSystem.h"
 #include "ReliabilityLayerHarness.h"
@@ -312,8 +313,10 @@ TEST_CASE( "A System closed at its byte budget cannot keep the connection alive 
     unsigned char notification = (unsigned char)ID_DISCONNECTION_NOTIFICATION;
     REQUIRE( layer.Layer().Send( (char*)&notification, BYTES_TO_BITS( 1 ), LOW_PRIORITY, RELIABLE_ORDERED, 0, true, kMTUSize, RakNet::GetTimeUS(), 0 ) );
 
-    const RakNet::TimeMS deadline = RakNet::GetTimeMS() + kTimeoutTime * 3;
-    while( !layer.IsDeadConnection() && RakNet::GetTimeMS() < deadline )
+    // Hang guard for the ack timeout to give up: three of its lengths.
+    constexpr RakNet::TimeMS kDeadConnectionBudgetMs = kTimeoutTime * 3;
+    const RakNet::TimeMS deadline = RakNet::GetTimeMS() + kDeadConnectionBudgetMs;
+    while( !layer.IsDeadConnection() && !ConnectionWaits::Expired( deadline ) )
     {
         layer.DeliverChunk( UnsplitMessage( UNRELIABLE, 0 ) );
         layer.UpdateNow();
@@ -399,7 +402,11 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
 
     constexpr unsigned short kServerPort = 30000;
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF12345679ull;
+    // Hang guard for each wait below: the connection, the first lost report, and the
+    // disconnection notification.
     constexpr RakNet::TimeMS kBudgetMs = 5000;
+    // How long the test keeps receiving after the first lost report, for a second one.
+    constexpr RakNet::TimeMS kSecondReportWindowMs = 1000;
 
     PeerScope peers;
     RakPeerInterface* server = peers.Server( kServerPort );
@@ -408,7 +415,7 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
     rawSystem.CompleteConnection();
 
     bool connected = false;
-    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + kBudgetMs; !connected && RakNet::GetTimeMS() < deadline; )
+    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + kBudgetMs; !connected && !ConnectionWaits::Expired( deadline ); )
     {
         for( Packet* packet = server->Receive(); packet != nullptr; server->DeallocatePacket( packet ), packet = server->Receive() )
             connected = connected || packet->data[0] == ID_NEW_INCOMING_CONNECTION;
@@ -425,15 +432,14 @@ TEST_CASE( "A connected System over its byte budget is reported lost and told so
     // Counted past the first report, and past the moment the notification goes out, so a
     // second report of the same close - from the dead-connection path, say - would show.
     unsigned int lostReports = 0;
-    const RakNet::TimeMS settle = 1000;
-    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + kBudgetMs; RakNet::GetTimeMS() < deadline; )
+    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + kBudgetMs; !ConnectionWaits::Expired( deadline ); )
     {
         for( Packet* packet = server->Receive(); packet != nullptr; server->DeallocatePacket( packet ), packet = server->Receive() )
         {
             if( packet->data[0] == ID_CONNECTION_LOST || packet->data[0] == ID_DISCONNECTION_NOTIFICATION )
             {
                 if( lostReports++ == 0 )
-                    deadline = RakNet::GetTimeMS() + settle;
+                    deadline = RakNet::GetTimeMS() + kSecondReportWindowMs;
                 CHECK( packet->data[0] == ID_CONNECTION_LOST );
             }
         }
@@ -453,6 +459,8 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
     constexpr unsigned short kServerPort = 30000;
     constexpr uint64_t kRawSystemGuid = 0x00ABCDEF1234567Aull;
     constexpr unsigned int kChunks = 20;
+    // Hang guard for each wait below: the System's record, and the Peer reading every chunk.
+    constexpr RakNet::TimeMS kBudgetMs = 5000;
 
     PeerScope peers;
     RakPeerInterface* server = peers.Server( kServerPort );
@@ -474,18 +482,21 @@ TEST_CASE( "A Half-open System's split chunks cost a Peer nothing", "[network]" 
     // The Peer sends ID_OPEN_CONNECTION_REPLY_2 during an update cycle and publishes the
     // System's record only at the cycle's end, so the reply can arrive before the record.
     SystemAddress rawAddress = UNASSIGNED_SYSTEM_ADDRESS;
-    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + 5000; rawAddress == UNASSIGNED_SYSTEM_ADDRESS && RakNet::GetTimeMS() < deadline; std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) ) )
-        rawAddress = server->GetSystemAddressFromGuid( RakNetGUID( kRawSystemGuid ) );
+    ConnectionWaits::WaitUntil(
+        [&] {
+            rawAddress = server->GetSystemAddressFromGuid( RakNetGUID( kRawSystemGuid ) );
+            return rawAddress != UNASSIGNED_SYSTEM_ADDRESS;
+        },
+        kBudgetMs );
     REQUIRE( rawAddress != UNASSIGNED_SYSTEM_ADDRESS );
 
     RakNetStatistics statistics;
-    bool readThemAll = false;
-    for( RakNet::TimeMS deadline = RakNet::GetTimeMS() + 5000; !readThemAll && RakNet::GetTimeMS() < deadline; std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) ) )
-    {
-        REQUIRE( server->GetStatistics( rawAddress, &statistics ) != nullptr );
-        readThemAll = statistics.runningTotal[ACTUAL_BYTES_RECEIVED] >= bytesSent;
-    }
-    REQUIRE( readThemAll );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            REQUIRE( server->GetStatistics( rawAddress, &statistics ) != nullptr );
+            return statistics.runningTotal[ACTUAL_BYTES_RECEIVED] >= bytesSent;
+        },
+        kBudgetMs ) );
 
     // Without the gate, twenty widest channels: ten megabytes.
     CHECK( statistics.bytesHeldForReassemblyAndOrdering == 0 );

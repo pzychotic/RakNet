@@ -115,29 +115,17 @@ private:
     int userMessagesReceived = 0;
 };
 
-/// Pumps \a peers until \a condition holds or the budget is spent.
-template<class Condition>
-bool WaitFor( std::initializer_list<Peer*> peers, Condition condition )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        for( Peer* peer : peers )
-            peer->Pump();
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
-
 bool Connect( Peer& client, Peer& server )
 {
     if( client->Connect( "127.0.0.1", server.Address().GetPort(), 0, 0 ) != CONNECTION_ATTEMPT_STARTED )
         return false;
-    return WaitFor( { &client, &server }, [&] {
-        return client->GetConnectionState( server.Address() ) == IS_CONNECTED && server->GetConnectionState( client.Address() ) == IS_CONNECTED;
-    } );
+    return ConnectionWaits::WaitUntil(
+        [&] {
+            client.Pump();
+            server.Pump();
+            return client->GetConnectionState( server.Address() ) == IS_CONNECTED && server->GetConnectionState( client.Address() ) == IS_CONNECTED;
+        },
+        kWaitBudgetMs );
 }
 
 /// Sends \a count user messages of kMessageBytes from \a from to \a to, and waits until they
@@ -150,12 +138,16 @@ bool SendAndSettle( Peer& from, Peer& to, int count )
     for( int i = 0; i < count; i++ )
         from->Send( message, kMessageBytes, HIGH_PRIORITY, RELIABLE_ORDERED, 0, to.Address(), false );
 
-    return WaitFor( { &from, &to }, [&] {
-        if( to.UserMessagesReceived() < receivedBefore + count )
-            return false;
-        RakNetStatistics statistics;
-        return from->GetStatistics( to.Address(), &statistics ) != 0 && statistics.messagesInResendBuffer == 0;
-    } );
+    return ConnectionWaits::WaitUntil(
+        [&] {
+            from.Pump();
+            to.Pump();
+            if( to.UserMessagesReceived() < receivedBefore + count )
+                return false;
+            RakNetStatistics statistics;
+            return from->GetStatistics( to.Address(), &statistics ) != 0 && statistics.messagesInResendBuffer == 0;
+        },
+        kWaitBudgetMs );
 }
 
 /// The fields that stay put while a settled connection carries only its keepalive pings,
@@ -349,7 +341,12 @@ TEST_CASE( "A statistics query that times out hands its answer to nobody", "[net
     Staller staller;
     server->SetUserUpdateThread( &Staller::Callback, &staller );
     staller.stallMs = BLOCKING_QUERY_TIMEOUT_MS + 250;
-    REQUIRE( WaitFor( { &client }, [&] { return staller.stalling.load(); } ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            client.Pump();
+            return staller.stalling.load();
+        },
+        kWaitBudgetMs ) );
 
     RakNetStatistics statistics;
     const TimeMS start = GetTimeMS();
@@ -357,7 +354,12 @@ TEST_CASE( "A statistics query that times out hands its answer to nobody", "[net
     const TimeMS waited = GetTimeMS() - start;
     CHECK( waited >= BLOCKING_QUERY_TIMEOUT_MS - 50 );
 
-    REQUIRE( WaitFor( { &client }, [&] { return staller.stalling.load() == false; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            client.Pump();
+            return staller.stalling.load() == false;
+        },
+        kWaitBudgetMs ) );
 
     // The network thread answers the abandoned query too, at the end of the cycle the
     // stall held up. None of that answer may reach these.
@@ -396,7 +398,13 @@ TEST_CASE( "A statistics query asked on the network thread is answered there", "
     asker.peer = server.Get();
 
     server->SetUserUpdateThread( &Asker::Callback, &asker );
-    REQUIRE( WaitFor( { &client, &server }, [&] { return asker.asked.load() && server->GetStatistics( client.Address() ) != nullptr; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            client.Pump();
+            server.Pump();
+            return asker.asked.load() && server->GetStatistics( client.Address() ) != nullptr;
+        },
+        kWaitBudgetMs ) );
     server->SetUserUpdateThread( nullptr, nullptr );
 
     CHECK( asker.answered );
@@ -441,7 +449,12 @@ TEST_CASE( "A statistics query in flight when Shutdown starts fails promptly", "
         }
     } stopAsker{ stop, asker };
 
-    REQUIRE( WaitFor( { &client }, [&] { return answered.load() > 10; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] {
+            client.Pump();
+            return answered.load() > 10;
+        },
+        kWaitBudgetMs ) );
     server->Shutdown( 0 );
     std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     stop = true;

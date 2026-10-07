@@ -159,20 +159,6 @@ private:
     bool m_waiting = false;
 };
 
-/// Polls \a condition until it holds or the budget is spent.
-template<class Condition>
-bool WaitFor( Condition condition )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( GetTimeMS() < deadline )
-    {
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
-
 constexpr int kJunkDatagramBytes = 2;
 
 /// Two bytes that are no RakNet message: ProcessNetworkPacket treats them as offline and
@@ -225,7 +211,7 @@ TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_R
                 sender.Send( junk );
             std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
         }
-        REQUIRE( WaitFor( [&] { return peer.GetReceivedDatagramsDroppedAtCap() > 0; } ) );
+        REQUIRE( ConnectionWaits::WaitUntil( [&] { return peer.GetReceivedDatagramsDroppedAtCap() > 0; }, kWaitBudgetMs ) );
 
         CHECK( peer.BufferedDatagrams() == (size_t)MAX_BUFFERED_RECEIVED_DATAGRAMS );
 
@@ -233,14 +219,14 @@ TEST_CASE( "A datagram flood with the update thread held stops at MAX_BUFFERED_R
         const uint64_t droppedBefore = peer.GetReceivedDatagramsDroppedAtCap();
         for( int i = 0; i < 16; ++i )
             sender.Send( junk );
-        REQUIRE( WaitFor( [&] { return peer.GetReceivedDatagramsDroppedAtCap() >= droppedBefore + 16; } ) );
+        REQUIRE( ConnectionWaits::WaitUntil( [&] { return peer.GetReceivedDatagramsDroppedAtCap() >= droppedBefore + 16; }, kWaitBudgetMs ) );
         CHECK( peer.BufferedDatagrams() == (size_t)MAX_BUFFERED_RECEIVED_DATAGRAMS );
 
         gate.Release();
     }
 
-    REQUIRE( WaitFor( [&] { return peer.BufferedDatagrams() == 0; } ) );
-    CHECK( WaitFor( [&] { return peer.BuffersOutstanding() == 1; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return peer.BufferedDatagrams() == 0; }, kWaitBudgetMs ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return peer.BuffersOutstanding() == 1; }, kWaitBudgetMs ) );
 }
 
 TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES and a connected System's Messages all arrive", "[network]" )
@@ -253,7 +239,7 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
     RakPeerInterface* both[] = { server, client };
     ConnectionWaits::WaitForConnectionCounts( both, 2, 1 );
     ConnectionWaits::Drain( server );
-    REQUIRE( WaitFor( [&] { return server->GetReceiveBufferSize() == 0; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server->GetReceiveBufferSize() == 0; }, kWaitBudgetMs ) );
 
     RawSystem pinger( SystemAddress( "127.0.0.1", 30000 ), 0x52 );
     BitStream ping;
@@ -278,8 +264,9 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
         std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
     }
     REQUIRE( connectedSent == kConnectedMessages );
-    REQUIRE( WaitFor( [&] { return server->GetOfflineMessagesDroppedAtCap() > 0; } ) );
-    REQUIRE( WaitFor( [&] { return server->GetReceiveBufferSize() >= (unsigned int)( MAX_PENDING_OFFLINE_MESSAGES + kConnectedMessages ); } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server->GetOfflineMessagesDroppedAtCap() > 0; }, kWaitBudgetMs ) );
+    REQUIRE( ConnectionWaits::WaitUntil(
+        [&] { return server->GetReceiveBufferSize() >= (unsigned int)( MAX_PENDING_OFFLINE_MESSAGES + kConnectedMessages ); }, kWaitBudgetMs ) );
 
     int pings = 0;
     int connectedReceived = 0;
@@ -307,7 +294,7 @@ TEST_CASE( "A flood of unconnected pings stops at MAX_PENDING_OFFLINE_MESSAGES a
     // Draining frees the slots: the next ping is queued again.
     const uint64_t droppedBefore = server->GetOfflineMessagesDroppedAtCap();
     pinger.Send( ping );
-    REQUIRE( WaitFor( [&] { return server->GetReceiveBufferSize() == 1; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return server->GetReceiveBufferSize() == 1; }, kWaitBudgetMs ) );
     CHECK( server->GetOfflineMessagesDroppedAtCap() == droppedBefore );
 }
 
@@ -325,8 +312,8 @@ TEST_CASE( "A datagram the incoming-datagram handler rejects gives its buffer ba
     for( int i = 0; i < kDatagrams; ++i )
         sender.Send( junk );
 
-    REQUIRE( WaitFor( [&] { return s_rejectedJunkDatagrams.load() == kDatagrams; } ) );
-    CHECK( WaitFor( [&] { return peer.BuffersOutstanding() == 1; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return s_rejectedJunkDatagrams.load() == kDatagrams; }, kWaitBudgetMs ) );
+    CHECK( ConnectionWaits::WaitUntil( [&] { return peer.BuffersOutstanding() == 1; }, kWaitBudgetMs ) );
     CHECK( peer.BufferedDatagrams() == 0 );
 
     peer.SetIncomingDatagramEventHandler( nullptr );
@@ -336,7 +323,7 @@ TEST_CASE( "Shutdown gives every receive buffer back through DeallocRNS2RecvStru
 {
     ObservedPeer peer;
     peer.Start();
-    REQUIRE( WaitFor( [&] { return peer.BuffersOutstanding() == 1; } ) );
+    REQUIRE( ConnectionWaits::WaitUntil( [&] { return peer.BuffersOutstanding() == 1; }, kWaitBudgetMs ) );
 
     // Shutdown wakes the receive thread with a datagram to the socket's own address, and
     // the receive thread queues it after the update thread is gone. That buffer is freed

@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <functional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -90,19 +89,6 @@ struct ForwardingHandler : public UDPProxyClientResultHandler
     void OnForwardingInProgress( const char*, unsigned short, SystemAddress, SystemAddress, SystemAddress, RakNetGUID, UDPProxyClient* ) override { failures++; }
 };
 
-// Receives on every peer, since the plugins run inside Receive, until done() holds or budget
-// passes. Returns done().
-bool PumpUntil( const std::vector<RakPeerInterface*>& peers, const std::function<bool()>& done, TimeMS budget = kStepBudgetMs )
-{
-    const TimeMS deadline = GetTimeMS() + budget;
-    while( !done() && !ConnectionWaits::Expired( deadline ) )
-    {
-        ConnectionWaits::DrainAll( peers.data(), (int)peers.size() );
-        std::this_thread::sleep_for( std::chrono::milliseconds( ConnectionWaits::kPollInterval ) );
-    }
-    return done();
-}
-
 // Receives on every peer until pinger's Receive hands out a pong from answerer, or the
 // budget passes.
 bool PongFrom( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* pinger, RakNetGUID answerer )
@@ -161,7 +147,9 @@ private:
 void Connect( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* client )
 {
     REQUIRE( client->Connect( "127.0.0.1", kCoordinatorPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( PumpUntil( peers, [client]() { return client->GetConnectionState( SystemAddress( "127.0.0.1", kCoordinatorPort ) ) == IS_CONNECTED; } ) );
+    REQUIRE( ConnectionWaits::DrainUntil(
+        peers.data(), (int)peers.size(),
+        [client]() { return client->GetConnectionState( SystemAddress( "127.0.0.1", kCoordinatorPort ) ) == IS_CONNECTED; }, kStepBudgetMs ) );
 }
 
 } // namespace
@@ -196,7 +184,7 @@ TEST_CASE( "UDPProxyClient's forwarding flow reaches a target that designated it
     Connect( peers, target );
 
     REQUIRE( proxyServerPlugin.LoginToCoordinator( kPassword, coordinatorAddress ) );
-    REQUIRE( PumpUntil( peers, [&]() { return loginHandler.loggedIn; } ) );
+    REQUIRE( ConnectionWaits::DrainUntil( peers.data(), (int)peers.size(), [&]() { return loginHandler.loggedIn; }, kStepBudgetMs ) );
 
     SECTION( "Both ends hear of it when both designated the coordinator" )
     {
@@ -204,7 +192,8 @@ TEST_CASE( "UDPProxyClient's forwarding flow reaches a target that designated it
         targetPlugin.AddCoordinator( coordinatorAddress );
 
         REQUIRE( sourcePlugin.RequestForwarding( coordinatorAddress, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID(), kForwardingTimeoutMs ) );
-        REQUIRE( PumpUntil( peers, [&]() { return sourceHandler.successes == 1 && targetHandler.notifications == 1; } ) );
+        REQUIRE( ConnectionWaits::DrainUntil(
+            peers.data(), (int)peers.size(), [&]() { return sourceHandler.successes == 1 && targetHandler.notifications == 1; }, kStepBudgetMs ) );
         CHECK( sourceHandler.failures == 0 );
         CHECK( sourceHandler.proxyPort == targetHandler.proxyPort );
 
@@ -216,8 +205,9 @@ TEST_CASE( "UDPProxyClient's forwarding flow reaches a target that designated it
     SECTION( "The source hears of it without designating, and an undesignating target does not" )
     {
         REQUIRE( sourcePlugin.RequestForwarding( coordinatorAddress, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID(), kForwardingTimeoutMs ) );
-        REQUIRE( PumpUntil( peers, [&]() { return sourceHandler.successes == 1; } ) );
-        CHECK( !PumpUntil( peers, [&]() { return targetHandler.notifications != 0; }, kNoNotificationWindowMs ) );
+        REQUIRE( ConnectionWaits::DrainUntil( peers.data(), (int)peers.size(), [&]() { return sourceHandler.successes == 1; }, kStepBudgetMs ) );
+        CHECK_FALSE(
+            ConnectionWaits::DrainUntil( peers.data(), (int)peers.size(), [&]() { return targetHandler.notifications != 0; }, kNoNotificationWindowMs ) );
         CHECK( sourceHandler.failures == 0 );
     }
 
@@ -261,13 +251,14 @@ TEST_CASE( "UDPProxyClient's ping replies reach the coordinator when two proxy s
 
     REQUIRE( firstServerPlugin.LoginToCoordinator( kPassword, coordinatorAddress ) );
     REQUIRE( secondServerPlugin.LoginToCoordinator( kPassword, coordinatorAddress ) );
-    REQUIRE( PumpUntil( peers, [&]() { return firstLogin.loggedIn && secondLogin.loggedIn; } ) );
+    REQUIRE( ConnectionWaits::DrainUntil( peers.data(), (int)peers.size(), [&]() { return firstLogin.loggedIn && secondLogin.loggedIn; }, kStepBudgetMs ) );
 
     sourcePlugin.AddCoordinator( coordinatorAddress );
     targetPlugin.AddCoordinator( coordinatorAddress );
 
     REQUIRE( sourcePlugin.RequestForwarding( coordinatorAddress, UNASSIGNED_SYSTEM_ADDRESS, target->GetMyGUID(), kForwardingTimeoutMs ) );
-    REQUIRE( PumpUntil( peers, [&]() { return sourceHandler.successes == 1 && targetHandler.notifications == 1; } ) );
+    REQUIRE( ConnectionWaits::DrainUntil(
+        peers.data(), (int)peers.size(), [&]() { return sourceHandler.successes == 1 && targetHandler.notifications == 1; }, kStepBudgetMs ) );
     CHECK( sourceHandler.failures == 0 );
 
     // Which server wins is not asserted: loopback pings give no meaningful order.

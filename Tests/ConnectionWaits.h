@@ -3,6 +3,8 @@
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
 
+#include <functional>
+
 namespace RakNet {
 class RakPeerInterface;
 }
@@ -10,7 +12,8 @@ class RakPeerInterface;
 /*
  *  Bounded waits on a peer's connection state, plus Drain - the suite's
  *  receive-and-deallocate primitive, which any polling loop needs whether or
- *  not it is polling for a connection.
+ *  not it is polling for a connection - and WaitUntil/DrainUntil, the bounded
+ *  wait on any condition, for the polls the named waits do not cover.
  *
  *  Split out of PeerScope deliberately: PeerScope is about ownership, this is
  *  about time.
@@ -239,5 +242,27 @@ void Drain( RakNet::RakPeerInterface* peer );
 // distinct role in a drain - it is a peer with a queue, like every other, and
 // only the caller's variable names say otherwise.
 void DrainAll( RakNet::RakPeerInterface* const* peers, int count );
+
+// The suite's poll-a-condition primitive, for every wait the named shapes above
+// do not cover: calls condition every kPollInterval until it returns true or
+// budget ms have passed, under one deadline checked with Expired. Returns the
+// condition's last answer.
+//
+// Returns rather than FAILs, unlike the named waits: they know what they wait on
+// and so can name what was stuck, and this cannot. The caller wraps it in REQUIRE
+// or CHECK, or expects it to expire - a wait that something does NOT happen, or a
+// grace window.
+//
+// Does not drain, like the named waits. A condition that has to receive in its
+// own way - recording what arrives, or running an update cycle first - does that
+// inside the condition; one that only needs the queues kept down uses DrainUntil.
+bool WaitUntil( const std::function<bool()>& condition, RakNet::TimeMS budget );
+
+// WaitUntil that drains every peer, through DrainAll, before each call of
+// condition. Same justification as DrainAll: a loop that polls without draining
+// grows `count` queues without bound, and this is that loop for a caller that
+// reads none of what arrives. A condition that never returns true makes it a
+// drain for the whole budget.
+bool DrainUntil( RakNet::RakPeerInterface* const* peers, int count, const std::function<bool()>& condition, RakNet::TimeMS budget );
 
 } // namespace ConnectionWaits

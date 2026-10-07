@@ -87,6 +87,10 @@ constexpr int kConnectionsPerClient = 12;
 constexpr TimeMS kChurnBudgetMs = 60000;
 // Hang guard for each wait below.
 constexpr TimeMS kWaitBudgetMs = 10000;
+// How long the ping test receives after each of its pings, and then after the last one so
+// every pong is back. Settle times, not hang guards: the test receives for all of each.
+constexpr TimeMS kPongWindowMs = 40;
+constexpr TimeMS kPingSettleMs = 500;
 // The timeouts the churn's setter thread alternates between. Both far above a loopback
 // round trip, so neither drops a connection.
 constexpr TimeMS kChurnTimeouts[] = { 20000, 25000 };
@@ -239,22 +243,6 @@ private:
     std::function<void()> pendingWork;
 };
 
-/// Polls \a condition, draining both Peers, until it holds or the budget is spent.
-template<class Condition>
-bool WaitFor( CountedPeer& a, CountedPeer& b, Condition condition )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        ConnectionWaits::Drain( a.Get() );
-        ConnectionWaits::Drain( b.Get() );
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
-
 bool Contains( const std::vector<SystemAddress>& addresses, const SystemAddress& address )
 {
     return std::find( addresses.begin(), addresses.end(), address ) != addresses.end();
@@ -266,14 +254,18 @@ TEST_CASE( "The identity and state getters describe an open connection, and stop
 {
     CountedPeer server( kClosedServerPort, 1 );
     CountedPeer client( kClosedClientPort, 1 );
+    RakPeerInterface* const both[] = { client.Get(), server.Get() };
     const SystemAddress clientAddress = client.Address();
     const RakNetGUID clientGuid = client.Guid();
 
     REQUIRE( client->Connect( "127.0.0.1", kClosedServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( WaitFor( client, server, [&] {
-        return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
-               server->GetConnectionState( clientAddress ) == IS_CONNECTED;
-    } ) );
+    REQUIRE( ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] {
+            return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
+                   server->GetConnectionState( clientAddress ) == IS_CONNECTED;
+        },
+        kWaitBudgetMs ) );
 
     const int index = server->GetIndexFromSystemAddress( clientAddress );
     REQUIRE( index >= 0 );
@@ -310,10 +302,13 @@ TEST_CASE( "The identity and state getters describe an open connection, and stop
     }
 
     client->CloseConnection( server.Address(), true, 0, LOW_PRIORITY );
-    REQUIRE( WaitFor( client, server, [&] {
-        const ConnectionState state = server->GetConnectionState( clientAddress );
-        return state != IS_CONNECTED && state != IS_DISCONNECTING;
-    } ) );
+    REQUIRE( ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] {
+            const ConnectionState state = server->GetConnectionState( clientAddress );
+            return state != IS_CONNECTED && state != IS_DISCONNECTING;
+        },
+        kWaitBudgetMs ) );
     REQUIRE( server.WaitForAFullCycle() );
 
     {
@@ -341,24 +336,13 @@ PingSummary ReadPingSummary( RakPeerInterface* peer, const AddressOrGUID& system
                         peer->GetClockDifferential( systemIdentifier ) };
 }
 
-/// Drains both Peers for \a milliseconds.
-void DrainFor( CountedPeer& a, CountedPeer& b, TimeMS milliseconds )
-{
-    const TimeMS deadline = GetTimeMS() + milliseconds;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        ConnectionWaits::Drain( a.Get() );
-        ConnectionWaits::Drain( b.Get() );
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-}
-
 } // namespace
 
 TEST_CASE( "The ping and clock getters answer on the user thread what the network thread computes", "[network]" )
 {
     CountedPeer server( kPingServerPort, 1 );
     CountedPeer client( kPingClientPort, 1 );
+    RakPeerInterface* const both[] = { client.Get(), server.Get() };
     const SystemAddress clientAddress = client.Address();
     const RakNetGUID clientGuid = client.Guid();
 
@@ -367,19 +351,22 @@ TEST_CASE( "The ping and clock getters answer on the user thread what the networ
     client->ApplyNetworkSimulator( 0.0f, 10, 20 );
 
     REQUIRE( client->Connect( "127.0.0.1", kPingServerPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( WaitFor( client, server, [&] {
-        return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
-               server->GetConnectionState( clientAddress ) == IS_CONNECTED;
-    } ) );
+    REQUIRE( ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] {
+            return client->GetConnectionState( server.Address() ) == IS_CONNECTED &&
+                   server->GetConnectionState( clientAddress ) == IS_CONNECTED;
+        },
+        kWaitBudgetMs ) );
 
     // Occasional pings are off, so once these pongs are back the server's ping records hold
     // still.
     for( int i = 0; i < 6; i++ )
     {
         server->Ping( clientAddress );
-        DrainFor( client, server, 40 );
+        ConnectionWaits::DrainUntil( both, 2, [] { return false; }, kPongWindowMs );
     }
-    DrainFor( client, server, 500 );
+    ConnectionWaits::DrainUntil( both, 2, [] { return false; }, kPingSettleMs );
     REQUIRE( server.WaitForAFullCycle() );
 
     PingSummary fromRecords{};
@@ -410,7 +397,7 @@ TEST_CASE( "The ping and clock getters answer on the user thread what the networ
     }
 
     client->CloseConnection( server.Address(), true, 0, LOW_PRIORITY );
-    REQUIRE( WaitFor( client, server, [&] { return server->GetConnectionState( clientAddress ) == IS_NOT_CONNECTED; } ) );
+    REQUIRE( ConnectionWaits::DrainUntil( both, 2, [&] { return server->GetConnectionState( clientAddress ) == IS_NOT_CONNECTED; }, kWaitBudgetMs ) );
     REQUIRE( server.WaitForAFullCycle() );
 
     {

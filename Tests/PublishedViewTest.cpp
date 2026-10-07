@@ -101,32 +101,20 @@ private:
     std::atomic<unsigned long long> cycles{ 0 };
 };
 
-/// Polls \a condition, draining both Peers, until it holds or the budget is spent.
-template<class Condition>
-bool WaitFor( ViewedPeer& a, ViewedPeer& b, Condition condition )
-{
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( ConnectionWaits::Expired( deadline ) == false )
-    {
-        ConnectionWaits::Drain( &a );
-        ConnectionWaits::Drain( &b );
-        if( condition() )
-            return true;
-        std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-    }
-    return condition();
-}
-
 /// Connects \a client to \a server and waits until each connection record says so.
 void Connect( ViewedPeer& client, ViewedPeer& server )
 {
     const SystemAddress serverAddress = server.Address();
     const SystemAddress clientAddress = client.Address();
     REQUIRE( client.Connect( "127.0.0.1", serverAddress.GetPort(), 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
-    REQUIRE( WaitFor( client, server, [&] {
-        return client.GetConnectionState( serverAddress ) == IS_CONNECTED &&
-               server.GetConnectionState( clientAddress ) == IS_CONNECTED;
-    } ) );
+    RakPeerInterface* const both[] = { &client, &server };
+    REQUIRE( ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] {
+            return client.GetConnectionState( serverAddress ) == IS_CONNECTED &&
+                   server.GetConnectionState( clientAddress ) == IS_CONNECTED;
+        },
+        kWaitBudgetMs ) );
 }
 
 /// Checks that \a peer's view finds \a other by address, by RakNetGUID and at \a index,
@@ -191,12 +179,16 @@ TEST_CASE( "The published view finds a connected System by address, RakNetGUID a
     }
 
     client.CloseConnection( serverAddress, true, 0, LOW_PRIORITY );
-    REQUIRE( WaitFor( client, server, [&] {
-        return client.GetConnectionState( serverAddress ) != IS_CONNECTED &&
-               client.GetConnectionState( serverAddress ) != IS_DISCONNECTING &&
-               server.GetConnectionState( clientAddress ) != IS_CONNECTED &&
-               server.GetConnectionState( clientAddress ) != IS_DISCONNECTING;
-    } ) );
+    RakPeerInterface* const both[] = { &client, &server };
+    REQUIRE( ConnectionWaits::DrainUntil(
+        both, 2,
+        [&] {
+            return client.GetConnectionState( serverAddress ) != IS_CONNECTED &&
+                   client.GetConnectionState( serverAddress ) != IS_DISCONNECTING &&
+                   server.GetConnectionState( clientAddress ) != IS_CONNECTED &&
+                   server.GetConnectionState( clientAddress ) != IS_DISCONNECTING;
+        },
+        kWaitBudgetMs ) );
 
     client.WaitForAFullCycle();
     server.WaitForAFullCycle();

@@ -1,7 +1,7 @@
 #include "PeerScope.h"
 
 #include "CommonFunctions.h"
-#include "GetTime.h"
+#include "ConnectionWaits.h"
 #include "MessageIdentifiers.h"
 #include "RakNetDefines.h"
 #include "RakNetStringMakers.h"
@@ -123,9 +123,7 @@ TEST_CASE( "An internal ID index outside the list reads and writes nothing", "[n
     REQUIRE( accepted != nullptr );
     client->DeallocatePacket( accepted );
 
-    const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-    while( client->GetInternalID( serverAddress, 1 ) != kSecondAddress && GetTimeMS() < deadline )
-        std::this_thread::yield();
+    ConnectionWaits::WaitUntil( [&] { return client->GetInternalID( serverAddress, 1 ) == kSecondAddress; }, kWaitBudgetMs );
     REQUIRE( client->GetInternalID( serverAddress, 1 ) == kSecondAddress );
     CHECK( client->GetInternalID( serverAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS ) == UNASSIGNED_SYSTEM_ADDRESS );
     CHECK( client->GetInternalID( serverAddress, -1 ) == UNASSIGNED_SYSTEM_ADDRESS );
@@ -194,9 +192,7 @@ TEST_CASE( "Connections open while the internal IDs change", "[network]" )
         REQUIRE( closed != nullptr );
         server->DeallocatePacket( closed );
 
-        const TimeMS deadline = GetTimeMS() + kWaitBudgetMs;
-        while( client->GetConnectionState( serverAddress ) != IS_NOT_CONNECTED && GetTimeMS() < deadline )
-            std::this_thread::yield();
+        ConnectionWaits::WaitUntil( [&] { return client->GetConnectionState( serverAddress ) == IS_NOT_CONNECTED; }, kWaitBudgetMs );
         REQUIRE( client->GetConnectionState( serverAddress ) == IS_NOT_CONNECTED );
     }
 
