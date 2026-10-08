@@ -25,10 +25,6 @@ namespace RakNet {
 
 static const int DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR = 1000;
 
-// bool operator<( const DataStructures::MLKeyRef<UDPProxyClient::ServerWithPing> &inputKey, const UDPProxyClient::ServerWithPing &cls ) {return inputKey.Get().serverAddress < cls.serverAddress;}
-// bool operator>( const DataStructures::MLKeyRef<UDPProxyClient::ServerWithPing> &inputKey, const UDPProxyClient::ServerWithPing &cls ) {return inputKey.Get().serverAddress > cls.serverAddress;}
-// bool operator==( const DataStructures::MLKeyRef<UDPProxyClient::ServerWithPing> &inputKey, const UDPProxyClient::ServerWithPing &cls ) {return inputKey.Get().serverAddress == cls.serverAddress;}
-
 STATIC_FACTORY_DEFINITIONS( UDPProxyClient, UDPProxyClient );
 
 UDPProxyClient::UDPProxyClient()
