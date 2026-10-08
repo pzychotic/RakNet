@@ -388,6 +388,11 @@ have that type. Code that reached them through a subclass calls `Append`, `Size`
 the bytes asked for or none, where `ReadBytes` read what there was.
 `DecrementReadOffset` and `Print` have no counterpart.
 
+**`DS_RangeList.h`.** Gone. `ReliabilityLayer`, its only user, now keeps acknowledged and
+missing datagram numbers in `RakNet::SequenceRanges` (`SequenceRanges.h`), which writes and
+reads the same bytes. Code that walked `RangeList::ranges` and its `minIndex` and `maxIndex`
+walks `Ranges()` and each run's `first` and `last` instead.
+
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 

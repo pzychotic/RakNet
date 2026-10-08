@@ -607,11 +607,11 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
             return false;
         }
-        for( unsigned int i = 0; i < incomingAcks.ranges.Size(); i++ )
+        for( const auto& range : incomingAcks.Ranges() )
         {
-            if( incomingAcks.ranges[i].minIndex > incomingAcks.ranges[i].maxIndex || ( incomingAcks.ranges[i].maxIndex == (uint24_t)( 0xFFFFFFFF ) ) )
+            if( range.first > range.last || ( range.last == (uint24_t)( 0xFFFFFFFF ) ) )
             {
-                RakAssert( incomingAcks.ranges[i].minIndex <= incomingAcks.ranges[i].maxIndex );
+                RakAssert( range.first <= range.last );
 
                 for( PluginInterface2* pPlugin : messageHandlerList )
                 {
@@ -619,7 +619,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                 }
                 return false;
             }
-            for( datagramNumber = incomingAcks.ranges[i].minIndex; datagramNumber >= incomingAcks.ranges[i].minIndex && datagramNumber <= incomingAcks.ranges[i].maxIndex; datagramNumber++ )
+            for( datagramNumber = range.first; datagramNumber >= range.first && datagramNumber <= range.last; datagramNumber++ )
             {
                 for( auto it = unreliableWithAckReceiptHistory.begin();  it != unreliableWithAckReceiptHistory.end(); /**/ )
                 {
@@ -668,7 +668,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     else if( dhf.isNAK )
     {
         DatagramSequenceNumberType messageNumber;
-        DataStructures::RangeList<DatagramSequenceNumberType> incomingNAKs;
+        SequenceRanges<DatagramSequenceNumberType> incomingNAKs;
         if( incomingNAKs.Deserialize( &socketData ) == false )
         {
             for( PluginInterface2* pPlugin : messageHandlerList )
@@ -678,11 +678,11 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
             return false;
         }
-        for( unsigned int i = 0; i < incomingNAKs.ranges.Size(); i++ )
+        for( const auto& range : incomingNAKs.Ranges() )
         {
-            if( incomingNAKs.ranges[i].minIndex > incomingNAKs.ranges[i].maxIndex )
+            if( range.first > range.last )
             {
-                RakAssert( incomingNAKs.ranges[i].minIndex <= incomingNAKs.ranges[i].maxIndex );
+                RakAssert( range.first <= range.last );
 
                 for( PluginInterface2* pPlugin : messageHandlerList )
                 {
@@ -691,9 +691,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
                 return false;
             }
-            // Sanity check
-            //RakAssert(incomingNAKs.ranges[i].maxIndex.val-incomingNAKs.ranges[i].minIndex.val<1000);
-            for( messageNumber = incomingNAKs.ranges[i].minIndex; messageNumber >= incomingNAKs.ranges[i].minIndex && messageNumber <= incomingNAKs.ranges[i].maxIndex; messageNumber++ )
+            for( messageNumber = range.first; messageNumber >= range.first && messageNumber <= range.last; messageNumber++ )
             {
                 congestionManager.OnNAK( timeRead, messageNumber );
 

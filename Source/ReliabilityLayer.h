@@ -22,7 +22,7 @@
 #include "RakNetStatistics.h"
 #include "DR_SHA1.h"
 #include "DS_OrderedList.h"
-#include "DS_RangeList.h"
+#include "SequenceRanges.h"
 #include "DS_MemoryPool.h"
 #include "RakNetDefines.h"
 #include "NativeFeatureIncludes.h"
@@ -736,15 +736,15 @@ private:
     CCTimeType timeToNextSplitPacketChannelSweep;
 
     // This doesn't need to be a member, but I do it to avoid reallocations
-    DataStructures::RangeList<DatagramSequenceNumberType> incomingAcks;
+    SequenceRanges<DatagramSequenceNumberType> incomingAcks;
 
     // Every 16 datagrams, we make sure the 17th datagram goes out the same update tick, and is the same size as the 16th
     int countdownToNextPacketPair;
     InternalPacket* AllocateFromInternalPacketPool( void );
     void ReleaseToInternalPacketPool( InternalPacket* ip );
 
-    DataStructures::RangeList<DatagramSequenceNumberType> acknowlegements;
-    DataStructures::RangeList<DatagramSequenceNumberType> NAKs;
+    SequenceRanges<DatagramSequenceNumberType> acknowlegements;
+    SequenceRanges<DatagramSequenceNumberType> NAKs;
     bool remoteSystemNeedsBAndAS;
 
     unsigned int GetMaxDatagramSizeExcludingMessageHeaderBytes( void );
