@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <vector>
 
 /*
 CallLoopback's error path, driven locally.
@@ -64,5 +65,35 @@ TEST_CASE( "RPC4 CallLoopback error packet is readable by the RPC4 reader", "[rp
     CHECK( functionName == uniqueID );
 
     peer->DeallocatePacket( packet );
+    peer->DetachPlugin( &rpc4 );
+}
+
+namespace {
+
+std::vector<char> g_slotCalls;
+
+void SlotA( BitStream*, Packet* ) { g_slotCalls.push_back( 'A' ); }
+void SlotB( BitStream*, Packet* ) { g_slotCalls.push_back( 'B' ); }
+void SlotC( BitStream*, Packet* ) { g_slotCalls.push_back( 'C' ); }
+
+} // namespace
+
+TEST_CASE( "RPC4 calls a signal's slots by priority, highest first, then in registration order", "[rpc4]" )
+{
+    RPC4 rpc4;
+
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Client();
+    peer->AttachPlugin( &rpc4 );
+
+    rpc4.RegisterSlot( "signal", SlotA, 0 );
+    rpc4.RegisterSlot( "signal", SlotB, 5 );
+    rpc4.RegisterSlot( "signal", SlotC, 0 );
+
+    g_slotCalls.clear();
+    rpc4.Signal( "signal", nullptr, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true, true );
+
+    CHECK( g_slotCalls == std::vector<char>{ 'B', 'A', 'C' } );
+
     peer->DetachPlugin( &rpc4 );
 }

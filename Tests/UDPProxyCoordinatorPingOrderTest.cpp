@@ -71,9 +71,7 @@ public:
         fw->sata.targetClientAddress = kTargetClient;
         fw->timeRequestedPings = 1;
         fw->remainingServersToTry.assign( servers.begin(), servers.end() );
-        bool objectExists;
-        unsigned int index = forwardingRequestList.GetIndexFromKey( fw->sata, &objectExists );
-        forwardingRequestList.InsertAtIndex( fw, index, _FILE_AND_LINE_ );
+        forwardingRequestList.emplace( fw->sata, fw );
         return fw;
     }
 
@@ -118,6 +116,18 @@ TEST_CASE( "Servers are tried in order of their own summed ping", "[UDPProxyCoor
     fw.OrderRemainingServersToTry();
 
     CHECK( RemainingServers( fw ) == std::vector<SystemAddress>{ kServerB, kServerC, kServerA } );
+}
+
+TEST_CASE( "Servers with the same summed ping are all tried, in the order they were listed", "[UDPProxyCoordinator]" )
+{
+    ForwardingRequest fw;
+    fw.remainingServersToTry = { kServerA, kServerB, kServerC };
+    fw.sourceServerPings = { ServerPing( kServerA, 30 ), ServerPing( kServerB, 10 ), ServerPing( kServerC, 30 ) };
+    fw.targetServerPings = { ServerPing( kServerA, 30 ), ServerPing( kServerB, 10 ), ServerPing( kServerC, 30 ) };
+
+    fw.OrderRemainingServersToTry();
+
+    CHECK( RemainingServers( fw ) == std::vector<SystemAddress>{ kServerB, kServerA, kServerC } );
 }
 
 TEST_CASE( "A ping reply only records servers the coordinator asked about, once each", "[UDPProxyCoordinator]" )

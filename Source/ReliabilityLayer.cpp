@@ -226,15 +226,6 @@ static_assert( MAXIMUM_MESSAGE_SIZE ==
                          RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES ),
                "The send-side limit no longer matches what the receive side will reassemble" );
 
-int SplitPacketChannelComp( SplitPacketIdType const& key, SplitPacketChannel* const& data )
-{
-    if( key < data->splitPacketList.PacketId() )
-        return -1;
-    if( key == data->splitPacketList.PacketId() )
-        return 0;
-    return 1;
-}
-
 //-------------------------------------------------------------------------------------------------------
 // Constructor
 //-------------------------------------------------------------------------------------------------------
@@ -1558,7 +1549,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     // bound a connection with no traffic at all is held to.
     if( timeSinceLastTick >= timeToNextSplitPacketChannelSweep )
     {
-        if( splitPacketChannelList.Size() > 0 )
+        if( !splitPacketChannelList.empty() )
         {
             FreeStalledSplitPacketChannels( time );
         }
@@ -2633,12 +2624,11 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 //-------------------------------------------------------------------------------------------------------
 bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket, CCTimeType time )
 {
-    bool objectExists;
-    unsigned index;
     const uint64_t chunkCost = HeldPacketCost( internalPacket );
+    SplitPacketChannel* channel;
     // Find in splitPacketChannelList if a SplitPacketChannel with this splitPacketId was already allocated. If not, allocate and insert the channel into the list.
-    index = splitPacketChannelList.GetIndexFromKey( internalPacket->splitPacketId, &objectExists );
-    if( objectExists == false )
+    const auto channelIt = splitPacketChannelList.find( internalPacket->splitPacketId );
+    if( channelIt == splitPacketChannelList.end() )
     {
         // Refused before it is charged, so a count this Peer will not honour costs nothing
         // and cannot be what pushes a connection over its budget.
@@ -2664,11 +2654,9 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         newChannel->lastUpdateTime = time;
         newChannel->firstPacket = 0;
 
-        // Preallocate to the final size, to avoid runtime copies. Before the Insert, not
-        // after: SplitPacketChannelComp orders channels by splitPacketList.PacketId(),
-        // which only exists once the list is allocated. Preallocate is also the one step
-        // here that can fail, and a channel that never entered the list is far cheaper to
-        // unwind than one that did.
+        // Preallocate to the final size, to avoid runtime copies. Before the insert, not
+        // after: Preallocate is the one step here that can fail, and a channel that never
+        // entered the list is far cheaper to unwind than one that did.
         if( newChannel->splitPacketList.Preallocate( internalPacket, __FILE__, __LINE__ ) == false )
         {
             // The allocation failed; the count was checked above. Drop the chunk and the
@@ -2680,15 +2668,16 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
             return false;
         }
 
-        index = splitPacketChannelList.Insert( internalPacket->splitPacketId, newChannel, true, __FILE__, __LINE__ );
+        channel = newChannel;
+        const auto insertedIt = splitPacketChannelList.emplace( internalPacket->splitPacketId, newChannel ).first;
 
         // CreateInternalPacketFromBitStream checked splitPacketIndex < splitPacketCount, and
         // the channel was just sized from this chunk's own count, so this does not fail
         // today. If it ever does, the empty channel goes with the chunk.
-        if( !splitPacketChannelList[index]->splitPacketList.Add( internalPacket, __FILE__, __LINE__ ) )
+        if( !channel->splitPacketList.Add( internalPacket, __FILE__, __LINE__ ) )
         {
-            FreeSplitPacketChannel( splitPacketChannelList[index] );
-            splitPacketChannelList.RemoveAtIndex( index );
+            FreeSplitPacketChannel( channel );
+            splitPacketChannelList.erase( insertedIt );
             ReleaseHeldBytes( chunkCost );
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseToInternalPacketPool( internalPacket );
@@ -2697,9 +2686,11 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
     }
     else
     {
+        channel = channelIt->second;
+
         // Refused before it is charged, as above: a duplicate or disagreeing chunk would be
         // dropped anyway, and must not be what closes the connection.
-        if( !splitPacketChannelList[index]->splitPacketList.Accepts( internalPacket ) )
+        if( !channel->splitPacketList.Accepts( internalPacket ) )
         {
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseToInternalPacketPool( internalPacket );
@@ -2714,8 +2705,8 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
             // channel already.
             if( !closedOverBudget )
             {
-                FreeSplitPacketChannel( splitPacketChannelList[index] );
-                splitPacketChannelList.RemoveAtIndex( index );
+                FreeSplitPacketChannel( channel );
+                splitPacketChannelList.erase( channelIt );
             }
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseToInternalPacketPool( internalPacket );
@@ -2723,41 +2714,41 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         }
 
         // Accepts said yes above, and nothing between there and here touches the channel.
-        const bool added = splitPacketChannelList[index]->splitPacketList.Add( internalPacket, __FILE__, __LINE__ );
+        const bool added = channel->splitPacketList.Add( internalPacket, __FILE__, __LINE__ );
         RakAssert( added );
         (void)added;
     }
-    splitPacketChannelList[index]->lastUpdateTime = time;
+    channel->lastUpdateTime = time;
 
     // If the index is 0, then this is the first packet. Record this so it can be returned to the user with download progress
     if( internalPacket->splitPacketIndex == 0 )
-        splitPacketChannelList[index]->firstPacket = internalPacket;
+        channel->firstPacket = internalPacket;
 
     // Return download progress if we have the first packet, the list is not complete, and there are enough packets to justify it
     if( splitMessageProgressInterval &&
-        splitPacketChannelList[index]->firstPacket &&
-        splitPacketChannelList[index]->splitPacketList.AddedPacketsCount() != splitPacketChannelList[index]->firstPacket->splitPacketCount &&
-        ( splitPacketChannelList[index]->splitPacketList.AddedPacketsCount() % splitMessageProgressInterval ) == 0 )
+        channel->firstPacket &&
+        channel->splitPacketList.AddedPacketsCount() != channel->firstPacket->splitPacketCount &&
+        ( channel->splitPacketList.AddedPacketsCount() % splitMessageProgressInterval ) == 0 )
     {
         // Return ID_DOWNLOAD_PROGRESS
         // Write splitPacketIndex (SplitPacketIndexType)
         // Write splitPacketCount (SplitPacketIndexType)
         // Write byteLength (4)
-        // Write data, splitPacketChannelList[index]->splitPacketList[0]->data
+        // Write data, channel->splitPacketList[0]->data
         InternalPacket* progressIndicator = AllocateFromInternalPacketPool();
-        unsigned int length = sizeof( MessageID ) + sizeof( unsigned int ) * 2 + sizeof( unsigned int ) + (unsigned int)BITS_TO_BYTES( splitPacketChannelList[index]->firstPacket->dataBitLength );
+        unsigned int length = sizeof( MessageID ) + sizeof( unsigned int ) * 2 + sizeof( unsigned int ) + (unsigned int)BITS_TO_BYTES( channel->firstPacket->dataBitLength );
         AllocInternalPacketData( progressIndicator, length, false, __FILE__, __LINE__ );
         progressIndicator->dataBitLength = BYTES_TO_BITS( length );
         progressIndicator->data[0] = (MessageID)ID_DOWNLOAD_PROGRESS;
         unsigned int temp;
-        temp = splitPacketChannelList[index]->splitPacketList.AddedPacketsCount();
+        temp = channel->splitPacketList.AddedPacketsCount();
         memcpy( progressIndicator->data + sizeof( MessageID ), &temp, sizeof( unsigned int ) );
         temp = (unsigned int)internalPacket->splitPacketCount;
         memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &temp, sizeof( unsigned int ) );
-        temp = (unsigned int)BITS_TO_BYTES( splitPacketChannelList[index]->firstPacket->dataBitLength );
+        temp = (unsigned int)BITS_TO_BYTES( channel->firstPacket->dataBitLength );
         memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &temp, sizeof( unsigned int ) );
 
-        memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, splitPacketChannelList[index]->firstPacket->data, (size_t)BITS_TO_BYTES( splitPacketChannelList[index]->firstPacket->dataBitLength ) );
+        memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, channel->firstPacket->data, (size_t)BITS_TO_BYTES( channel->firstPacket->dataBitLength ) );
         outputQueue.push_back( progressIndicator );
     }
 
@@ -2809,18 +2800,16 @@ void ReliabilityLayer::FreeStalledSplitPacketChannels( CCTimeType time )
 {
     const CCTimeType stallTime = GetSplitPacketChannelStallTime();
 
-    // RemoveAtIndex shifts the tail down, so only advance when nothing was removed.
-    unsigned int i = 0;
-    while( i < splitPacketChannelList.Size() )
+    for( auto it = splitPacketChannelList.begin(); it != splitPacketChannelList.end(); )
     {
-        if( time > splitPacketChannelList[i]->lastUpdateTime + stallTime )
+        if( time > it->second->lastUpdateTime + stallTime )
         {
-            FreeSplitPacketChannel( splitPacketChannelList[i] );
-            splitPacketChannelList.RemoveAtIndex( i );
+            FreeSplitPacketChannel( it->second );
+            it = splitPacketChannelList.erase( it );
         }
         else
         {
-            ++i;
+            ++it;
         }
     }
 }
@@ -2907,11 +2896,11 @@ void ReliabilityLayer::ReleaseHeldBytes( uint64_t bytes )
 
 void ReliabilityLayer::FreeHeldReceiveBuffers( void )
 {
-    for( unsigned i = 0; i < splitPacketChannelList.Size(); i++ )
+    for( const auto& [splitPacketId, channel] : splitPacketChannelList )
     {
-        FreeSplitPacketChannel( splitPacketChannelList[i] );
+        FreeSplitPacketChannel( channel );
     }
-    splitPacketChannelList.Clear( false, _FILE_AND_LINE_ );
+    splitPacketChannelList.clear();
 
     for( unsigned i = 0; i < NUMBER_OF_ORDERED_STREAMS; i++ )
     {
@@ -3079,21 +3068,16 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdT
                                                                   RakNetSocket2* s, SystemAddress& systemAddress,
                                                                   BitStream& updateBitStream )
 {
-    unsigned int i;
-    bool objectExists;
-    SplitPacketChannel* splitPacketChannel;
-    InternalPacket* internalPacket;
-
     // Find in splitPacketChannelList the SplitPacketChannel with this splitPacketId
-    i = splitPacketChannelList.GetIndexFromKey( splitPacketId, &objectExists );
-    splitPacketChannel = splitPacketChannelList[i];
+    const auto channelIt = splitPacketChannelList.find( splitPacketId );
+    SplitPacketChannel* splitPacketChannel = channelIt->second;
 
     if( splitPacketChannel->splitPacketList.AllocSize() == splitPacketChannel->splitPacketList.AddedPacketsCount() )
     {
         // Ack immediately, because for large files this can take a long time
         SendACKs( s, systemAddress, time, updateBitStream );
-        internalPacket = BuildPacketFromSplitPacketList( splitPacketChannel, time );
-        splitPacketChannelList.RemoveAtIndex( i );
+        InternalPacket* internalPacket = BuildPacketFromSplitPacketList( splitPacketChannel, time );
+        splitPacketChannelList.erase( channelIt );
         return internalPacket;
     }
     else

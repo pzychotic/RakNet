@@ -21,8 +21,8 @@
 #include "Export.h"
 #include "PluginInterface2.h"
 #include "SocketIncludes.h"
-#include "DS_OrderedList.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -135,11 +135,10 @@ public:
         std::vector<ConnectionAttempt*> TakeConnectionAttempts();
     };
     RakNet::Time lastUpdate;
-    static int NatPunchthroughUserComp( const RakNetGUID& key, User* const& data );
 
 protected:
     void OnNATPunchthroughRequest( Packet* packet );
-    DataStructures::OrderedList<RakNetGUID, User*, NatPunchthroughServer::NatPunchthroughUserComp> users;
+    std::map<RakNetGUID, User*> users;
 
     void OnGetMostRecentPort( Packet* packet );
     void OnClientReady( Packet* packet );

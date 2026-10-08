@@ -19,9 +19,10 @@
 
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "DS_OrderedList.h"
 #include "Export.h"
 
+#include <map>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -32,9 +33,6 @@ namespace RakNet {
 
 /// Forward declarations
 class RakPeerInterface;
-
-/// \internal Has to be public so some of the shittier compilers can use it.
-int RAK_DLL_EXPORT MessageFilterStrComp( char* const& key, char* const& data );
 
 /// \internal Has to be public so some of the shittier compilers can use it.
 struct FilterSet
@@ -51,11 +49,8 @@ struct FilterSet
     void* timeoutUserData;
     int filterSetID;
     bool allowedIDs[MESSAGE_FILTER_MAX_MESSAGE_ID];
-    DataStructures::OrderedList<std::string, std::string> allowedRPC4;
+    std::set<std::string> allowedRPC4;
 };
-
-/// \internal Has to be public so some of the shittier compilers can use it.
-int RAK_DLL_EXPORT FilterSetComp( const int& key, FilterSet* const& data );
 
 /// \internal Has to be public so some of the shittier compilers can use it.
 struct FilteredSystem
@@ -182,7 +177,7 @@ protected:
     FilterSet* GetFilterSetByID( int filterSetID );
     void OnInvalidMessage( FilterSet* filterSet, AddressOrGUID systemAddress, unsigned char messageID );
 
-    DataStructures::OrderedList<int, FilterSet*, FilterSetComp> filterList;
+    std::map<int, FilterSet*> filterList;
     // Change to guid
     std::unordered_map<AddressOrGUID, FilteredSystem> systemList;
 

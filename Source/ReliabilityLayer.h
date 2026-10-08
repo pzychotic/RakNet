@@ -21,7 +21,6 @@
 #include "InternalPacket.h"
 #include "RakNetStatistics.h"
 #include "DR_SHA1.h"
-#include "DS_OrderedList.h"
 #include "SequenceRanges.h"
 #include "DS_MemoryPool.h"
 #include "RakNetDefines.h"
@@ -40,6 +39,7 @@
 
 #include <atomic>
 #include <deque>
+#include <map>
 #include <queue>
 #include <vector>
 
@@ -215,7 +215,6 @@ struct SplitPacketChannel
     // This is here for progress notifications, since progress notifications return the first packet data, if available
     InternalPacket* firstPacket;
 };
-int RAK_DLL_EXPORT SplitPacketChannelComp( SplitPacketIdType const& key, SplitPacketChannel* const& data );
 
 // Helper class
 struct BPSTracker
@@ -610,7 +609,7 @@ private:
     void InitHeapWeights( void );
     reliabilityHeapWeightType GetNextWeight( int priorityLevel );
 
-    DataStructures::OrderedList<SplitPacketIdType, SplitPacketChannel*, SplitPacketChannelComp> splitPacketChannelList;
+    std::map<SplitPacketIdType, SplitPacketChannel*> splitPacketChannelList;
 
     MessageNumberType sendReliableMessageNumberIndex;
     MessageNumberType internalOrderIndex;

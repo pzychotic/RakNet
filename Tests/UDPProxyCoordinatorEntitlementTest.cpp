@@ -59,11 +59,10 @@ public:
         SenderAndTargetAddress sata;
         sata.senderClientAddress = source;
         sata.targetClientAddress = target;
-        bool objectExists;
-        const unsigned int index = forwardingRequestList.GetIndexFromKey( sata, &objectExists );
-        return objectExists ? forwardingRequestList[index] : nullptr;
+        const auto it = forwardingRequestList.find( sata );
+        return it != forwardingRequestList.end() ? it->second : nullptr;
     }
-    unsigned int RequestCount() const { return forwardingRequestList.Size(); }
+    size_t RequestCount() const { return forwardingRequestList.size(); }
 };
 
 // Receives on the coordinator and on peer until peer's Receive hands out the ID_UDP_PROXY_GENERAL

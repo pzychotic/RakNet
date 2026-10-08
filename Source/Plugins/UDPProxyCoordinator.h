@@ -21,10 +21,11 @@
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
 #include "BitStream.h"
-#include "DS_OrderedList.h"
 
 #include <deque>
+#include <map>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace RakNet {
@@ -89,6 +90,12 @@ public:
         RakNetGUID senderClientGuid;
         SystemAddress targetClientAddress;
         RakNetGUID targetClientGuid;
+
+        // A forwarding request is identified by its address pair. The guids are not compared.
+        bool operator<( const SenderAndTargetAddress& rhs ) const
+        {
+            return std::tie( senderClientAddress, targetClientAddress ) < std::tie( rhs.senderClientAddress, rhs.targetClientAddress );
+        }
     };
 
     struct ServerWithPing
@@ -115,9 +122,6 @@ public:
     };
 
 protected:
-    static int ServerWithPingComp( const unsigned short& key, const UDPProxyCoordinator::ServerWithPing& data );
-    static int ForwardingRequestComp( const SenderAndTargetAddress& key, ForwardingRequest* const& data );
-
     void OnForwardingRequestFromClientToCoordinator( Packet* packet );
     void OnLoginRequestFromServerToCoordinator( Packet* packet );
     void OnForwardingReplyFromServerToCoordinator( Packet* packet );
@@ -133,7 +137,7 @@ protected:
     std::vector<SystemAddress> serverList;
 
     // Forwarding requests in progress
-    DataStructures::OrderedList<SenderAndTargetAddress, ForwardingRequest*, ForwardingRequestComp> forwardingRequestList;
+    std::map<SenderAndTargetAddress, ForwardingRequest*> forwardingRequestList;
 
     std::string remoteLoginPassword;
 

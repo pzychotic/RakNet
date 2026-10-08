@@ -31,9 +31,9 @@ namespace RakNet {
 
 const unsigned char CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS = 255;
 
-int RegisteredCommandComp( const char* const& key, const RegisteredCommand& data )
+bool CommandParserInterface::CommandNameLess::operator()( const char* lhs, const char* rhs ) const
 {
-    return _stricmp( key, data.command );
+    return _stricmp( lhs, rhs ) < 0;
 }
 
 CommandParserInterface::CommandParserInterface() {}
@@ -87,14 +87,13 @@ void CommandParserInterface::ParseConsoleString( char* str, const char delineato
 }
 void CommandParserInterface::SendCommandList( TransportInterface* transport, const SystemAddress& systemAddress )
 {
-    unsigned i;
-    if( commandList.Size() )
+    if( !commandList.empty() )
     {
-        for( i = 0; i < commandList.Size(); i++ )
+        const char* separator = "";
+        for( const auto& [name, rc] : commandList )
         {
-            transport->Send( systemAddress, "%s", commandList[i].command );
-            if( i < commandList.Size() - 1 )
-                transport->Send( systemAddress, ", " );
+            transport->Send( systemAddress, "%s%s", separator, rc.command );
+            separator = ", ";
         }
         transport->Send( systemAddress, "\r\n" );
     }
@@ -107,16 +106,18 @@ void CommandParserInterface::RegisterCommand( unsigned char parameterCount, cons
     rc.command = command;
     rc.commandHelp = commandHelp;
     rc.parameterCount = parameterCount;
-    commandList.Insert( command, rc, true, _FILE_AND_LINE_ );
+    // A name registered twice, in any case, keeps its first registration.
+    const bool inserted = commandList.emplace( command, rc ).second;
+    RakAssert( inserted );
+    (void)inserted;
 }
 bool CommandParserInterface::GetRegisteredCommand( const char* command, RegisteredCommand* rc )
 {
-    bool objectExists;
-    unsigned index;
-    index = commandList.GetIndexFromKey( command, &objectExists );
-    if( objectExists )
-        *rc = commandList[index];
-    return objectExists;
+    const auto it = commandList.find( command );
+    if( it == commandList.end() )
+        return false;
+    *rc = it->second;
+    return true;
 }
 void CommandParserInterface::OnTransportChange( TransportInterface* transport )
 {

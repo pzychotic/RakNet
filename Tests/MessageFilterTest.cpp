@@ -217,3 +217,24 @@ TEST_CASE( "MessageFilter lets through an unfiltered System's short Timestamped 
 
     CHECK( filter.OnReceive( message.Get() ) == RR_CONTINUE_PROCESSING );
 }
+
+TEST_CASE( "MessageFilter lists its filter sets in ID order and keeps the others when one is deleted", "[messagefilter]" )
+{
+    MessageFilter filter;
+    filter.SetAllowMessageID( true, ID_USER_PACKET_ENUM, ID_USER_PACKET_ENUM, 7 );
+    filter.SetAllowMessageID( true, ID_USER_PACKET_ENUM, ID_USER_PACKET_ENUM, 3 );
+    filter.SetAllowMessageID( true, ID_USER_PACKET_ENUM, ID_USER_PACKET_ENUM, 5 );
+
+    const auto filterSetIDs = [&filter] {
+        std::vector<int> ids;
+        for( unsigned index = 0; index < filter.GetFilterSetCount(); index++ )
+            ids.push_back( filter.GetFilterSetIDByIndex( index ) );
+        return ids;
+    };
+
+    CHECK( filterSetIDs() == std::vector<int>{ 3, 5, 7 } );
+
+    filter.DeleteFilterSet( 5 );
+
+    CHECK( filterSetIDs() == std::vector<int>{ 3, 7 } );
+}

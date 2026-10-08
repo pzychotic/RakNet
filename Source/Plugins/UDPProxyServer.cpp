@@ -39,20 +39,14 @@ void UDPProxyServer::SetResultHandler( UDPProxyServerResultHandler* rh )
 }
 bool UDPProxyServer::LoginToCoordinator( const std::string& password, SystemAddress coordinatorAddress )
 {
-    unsigned int insertionIndex;
-    bool objectExists;
-    insertionIndex = loggingInCoordinators.GetIndexFromKey( coordinatorAddress, &objectExists );
-    if( objectExists == true )
-        return false;
-    loggedInCoordinators.GetIndexFromKey( coordinatorAddress, &objectExists );
-    if( objectExists == true )
+    if( loggingInCoordinators.count( coordinatorAddress ) != 0 || loggedInCoordinators.count( coordinatorAddress ) != 0 )
         return false;
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_LOGIN_REQUEST_FROM_SERVER_TO_COORDINATOR );
     outgoingBs.Write( password );
     rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, coordinatorAddress, false );
-    loggingInCoordinators.InsertAtIndex( coordinatorAddress, insertionIndex, _FILE_AND_LINE_ );
+    loggingInCoordinators.insert( coordinatorAddress );
     return true;
 }
 void UDPProxyServer::SetServerPublicIP( const std::string& ip )
@@ -68,12 +62,10 @@ PluginReceiveResult UDPProxyServer::OnReceive( Packet* packet )
 
     if( packet->data[0] == ID_UDP_PROXY_GENERAL && packet->length > 1 )
     {
-        bool objectExists;
-
         switch( packet->data[1] )
         {
         case ID_UDP_PROXY_FORWARDING_REQUEST_FROM_COORDINATOR_TO_SERVER:
-            if( loggedInCoordinators.GetIndexFromKey( packet->systemAddress, &objectExists ) != (unsigned int)-1 )
+            if( loggedInCoordinators.count( packet->systemAddress ) != 0 )
             {
                 OnForwardingRequestFromCoordinatorToServer( packet );
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
@@ -83,11 +75,8 @@ PluginReceiveResult UDPProxyServer::OnReceive( Packet* packet )
         case ID_UDP_PROXY_WRONG_PASSWORD_FROM_COORDINATOR_TO_SERVER:
         case ID_UDP_PROXY_ALREADY_LOGGED_IN_FROM_COORDINATOR_TO_SERVER:
         case ID_UDP_PROXY_LOGIN_SUCCESS_FROM_COORDINATOR_TO_SERVER: {
-            unsigned int removalIndex = loggingInCoordinators.GetIndexFromKey( packet->systemAddress, &objectExists );
-            if( objectExists )
+            if( loggingInCoordinators.erase( packet->systemAddress ) != 0 )
             {
-                loggingInCoordinators.RemoveAtIndex( removalIndex );
-
                 BitStream incomingBs( packet->data, packet->length, false );
                 incomingBs.IgnoreBytes( 2 );
                 std::string password;
@@ -107,8 +96,7 @@ PluginReceiveResult UDPProxyServer::OnReceive( Packet* packet )
                         resultHandler->OnAlreadyLoggedIn( password, this );
                     break;
                 case ID_UDP_PROXY_LOGIN_SUCCESS_FROM_COORDINATOR_TO_SERVER:
-                    // RakAssert(loggedInCoordinators.GetIndexOf(packet->systemAddress)==(unsigned int)-1);
-                    loggedInCoordinators.Insert( packet->systemAddress, packet->systemAddress, true, _FILE_AND_LINE_ );
+                    loggedInCoordinators.insert( packet->systemAddress );
                     if( resultHandler )
                         resultHandler->OnLoginSuccess( password, this );
                     break;
@@ -127,8 +115,8 @@ void UDPProxyServer::OnClosedConnection( const SystemAddress& systemAddress, Rak
     (void)lostConnectionReason;
     (void)rakNetGUID;
 
-    loggingInCoordinators.RemoveIfExists( systemAddress );
-    loggedInCoordinators.RemoveIfExists( systemAddress );
+    loggingInCoordinators.erase( systemAddress );
+    loggedInCoordinators.erase( systemAddress );
 }
 void UDPProxyServer::OnRakPeerStartup( void )
 {
@@ -137,8 +125,8 @@ void UDPProxyServer::OnRakPeerStartup( void )
 void UDPProxyServer::OnRakPeerShutdown( void )
 {
     udpForwarder.Shutdown();
-    loggingInCoordinators.Clear( true, _FILE_AND_LINE_ );
-    loggedInCoordinators.Clear( true, _FILE_AND_LINE_ );
+    loggingInCoordinators.clear();
+    loggedInCoordinators.clear();
 }
 void UDPProxyServer::OnAttach( void )
 {

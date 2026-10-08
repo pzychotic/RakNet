@@ -21,6 +21,7 @@
 #include "UDPForwarder.h"
 
 #include <algorithm>
+#include <iterator>
 
 namespace RakNet {
 
@@ -39,28 +40,6 @@ static unsigned int ReportedPingOrUnresponsive( const std::vector<UDPProxyCoordi
 {
     auto it = FindServerPing( pings, serverAddress );
     return it != pings.end() ? it->ping : DEFAULT_CLIENT_UNRESPONSIVE_PING_TIME;
-}
-
-int UDPProxyCoordinator::ServerWithPingComp( const unsigned short& key, const UDPProxyCoordinator::ServerWithPing& data )
-{
-    if( key < data.ping )
-        return -1;
-    if( key > data.ping )
-        return 1;
-    return 0;
-}
-
-int UDPProxyCoordinator::ForwardingRequestComp( const SenderAndTargetAddress& key, ForwardingRequest* const& data )
-{
-    if( key.senderClientAddress < data->sata.senderClientAddress )
-        return -1;
-    if( key.senderClientAddress > data->sata.senderClientAddress )
-        return 1;
-    if( key.targetClientAddress < data->sata.targetClientAddress )
-        return -1;
-    if( key.targetClientAddress > data->sata.targetClientAddress )
-        return 1;
-    return 0;
 }
 
 STATIC_FACTORY_DEFINITIONS( UDPProxyCoordinator, UDPProxyCoordinator );
@@ -107,39 +86,36 @@ uint64_t UDPProxyCoordinator::GetServerSelectionBitstreamsRefused( void ) const
 unsigned int UDPProxyCoordinator::CountRequestsFrom( const SystemAddress& requestingAddress ) const
 {
     unsigned int count = 0;
-    for( unsigned int idx = 0; idx < forwardingRequestList.Size(); idx++ )
+    for( const auto& [sata, fw] : forwardingRequestList )
     {
-        if( forwardingRequestList[idx]->requestingAddress == requestingAddress )
+        if( fw->requestingAddress == requestingAddress )
             count++;
     }
     return count;
 }
 void UDPProxyCoordinator::Update( void )
 {
-    unsigned int idx;
     RakNet::TimeMS curTime = RakNet::GetTimeMS();
-    ForwardingRequest* fw;
-    idx = 0;
-    while( idx < forwardingRequestList.Size() )
+    for( auto it = forwardingRequestList.begin(); it != forwardingRequestList.end(); )
     {
-        fw = forwardingRequestList[idx];
+        // TryNextServer may forget the request, so the next one is found first.
+        const auto next = std::next( it );
+        ForwardingRequest* fw = it->second;
         if( fw->timeRequestedPings != 0 &&
             curTime > fw->timeRequestedPings + DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR )
         {
             fw->OrderRemainingServersToTry();
             fw->timeRequestedPings = 0;
             TryNextServer( fw->sata, fw );
-            idx++;
         }
         else if( fw->timeoutAfterSuccess != 0 &&
                  curTime > fw->timeoutAfterSuccess )
         {
             // Forwarding request succeeded, we waited a bit to prevent duplicates. Can forget about the entry now.
             RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
-            forwardingRequestList.RemoveAtIndex( idx );
+            forwardingRequestList.erase( it );
         }
-        else
-            idx++;
+        it = next;
     }
 }
 PluginReceiveResult UDPProxyCoordinator::OnReceive( Packet* packet )
@@ -169,18 +145,17 @@ void UDPProxyCoordinator::OnClosedConnection( const SystemAddress& systemAddress
     (void)lostConnectionReason;
     (void)rakNetGUID;
 
-    unsigned int idx = 0;
-    while( idx < forwardingRequestList.Size() )
+    for( auto requestIt = forwardingRequestList.begin(); requestIt != forwardingRequestList.end(); )
     {
-        if( forwardingRequestList[idx]->requestingAddress == systemAddress )
+        if( requestIt->second->requestingAddress == systemAddress )
         {
             // Guy disconnected before the attempt completed
-            RakNet::OP_DELETE( forwardingRequestList[idx], _FILE_AND_LINE_ );
-            forwardingRequestList.RemoveAtIndex( idx );
+            RakNet::OP_DELETE( requestIt->second, _FILE_AND_LINE_ );
+            requestIt = forwardingRequestList.erase( requestIt );
         }
         else
         {
-            idx++;
+            ++requestIt;
         }
     }
 
@@ -188,14 +163,17 @@ void UDPProxyCoordinator::OnClosedConnection( const SystemAddress& systemAddress
     if( it != serverList.end() )
     {
         // For each pending client for this server, choose from remaining servers.
-        for( unsigned int idx2 = 0; idx2 < forwardingRequestList.Size(); idx2++ )
+        for( auto requestIt = forwardingRequestList.begin(); requestIt != forwardingRequestList.end(); )
         {
-            ForwardingRequest* fw = forwardingRequestList[idx2];
+            // TryNextServer may forget the request, so the next one is found first.
+            const auto next = std::next( requestIt );
+            ForwardingRequest* fw = requestIt->second;
             if( fw->currentlyAttemptedServerAddress == systemAddress )
             {
                 // Try the next server
                 TryNextServer( fw->sata, fw );
             }
+            requestIt = next;
         }
 
         // Remove dead server
@@ -244,12 +222,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
     sataReversed.senderClientGuid = sata.targetClientGuid;
     sataReversed.targetClientGuid = sata.senderClientGuid;
 
-    unsigned int insertionIndex;
-    bool objectExists1, objectExists2;
-    insertionIndex = forwardingRequestList.GetIndexFromKey( sata, &objectExists1 );
-    forwardingRequestList.GetIndexFromKey( sataReversed, &objectExists2 );
-
-    if( objectExists1 || objectExists2 )
+    if( forwardingRequestList.count( sata ) != 0 || forwardingRequestList.count( sataReversed ) != 0 )
     {
         outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
         outgoingBs.Write( (MessageID)ID_UDP_PROXY_IN_PROGRESS );
@@ -333,13 +306,13 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         {
             fw->remainingServersToTry.push_back( rServer );
         }
-        forwardingRequestList.InsertAtIndex( fw, insertionIndex, _FILE_AND_LINE_ );
+        forwardingRequestList.emplace( sata, fw );
     }
     else
     {
         fw->timeRequestedPings = 0;
         fw->currentlyAttemptedServerAddress = serverList[0];
-        forwardingRequestList.InsertAtIndex( fw, insertionIndex, _FILE_AND_LINE_ );
+        forwardingRequestList.emplace( sata, fw );
         SendForwardingRequest( sourceAddress, targetAddress, fw->currentlyAttemptedServerAddress, fw->timeoutOnNoDataMS );
     }
 }
@@ -403,14 +376,13 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
     SenderAndTargetAddress sata;
     incomingBs.Read( sata.senderClientAddress );
     incomingBs.Read( sata.targetClientAddress );
-    bool objectExists;
-    unsigned int index = forwardingRequestList.GetIndexFromKey( sata, &objectExists );
-    if( objectExists == false )
+    const auto requestIt = forwardingRequestList.find( sata );
+    if( requestIt == forwardingRequestList.end() )
     {
         // The guy disconnected before the request finished
         return;
     }
-    ForwardingRequest* fw = forwardingRequestList[index];
+    ForwardingRequest* fw = requestIt->second;
     sata.senderClientGuid = fw->sata.senderClientGuid;
     sata.targetClientGuid = fw->sata.targetClientGuid;
 
@@ -456,8 +428,6 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
 
         // 05/18/09 Keep the entry around for some time after success, so duplicates are reported if attempting forwarding from the target system before notification of success
         fw->timeoutAfterSuccess = RakNet::GetTimeMS() + fw->timeoutOnNoDataMS;
-        // forwardingRequestList.RemoveAtIndex(index);
-        // RakNet::OP_DELETE(fw,_FILE_AND_LINE_);
 
         return;
     }
@@ -479,7 +449,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
         outgoingBs.Write( serverPublicIp );
         outgoingBs.Write( forwardingPort );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, fw->requestingAddress, false );
-        forwardingRequestList.RemoveAtIndex( index );
+        forwardingRequestList.erase( requestIt );
         RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
     }
 }
@@ -492,12 +462,11 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
     SenderAndTargetAddress sata;
     incomingBs.Read( sata.senderClientAddress );
     incomingBs.Read( sata.targetClientAddress );
-    bool objectExists;
-    unsigned int index = forwardingRequestList.GetIndexFromKey( sata, &objectExists );
-    if( objectExists == false )
+    const auto requestIt = forwardingRequestList.find( sata );
+    if( requestIt == forwardingRequestList.end() )
         return;
     ServerWithPing swp;
-    ForwardingRequest* fw = forwardingRequestList[index];
+    ForwardingRequest* fw = requestIt->second;
     if( fw->timeRequestedPings == 0 )
         return;
 
@@ -551,7 +520,7 @@ void UDPProxyCoordinator::TryNextServer( SenderAndTargetAddress sata, Forwarding
     if( pickedGoodServer == false )
     {
         SendAllBusy( sata.senderClientAddress, sata.targetClientAddress, sata.targetClientGuid, fw->requestingAddress );
-        forwardingRequestList.Remove( sata );
+        forwardingRequestList.erase( sata );
         RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
         return;
     }
@@ -571,31 +540,33 @@ void UDPProxyCoordinator::SendAllBusy( SystemAddress senderClientAddress, System
 void UDPProxyCoordinator::Clear( void )
 {
     serverList.clear();
-    for( unsigned int i = 0; i < forwardingRequestList.Size(); i++ )
+    for( const auto& [sata, fw] : forwardingRequestList )
     {
-        RakNet::OP_DELETE( forwardingRequestList[i], _FILE_AND_LINE_ );
+        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
     }
-    forwardingRequestList.Clear( false, _FILE_AND_LINE_ );
+    forwardingRequestList.clear();
 }
 void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )
 {
-    DataStructures::OrderedList<unsigned short, UDPProxyCoordinator::ServerWithPing, ServerWithPingComp> swpList;
-
     if( sourceServerPings.empty() && targetServerPings.empty() )
         return;
 
+    std::vector<ServerWithPing> swpList;
+    swpList.reserve( remainingServersToTry.size() );
     ServerWithPing swp;
     for( const SystemAddress& serverAddress : remainingServersToTry )
     {
         swp.serverAddress = serverAddress;
         unsigned int ping = ReportedPingOrUnresponsive( sourceServerPings, serverAddress ) + ReportedPingOrUnresponsive( targetServerPings, serverAddress );
         swp.ping = ping > 0xFFFF ? (unsigned short)0xFFFF : (unsigned short)ping;
-        swpList.Insert( swp.ping, swp, false, _FILE_AND_LINE_ );
+        swpList.push_back( swp );
     }
+    // Servers with the same ping keep the order they were listed in.
+    std::stable_sort( swpList.begin(), swpList.end(), []( const ServerWithPing& lhs, const ServerWithPing& rhs ) { return lhs.ping < rhs.ping; } );
     remainingServersToTry.clear();
-    for( uint32_t idx = 0; idx < swpList.Size(); idx++ )
+    for( const ServerWithPing& sorted : swpList )
     {
-        remainingServersToTry.push_back( swpList[idx].serverAddress );
+        remainingServersToTry.push_back( sorted.serverAddress );
     }
 }
 

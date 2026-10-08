@@ -124,10 +124,10 @@ public:
                                packet->data[1] == ID_UDP_PROXY_PING_SERVERS_REPLY_FROM_CLIENT_TO_COORDINATOR;
         const PluginReceiveResult result = UDPProxyCoordinator::OnReceive( packet );
         // The test makes one request
-        if( pingReply && forwardingRequestList.Size() == 1 )
+        if( pingReply && forwardingRequestList.size() == 1 )
         {
-            sourcePinged = Addresses( forwardingRequestList[0]->sourceServerPings );
-            targetPinged = Addresses( forwardingRequestList[0]->targetServerPings );
+            sourcePinged = Addresses( forwardingRequestList.begin()->second->sourceServerPings );
+            targetPinged = Addresses( forwardingRequestList.begin()->second->targetServerPings );
         }
         return result;
     }

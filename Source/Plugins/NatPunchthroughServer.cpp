@@ -106,15 +106,6 @@ void NatPunchthroughServer::User::LogConnectionAttempts( std::string& rs )
     }
 }
 
-int NatPunchthroughServer::NatPunchthroughUserComp( const RakNetGUID& key, User* const& data )
-{
-    if( key < data->guid )
-        return -1;
-    if( key > data->guid )
-        return 1;
-    return 0;
-}
-
 STATIC_FACTORY_DEFINITIONS( NatPunchthroughServer, NatPunchthroughServer );
 
 NatPunchthroughServer::NatPunchthroughServer()
@@ -129,9 +120,9 @@ NatPunchthroughServer::NatPunchthroughServer()
 
 NatPunchthroughServer::~NatPunchthroughServer()
 {
-    while( users.Size() )
+    while( !users.empty() )
     {
-        User* user = users[0];
+        User* user = users.begin()->second;
         for( ConnectionAttempt* pConnectionAttempt : user->TakeConnectionAttempts() )
         {
             User* otherUser = pConnectionAttempt->sender == user ? pConnectionAttempt->recipient : pConnectionAttempt->sender;
@@ -139,8 +130,7 @@ NatPunchthroughServer::~NatPunchthroughServer()
             RakNet::OP_DELETE( pConnectionAttempt, _FILE_AND_LINE_ );
         }
         RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
-        users[0] = users[users.Size() - 1];
-        users.RemoveAtIndex( users.Size() - 1 );
+        users.erase( users.begin() );
     }
 }
 
@@ -156,9 +146,8 @@ void NatPunchthroughServer::Update( void )
     {
         lastUpdate = time;
 
-        for( unsigned int i = 0; i < users.Size(); i++ )
+        for( const auto& [guid, user] : users )
         {
-            User* user = users[i];
             for( ConnectionAttempt* connectionAttempt : user->connectionAttempts )
             {
                 if( connectionAttempt->sender == user )
@@ -279,13 +268,12 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
     (void)lostConnectionReason;
     (void)systemAddress;
 
-    bool objectExists;
-    unsigned int i = users.GetIndexFromKey( rakNetGUID, &objectExists );
-    if( objectExists )
+    const auto userIt = users.find( rakNetGUID );
+    if( userIt != users.end() )
     {
         BitStream outgoingBs;
         std::vector<User*> freedUpInProgressUsers;
-        User* user = users[i];
+        User* user = userIt->second;
         for( ConnectionAttempt* connectionAttempt : user->TakeConnectionAttempts() )
         {
             outgoingBs.Reset();
@@ -317,8 +305,8 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
             RakNet::OP_DELETE( connectionAttempt, _FILE_AND_LINE_ );
         }
 
-        RakNet::OP_DELETE( users[i], _FILE_AND_LINE_ );
-        users.RemoveAtIndex( i );
+        RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
+        users.erase( userIt );
 
         for( User* pUser : freedUpInProgressUsers )
         {
@@ -337,10 +325,9 @@ void NatPunchthroughServer::OnNewConnection( const SystemAddress& systemAddress,
     user->mostRecentPort = 0;
     user->systemAddress = systemAddress;
     user->isReady = true;
-    users.Insert( rakNetGUID, user, true, _FILE_AND_LINE_ );
-
-    //  printf("Adding to users %s\n", rakNetGUID.ToString());
-    //  printf("DEBUG users[0] guid=%s\n", users[0]->guid.ToString());
+    // A guid already listed keeps its User.
+    if( !users.emplace( rakNetGUID, user ).second )
+        RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
 }
 
 void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
@@ -351,24 +338,23 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
     RakNetGUID recipientGuid, senderGuid;
     incomingBs.Read( recipientGuid );
     senderGuid = packet->guid;
-    bool objectExists;
-    unsigned int i = users.GetIndexFromKey( senderGuid, &objectExists );
+    const auto senderIt = users.find( senderGuid );
     // A sender that connected before this plugin was attached has no User.
-    if( objectExists == false )
+    if( senderIt == users.end() )
         return;
-    User* sender = users[i];
+    User* sender = senderIt->second;
 
-    i = users.GetIndexFromKey( recipientGuid, &objectExists );
+    const auto recipientIt = users.find( recipientGuid );
     // A request to the sender's own guid is refused too: its attempt would be listed twice on
     // one User.
-    if( objectExists == false || recipientGuid == senderGuid )
+    if( recipientIt == users.end() || recipientGuid == senderGuid )
     {
         outgoingBs.Write( (MessageID)ID_NAT_TARGET_NOT_CONNECTED );
         outgoingBs.Write( recipientGuid );
         rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
         return;
     }
-    User* recipient = users[i];
+    User* recipient = recipientIt->second;
     if( recipient->HasConnectionAttemptToUser( sender ) )
     {
         outgoingBs.Write( (MessageID)ID_NAT_ALREADY_IN_PROGRESS );
@@ -389,12 +375,11 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
 
 void NatPunchthroughServer::OnClientReady( Packet* packet )
 {
-    bool objectExists;
-    unsigned int i = users.GetIndexFromKey( packet->guid, &objectExists );
-    if( objectExists )
+    const auto userIt = users.find( packet->guid );
+    if( userIt != users.end() )
     {
-        users[i]->isReady = true;
-        StartPunchthroughForUser( users[i] );
+        userIt->second->isReady = true;
+        StartPunchthroughForUser( userIt->second );
     }
 }
 
@@ -407,8 +392,8 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
     bsIn.Read( sessionId );
     bsIn.Read( mostRecentPort );
 
-    bool objectExists;
-    unsigned int i = users.GetIndexFromKey( packet->guid, &objectExists );
+    const auto userIt = users.find( packet->guid );
+    const bool objectExists = userIt != users.end();
 
     if( natPunchthroughServerDebugInterface )
     {
@@ -421,7 +406,7 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
 
     if( objectExists )
     {
-        User* user = users[i];
+        User* user = userIt->second;
         user->mostRecentPort = mostRecentPort;
         RakNet::Time time = RakNet::GetTime();
 

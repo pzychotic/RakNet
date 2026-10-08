@@ -101,29 +101,6 @@ enum RPC4Identifiers
     ID_RPC4_RETURN,
     ID_RPC4_SIGNAL,
 };
-int RPC4::LocalSlotObjectComp( const LocalSlotObject& key, const LocalSlotObject& data )
-{
-    if( key.callPriority > data.callPriority )
-        return -1;
-    if( key.callPriority == data.callPriority )
-    {
-        if( key.registrationCount < data.registrationCount )
-            return -1;
-        if( key.registrationCount == data.registrationCount )
-            return 0;
-        return 1;
-    }
-
-    return 1;
-}
-int RPC4::LocalCallbackComp( const MessageID& key, RPC4::LocalCallback* const& data )
-{
-    if( key < data->messageId )
-        return -1;
-    if( key > data->messageId )
-        return 1;
-    return 0;
-}
 
 RPC4::RPC4()
 {
@@ -134,9 +111,9 @@ RPC4::RPC4()
 
 RPC4::~RPC4()
 {
-    for( unsigned int i = 0; i < localCallbacks.Size(); i++ )
+    for( const auto& entry : localCallbacks )
     {
-        RakNet::OP_DELETE( localCallbacks[i], _FILE_AND_LINE_ );
+        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
     }
 
     for( const auto& entry : localSlots )
@@ -170,7 +147,7 @@ void RPC4::RegisterSlot( const char* sharedIdentifier, void ( *functionPointer )
     }
 
     LocalSlotObject lso( nextSlotRegistrationCount++, callPriority, functionPointer );
-    localSlot->slotObjects.Insert( lso, lso, true, _FILE_AND_LINE_ );
+    localSlot->slotObjects.insert( lso );
 }
 
 bool RPC4::RegisterBlockingFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, BitStream* returnData, Packet* packet ) )
@@ -184,25 +161,13 @@ bool RPC4::RegisterBlockingFunction( const char* uniqueID, void ( *functionPoint
 
 void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )
 {
-    bool objectExists;
-    unsigned int index;
-    LocalCallback* lc;
-    std::string str( uniqueID );
-    index = localCallbacks.GetIndexFromKey( messageId, &objectExists );
-    if( objectExists )
-    {
-        lc = localCallbacks[index];
-        index = lc->functions.GetIndexFromKey( str, &objectExists );
-        if( objectExists == false )
-            lc->functions.InsertAtIndex( str, index, _FILE_AND_LINE_ );
-    }
-    else
+    LocalCallback*& lc = localCallbacks[messageId];
+    if( lc == nullptr )
     {
         lc = RakNet::OP_NEW<LocalCallback>( _FILE_AND_LINE_ );
         lc->messageId = messageId;
-        lc->functions.Insert( str, str, false, _FILE_AND_LINE_ );
-        localCallbacks.InsertAtIndex( lc, index, _FILE_AND_LINE_ );
     }
+    lc->functions.insert( uniqueID );
 }
 
 bool RPC4::UnregisterFunction( const char* uniqueID )
@@ -217,24 +182,15 @@ bool RPC4::UnregisterBlockingFunction( const char* uniqueID )
 
 bool RPC4::UnregisterLocalCallback( const char* uniqueID, MessageID messageId )
 {
-    bool objectExists;
-    unsigned int index, index2;
-    LocalCallback* lc;
-    std::string str( uniqueID );
-    index = localCallbacks.GetIndexFromKey( messageId, &objectExists );
-    if( objectExists )
+    const auto it = localCallbacks.find( messageId );
+    if( it != localCallbacks.end() )
     {
-        lc = localCallbacks[index];
-        index2 = lc->functions.GetIndexFromKey( str, &objectExists );
-        if( objectExists )
+        LocalCallback* lc = it->second;
+        if( lc->functions.erase( uniqueID ) != 0 && lc->functions.empty() )
         {
-            lc->functions.RemoveAtIndex( index2 );
-            if( lc->functions.Size() == 0 )
-            {
-                RakNet::OP_DELETE( lc, _FILE_AND_LINE_ );
-                localCallbacks.RemoveAtIndex( index );
-                return true;
-            }
+            RakNet::OP_DELETE( lc, _FILE_AND_LINE_ );
+            localCallbacks.erase( it );
+            return true;
         }
     }
     return false;
@@ -473,19 +429,15 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
 void RPC4::InvokeSignal( LocalSlot* localSlot, BitStream* serializedParameters, Packet* packet )
 {
     interruptSignal = false;
-    //LocalSlot* localSlot = localSlots.ItemAtIndex( functionIndex );
-    unsigned int i = 0u;
-    while( i < localSlot->slotObjects.Size() )
+    for( const LocalSlotObject& slotObject : localSlot->slotObjects )
     {
-        localSlot->slotObjects[i].functionPointer( serializedParameters, packet );
+        slotObject.functionPointer( serializedParameters, packet );
 
         // Not threadsafe
         if( interruptSignal == true )
             break;
 
         serializedParameters->ResetReadPointer();
-
-        i++;
     }
 }
 
@@ -593,16 +545,15 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
     }
 
-    bool objectExists = false;
-    unsigned int index = localCallbacks.GetIndexFromKey( packet->data[0], &objectExists );
-    if( objectExists )
+    if( const auto callbackIt = localCallbacks.find( packet->data[0] ); callbackIt != localCallbacks.end() )
     {
-        LocalCallback* lc = localCallbacks[index];
-        for( unsigned int index2 = 0; index2 < lc->functions.Size(); index2++ )
+        // Copied, because a function may unregister a local callback while the loop runs.
+        const std::set<std::string> functions = callbackIt->second->functions;
+        for( const std::string& function : functions )
         {
             BitStream bsIn( packet->data, packet->length, false );
 
-            if( auto it = registeredNonblockingFunctions.find( lc->functions[index2] ); it != registeredNonblockingFunctions.end() )
+            if( auto it = registeredNonblockingFunctions.find( function ); it != registeredNonblockingFunctions.end() )
             {
                 void ( *fp )( BitStream*, Packet* ) = it->second;
                 bsIn.AlignReadToByteBoundary();

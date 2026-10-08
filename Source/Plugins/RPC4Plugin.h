@@ -21,8 +21,9 @@
 #include "PacketPriority.h"
 #include "RakNetTypes.h"
 #include "BitStream.h"
-#include "DS_OrderedList.h"
 
+#include <map>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -172,9 +173,8 @@ public:
     struct LocalCallback
     {
         MessageID messageId;
-        DataStructures::OrderedList<std::string, std::string> functions;
+        std::set<std::string> functions;
     };
-    static int LocalCallbackComp( const MessageID& key, LocalCallback* const& data );
 
     /// \internal
     // Callable object, along with priority to call relative to other objects
@@ -193,14 +193,20 @@ public:
         unsigned int registrationCount;
         int callPriority;
         void ( *functionPointer )( BitStream* userData, Packet* packet );
-    };
 
-    static int LocalSlotObjectComp( const LocalSlotObject& key, const LocalSlotObject& data );
+        // Higher callPriority first, then in registration order
+        bool operator<( const LocalSlotObject& rhs ) const
+        {
+            if( callPriority != rhs.callPriority )
+                return callPriority > rhs.callPriority;
+            return registrationCount < rhs.registrationCount;
+        }
+    };
 
     /// \internal
     struct LocalSlot
     {
-        DataStructures::OrderedList<LocalSlotObject, LocalSlotObject, LocalSlotObjectComp> slotObjects;
+        std::set<LocalSlotObject> slotObjects;
     };
     std::unordered_map<std::string, LocalSlot*> localSlots;
 
@@ -213,7 +219,7 @@ protected:
 
     std::unordered_map<std::string, void ( * )( BitStream*, Packet* )> registeredNonblockingFunctions;
     std::unordered_map<std::string, void ( * )( BitStream*, BitStream*, Packet* )> registeredBlockingFunctions;
-    DataStructures::OrderedList<MessageID, LocalCallback*, RPC4::LocalCallbackComp> localCallbacks;
+    std::map<MessageID, LocalCallback*> localCallbacks;
 
     BitStream blockingReturnValue;
     bool gotBlockingReturnValue;

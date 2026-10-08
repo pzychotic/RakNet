@@ -393,6 +393,31 @@ missing datagram numbers in `RakNet::SequenceRanges` (`SequenceRanges.h`), which
 reads the same bytes. Code that walked `RangeList::ranges` and its `minIndex` and `maxIndex`
 walks `Ranges()` and each run's `first` and `last` instead.
 
+**`DS_OrderedList.h`.** Gone. Each user now holds a standard container, so the protected
+and `\internal` members below changed type. Code that reached them through a subclass uses
+the standard interface (`find`, `emplace`, `erase`, iteration) instead of
+`GetIndexFromKey`, `Insert`, `RemoveAtIndex` and `operator[]`.
+
+| Member | Now |
+|--------|-----|
+| `CommandParserInterface::commandList` | `std::map<const char*, RegisteredCommand, CommandNameLess>`, ordered by `_stricmp` as before |
+| `MessageFilter::filterList` | `std::map<int, FilterSet*>` |
+| `FilterSet::allowedRPC4` | `std::set<std::string>` |
+| `NatPunchthroughServer::users` | `std::map<RakNetGUID, User*>` |
+| `RPC4::localCallbacks` | `std::map<MessageID, LocalCallback*>` |
+| `RPC4::LocalCallback::functions` | `std::set<std::string>` |
+| `RPC4::LocalSlot::slotObjects` | `std::set<LocalSlotObject>` |
+| `StatisticsHistory::objects` | `std::vector<TrackedObject*>`, sorted by `objectId` |
+| `UDPProxyCoordinator::forwardingRequestList` | `std::map<SenderAndTargetAddress, ForwardingRequest*>` |
+| `UDPProxyServer::loggingInCoordinators`, `loggedInCoordinators` | `std::set<SystemAddress>` |
+
+The comparison functions they were declared with are gone too: `RegisteredCommandComp`,
+`FilterSetComp`, `MessageFilterStrComp` and `SplitPacketChannelComp`, and the static members
+`NatPunchthroughServer::NatPunchthroughUserComp`, `RPC4::LocalCallbackComp`,
+`RPC4::LocalSlotObjectComp`, `StatisticsHistory::TrackedObjectComp`,
+`UDPProxyCoordinator::ServerWithPingComp` and `UDPProxyCoordinator::ForwardingRequestComp`.
+`LocalSlotObject` and `SenderAndTargetAddress` have an `operator<` in their place.
+
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 
@@ -679,6 +704,15 @@ choose which proxy server another pair was given.
   itself. A target named by address still need not be connected to the coordinator.
 - A ping reply counts only from one of the pair's own ends, the two Systems the coordinator
   asked. Anything else is dropped. Nothing to do.
+- Proxy servers whose summed pings are equal are all tried, in the order they logged in.
+  Stock kept only the first of them, so with two unresponsive servers it tried one and
+  reported `ID_UDP_PROXY_ALL_SERVERS_BUSY` when that one failed. Nothing to do.
+
+**`UDPProxyServer`.** Stock opened forwarding for a forwarding request from any connected
+System, and sent it the port, because its check that the sender was a coordinator it had
+logged in to always passed. Any System could have a proxy server forward between two
+addresses of its choosing. A proxy server now opens forwarding only for a coordinator that
+answered its `LoginToCoordinator` with success. Nothing to do.
 
 ## Router2 reports a route it can't make
 
@@ -704,6 +738,12 @@ the first with `ID_ROUTER_2_FORWARDING_NO_PATH` and the second with `ID_CONNECTI
 straight away. The forwarded connection still times out later and reports its own
 `ID_CONNECTION_LOST`, as it does after any re-route that fails. A later `EstablishRouting`
 to that Endpoint works.
+
+**A source asks the router with the lowest ping.** A source asks the router whose ping to
+the endpoint, multiplied by one more than the forwarding entries it already uses, is lowest,
+and the first one it listed if several tie. Stock meant to, but ordered the routers with a
+function that put a higher score first in some cases, so which router it asked depended on
+the order the pings came back in.
 
 ## Getters answer only for open connections
 

@@ -45,6 +45,7 @@ include( Catch )
 set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CloseClosingConnectionTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/CommandParserInterfaceTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ComprehensiveConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectAlreadyConnectedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConnectWithSocketTest.cpp
@@ -68,6 +69,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/MessageFilterTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MiscellaneousTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughClientQueuedOpenNatTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughServerDisconnectTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughServerSelfRequestTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionBindTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionRecvLoopTest.cpp
@@ -90,6 +92,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ReplacedCallbackTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2EntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2ForwardingFlowTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Router2RequestForwardingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2UnrequestedForwardingSuccessTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RPC4LoopbackTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SecurityFunctionsTest.cpp
@@ -103,6 +106,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketWildcardAddressTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SplitPacketReassemblyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsHistoryCullOnAddTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsHistorySortTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsQueryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StringUtilsTest.cpp
@@ -127,6 +131,8 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyClientForwardingFlowTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorEntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorPingOrderTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorRemovalTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyServerEntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WSAStartupSingletonTest.cpp
 )
 

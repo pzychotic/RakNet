@@ -20,9 +20,9 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
-#include "DS_OrderedList.h"
 #include "UDPForwarder.h"
 
+#include <set>
 #include <string>
 
 namespace RakNet {
@@ -110,8 +110,8 @@ public:
 protected:
     void OnForwardingRequestFromCoordinatorToServer( Packet* packet );
 
-    DataStructures::OrderedList<SystemAddress, SystemAddress> loggingInCoordinators;
-    DataStructures::OrderedList<SystemAddress, SystemAddress> loggedInCoordinators;
+    std::set<SystemAddress> loggingInCoordinators;
+    std::set<SystemAddress> loggedInCoordinators;
 
     UDPProxyServerResultHandler* resultHandler;
     unsigned short socketFamily;

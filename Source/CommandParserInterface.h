@@ -16,8 +16,9 @@
 
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
-#include "DS_OrderedList.h"
 #include "Export.h"
+
+#include <map>
 
 namespace RakNet {
 
@@ -33,9 +34,6 @@ struct RAK_DLL_EXPORT RegisteredCommand
     const char* commandHelp;
     unsigned char parameterCount;
 };
-
-/// List of commands registered with RegisterCommand()
-int RAK_DLL_EXPORT RegisteredCommandComp( const char* const& key, const RegisteredCommand& data );
 
 /// \brief The interface used by command parsers.
 /// \details CommandParserInterface provides a set of functions and interfaces that plug into the ConsoleServer class.
@@ -136,7 +134,14 @@ public:
     virtual void ReturnResult( const char* command, TransportInterface* transport, const SystemAddress& systemAddress );
 
 protected:
-    DataStructures::OrderedList<const char*, RegisteredCommand, RegisteredCommandComp> commandList;
+    /// Orders command names without regard to case
+    struct RAK_DLL_EXPORT CommandNameLess
+    {
+        bool operator()( const char* lhs, const char* rhs ) const;
+    };
+
+    /// List of commands registered with RegisterCommand()
+    std::map<const char*, RegisteredCommand, CommandNameLess> commandList;
 };
 
 } // namespace RakNet

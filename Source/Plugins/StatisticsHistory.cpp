@@ -16,45 +16,13 @@
 #include "RakNetStatistics.h"
 #include "RakPeerInterface.h"
 
+#include <algorithm>
+
 namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS( StatisticsHistory, StatisticsHistory );
 STATIC_FACTORY_DEFINITIONS( StatisticsHistoryPlugin, StatisticsHistoryPlugin );
 
-int StatisticsHistory::TrackedObjectComp( const uint64_t& key, StatisticsHistory::TrackedObject* const& data )
-{
-    if( key < data->trackedObjectData.objectId )
-        return -1;
-    if( key == data->trackedObjectData.objectId )
-        return 0;
-    return 1;
-}
-
-int TimeAndValueQueueCompAsc( StatisticsHistory::TimeAndValueQueue* const& key, StatisticsHistory::TimeAndValueQueue* const& data )
-{
-    if( key->sortValue < data->sortValue )
-        return -1;
-    if( key->sortValue > data->sortValue )
-        return 1;
-    if( key->key < data->key )
-        return -1;
-    if( key->key > data->key )
-        return 1;
-    return 0;
-}
-
-int TimeAndValueQueueCompDesc( StatisticsHistory::TimeAndValueQueue* const& key, StatisticsHistory::TimeAndValueQueue* const& data )
-{
-    if( key->sortValue > data->sortValue )
-        return -1;
-    if( key->sortValue < data->sortValue )
-        return 1;
-    if( key->key > data->key )
-        return -1;
-    if( key->key < data->key )
-        return 1;
-    return 0;
-}
 StatisticsHistory::TrackedObjectData::TrackedObjectData() {}
 StatisticsHistory::TrackedObjectData::TrackedObjectData( uint64_t _objectId, int _objectType, void* _userData )
 {
@@ -71,13 +39,12 @@ void StatisticsHistory::SetDefaultTimeToTrack( Time defaultTimeToTrack ) { timeT
 Time StatisticsHistory::GetDefaultTimeToTrack( void ) const { return timeToTrack; }
 bool StatisticsHistory::AddObject( TrackedObjectData tod )
 {
-    bool objectExists;
-    unsigned int idx = objects.GetIndexFromKey( tod.objectId, &objectExists );
-    if( objectExists )
+    const auto it = LowerBound( tod.objectId );
+    if( it != objects.end() && ( *it )->trackedObjectData.objectId == tod.objectId )
         return false;
     TrackedObject* to = RakNet::OP_NEW<TrackedObject>( _FILE_AND_LINE_ );
     to->trackedObjectData = tod;
-    objects.InsertAtIndex( to, idx, _FILE_AND_LINE_ );
+    objects.insert( it, to );
     return true;
 }
 bool StatisticsHistory::RemoveObject( uint64_t objectId, void** userData )
@@ -93,18 +60,18 @@ bool StatisticsHistory::RemoveObject( uint64_t objectId, void** userData )
 void StatisticsHistory::RemoveObjectAtIndex( unsigned int index )
 {
     TrackedObject* to = objects[index];
-    objects.RemoveAtIndex( index );
+    objects.erase( objects.begin() + index );
     RakNet::OP_DELETE( to, _FILE_AND_LINE_ );
 }
 void StatisticsHistory::Clear( void )
 {
-    for( unsigned int idx = 0; idx < objects.Size(); idx++ )
+    for( TrackedObject* to : objects )
     {
-        RakNet::OP_DELETE( objects[idx], _FILE_AND_LINE_ );
+        RakNet::OP_DELETE( to, _FILE_AND_LINE_ );
     }
-    objects.Clear( false, _FILE_AND_LINE_ );
+    objects.clear();
 }
-unsigned int StatisticsHistory::GetObjectCount( void ) const { return objects.Size(); }
+unsigned int StatisticsHistory::GetObjectCount( void ) const { return static_cast<unsigned int>( objects.size() ); }
 StatisticsHistory::TrackedObjectData* StatisticsHistory::GetObjectAtIndex( unsigned int index ) const { return &objects[index]->trackedObjectData; }
 bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes )
 {
@@ -190,8 +157,8 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
     TrackedObject* to = objects[idx];
     Time curTime = GetTime();
 
-    DataStructures::OrderedList<TimeAndValueQueue*, TimeAndValueQueue*, TimeAndValueQueueCompAsc> sortedQueues;
-    //for( unsigned int i = 0; i < itemList.Size(); i++ )
+    std::vector<TimeAndValueQueue*> sortedQueues;
+    sortedQueues.reserve( to->dataQueues.size() );
     for( const auto& entry : to->dataQueues )
     {
         TimeAndValueQueue* tavq = entry.second;
@@ -216,26 +183,30 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
         else
             tavq->sortValue = tavq->GetLongTermLowest();
 
-        if(
-            sortType == SH_SORT_BY_RECENT_SUM_ASCENDING ||
-            sortType == SH_SORT_BY_LONG_TERM_SUM_ASCENDING ||
-            sortType == SH_SORT_BY_RECENT_SUM_OF_SQUARES_ASCENDING ||
-            sortType == SH_SORT_BY_RECENT_AVERAGE_ASCENDING ||
-            sortType == SH_SORT_BY_LONG_TERM_AVERAGE_ASCENDING ||
-            sortType == SH_SORT_BY_RECENT_HIGHEST_ASCENDING ||
-            sortType == SH_SORT_BY_RECENT_LOWEST_ASCENDING ||
-            sortType == SH_SORT_BY_LONG_TERM_HIGHEST_ASCENDING ||
-            sortType == SH_SORT_BY_LONG_TERM_LOWEST_ASCENDING )
-            sortedQueues.Insert( tavq, tavq, false, _FILE_AND_LINE_, TimeAndValueQueueCompAsc );
-        else
-            sortedQueues.Insert( tavq, tavq, false, _FILE_AND_LINE_, TimeAndValueQueueCompDesc );
+        sortedQueues.push_back( tavq );
     }
 
-    values.reserve( values.size() + sortedQueues.Size() );
-    for( unsigned int i = 0; i < sortedQueues.Size(); i++ )
-    {
-        values.emplace_back( sortedQueues[i] );
-    }
+    // By sortValue, then by key. The keys are unique, so the order is total.
+    const auto ascending = []( const TimeAndValueQueue* lhs, const TimeAndValueQueue* rhs ) {
+        if( lhs->sortValue != rhs->sortValue )
+            return lhs->sortValue < rhs->sortValue;
+        return lhs->key < rhs->key;
+    };
+    if(
+        sortType == SH_SORT_BY_RECENT_SUM_ASCENDING ||
+        sortType == SH_SORT_BY_LONG_TERM_SUM_ASCENDING ||
+        sortType == SH_SORT_BY_RECENT_SUM_OF_SQUARES_ASCENDING ||
+        sortType == SH_SORT_BY_RECENT_AVERAGE_ASCENDING ||
+        sortType == SH_SORT_BY_LONG_TERM_AVERAGE_ASCENDING ||
+        sortType == SH_SORT_BY_RECENT_HIGHEST_ASCENDING ||
+        sortType == SH_SORT_BY_RECENT_LOWEST_ASCENDING ||
+        sortType == SH_SORT_BY_LONG_TERM_HIGHEST_ASCENDING ||
+        sortType == SH_SORT_BY_LONG_TERM_LOWEST_ASCENDING )
+        std::sort( sortedQueues.begin(), sortedQueues.end(), ascending );
+    else
+        std::sort( sortedQueues.begin(), sortedQueues.end(), [&ascending]( const TimeAndValueQueue* lhs, const TimeAndValueQueue* rhs ) { return ascending( rhs, lhs ); } );
+
+    values.insert( values.end(), sortedQueues.begin(), sortedQueues.end() );
 
     return true;
 }
@@ -247,9 +218,8 @@ void StatisticsHistory::MergeAllObjectsOnKey( const std::string& key, TimeAndVal
     Time curTime = GetTime();
 
     // Find every object with this key
-    for( unsigned int idx = 0; idx < objects.Size(); idx++ )
+    for( TrackedObject* to : objects )
     {
-        TrackedObject* to = objects[idx];
         if( auto it = to->dataQueues.find( key ); it != to->dataQueues.end() )
         {
             TimeAndValueQueue* tavqInput = it->second;
@@ -693,11 +663,14 @@ StatisticsHistory::TrackedObject::~TrackedObject()
 
 unsigned int StatisticsHistory::GetObjectIndex( uint64_t objectId ) const
 {
-    bool objectExists;
-    unsigned int idx = objects.GetIndexFromKey( objectId, &objectExists );
-    if( objectExists )
-        return idx;
+    const auto it = LowerBound( objectId );
+    if( it != objects.end() && ( *it )->trackedObjectData.objectId == objectId )
+        return static_cast<unsigned int>( it - objects.begin() );
     return (unsigned int)-1;
+}
+std::vector<StatisticsHistory::TrackedObject*>::const_iterator StatisticsHistory::LowerBound( uint64_t objectId ) const
+{
+    return std::lower_bound( objects.begin(), objects.end(), objectId, []( const TrackedObject* to, uint64_t id ) { return to->trackedObjectData.objectId < id; } );
 }
 StatisticsHistoryPlugin::StatisticsHistoryPlugin()
 {

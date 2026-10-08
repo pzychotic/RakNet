@@ -20,22 +20,10 @@
 #include "BitStream.h"
 #include <string.h>
 
+#include <iterator>
+
 namespace RakNet {
 
-int MessageFilterStrComp( char* const& key, char* const& data )
-{
-    return strcmp( key, data );
-}
-
-int FilterSetComp( const int& key, FilterSet* const& data )
-{
-    if( key < data->filterSetID )
-        return -1;
-    else if( key == data->filterSetID )
-        return 0;
-    else
-        return 1;
-}
 STATIC_FACTORY_DEFINITIONS( MessageFilter, MessageFilter );
 
 MessageFilter::MessageFilter()
@@ -61,22 +49,18 @@ void MessageFilter::SetAllowMessageID( bool allow, int messageIDStart, int messa
 void MessageFilter::SetAllowRPC4( bool allow, const char* uniqueID, int filterSetID )
 {
     FilterSet* filterSet = GetFilterSetByID( filterSetID );
-    bool objectExists;
-    unsigned int idx = filterSet->allowedRPC4.GetIndexFromKey( uniqueID, &objectExists );
     if( allow )
     {
-        if( objectExists == false )
+        if( filterSet->allowedRPC4.insert( uniqueID ).second )
         {
-            filterSet->allowedRPC4.InsertAtIndex( uniqueID, idx, _FILE_AND_LINE_ );
             filterSet->allowedIDs[ID_RPC_PLUGIN] = true;
         }
     }
     else
     {
-        if( objectExists == true )
+        if( filterSet->allowedRPC4.erase( uniqueID ) != 0 )
         {
-            filterSet->allowedRPC4.RemoveAtIndex( idx );
-            if( filterSet->allowedRPC4.Size() == 0 )
+            if( filterSet->allowedRPC4.empty() )
             {
                 filterSet->allowedIDs[ID_RPC_PLUGIN] = false;
             }
@@ -168,22 +152,22 @@ unsigned MessageFilter::GetSystemCount( int filterSetID ) const
 
 unsigned MessageFilter::GetFilterSetCount( void ) const
 {
-    return filterList.Size();
+    return static_cast<unsigned>( filterList.size() );
 }
 int MessageFilter::GetFilterSetIDByIndex( unsigned index )
 {
-    return filterList[index]->filterSetID;
+    RakAssert( index < filterList.size() );
+    return std::next( filterList.begin(), index )->first;
 }
 
 void MessageFilter::DeleteFilterSet( int filterSetID )
 {
-    bool objectExists = false;
-    unsigned int index = filterList.GetIndexFromKey( filterSetID, &objectExists );
-    if( objectExists )
+    const auto filterIt = filterList.find( filterSetID );
+    if( filterIt != filterList.end() )
     {
-        FilterSet* filterSet = filterList[index];
+        FilterSet* filterSet = filterIt->second;
         DeallocateFilterSet( filterSet );
-        filterList.RemoveAtIndex( index );
+        filterList.erase( filterIt );
 
         for( auto it = systemList.begin(); it != systemList.end(); )
         {
@@ -202,9 +186,9 @@ void MessageFilter::DeleteFilterSet( int filterSetID )
 void MessageFilter::Clear( void )
 {
     systemList.clear();
-    for( unsigned int i = 0; i < filterList.Size(); i++ )
-        DeallocateFilterSet( filterList[i] );
-    filterList.Clear( false, _FILE_AND_LINE_ );
+    for( const auto& [filterSetID, filterSet] : filterList )
+        DeallocateFilterSet( filterSet );
+    filterList.clear();
 }
 
 void MessageFilter::DeallocateFilterSet( FilterSet* filterSet )
@@ -215,10 +199,9 @@ void MessageFilter::DeallocateFilterSet( FilterSet* filterSet )
 FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
 {
     RakAssert( filterSetID >= 0 );
-    bool objectExists = false;
-    unsigned int index = filterList.GetIndexFromKey( filterSetID, &objectExists );
-    if( objectExists )
-        return filterList[index];
+    const auto filterIt = filterList.find( filterSetID );
+    if( filterIt != filterList.end() )
+        return filterIt->second;
     else
     {
         FilterSet* newFilterSet = RakNet::OP_NEW<FilterSet>( _FILE_AND_LINE_ );
@@ -233,7 +216,7 @@ FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
         newFilterSet->invalidMessageCallback = 0;
         newFilterSet->timeoutCallback = 0;
         newFilterSet->timeoutUserData = 0;
-        filterList.Insert( filterSetID, newFilterSet, true, _FILE_AND_LINE_ );
+        filterList.emplace( filterSetID, newFilterSet );
         return newFilterSet;
     }
 }
@@ -382,7 +365,7 @@ PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
             bsIn.IgnoreBytes( 2 );
             std::string functionName;
             bsIn.ReadCompressed( functionName );
-            if( value.filter->allowedRPC4.HasData( functionName ) == false )
+            if( value.filter->allowedRPC4.count( functionName ) == 0 )
             {
                 OnInvalidMessage( value.filter, packet, packet->data[0] );
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;

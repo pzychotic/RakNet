@@ -19,7 +19,6 @@
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
 #include "RakNetTypes.h"
-#include "DS_OrderedList.h"
 
 #include <float.h>
 #include <stdint.h>
@@ -176,12 +175,6 @@ public:
     };
 
 protected:
-    struct TrackedObject;
-
-public:
-    static int TrackedObjectComp( const uint64_t& key, TrackedObject* const& data );
-
-protected:
     struct TrackedObject
     {
         TrackedObject();
@@ -190,7 +183,11 @@ protected:
         std::unordered_map<std::string, TimeAndValueQueue*> dataQueues;
     };
 
-    DataStructures::OrderedList<uint64_t, TrackedObject*, TrackedObjectComp> objects;
+    // Sorted by objectId, so an object's index is its position in this order.
+    std::vector<TrackedObject*> objects;
+
+    // The first object whose objectId is not less than objectId
+    std::vector<TrackedObject*>::const_iterator LowerBound( uint64_t objectId ) const;
 
     Time timeToTrack;
 };

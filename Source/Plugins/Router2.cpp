@@ -16,7 +16,6 @@
 #include "BitStream.h"
 #include "RakNetTime.h"
 #include "GetTime.h"
-#include "DS_OrderedList.h"
 #include "SocketDefines.h"
 #include "StringUtils.h"
 
@@ -664,19 +663,6 @@ void Router2::RemoveConnectionRequest( unsigned int connectionRequestIndex )
     connectionRequests.erase( connectionRequests.begin() + connectionRequestIndex );
 }
 
-int ConnectionRequestSystemComp( const Router2::ConnectionRequestSystem& key, const Router2::ConnectionRequestSystem& data )
-{
-    if( key.pingToEndpoint * ( key.usedForwardingEntries + 1 ) < data.pingToEndpoint * ( data.usedForwardingEntries + 1 ) )
-        return -1;
-    if( key.pingToEndpoint * ( key.usedForwardingEntries + 1 ) == data.pingToEndpoint * ( data.usedForwardingEntries + 1 ) )
-        return 1;
-    if( key.guid < data.guid )
-        return -1;
-    if( key.guid > data.guid )
-        return -1;
-    return 0;
-}
-
 // connectionRequestsMutex should already be locked
 void Router2::RequestForwarding( ConnnectRequest* connectionRequest )
 {
@@ -690,17 +676,22 @@ void Router2::RequestForwarding( ConnnectRequest* connectionRequest )
         return;
     }
 
-    // Prioritize systems to request forwarding
-    DataStructures::OrderedList<ConnectionRequestSystem, ConnectionRequestSystem, ConnectionRequestSystemComp> commandList;
+    // Ask the system with the lowest ping to the endpoint, weighted by the forwarding it already
+    // does. Of systems that score the same, the one listed first.
     connectionRequest->connectionRequestSystemsMutex.lock();
-    for( const ConnectionRequestSystem& rSystem : connectionRequest->connectionRequestSystems )
+    const std::vector<ConnectionRequestSystem>& systems = connectionRequest->connectionRequestSystems;
+    if( systems.empty() )
     {
-        RakAssert( rSystem.pingToEndpoint >= 0 );
-        commandList.Insert( rSystem, rSystem, true, _FILE_AND_LINE_ );
+        // UpdateForwarding reports no route on its next pass.
+        connectionRequest->connectionRequestSystemsMutex.unlock();
+        return;
     }
+    const auto best = std::min_element( systems.begin(), systems.end(), []( const ConnectionRequestSystem& lhs, const ConnectionRequestSystem& rhs ) {
+        RakAssert( lhs.pingToEndpoint >= 0 && rhs.pingToEndpoint >= 0 );
+        return lhs.pingToEndpoint * ( lhs.usedForwardingEntries + 1 ) < rhs.pingToEndpoint * ( rhs.usedForwardingEntries + 1 );
+    } );
+    connectionRequest->lastRequestedForwardingSystem = best->guid;
     connectionRequest->connectionRequestSystemsMutex.unlock();
-
-    connectionRequest->lastRequestedForwardingSystem = commandList[0].guid;
 
     BitStream bsOut;
     bsOut.Write( (MessageID)ID_ROUTER_2_INTERNAL );
