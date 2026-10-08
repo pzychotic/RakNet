@@ -22,7 +22,7 @@
 #include "Export.h"
 #include "RakNetDefines.h"
 #include "SocketIncludes.h"
-#include "DS_ByteQueue.h"
+#include "TCPByteBuffer.h"
 #include "DS_ThreadsafeAllocatingQueue.h"
 #include "MTUSize.h"
 #include "PluginInterface2.h"
@@ -428,7 +428,7 @@ struct RemoteClient
     }
     __TCPSOCKET__ socket;
     SystemAddress systemAddress;
-    DataStructures::ByteQueue outgoingData;
+    TCPByteBuffer outgoingData;
     State state;
 
     /// Bumped by every Activate, and never 0 while ACTIVE. The update loop keeps it from
@@ -460,7 +460,7 @@ struct RemoteClient
     void Reset( void )
     {
         std::lock_guard<std::mutex> guard( outgoingDataMutex );
-        outgoingData.Clear( _FILE_AND_LINE_ );
+        outgoingData.Clear();
         isOverOutgoingCap = false;
         incomingBytesQueued = 0;
     }

@@ -380,6 +380,14 @@ or do without.
 `std::deque`. `ThreadsafePacketLogger`, its only user, now keeps its lines in private
 members, so `ThreadsafePacketLogger::logMessages` is no longer visible to subclasses.
 
+**`DS_ByteQueue.h`.** Gone. `TCPInterface` and `PacketizedTCP`, its only users, now buffer
+through `TCPByteBuffer` (`TCPByteBuffer.h`), so `RemoteClient::outgoingData` and `PacketizedTCP::Connection::bytes`
+have that type. Code that reached them through a subclass calls `Append`, `Size`, `Peek`,
+`Read`, `Consume` and `Contiguous` instead of `WriteBytes`, `GetBytesWritten`,
+`ReadBytes`, `IncrementReadOffset` and `PeekContiguousBytes`. `Peek` and `Read` copy all
+the bytes asked for or none, where `ReadBytes` read what there was.
+`DecrementReadOffset` and `Print` have no counterpart.
+
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 

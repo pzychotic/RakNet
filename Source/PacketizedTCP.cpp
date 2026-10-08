@@ -24,13 +24,12 @@ typedef uint32_t PTCPHeader;
 
 namespace {
 
-// Reads the header at the front of \a bq without consuming it. False if fewer bytes than a
-// header are buffered: ReadBytes would read what there is and leave the rest unset.
-bool PeekHeader( DataStructures::ByteQueue& bq, PTCPHeader& dataLength )
+// Reads the header at the front of \a bytes without consuming it. False if fewer bytes than
+// a header are buffered.
+bool PeekHeader( const TCPByteBuffer& bytes, PTCPHeader& dataLength )
 {
-    if( bq.GetBytesWritten() < sizeof( PTCPHeader ) )
+    if( bytes.Peek( (char*)&dataLength, sizeof( PTCPHeader ) ) == false )
         return false;
-    bq.ReadBytes( (char*)&dataLength, sizeof( PTCPHeader ), true );
     if( BitStream::DoEndianSwap() )
         BitStream::ReverseBytesInPlace( (unsigned char*)&dataLength, sizeof( dataLength ) );
     return true;
@@ -203,16 +202,16 @@ Packet* PacketizedTCP::Receive( void )
 }
 void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& connection )
 {
-    DataStructures::ByteQueue* bq = &connection.bytes;
+    TCPByteBuffer& bytes = connection.bytes;
     // Buffer data
-    bq->WriteBytes( (const char*)incomingPacket.data, incomingPacket.length, _FILE_AND_LINE_ );
+    bytes.Append( (const char*)incomingPacket.data, incomingPacket.length );
     const SystemAddress systemAddressFromPacket = incomingPacket.systemAddress;
 
     // Header indicates packet length. Read out every message that is complete, checking
     // each header against the maximum before its message is buffered any further.
     PTCPHeader dataLength;
     bool isAnyFramed = false;
-    while( PeekHeader( *bq, dataLength ) )
+    while( PeekHeader( bytes, dataLength ) )
     {
         if( dataLength > maxMessageLength )
         {
@@ -220,10 +219,10 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
             return;
         }
 
-        if( bq->GetBytesWritten() < (uint64_t)dataLength + sizeof( PTCPHeader ) )
+        if( bytes.Size() < (uint64_t)dataLength + sizeof( PTCPHeader ) )
             break;
 
-        bq->IncrementReadOffset( sizeof( PTCPHeader ) );
+        bytes.Consume( sizeof( PTCPHeader ) );
         Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
         outgoingPacket->length = dataLength;
         outgoingPacket->bitSize = BYTES_TO_BITS( dataLength );
@@ -237,18 +236,19 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
             RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
             return;
         }
-        bq->ReadBytes( (char*)outgoingPacket->data, dataLength, false );
+        bytes.Read( (char*)outgoingPacket->data, dataLength );
 
         waitingPackets.push_back( outgoingPacket );
         isAnyFramed = true;
     }
 
     // A message still arriving, with nothing framed out of this read
-    if( isAnyFramed || bq->GetBytesWritten() < sizeof( PTCPHeader ) )
+    if( isAnyFramed || bytes.Size() < sizeof( PTCPHeader ) )
         return;
 
-    unsigned int oldWritten = bq->GetBytesWritten() - incomingPacket.length;
-    unsigned int newWritten = bq->GetBytesWritten();
+    // At most a header and maxMessageLength bytes, so it fits an unsigned int.
+    unsigned int newWritten = (unsigned int)bytes.Size();
+    unsigned int oldWritten = newWritten - incomingPacket.length;
 
     // Return ID_DOWNLOAD_PROGRESS
     if( newWritten / 65536 != oldWritten / 65536 )
@@ -281,9 +281,9 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
         memcpy( outgoingPacket->data + sizeof( MessageID ), &partIndex, sizeof( unsigned int ) );
         memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &totalParts, sizeof( unsigned int ) );
         memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &oneChunkSize, sizeof( unsigned int ) );
-        bq->IncrementReadOffset( sizeof( PTCPHeader ) );
-        bq->ReadBytes( (char*)outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, oneChunkSize, true );
-        bq->DecrementReadOffset( sizeof( PTCPHeader ) );
+        size_t bufferedLength;
+        const char* buffered = bytes.Contiguous( &bufferedLength );
+        memcpy( outgoingPacket->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, buffered + sizeof( PTCPHeader ), oneChunkSize );
 
         waitingPackets.push_back( outgoingPacket );
     }
@@ -297,7 +297,7 @@ void PacketizedTCP::CloseOverlongSender( const SystemAddress& sa, Connection& co
     }
 
     // What it sent is discarded, and so is anything still queued from it.
-    connection.bytes.Clear( _FILE_AND_LINE_ );
+    connection.bytes.Clear();
     connection.isClosed = true;
 
     // Reported like any lost connection. If TCPInterface found it already lost, its lost
@@ -359,7 +359,7 @@ void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
     if( delta > 0 )
     {
         // A new stream: whatever the old connection left unframed is not part of it.
-        connection->bytes.Clear( _FILE_AND_LINE_ );
+        connection->bytes.Clear();
         connection->isClosed = false;
     }
 

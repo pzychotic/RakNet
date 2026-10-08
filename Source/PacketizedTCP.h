@@ -18,7 +18,7 @@
 #if _RAKNET_SUPPORT_PacketizedTCP == 1 && _RAKNET_SUPPORT_TCPInterface == 1
 
 #include "TCPInterface.h"
-#include "DS_ByteQueue.h"
+#include "TCPByteBuffer.h"
 #include "MTUSize.h"
 
 #include <cstdint>
@@ -86,7 +86,7 @@ protected:
     struct Connection
     {
         /// Bytes received and not yet framed into a message.
-        DataStructures::ByteQueue bytes;
+        TCPByteBuffer bytes;
 
         /// Connections at this address reported new and not yet lost. A reconnect from the
         /// same address can be reported new before the old connection is reported lost, so

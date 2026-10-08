@@ -1029,7 +1029,7 @@ unsigned int TCPInterface::GetOutgoingDataBufferSize( SystemAddress systemAddres
         if( isMatched == false )
             return 0;
         std::lock_guard<std::mutex> outgoingGuard( remoteClient.outgoingDataMutex );
-        return remoteClient.outgoingData.GetBytesWritten();
+        return (unsigned int)remoteClient.outgoingData.Size();
     };
 
     bool isMatched = false;
@@ -1321,7 +1321,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                 bool hasOutgoingData;
                 {
                     std::lock_guard<std::mutex> outgoingGuard( remoteClient.outgoingDataMutex );
-                    hasOutgoingData = remoteClient.outgoingData.GetBytesWritten() > 0;
+                    hasOutgoingData = remoteClient.outgoingData.Size() > 0;
                 }
                 if( hasOutgoingData )
                     FD_SET( remoteClient.socket, &writeFD );
@@ -1467,30 +1467,16 @@ void UpdateTCPInterfaceLoop( void* arg )
                 }
                 if( FD_ISSET( remoteClient.socket, &writeFD ) )
                 {
-                    int bytesAvailable;
-                    int bytesSent;
                     std::lock_guard<std::mutex> outgoingGuard( remoteClient.outgoingDataMutex );
-                    const unsigned int bytesInBuffer = remoteClient.outgoingData.GetBytesWritten();
+                    size_t bytesInBuffer = 0;
+                    const char* bytesToSend = remoteClient.outgoingData.Contiguous( &bytesInBuffer );
                     if( bytesInBuffer > 0 )
                     {
-                        unsigned int contiguousLength;
-                        char* contiguousBytesPointer = remoteClient.outgoingData.PeekContiguousBytes( &contiguousLength );
-                        if( contiguousLength < (unsigned int)BUFF_SIZE && contiguousLength < bytesInBuffer )
-                        {
-                            if( bytesInBuffer > BUFF_SIZE )
-                                bytesAvailable = BUFF_SIZE;
-                            else
-                                bytesAvailable = bytesInBuffer;
-                            remoteClient.outgoingData.ReadBytes( data, bytesAvailable, true );
-                            bytesSent = remoteClient.Send( data, bytesAvailable );
-                        }
-                        else
-                        {
-                            bytesSent = remoteClient.Send( contiguousBytesPointer, contiguousLength );
-                        }
-
+                        // send and SSL_write take an int length.
+                        const unsigned int bytesToSendLength = bytesInBuffer < BUFF_SIZE ? (unsigned int)bytesInBuffer : BUFF_SIZE;
+                        const int bytesSent = remoteClient.Send( bytesToSend, bytesToSendLength );
                         if( bytesSent > 0 )
-                            remoteClient.outgoingData.IncrementReadOffset( bytesSent );
+                            remoteClient.outgoingData.Consume( bytesSent );
                     }
                 }
             }
@@ -1548,14 +1534,14 @@ bool RemoteClient::SendOrBuffer( const char** data, const unsigned int* lengths,
     std::lock_guard<std::mutex> guard( outgoingDataMutex );
     if( isOverOutgoingCap )
         return false;
-    if( outgoingData.GetBytesWritten() + totalLength > maxOutgoingBytes )
+    if( outgoingData.Size() + totalLength > maxOutgoingBytes )
     {
         // Buffered no further: the far end is not reading. The update loop closes it.
         isOverOutgoingCap = true;
         return true;
     }
     for( int parameterIndex = 0; parameterIndex < numParameters; parameterIndex++ )
-        outgoingData.WriteBytes( data[parameterIndex], lengths[parameterIndex], _FILE_AND_LINE_ );
+        outgoingData.Append( data[parameterIndex], lengths[parameterIndex] );
     return false;
 }
 #if OPEN_SSL_CLIENT_SUPPORT == 1
