@@ -14,6 +14,12 @@
 #include <catch2/interfaces/catch_interfaces_config.hpp>
 #include <catch2/internal/catch_context.hpp>
 
+#if defined( _WIN32 )
+#include "WindowsIncludes.h"
+#else
+#include <time.h>
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -36,16 +42,27 @@ Hidden under [.bench], so ctest and CI never run it. Build Release and run it on
     build/Tests/Release/RakNetTests.exe -# "[#ThroughputBenchmark]" "[.bench]" --benchmark-samples 5
 
 --benchmark-samples 5 is part of the command, not a tuning knob, and the test case fails
-without it: Catch2's default is 100 samples, and one sample here takes seconds. Catch2 prints its own mean and standard
-deviation. Each case also prints the number ADR-0009 judges by, the median of the
-samples:
+without it: Catch2's default is 100 samples, and one sample here takes seconds. Catch2
+prints its own mean and standard deviation of the wall time. Each case also prints the
+medians ADR-0009 judges by, of the samples' wall time and of the CPU time the whole
+process used during them:
 
-    ThroughputBenchmark: 32 B: median 6533.4 ms of 5 runs
+    ThroughputBenchmark: 32 B: median 6552.8 ms wall, 750.0 ms CPU of 5 runs
+
+The two numbers fail in opposite ways. With small messages the wall time is held by how
+many reliable messages may await an ack (RESEND_BUFFER_ARRAY_LENGTH) per round trip, so
+32 B and 1 KB take the same wall time and a slower allocator barely moves it; it repeats
+within 2% on an idle machine. The CPU time is the work both Peers did to move the
+messages, which is what an allocator changes, but its median moves between runs of the
+same build: by up to 63% for 32 B, 10% for 1 KB and 3.5% for 4 KB on Windows, which also
+counts it in 15.6 ms ticks. The wait for the last message sleeps rather than spins, so
+it adds little CPU time of its own.
 
 To compare two builds, run the command above on each, on an idle machine, one after the
-other, and compare the medians case by case. ADR-0009's threshold is 5% on every case,
-and the 1 KB case alone can move more than that between two runs of the same build, so
-run each build at least twice, alternating, and compare against that spread.
+other, and compare the medians case by case. ADR-0009's threshold is 5% on every case.
+Interactive use of the machine during a run moved the 1 KB wall time by over 30%. Run
+each build several times, alternating, and judge a difference only against the spread
+between runs of the same build.
 
 A run that does not deliver every message inside kRunBudgetMs fails the test case,
 naming how far it got and what the sender still held.
@@ -157,12 +174,35 @@ std::string SendAndReceiveAll( RakPeerInterface* sender, RakPeerInterface* recei
         {
             return DescribeFailure( "the run budget ran out", sender, receiver, kMessageCount, received );
         }
+        // Receive does not wake either Peer's update thread, so sleeping here leaves
+        // the transfer's pace alone and keeps this thread's CPU time out of the run's.
         if( received == before )
         {
-            std::this_thread::yield();
+            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
         }
     }
     return {};
+}
+
+/// CPU time the whole process has used so far, every thread of both Peers and this one,
+/// in user and kernel mode.
+double ProcessCpuMs()
+{
+#if defined( _WIN32 )
+    FILETIME creation, exit, kernel, user;
+    if( !GetProcessTimes( GetCurrentProcess(), &creation, &exit, &kernel, &user ) )
+    {
+        return 0;
+    }
+    auto hundredsOfNs = []( const FILETIME& time ) {
+        return ( (unsigned long long)time.dwHighDateTime << 32 ) | time.dwLowDateTime;
+    };
+    return (double)( hundredsOfNs( kernel ) + hundredsOfNs( user ) ) / 10000.0;
+#else
+    timespec now{};
+    clock_gettime( CLOCK_PROCESS_CPUTIME_ID, &now );
+    return (double)now.tv_sec * 1000.0 + (double)now.tv_nsec / 1000000.0;
+#endif
 }
 
 double Median( std::vector<double> values )
@@ -187,12 +227,15 @@ void RunCase( const BenchCase& benchCase )
     // Catch2 runs the measured code once more than it takes samples, to estimate its
     // length, so the samples are the last kSamples runs recorded here.
     std::vector<double> runMs;
+    std::vector<double> runCpuMs;
 
     BENCHMARK_ADVANCED( benchCase.name )( Catch::Benchmark::Chronometer meter )
     {
         meter.measure( [&] {
             const auto start = std::chrono::steady_clock::now();
+            const double startCpuMs = ProcessCpuMs();
             const std::string failure = SendAndReceiveAll( sender, receiver, message );
+            runCpuMs.push_back( ProcessCpuMs() - startCpuMs );
             runMs.push_back( std::chrono::duration<double, std::milli>( std::chrono::steady_clock::now() - start ).count() );
             if( !failure.empty() )
             {
@@ -207,7 +250,9 @@ void RunCase( const BenchCase& benchCase )
         return;
     }
     const std::vector<double> sampleMs( runMs.end() - kSamples, runMs.end() );
-    std::printf( "\nThroughputBenchmark: %s: median %.1f ms of %u runs\n", benchCase.name, Median( sampleMs ), kSamples );
+    const std::vector<double> sampleCpuMs( runCpuMs.end() - kSamples, runCpuMs.end() );
+    std::printf( "\nThroughputBenchmark: %s: median %.1f ms wall, %.1f ms CPU of %u runs\n", benchCase.name, Median( sampleMs ),
+                 Median( sampleCpuMs ), kSamples );
     std::fflush( stdout );
 }
 
