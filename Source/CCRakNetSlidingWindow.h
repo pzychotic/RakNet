@@ -195,6 +195,9 @@ protected:
     DatagramSequenceNumberType nextDatagramSequenceNumber;
     DatagramSequenceNumberType nextCongestionControlBlock;
     bool backoffThisBlock, speedUpThisBlock;
+    /// The first datagram sent after the window last backed off. A NAK for a datagram
+    /// sent before it reports a loss that back-off already answered.
+    DatagramSequenceNumberType firstDatagramAfterBackoff;
     /// Track which datagram sequence numbers have arrived.
     /// If a sequence number is skipped, send a NAK for all skipped messages
     DatagramSequenceNumberType expectedNextSequenceNumber;

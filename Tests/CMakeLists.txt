@@ -100,6 +100,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ShutdownNotifiesTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ShutdownStopsReceiveThreadTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SlidingWindowAckTimingTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SlidingWindowLossRecoveryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketQueryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketSendAddressFamilyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketTTLOptionTest.cpp

@@ -55,6 +55,7 @@ void CCRakNetSlidingWindow::Init( CCTimeType curTime, uint32_t maxDatagramPayloa
     nextDatagramSequenceNumber = 0;
     nextCongestionControlBlock = 0;
     backoffThisBlock = speedUpThisBlock = false;
+    firstDatagramAfterBackoff = 0;
     expectedNextSequenceNumber = 0;
     _isContinuousSend = false;
 }
@@ -179,6 +180,7 @@ void CCRakNetSlidingWindow::OnResend( CCTimeType curTime, RakNet::TimeUS nextAct
         // Only backoff once per period
         nextCongestionControlBlock = nextDatagramSequenceNumber;
         backoffThisBlock = true;
+        firstDatagramAfterBackoff = nextDatagramSequenceNumber;
 
         // CC PRINTF
         //printf("-- %.0f (Resend) Enter slow start.\n", cwnd);
@@ -187,13 +189,18 @@ void CCRakNetSlidingWindow::OnResend( CCTimeType curTime, RakNet::TimeUS nextAct
 // ----------------------------------------------------------------------------------------------------------------------------
 void CCRakNetSlidingWindow::OnNAK( CCTimeType curTime, DatagramSequenceNumberType nakSequenceNumber )
 {
-    (void)nakSequenceNumber;
     (void)curTime;
+
+    // Lost before the last back-off, which already answered it
+    if( GreaterThan( firstDatagramAfterBackoff, nakSequenceNumber ) )
+        return;
 
     if( _isContinuousSend && backoffThisBlock == false )
     {
         // Start congestion avoidance
         ssThresh = cwnd / 2;
+        if( ssThresh < MAXIMUM_MTU_INCLUDING_UDP_HEADER )
+            ssThresh = MAXIMUM_MTU_INCLUDING_UDP_HEADER;
 
         // CC PRINTF
         //printf("- %.0f (NAK) Set congestion avoidance.\n", cwnd);
@@ -247,8 +254,9 @@ void CCRakNetSlidingWindow::OnAck( CCTimeType curTime, CCTimeType rtt, bool hasB
         // CC PRINTF
         //  printf("++ %.0f Slow start increase.\n", cwnd);
     }
-    else if( isNewCongestionControlPeriod )
+    else
     {
+        // Per ack, so about one MTU per round trip, as in TCP Reno
         cwnd += MAXIMUM_MTU_INCLUDING_UDP_HEADER * MAXIMUM_MTU_INCLUDING_UDP_HEADER / cwnd;
 
         // CC PRINTF
