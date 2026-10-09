@@ -44,19 +44,17 @@ Hidden under [.bench], so ctest and CI never run it. Build Release and run it on
 --benchmark-samples 5 is part of the command, not a tuning knob, and the test case fails
 without it: Catch2's default is 100 samples, and one sample here takes seconds. Catch2
 prints its own mean and standard deviation of the wall time. Each case also prints the
-medians ADR-0009 judges by, of the samples' wall time and of the CPU time the whole
-process used during them:
+medians ADR-0009 judges by, of the samples' wall time and of the CPU work the whole
+process did during them, in megacycles on Windows and CPU milliseconds elsewhere:
 
-    ThroughputBenchmark: 32 B: median 6552.8 ms wall, 750.0 ms CPU of 5 runs
+    ThroughputBenchmark: 32 B: median 6566.0 ms wall, 2820 Mcycles of 5 runs
 
-The two numbers fail in opposite ways. With small messages the wall time is held by how
-many reliable messages may await an ack (RESEND_BUFFER_ARRAY_LENGTH) per round trip, so
-32 B and 1 KB take the same wall time and a slower allocator barely moves it; it repeats
-within 2% on an idle machine. The CPU time is the work both Peers did to move the
-messages, which is what an allocator changes, but its median moves between runs of the
-same build: by up to 63% for 32 B, 10% for 1 KB and 3.5% for 4 KB on Windows, which also
-counts it in 15.6 ms ticks. The wait for the last message sleeps rather than spins, so
-it adds little CPU time of its own.
+Judge by the CPU work. With small messages the wall time is held by how many reliable
+messages may await an ack (RESEND_BUFFER_ARRAY_LENGTH) per round trip, about one Windows
+timer tick each, so 32 B and 1 KB take the same wall time and a slower allocator barely
+moves it. The CPU work is what both Peers did to move the messages, which is what an
+allocator changes; on an idle machine its median repeats within 2% for every case. The
+wait for the last message sleeps rather than spins, so it adds little work of its own.
 
 To compare two builds, run the command above on each, on an idle machine, one after the
 other, and compare the medians case by case. ADR-0009's threshold is 5% on every case.
@@ -184,26 +182,31 @@ std::string SendAndReceiveAll( RakPeerInterface* sender, RakPeerInterface* recei
     return {};
 }
 
-/// CPU time the whole process has used so far, every thread of both Peers and this one,
-/// in user and kernel mode.
-double ProcessCpuMs()
-{
+/// The CPU work the whole process has done so far, every thread of both Peers and this
+/// one, in user and kernel mode, in kCpuWorkUnit.
+///
+/// On Windows it is counted in cycles: GetProcessTimes charges whole 15.6 ms timer ticks
+/// to whichever thread a tick lands on, too coarse for a run that uses under a second of
+/// CPU. Elsewhere the process CPU clock is exact.
 #if defined( _WIN32 )
-    FILETIME creation, exit, kernel, user;
-    if( !GetProcessTimes( GetCurrentProcess(), &creation, &exit, &kernel, &user ) )
-    {
-        return 0;
-    }
-    auto hundredsOfNs = []( const FILETIME& time ) {
-        return ( (unsigned long long)time.dwHighDateTime << 32 ) | time.dwLowDateTime;
-    };
-    return (double)( hundredsOfNs( kernel ) + hundredsOfNs( user ) ) / 10000.0;
+constexpr const char* kCpuWorkUnit = "Mcycles";
+
+double ProcessCpuWork()
+{
+    ULONG64 cycles = 0;
+    QueryProcessCycleTime( GetCurrentProcess(), &cycles );
+    return (double)cycles / 1e6;
+}
 #else
+constexpr const char* kCpuWorkUnit = "ms CPU";
+
+double ProcessCpuWork()
+{
     timespec now{};
     clock_gettime( CLOCK_PROCESS_CPUTIME_ID, &now );
     return (double)now.tv_sec * 1000.0 + (double)now.tv_nsec / 1000000.0;
-#endif
 }
+#endif
 
 double Median( std::vector<double> values )
 {
@@ -227,15 +230,15 @@ void RunCase( const BenchCase& benchCase )
     // Catch2 runs the measured code once more than it takes samples, to estimate its
     // length, so the samples are the last kSamples runs recorded here.
     std::vector<double> runMs;
-    std::vector<double> runCpuMs;
+    std::vector<double> runCpuWork;
 
     BENCHMARK_ADVANCED( benchCase.name )( Catch::Benchmark::Chronometer meter )
     {
         meter.measure( [&] {
             const auto start = std::chrono::steady_clock::now();
-            const double startCpuMs = ProcessCpuMs();
+            const double startCpuWork = ProcessCpuWork();
             const std::string failure = SendAndReceiveAll( sender, receiver, message );
-            runCpuMs.push_back( ProcessCpuMs() - startCpuMs );
+            runCpuWork.push_back( ProcessCpuWork() - startCpuWork );
             runMs.push_back( std::chrono::duration<double, std::milli>( std::chrono::steady_clock::now() - start ).count() );
             if( !failure.empty() )
             {
@@ -250,9 +253,9 @@ void RunCase( const BenchCase& benchCase )
         return;
     }
     const std::vector<double> sampleMs( runMs.end() - kSamples, runMs.end() );
-    const std::vector<double> sampleCpuMs( runCpuMs.end() - kSamples, runCpuMs.end() );
-    std::printf( "\nThroughputBenchmark: %s: median %.1f ms wall, %.1f ms CPU of %u runs\n", benchCase.name, Median( sampleMs ),
-                 Median( sampleCpuMs ), kSamples );
+    const std::vector<double> sampleCpuWork( runCpuWork.end() - kSamples, runCpuWork.end() );
+    std::printf( "\nThroughputBenchmark: %s: median %.1f ms wall, %.0f %s of %u runs\n", benchCase.name, Median( sampleMs ),
+                 Median( sampleCpuWork ), kCpuWorkUnit, kSamples );
     std::fflush( stdout );
 }
 
