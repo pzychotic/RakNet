@@ -960,8 +960,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                     }
 
-                    internalPacket = BuildPacketFromSplitPacketList( splitPacketIdOfChunk, timeRead,
-                                                                     s, systemAddress, updateBitStream );
+                    internalPacket = BuildPacketFromSplitPacketList( splitPacketIdOfChunk, timeRead );
 
                     if( internalPacket == 0 )
                     {
@@ -3064,9 +3063,7 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
 
 
 //-------------------------------------------------------------------------------------------------------
-InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdType splitPacketId, CCTimeType time,
-                                                                  RakNetSocket2* s, SystemAddress& systemAddress,
-                                                                  BitStream& updateBitStream )
+InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdType splitPacketId, CCTimeType time )
 {
     // Find in splitPacketChannelList the SplitPacketChannel with this splitPacketId
     const auto channelIt = splitPacketChannelList.find( splitPacketId );
@@ -3074,8 +3071,6 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdT
 
     if( splitPacketChannel->splitPacketList.AllocSize() == splitPacketChannel->splitPacketList.AddedPacketsCount() )
     {
-        // Ack immediately, because for large files this can take a long time
-        SendACKs( s, systemAddress, time, updateBitStream );
         InternalPacket* internalPacket = BuildPacketFromSplitPacketList( splitPacketChannel, time );
         splitPacketChannelList.erase( channelIt );
         return internalPacket;

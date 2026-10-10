@@ -21,6 +21,7 @@ SignaledEvent::SignaledEvent()
 {
 #ifdef _WIN32
     eventList = INVALID_HANDLE_VALUE;
+    waitTimer = NULL;
 #else
     isSignaled = false;
 #endif
@@ -34,6 +35,7 @@ void SignaledEvent::InitEvent( void )
 {
 #if defined( _WIN32 )
     eventList = CreateEvent( 0, false, false, 0 );
+    waitTimer = CreateWaitableTimerExW( NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS );
 #else
     pthread_condattr_init( &condAttr );
     pthread_cond_init( &eventList, &condAttr );
@@ -49,6 +51,11 @@ void SignaledEvent::CloseEvent( void )
     {
         CloseHandle( eventList );
         eventList = INVALID_HANDLE_VALUE;
+    }
+    if( waitTimer != NULL )
+    {
+        CloseHandle( waitTimer );
+        waitTimer = NULL;
     }
 #else
     pthread_cond_destroy( &eventList );
@@ -77,7 +84,17 @@ void SignaledEvent::SetEvent( void )
 void SignaledEvent::WaitOnEvent( int timeoutMs )
 {
 #ifdef _WIN32
-    WaitForSingleObjectEx( eventList, timeoutMs, FALSE );
+    LARGE_INTEGER dueTime;
+    dueTime.QuadPart = -(LONGLONG)timeoutMs * 10000; // Relative, in 100 ns units
+    if( waitTimer != NULL && timeoutMs >= 0 && SetWaitableTimer( waitTimer, &dueTime, 0, NULL, NULL, FALSE ) )
+    {
+        HANDLE handles[2] = { eventList, waitTimer };
+        WaitForMultipleObjectsEx( 2, handles, FALSE, timeoutMs, FALSE );
+    }
+    else
+    {
+        WaitForSingleObjectEx( eventList, timeoutMs, FALSE );
+    }
 #else
 
     // If was previously set signaled, just unset and return

@@ -266,11 +266,11 @@ const char kRightPassword[] = "password";
 const char kWrongPassword[] = "badpass";
 
 // Connects with the wrong password and waits for the refusal, keeping the client's network
-// thread cycling meanwhile: GetStatistics is answered on that thread and wakes it. Cycles
-// that come faster than the reliability layer holds an ack back (one SYN, 10 ms) are what
-// let a client drop its record before acking the refusal. Left to the 10 ms timer, a client
-// mostly gets the ack out first. Hence a spin rather than ConnectionWaits::WaitForMessage,
-// whose sleep between polls leaves the thread to that timer.
+// thread cycling meanwhile: GetStatistics is answered on that thread and wakes it. A client
+// holds the refusal's ack back only if it sent an ack datagram within the last millisecond,
+// and cycles that come faster than that hold are what would let it drop its record before
+// acking. Hence a spin rather than ConnectionWaits::WaitForMessage, whose sleep between
+// polls leaves the thread idle.
 bool RefuseWhileBusy( RakPeerInterface* client, const SystemAddress& server )
 {
     if( client->Connect( "127.0.0.1", server.GetPort(), kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) ) != CONNECTION_ATTEMPT_STARTED )

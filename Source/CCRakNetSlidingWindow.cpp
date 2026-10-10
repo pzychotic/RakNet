@@ -23,14 +23,11 @@ namespace RakNet {
 
 static const double UNSET_TIME_US = -1;
 
-// GetSenderRTOForACK's answer before an RTT is known. An integer of its own, because
-// converting UNSET_TIME_US to CCTimeType is undefined behaviour.
-static const CCTimeType UNSET_SENDER_RTO = (CCTimeType)-1;
-
+// After an ack datagram goes out, the next waits this long.
 #if CC_TIME_TYPE_BYTES == 4
-static const CCTimeType SYN = 10;
+static const CCTimeType ACK_GAP = 1;
 #else
-static const CCTimeType SYN = 10000;
+static const CCTimeType ACK_GAP = 1000;
 #endif
 
 // cwnd stops at RESEND_BUFFER_ARRAY_LENGTH full datagrams. The resend buffer holds that many
@@ -58,7 +55,7 @@ void CCRakNetSlidingWindow::Init( CCTimeType curTime, uint32_t maxDatagramPayloa
     MAXIMUM_MTU_INCLUDING_UDP_HEADER = maxDatagramPayload;
     cwnd = maxDatagramPayload;
     ssThresh = 0.0;
-    oldestUnsentAck = 0;
+    lastAckSendTime = 0;
     nextDatagramSequenceNumber = 0;
     nextCongestionControlBlock = 0;
     backoffThisBlock = speedUpThisBlock = false;
@@ -97,17 +94,9 @@ int CCRakNetSlidingWindow::GetTransmissionBandwidth( CCTimeType curTime, CCTimeT
 // ----------------------------------------------------------------------------------------------------------------------------
 bool CCRakNetSlidingWindow::ShouldSendACKs( CCTimeType curTime, CCTimeType estimatedTimeToNextTick )
 {
-    CCTimeType rto = GetSenderRTOForACK();
     (void)estimatedTimeToNextTick;
 
-    // iphone crashes on comparison between double and int64 http://www.jenkinssoftware.com/forum/index.php?topic=2717.0
-    if( rto == UNSET_SENDER_RTO )
-    {
-        // Unknown how long until the remote system will retransmit, so better send right away
-        return true;
-    }
-
-    return curTime >= oldestUnsentAck + SYN;
+    return curTime >= lastAckSendTime + ACK_GAP;
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 DatagramSequenceNumberType CCRakNetSlidingWindow::GetNextDatagramSequenceNumber( void )
@@ -140,9 +129,6 @@ bool CCRakNetSlidingWindow::OnGotPacket( DatagramSequenceNumberType datagramSequ
     (void)curTime;
     (void)sizeInBytes;
     (void)isContinuousSend;
-
-    if( oldestUnsentAck == 0 )
-        oldestUnsentAck = curTime;
 
     if( datagramSequenceNumber == expectedNextSequenceNumber )
     {
@@ -292,10 +278,9 @@ void CCRakNetSlidingWindow::OnSendAckGetBAndAS( CCTimeType curTime, bool* hasBAn
 // ----------------------------------------------------------------------------------------------------------------------------
 void CCRakNetSlidingWindow::OnSendAck( CCTimeType curTime, uint32_t numBytes )
 {
-    (void)curTime;
     (void)numBytes;
 
-    oldestUnsentAck = 0;
+    lastAckSendTime = curTime;
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 void CCRakNetSlidingWindow::OnSendNACK( CCTimeType curTime, uint32_t numBytes )
@@ -374,13 +359,6 @@ bool CCRakNetSlidingWindow::LessThan( DatagramSequenceNumberType a, DatagramSequ
 uint64_t CCRakNetSlidingWindow::GetBytesPerSecondLimitByCongestionControl( void ) const
 {
     return 0; // TODO
-}
-// ----------------------------------------------------------------------------------------------------------------------------
-CCTimeType CCRakNetSlidingWindow::GetSenderRTOForACK( void ) const
-{
-    if( lastRtt == UNSET_TIME_US )
-        return UNSET_SENDER_RTO;
-    return (CCTimeType)( lastRtt + SYN );
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 bool CCRakNetSlidingWindow::IsInSlowStart( void ) const

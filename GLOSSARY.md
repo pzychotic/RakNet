@@ -123,6 +123,16 @@ Message is untouched. Its Message ID is the one after the time; `ID_TIMESTAMP` m
 prefix and is not the Message's ID.
 _Avoid_: Timestamp packet, timed message
 
+**Ack delay**:
+How long a receiving Peer holds the acknowledgement for a datagram after it arrives. The
+first datagram after a quiet spell is acknowledged in the **Update cycle** that handles
+it. While datagrams keep arriving, their acknowledgements share one ack datagram about
+every millisecond, whatever the Message's size. The sender cannot see it on its own: what
+the sender measures is the **Round trip**, from a datagram leaving to its acknowledgement
+arriving, which includes the Ack delay.
+_Avoid_: SYN (the 10 ms ack timer only `CCRakNetUDT` still uses), ack gap (the millisecond
+between two ack datagrams, not the concept), round trip, ping
+
 **Offline datagram**:
 A single datagram exchanged with a System that has no connection record: a ping, a pong,
 an advertisement or out-of-band data. It is not a Message: it never goes through `Send`,

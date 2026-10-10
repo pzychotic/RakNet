@@ -219,6 +219,7 @@ RakPeer::RakPeer()
     receivedDatagramsDroppedAtCap = 0;
     offlineMessagesDroppedAtCap = 0;
     insideUpdateCycle = false;
+    acksWaitingAfterCycle = false;
     acceptingQueries = false;
 
     occasionalPing = false;
@@ -5575,6 +5576,8 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         }
     }
 
+    acksWaitingAfterCycle = false;
+
     // remoteSystemList in network thread
     for( activeSystemListIndex = 0; activeSystemListIndex < activeSystemListSize; ++activeSystemListIndex )
     {
@@ -5614,6 +5617,8 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         }
 
         remoteSystem->reliabilityLayer.Update( remoteSystem->rakNetSocket, systemAddress, remoteSystem->MTUSize, timeNS, maxOutgoingBPS, pluginListNTS, updateBitStream ); // systemAddress only used for the internet simulator test
+        if( remoteSystem->reliabilityLayer.AreAcksWaiting() )
+            acksWaitingAfterCycle = true;
 
         // A byte budget closed this connection (ADR-0005): the layer has freed what it held
         // and drops whatever else arrives. Reported locally the way a dead connection is, and
@@ -6104,8 +6109,9 @@ void UpdateNetworkLoop( void* arg )
 
         rakPeer->RunUpdateCycle( updateBitStream );
 
-        // Pending sends go out this often, unless quitAndDataEvents is set
-        rakPeer->quitAndDataEvents.WaitOnEvent( 10 );
+        // Pending sends go out this often, unless quitAndDataEvents is set. Acks held back so
+        // they share a datagram fall due a millisecond after the last ack datagram.
+        rakPeer->quitAndDataEvents.WaitOnEvent( rakPeer->acksWaitingAfterCycle ? 1 : 10 );
     }
 
     networkThreadOf = nullptr;

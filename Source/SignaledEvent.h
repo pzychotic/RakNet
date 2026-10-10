@@ -36,6 +36,9 @@ public:
 protected:
 #ifdef _WIN32
     HANDLE eventList;
+    /// Ends WaitOnEvent's timeout to the millisecond, where a plain wait rounds it up to
+    /// the 15.6 ms system timer tick. Null where Windows has no high-resolution timer.
+    HANDLE waitTimer;
 #else
     std::mutex isSignaledMutex;
     bool isSignaled;

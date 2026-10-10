@@ -505,8 +505,7 @@ private:
     bool InsertIntoSplitPacketList( InternalPacket* internalPacket, CCTimeType time );
 
     /// Take all split chunks with the specified splitPacketId and try to reconstruct a packet. If we can, allocate and return it.  Otherwise return 0
-    InternalPacket* BuildPacketFromSplitPacketList( SplitPacketIdType splitPacketId, CCTimeType time,
-                                                    RakNetSocket2* s, SystemAddress& systemAddress, BitStream& updateBitStream );
+    InternalPacket* BuildPacketFromSplitPacketList( SplitPacketIdType splitPacketId, CCTimeType time );
     InternalPacket* BuildPacketFromSplitPacketList( SplitPacketChannel* splitPacketChannel, CCTimeType time );
 
     /// Free a split packet channel and every chunk it is holding.

@@ -91,9 +91,9 @@ public:
     int GetRetransmissionBandwidth( CCTimeType curTime, CCTimeType timeSinceLastTick, uint32_t unacknowledgedBytes, bool isContinuousSend );
     int GetTransmissionBandwidth( CCTimeType curTime, CCTimeType timeSinceLastTick, uint32_t unacknowledgedBytes, bool isContinuousSend );
 
-    /// Acks do not have to be sent immediately. Instead, they can be buffered up such that groups of acks are sent at a time
-    /// This reduces overall bandwidth usage
-    /// How long they can be buffered depends on the retransmit time of the sender
+    /// True once a millisecond has passed since the last ack datagram went out. The first ack
+    /// after a quiet spell goes out in the update cycle that handled its datagram; while
+    /// datagrams keep arriving, their acks share about one ack datagram a millisecond.
     /// Should call once per update tick, and send if needed
     bool ShouldSendACKs( CCTimeType curTime, CCTimeType estimatedTimeToNextTick );
 
@@ -124,8 +124,6 @@ public:
 
     /// Call this when an ACK arrives.
     /// hasBAndAS are possibly written with the ack, see OnSendAck()
-    /// B and AS are used in the calculations in UpdateWindowSizeAndAckOnAckPerSyn
-    /// B and AS are updated at most once per SYN
     void OnAck( CCTimeType curTime, CCTimeType rtt, bool hasBAndAS, BytesPerMicrosecond _BB, BytesPerMicrosecond _AS, double totalUserDataBytesAcked, bool isContinuousSend, DatagramSequenceNumberType sequenceNumber );
     void OnDuplicateAck( CCTimeType curTime, DatagramSequenceNumberType sequenceNumber );
 
@@ -133,9 +131,7 @@ public:
     /// Call before calling OnSendAck()
     void OnSendAckGetBAndAS( CCTimeType curTime, bool* hasBAndAS, BytesPerMicrosecond* _BB, BytesPerMicrosecond* _AS );
 
-    /// Call when we send an ack, to write B and AS if needed
-    /// B and AS are only written once per SYN, to prevent slow calculations
-    /// Also updates SND, the period between sends, since data is written out
+    /// Call when we send an ack datagram. ShouldSendACKs holds the next one a millisecond.
     /// Be sure to call OnSendAckGetBAndAS() before calling OnSendAck(), since whether you write it or not affects \a numBytes
     void OnSendAck( CCTimeType curTime, uint32_t numBytes );
 
@@ -145,10 +141,9 @@ public:
 
     /// Retransmission time out for the sender
     /// If the time difference between when a message was last transmitted, and the current time is greater than RTO then packet is eligible for retransmission, pending congestion control
-    /// RTO = (RTT + 4 * RTTVar) + SYN
+    /// RTO = 2 * RTT + 4 * RTTVar + 30 milliseconds, at most 2 seconds
     /// If we have been continuously sending for the last RTO, and no ACK or NAK at all, SND*=2;
     /// This is per message, which is different from UDT, but RakNet supports packetloss with continuing data where UDT is only RELIABLE_ORDERED
-    /// Minimum value is 100 milliseconds
     CCTimeType GetRTOForRetransmission( unsigned char timesSent ) const;
 
     /// Set the maximum amount of data that can be sent in one datagram
@@ -185,11 +180,8 @@ protected:
     double cwnd;     // max bytes on wire
     double ssThresh; // Threshhold between slow start and congestion avoidance
 
-    /// When we get an ack, if oldestUnsentAck==0, set it to the current time
-    /// When we send out acks, set oldestUnsentAck to 0
-    CCTimeType oldestUnsentAck;
-
-    CCTimeType GetSenderRTOForACK( void ) const;
+    /// When the last ack datagram went out, 0 before the first
+    CCTimeType lastAckSendTime;
 
     /// Every outgoing datagram is assigned a sequence number, which increments by 1 every assignment
     DatagramSequenceNumberType nextDatagramSequenceNumber;

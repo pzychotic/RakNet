@@ -47,12 +47,12 @@ prints its own mean and standard deviation of the wall time. Each case also prin
 medians ADR-0009 judges by, of the samples' wall time and of the CPU work the whole
 process did during them, in megacycles on Windows and CPU milliseconds elsewhere:
 
-    ThroughputBenchmark: 32 B: median 6566.0 ms wall, 2820 Mcycles of 5 runs
+    ThroughputBenchmark: 32 B: median 800.4 ms wall, 1493 Mcycles of 5 runs
 
-Judge by the CPU work. With small messages the wall time is held by how many reliable
-messages may await an ack (RESEND_BUFFER_ARRAY_LENGTH) per round trip, about one Windows
-timer tick each, so 32 B and 1 KB take the same wall time and a slower allocator barely
-moves it. The CPU work is what both Peers did to move the messages, which is what an
+Judge by the CPU work. With 32 B messages the wall time is held by how many reliable
+messages may await an ack (RESEND_BUFFER_ARRAY_LENGTH) per round trip, about two
+milliseconds on loopback with the receiver's ack gap, so a slower allocator barely moves
+it. The CPU work is what both Peers did to move the messages, which is what an
 allocator changes; on an idle machine its median repeats within 2% for every case. The
 wait for the last message sleeps rather than spins, so it adds little work of its own.
 
@@ -76,7 +76,7 @@ constexpr MessageID kMessageId = ID_USER_PACKET_ENUM + 1;
 
 constexpr char kChannel = 0;
 
-// Hang guard for one run, not a timeout to tune: the slowest case takes about 16 s.
+// Hang guard for one run, not a timeout to tune: the slowest case takes about 3 s.
 constexpr TimeMS kRunBudgetMs = 60000;
 
 // How many messages go out between two drains of the receiver while sending.

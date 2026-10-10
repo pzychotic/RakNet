@@ -1004,6 +1004,9 @@ protected:
     /// Set while RunUpdateCycle runs. A flag rather than a thread id, so it holds under
     /// RAKPEER_USER_THREADED too.
     mutable std::atomic<bool> insideUpdateCycle;
+    /// Whether a connection still held acks after the last update cycle, so the network
+    /// thread wakes when they fall due. Only the thread running the cycle touches it.
+    bool acksWaitingAfterCycle;
 
     std::mutex offlinePingResponseMutex;
     ///RunUpdateCycle is not thread safe but we don't need to mutex calls. Just skip calls if it is running already
