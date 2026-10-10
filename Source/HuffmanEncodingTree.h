@@ -8,14 +8,14 @@
  *
  */
 
-/// \file DS_HuffmanEncodingTree.h
+/// \file HuffmanEncodingTree.h
 /// \brief \b [Internal] Generates a huffman encoding tree, used for string and global compression.
 ///
 
 #pragma once
 
 #include "RakMemoryOverride.h"
-#include "DS_HuffmanEncodingTreeNode.h"
+#include "HuffmanEncodingTreeNode.h"
 #include "BitStream.h"
 #include "Export.h"
 
@@ -46,7 +46,6 @@ public:
     void FreeMemory( void );
 
 private:
-
     /// The root node of the tree
     HuffmanEncodingTreeNode* root;
 

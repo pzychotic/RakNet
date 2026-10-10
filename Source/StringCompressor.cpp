@@ -9,7 +9,7 @@
  */
 
 #include "StringCompressor.h"
-#include "DS_HuffmanEncodingTree.h"
+#include "HuffmanEncodingTree.h"
 #include "BitStream.h"
 #include "RakAssert.h"
 #include "RakMemoryOverride.h"

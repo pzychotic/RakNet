@@ -8,7 +8,7 @@
  *
  */
 
-#include "DS_HuffmanEncodingTree.h"
+#include "HuffmanEncodingTree.h"
 #include "BitStream.h"
 #include "RakAssert.h"
 
@@ -100,7 +100,7 @@ void HuffmanEncodingTree::GenerateFromFrequencyTable( unsigned int frequencyTabl
     // children of a new node, where the new node has the weight the sum of the weight of the left and right child nodes.
     while( 1 )
     {
-        HuffmanEncodingTreeNode* lesser  = aHuffmanEncodingTreeNodeList.front();
+        HuffmanEncodingTreeNode* lesser = aHuffmanEncodingTreeNodeList.front();
         aHuffmanEncodingTreeNodeList.pop_front();
         HuffmanEncodingTreeNode* greater = aHuffmanEncodingTreeNodeList.front();
         aHuffmanEncodingTreeNodeList.pop_front();

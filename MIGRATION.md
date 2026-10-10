@@ -105,14 +105,17 @@ below, which are all about strings, cannot reach the core protocol.
 **Source break.** Most of RakNet was already in `namespace RakNet` in stock 4.081. A
 handful of headers were not, and they are now: `MessageIdentifiers.h`, `PacketPriority.h`,
 `DR_SHA1.h`, `SuperFastHash.h`, `WSAStartupSingleton.h`, and
-the surviving `DS_*` headers.
+`HuffmanEncodingTreeNode.h` (stock's `DS_HuffmanEncodingTreeNode.h`).
 
 The two that matter to ordinary code are `PacketPriority` and `PacketReliability`, which
 were global enums and are now `RakNet::PacketPriority` and `RakNet::PacketReliability`.
 Their enumerators — `HIGH_PRIORITY`, `RELIABLE_ORDERED`, and the rest — moved with them.
 So did every `ID_*` enumerator in `MessageIdentifiers.h`.
 
-The `DataStructures` namespace is now nested: `RakNet::DataStructures`.
+The `DataStructures` namespace is gone. Every container it held was removed or replaced
+(see [Also removed](#also-removed)). `HuffmanEncodingTree`, the one class that stayed, was
+already `RakNet::HuffmanEncodingTree` and now lives in `HuffmanEncodingTree.h`. No header
+keeps the `DS_` prefix.
 
 ### What to do
 
@@ -426,6 +429,10 @@ the queue first, and there is no `Allocate`, `Deallocate` or `SetPageSize`.
 `TCPInterface::incomingMessages` holds `std::unique_ptr<Packet>`, and the unused
 `requestedCloseConnections` and `newRemoteClients` are gone. `MemoryPool` had no other
 user left, and `_DISABLE_MEMORY_POOL` is no longer read.
+
+**`DS_HuffmanEncodingTree.h`, `DS_HuffmanEncodingTreeNode.h`.** Renamed to
+`HuffmanEncodingTree.h` and `HuffmanEncodingTreeNode.h`. The class and its encoding are
+unchanged.
 
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.

@@ -8,6 +8,7 @@
 #include <climits>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 /*
 StringCompressor::DecodeString( std::string&, ... ) sizes its buffer from the stream's
@@ -96,4 +97,18 @@ TEST_CASE( "A std::string decode does not ask rakMalloc_Ex for maxCharsToWrite b
         CHECK( LargestMalloc::Largest() <= bound );
     }
     CHECK( received == "hello" );
+}
+
+TEST_CASE( "EncodeString writes the bytes its English Huffman table has always written", "[stringcompressor]" )
+{
+    // A peer decodes these bytes with its own tree, so a different encoding is a wire break.
+    StringCompressorScope compressor;
+
+    RakNet::BitStream bitStream;
+    RakNet::StringCompressor::Instance()->EncodeString( "Hello, World! 0x7F~", 256, &bitStream );
+
+    const std::vector<int> written( bitStream.GetData(), bitStream.GetData() + bitStream.GetNumberOfBytesUsed() );
+    const std::vector<int> expected = { 0x00, 0x00, 0x00, 0x44, 0x3E, 0x04, 0xA5, 0x1A, 0xFA, 0xB9, 0x19,
+                                        0x93, 0x95, 0xDF, 0x51, 0x54, 0xD5, 0x75, 0xAB, 0x2A, 0xDA, 0x80 };
+    CHECK( written == expected );
 }
