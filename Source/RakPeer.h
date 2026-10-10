@@ -1221,9 +1221,6 @@ protected:
     /// Set on the user thread and read on the network thread.
     std::atomic<bool> limitConnectionFrequencyFromTheSameIP;
 
-    std::mutex packetAllocationPoolMutex;
-    DataStructures::MemoryPool<Packet> packetAllocationPool;
-
     std::mutex packetReturnMutex;
     std::list<Packet*> packetReturnQueue;
     /// What the network thread pushes during an update cycle. PublishView moves it onto
@@ -1242,10 +1239,11 @@ protected:
     /// offline Packets, so the answer holds until it calls AddOfflinePacketToProducer.
     bool CountDropIfOfflineQueueFull( void );
     void AddOfflinePacketToProducer( Packet* p );
-    // Both return null after notifyOutOfMemory when an allocation fails; the caller drops
-    // the message. The second takes ownership of data either way, freeing it on failure.
+    // Returns null after notifyOutOfMemory when the payload allocation fails; the caller
+    // drops the message.
     Packet* AllocPacket( unsigned dataSize, const char* file, unsigned int line );
-    Packet* AllocPacket( unsigned dataSize, unsigned char* data, const char* file, unsigned int line );
+    // Takes ownership of data.
+    Packet* AllocPacket( unsigned dataSize, unsigned char* data );
 
     /// This is used to return a number to the user when they call Send identifying the message
     /// This number will be returned back with ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS and is only returned

@@ -447,6 +447,10 @@ replaced by code that needs no scratch buffer at all.
 standard specifiers. Replace `"%" PRINTF_64_BIT_MODIFIER "u"` with `"%" PRIu64` (and `d` with
 `PRId64`) from `<cinttypes>`, and pass the `uint64_t`/`int64_t` value without a cast.
 
+`INTERNAL_PACKET_PAGE_SIZE` is no longer read. It sized the memory pool `ReliabilityLayer`
+kept its per-message objects in, and those are now made with `new`. A build that defines
+it still compiles.
+
 The plugins that remain are `NatPunchthroughClient`/`Server`, `NatTypeDetectionClient`/
 `Server`, `Router2`, `RelayPlugin`, `UDPProxyClient`/`Coordinator`/`Server`,
 `UDPForwarder`, `RPC4Plugin`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistory`,
@@ -923,3 +927,9 @@ Here those are `std::string` and standard containers, which fail through `std::b
 and which neither hook reaches, so `SetNotifyOutOfMemory` is left with packet and buffer
 allocations in the core. If you relied on it as your OOM hook, move that code into a new
 handler.
+
+For a `Packet`, `SetNotifyOutOfMemory` now fires only when its payload can't be allocated.
+Stock took the `Packet` struct itself from a memory pool, and a pool that could not grow
+also fired it, and `AllocatePacket` returned null. Here the struct is made with `OP_NEW`, so
+failing to make it is fatal like any other allocation. `AllocatePacket` still returns null
+when the payload allocation fails.

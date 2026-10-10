@@ -45,4 +45,25 @@ is measured the same way.
 Verdicts:
 
 - Remote-system index: replace, cold.
-- `InternalPacket`, ref-counted payload, datagram history, `Packet`: pending measurement.
+- `Packet`, `InternalPacket`, ref-counted payload, datagram history: replace, measured.
+
+Each pool was replaced on its own in a build of its own, and a fifth build replaced all
+four. Windows 11, MSVC Release, an idle machine, the six builds run in turn four times.
+Each figure is the median of the four runs' medians, in megacycles of process CPU work,
+against the build that still had every pool:
+
+| Replaced          | 32 B          | 1 KB          | 4 KB, split    |
+|-------------------|---------------|---------------|----------------|
+| none (baseline)   | 1483          | 6176          | 19307          |
+| `Packet`          | 1417 (−4.4%)  | 6206 (+0.5%)  | 19226 (−0.4%)  |
+| `InternalPacket`  | 1513 (+2.1%)  | 6240 (+1.0%)  | 19294 (−0.1%)  |
+| ref-counted data  | 1470 (−0.8%)  | 6244 (+1.1%)  | 19375 (+0.4%)  |
+| datagram history  | 1489 (+0.4%)  | 6311 (+2.2%)  | 19567 (+1.3%)  |
+| all four          | 1543 (+4.1%)  | 6355 (+2.9%)  | 19634 (+1.7%)  |
+
+Between runs of one build the 32 B case spread up to 20%, the 1 KB case 2.5% and the 4 KB
+case 2.3%. So the 32 B column cannot resolve 5% on its own; no pool's median there was more
+than 4.4% slower, and the 1 KB and 4 KB columns, which can, put every pool under 2.3%.
+`Packet` is made with `OP_NEW`, the same way the plugins that hand `Packet`s to
+`DeallocatePacket` make theirs. Wall time moved less than 5% for every pool on every case: the medians were
+785-800 ms, 898-927 ms and 2992-3227 ms.

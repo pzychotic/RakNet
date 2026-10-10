@@ -1,7 +1,6 @@
 #include "PeerScope.h"
 
 #include "ConnectionWaits.h"
-#include "DS_MemoryPool.h"
 #include "MessageIdentifiers.h"
 #include "RakAssert.h"
 #include "RakMemoryOverride.h"
@@ -16,12 +15,10 @@
 
 /*
 RakPeer builds every Packet it hands the user in two steps: the payload from rakMalloc_Ex,
-then a slot from its packet pool. Either can come back null. When one does, the Packet is
-not built: the payload is freed, notifyOutOfMemory is told, the message that needed it is
-dropped, and the Peer carries on. ADR-0004, "Null-returning allocators".
-
-The pool case assumes the pool is enabled; under _DISABLE_MEMORY_POOL it asks for
-sizeof( Packet ) instead of a page.
+then the Packet itself with OP_NEW. The payload can come back null. When it does, the Packet
+is not built: notifyOutOfMemory is told, the message that needed it is dropped, and the
+Peer carries on. ADR-0004, "Null-returning allocators". Failing to make the Packet itself
+is fatal, like any other allocation.
 
 RakPeerInterface functions explicitly tested:
 
@@ -132,30 +129,6 @@ TEST_CASE( "AllocatePacket returns null when the payload allocation fails, and t
     REQUIRE( packet != nullptr );
     CHECK( packet->length == kFailedPayloadBytes );
     peer->DeallocatePacket( packet );
-}
-
-TEST_CASE( "AllocatePacket returns null when the packet pool cannot grow, and the pool still works afterwards", "[memory]" )
-{
-    // RakPeer's constructor sizes a packet pool page at 32 blocks. An un-started Peer has
-    // not allocated one yet, so its first AllocatePacket asks for exactly this.
-    const size_t poolPageBytes = sizeof( DataStructures::MemoryPool<Packet>::MemoryWithPage ) * 32;
-
-    FailingMalloc failing( poolPageBytes );
-    PeerScope peers;
-    RakPeerInterface* peer = peers.Create();
-
-    CHECK( peer->AllocatePacket( 1 ) == nullptr );
-    CHECK( FailingMalloc::Failures() == 1 );
-    CHECK( FailingMalloc::OutOfMemoryNotices() == 1 );
-
-    FailingMalloc::Stop();
-    Packet* first = peer->AllocatePacket( 1 );
-    Packet* second = peer->AllocatePacket( 2 );
-    REQUIRE( first != nullptr );
-    REQUIRE( second != nullptr );
-    CHECK( first != second );
-    peer->DeallocatePacket( second );
-    peer->DeallocatePacket( first );
 }
 
 TEST_CASE( "A SendLoopback whose packet cannot be allocated is dropped, and the next one arrives", "[memory][network]" )

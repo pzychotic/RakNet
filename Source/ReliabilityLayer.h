@@ -22,7 +22,6 @@
 #include "RakNetStatistics.h"
 #include "DR_SHA1.h"
 #include "SequenceRanges.h"
-#include "DS_MemoryPool.h"
 #include "RakNetDefines.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
@@ -494,7 +493,7 @@ private:
     bool IsOlderOrderedPacket( OrderingIndexType newPacketOrderingIndex, OrderingIndexType waitingForPacketOrderingIndex );
 
     /// Split the passed packet into chunks under MTU_SIZE bytes (including headers) and save those new chunks
-    /// Takes ownership of \a internalPacket and releases it to the pool.
+    /// Takes ownership of \a internalPacket and releases it.
     void SplitPacket( InternalPacket* internalPacket );
 
     /// Insert a packet into the split packet list
@@ -563,7 +562,6 @@ private:
     // This is essentially an O(1) lookup to get a DatagramHistoryNode given an index
     // datagramHistory holds a linked list of MessageNumberNode.
     std::deque<DatagramHistoryNode> datagramHistory;
-    DataStructures::MemoryPool<MessageNumberNode> datagramHistoryMessagePool;
 
     struct UnreliableWithAckReceiptNode
     {
@@ -587,7 +585,6 @@ private:
     MessageNumberNode* AddSubsequentToDatagramHistory( MessageNumberNode* messageNumberNode, DatagramSequenceNumberType messageNumber );
     DatagramSequenceNumberType datagramHistoryPopCount;
 
-    DataStructures::MemoryPool<InternalPacket> internalPacketPool;
     InternalPacket* resendBuffer[RESEND_BUFFER_ARRAY_LENGTH];
     InternalPacket* resendLinkedListHead;
     InternalPacket* unreliableLinkedListHead;
@@ -738,8 +735,8 @@ private:
 
     // Every 16 datagrams, we make sure the 17th datagram goes out the same update tick, and is the same size as the 16th
     int countdownToNextPacketPair;
-    InternalPacket* AllocateFromInternalPacketPool( void );
-    void ReleaseToInternalPacketPool( InternalPacket* ip );
+    InternalPacket* AllocateInternalPacket( void );
+    void ReleaseInternalPacket( InternalPacket* ip );
 
     SequenceRanges<DatagramSequenceNumberType> acknowlegements;
     SequenceRanges<DatagramSequenceNumberType> NAKs;
@@ -755,7 +752,6 @@ private:
     // Allocate new
     void AllocInternalPacketData( InternalPacket* internalPacket, unsigned int numBytes, bool allowStack, const char* file, unsigned int line );
     void FreeInternalPacketData( InternalPacket* internalPacket, const char* file, unsigned int line );
-    DataStructures::MemoryPool<InternalPacketRefCountedData> refCountedDataPool;
 
     BPSTracker bpsMetrics[RNS_PER_SECOND_METRICS_COUNT];
     CCTimeType lastBpsClear;

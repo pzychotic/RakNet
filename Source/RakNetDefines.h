@@ -169,12 +169,6 @@
 #define RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH 48
 #endif
 
-// Controls how many allocations occur at once for the memory pool of incoming or outgoing datagrams.
-// Has small effect on memory usage per connection. Uses about 256 bytes*INTERNAL_PACKET_PAGE_SIZE per connection
-#ifndef INTERNAL_PACKET_PAGE_SIZE
-#define INTERNAL_PACKET_PAGE_SIZE 8
-#endif
-
 // If defined to 1, the user is responsible for calling RakPeer::RunUpdateCycle and RakPeer::RunRecvfrom
 #ifndef RAKPEER_USER_THREADED
 #define RAKPEER_USER_THREADED 0

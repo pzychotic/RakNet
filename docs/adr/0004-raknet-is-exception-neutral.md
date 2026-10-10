@@ -87,7 +87,9 @@ A safe call is marked on its line with `// ADR-0004-allow(<rule>): <reason>`.
 `rakMalloc` and friends, a user-installed allocator, and `malloc` report exhaustion by
 returning null. Dereferencing that null is undefined behaviour, not a fatal error, so the
 result is always checked. Report the failure through `notifyOutOfMemory` and return failure,
-which is the shape the existing sites already use. One caveat: after `_set_new_mode(1)` on
+which is the shape the existing sites already use. For a `Packet` that covers only its
+payload: the `Packet` itself is made with `OP_NEW` (ADR-0009), so failing to make it is fatal
+as above. One caveat: after `_set_new_mode(1)` on
 MSVC, `malloc` calls the new handler and can throw. An embedder can set that for the whole
 application without RakNet knowing. The throw is then allocation failure, so it is fatal as
 above.

@@ -159,23 +159,12 @@ Packet* RakPeer::AllocPacket( unsigned dataSize, const char* file, unsigned int 
         notifyOutOfMemory( file, line );
         return 0;
     }
-    return AllocPacket( dataSize, data, file, line );
+    return AllocPacket( dataSize, data );
 }
 
-Packet* RakPeer::AllocPacket( unsigned dataSize, unsigned char* data, const char* file, unsigned int line )
+Packet* RakPeer::AllocPacket( unsigned dataSize, unsigned char* data )
 {
-    // Packet *p = (Packet *)rakMalloc_Ex(sizeof(Packet), file, line);
-    Packet* p;
-    packetAllocationPoolMutex.lock();
-    p = packetAllocationPool.Allocate( file, line );
-    packetAllocationPoolMutex.unlock();
-    if( p == 0 )
-    {
-        notifyOutOfMemory( file, line );
-        rakFree_Ex( data, file, line );
-        return 0;
-    }
-    p = new( (void*)p ) Packet;
+    Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
     p->data = data;
     p->length = dataSize;
     p->bitSize = BYTES_TO_BITS( dataSize );
@@ -252,10 +241,6 @@ RakPeer::RakPeer()
 #endif
 
     bufferedCommands.SetPageSize( sizeof( BufferedCommandStruct ) * 16 );
-
-    packetAllocationPoolMutex.lock();
-    packetAllocationPool.SetPageSize( sizeof( DataStructures::MemoryPool<Packet>::MemoryWithPage ) * 32 );
-    packetAllocationPoolMutex.unlock();
 
     GenerateGUID();
 
@@ -899,9 +884,6 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     stagedPacketQueue.clear();
     pendingOfflinePackets.clear();
     packetReturnMutex.unlock();
-    packetAllocationPoolMutex.lock();
-    packetAllocationPool.Clear( _FILE_AND_LINE_ );
-    packetAllocationPoolMutex.unlock();
 
     DerefAllSockets();
 
@@ -1316,9 +1298,7 @@ void RakPeer::DeallocatePacket( Packet* packet )
     if( packet->deleteData )
     {
         rakFree_Ex( packet->data, _FILE_AND_LINE_ );
-        packet->~Packet();
-        std::lock_guard<std::mutex> guard( packetAllocationPoolMutex );
-        packetAllocationPool.Release( packet, _FILE_AND_LINE_ );
+        RakNet::OP_DELETE( packet, _FILE_AND_LINE_ );
     }
     else
     {
@@ -5812,16 +5792,13 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                         }
 
                         // Send this info down to the game
-                        packet = AllocPacket( byteSize, data, _FILE_AND_LINE_ );
-                        if( packet != 0 )
-                        {
-                            packet->bitSize = bitSize;
-                            packet->systemAddress = systemAddress;
-                            packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
-                            packet->guid = remoteSystem->guid;
-                            packet->guid.systemIndex = packet->systemAddress.systemIndex;
-                            AddPacketToProducer( packet );
-                        }
+                        packet = AllocPacket( byteSize, data );
+                        packet->bitSize = bitSize;
+                        packet->systemAddress = systemAddress;
+                        packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
+                        packet->guid = remoteSystem->guid;
+                        packet->guid.systemIndex = packet->systemAddress.systemIndex;
+                        AddPacketToProducer( packet );
                     }
                     else
                     {
@@ -5882,16 +5859,13 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                 {
                     if( remoteSystem->connectMode == RemoteSystemStruct::REQUESTED_CONNECTION )
                     {
-                        packet = AllocPacket( byteSize, data, _FILE_AND_LINE_ );
-                        if( packet != 0 )
-                        {
-                            packet->bitSize = bitSize;
-                            packet->systemAddress = systemAddress;
-                            packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
-                            packet->guid = remoteSystem->guid;
-                            packet->guid.systemIndex = packet->systemAddress.systemIndex;
-                            AddPacketToProducer( packet );
-                        }
+                        packet = AllocPacket( byteSize, data );
+                        packet->bitSize = bitSize;
+                        packet->systemAddress = systemAddress;
+                        packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
+                        packet->guid = remoteSystem->guid;
+                        packet->guid.systemIndex = packet->systemAddress.systemIndex;
+                        AddPacketToProducer( packet );
 
                         // Closes once the refusal is acked, so the refusing Peer lets go of
                         // its record too.
@@ -5967,16 +5941,13 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                             }
 
                             // Send the connection request complete to the game
-                            packet = AllocPacket( byteSize, data, _FILE_AND_LINE_ );
-                            if( packet != 0 )
-                            {
-                                packet->bitSize = byteSize * 8;
-                                packet->systemAddress = systemAddress;
-                                packet->systemAddress.systemIndex = (SystemIndex)GetRecordIndexFromSystemAddress( systemAddress );
-                                packet->guid = remoteSystem->guid;
-                                packet->guid.systemIndex = packet->systemAddress.systemIndex;
-                                AddPacketToProducer( packet );
-                            }
+                            packet = AllocPacket( byteSize, data );
+                            packet->bitSize = byteSize * 8;
+                            packet->systemAddress = systemAddress;
+                            packet->systemAddress.systemIndex = (SystemIndex)GetRecordIndexFromSystemAddress( systemAddress );
+                            packet->guid = remoteSystem->guid;
+                            packet->guid.systemIndex = packet->systemAddress.systemIndex;
+                            AddPacketToProducer( packet );
 
                             BitStream outBitStream;
                             outBitStream.Write( (MessageID)ID_NEW_INCOMING_CONNECTION );
@@ -6015,16 +5986,13 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                     if( ( data[0] >= (MessageID)ID_TIMESTAMP || data[0] == ID_SND_RECEIPT_ACKED || data[0] == ID_SND_RECEIPT_LOSS ) &&
                         remoteSystem->isActive )
                     {
-                        packet = AllocPacket( byteSize, data, _FILE_AND_LINE_ );
-                        if( packet != 0 )
-                        {
-                            packet->bitSize = bitSize;
-                            packet->systemAddress = systemAddress;
-                            packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
-                            packet->guid = remoteSystem->guid;
-                            packet->guid.systemIndex = packet->systemAddress.systemIndex;
-                            AddPacketToProducer( packet );
-                        }
+                        packet = AllocPacket( byteSize, data );
+                        packet->bitSize = bitSize;
+                        packet->systemAddress = systemAddress;
+                        packet->systemAddress.systemIndex = remoteSystem->remoteSystemIndex;
+                        packet->guid = remoteSystem->guid;
+                        packet->guid.systemIndex = packet->systemAddress.systemIndex;
+                        AddPacketToProducer( packet );
                     }
                     else
                     {

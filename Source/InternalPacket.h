@@ -74,7 +74,6 @@ struct InternalPacketRefCountedData
 };
 
 /// Holds a user message, and related information
-/// Don't use a constructor or destructor, due to the memory pool I am using
 struct InternalPacket : public InternalPacketFixedSizeTransmissionHeader
 {
     /// Identifies the order in which this number was sent. Used locally
