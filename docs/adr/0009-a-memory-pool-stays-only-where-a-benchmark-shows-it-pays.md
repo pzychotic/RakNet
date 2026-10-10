@@ -46,6 +46,8 @@ Verdicts:
 
 - Remote-system index: replace, cold.
 - `Packet`, `InternalPacket`, ref-counted payload, datagram history: replace, measured.
+- `ThreadsafeAllocatingQueue`'s pool (`RakPeer`'s buffered commands, one per `Send`, and
+  `TCPInterface`'s received chunks): replace, measured. The queue holds items by value now.
 
 Each pool was replaced on its own in a build of its own, and a fifth build replaced all
 four. Windows 11, MSVC Release, an idle machine, the six builds run in turn four times.
@@ -67,3 +69,15 @@ than 4.4% slower, and the 1 KB and 4 KB columns, which can, put every pool under
 `Packet` is made with `OP_NEW`, the same way the plugins that hand `Packet`s to
 `DeallocatePacket` make theirs. Wall time moved less than 5% for every pool on every case: the medians were
 785-800 ms, 898-927 ms and 2992-3227 ms.
+
+The queue's pool was judged later, against the build with the other pools already
+replaced. Same machine and method, the two builds run in turn four times, medians of the
+four runs' medians in megacycles:
+
+| Replaced            | 32 B          | 1 KB          | 4 KB, split    |
+|---------------------|---------------|---------------|----------------|
+| none (baseline)     | 1571          | 6403          | 19563          |
+| the queue's pool    | 1454 (−7.4%)  | 6436 (+0.5%)  | 19648 (+0.4%)  |
+
+The 32 B gain is inside that case's spread between runs of one build (1024-1690 across
+both), so it shows no regression rather than a speed-up.

@@ -20,7 +20,7 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 #include "SocketIncludes.h"
-#include "DS_ThreadsafeAllocatingQueue.h"
+#include "ThreadsafeQueue.h"
 #include "Plugins/UDPProxyCommon.h"
 
 #include <atomic>
@@ -120,7 +120,7 @@ protected:
         unsigned int inputId;
     };
 
-    DataStructures::ThreadsafeAllocatingQueue<StartForwardingInputStruct> startForwardingInput;
+    ThreadsafeQueue<StartForwardingInputStruct> startForwardingInput;
 
     struct StartForwardingOutputStruct
     {
@@ -137,7 +137,7 @@ protected:
         SystemAddress source;
         SystemAddress destination;
     };
-    DataStructures::ThreadsafeAllocatingQueue<StopForwardingStruct> stopForwardingCommands;
+    ThreadsafeQueue<StopForwardingStruct> stopForwardingCommands;
     unsigned int nextInputId;
 
     // New entries are added to forwardListNotUpdated

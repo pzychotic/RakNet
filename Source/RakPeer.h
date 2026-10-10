@@ -21,10 +21,10 @@
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 #include "Export.h"
-#include "DS_ThreadsafeAllocatingQueue.h"
 #include "SignaledEvent.h"
 #include "NativeFeatureIncludes.h"
 #include "SecureHandshake.h"
+#include "ThreadsafeQueue.h"
 
 #include <array>
 #include <atomic>
@@ -33,6 +33,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <unordered_set>
 #include <vector>
@@ -1101,11 +1102,12 @@ protected:
         } command;
     };
 
-    DataStructures::ThreadsafeAllocatingQueue<BufferedCommandStruct> bufferedCommands;
+    /// A BCS_SEND command owns its data until the update thread hands it to SendImmediate.
+    ThreadsafeQueue<BufferedCommandStruct> bufferedCommands;
 
-    /// A command for a connection-record setter, toward \a target, with no data. 0 if the
-    /// Peer isn't running: the connection records it would change don't exist.
-    BufferedCommandStruct* AllocateConnectionSetting( const SystemAddress& target );
+    /// A command for a connection-record setter, toward \a target, with no data. Nothing if
+    /// the Peer isn't running: the connection records it would change don't exist.
+    std::optional<BufferedCommandStruct> MakeConnectionSetting( const SystemAddress& target );
     /// Applies a connection-record setter's command. Network thread only.
     void ApplyConnectionSetting( const BufferedCommandStruct& bcs );
 

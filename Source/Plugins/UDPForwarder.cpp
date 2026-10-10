@@ -14,6 +14,7 @@
 
 #include "GetTime.h"
 #include "MTUSize.h"
+#include "RakAssert.h"
 #include "SocketLayer.h"
 #include "WSAStartupSingleton.h"
 #include "RakThread.h"
@@ -56,8 +57,6 @@ UDPForwarder::UDPForwarder()
     threadRunning = 0;
     maxForwardEntries = DEFAULT_MAX_FORWARD_ENTRIES;
     nextInputId = 0;
-    startForwardingInput.SetPageSize( sizeof( StartForwardingInputStruct ) * 16 );
-    stopForwardingCommands.SetPageSize( sizeof( StopForwardingStruct ) * 16 );
 }
 UDPForwarder::~UDPForwarder()
 {
@@ -129,17 +128,16 @@ UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAd
 
     unsigned int inputId = nextInputId++;
 
-    StartForwardingInputStruct* sfis;
-    sfis = startForwardingInput.Allocate( _FILE_AND_LINE_ );
-    sfis->source = source;
-    sfis->destination = destination;
-    sfis->timeoutOnNoDataMS = timeoutOnNoDataMS;
+    StartForwardingInputStruct sfis;
+    sfis.source = source;
+    sfis.destination = destination;
+    sfis.timeoutOnNoDataMS = timeoutOnNoDataMS;
     RakAssert( timeoutOnNoDataMS != 0 );
     if( forceHostAddress && forceHostAddress[0] )
-        sfis->forceHostAddress = forceHostAddress;
-    sfis->socketFamily = socketFamily;
-    sfis->inputId = inputId;
-    startForwardingInput.Push( sfis );
+        sfis.forceHostAddress = forceHostAddress;
+    sfis.socketFamily = socketFamily;
+    sfis.inputId = inputId;
+    startForwardingInput.Push( std::move( sfis ) );
 
     while( 1 )
     {
@@ -167,10 +165,9 @@ UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAd
 }
 void UDPForwarder::StopForwarding( SystemAddress source, SystemAddress destination )
 {
-    StopForwardingStruct* sfs;
-    sfs = stopForwardingCommands.Allocate( _FILE_AND_LINE_ );
-    sfs->destination = destination;
-    sfs->source = source;
+    StopForwardingStruct sfs;
+    sfs.destination = destination;
+    sfs.source = source;
     stopForwardingCommands.Push( sfs );
 }
 void UDPForwarder::RecvFrom( RakNet::TimeMS curTime, ForwardEntry* forwardEntry )
@@ -340,19 +337,14 @@ void UDPForwarder::UpdateUDPForwarder( void )
 {
     RakNet::TimeMS curTime = RakNet::GetTimeMS();
 
-    StartForwardingInputStruct* sfis;
     StartForwardingOutputStruct sfos;
     sfos.forwardingSocket = INVALID_SOCKET;
     sfos.forwardingPort = 0;
     sfos.inputId = 0;
     sfos.result = UDPFORWARDER_RESULT_COUNT;
 
-    while( 1 )
+    while( std::optional<StartForwardingInputStruct> sfis = startForwardingInput.Pop() )
     {
-        sfis = startForwardingInput.Pop();
-        if( sfis == 0 )
-            break;
-
         if( GetUsedForwardEntries() > maxForwardEntries )
         {
             sfos.result = UDPFORWARDER_NO_SOCKETS;
@@ -476,16 +468,10 @@ void UDPForwarder::UpdateUDPForwarder( void )
         startForwardingOutputMutex.lock();
         startForwardingOutput.push_back( sfos );
         startForwardingOutputMutex.unlock();
-
-        startForwardingInput.Deallocate( sfis, _FILE_AND_LINE_ );
     }
 
-    while( 1 )
+    while( std::optional<StopForwardingStruct> sfs = stopForwardingCommands.Pop() )
     {
-        StopForwardingStruct* sfs = stopForwardingCommands.Pop();
-        if( sfs == 0 )
-            break;
-
         for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); ++it )
         {
             ForwardEntry* pEntry = *it;
@@ -499,8 +485,6 @@ void UDPForwarder::UpdateUDPForwarder( void )
                 break;
             }
         }
-
-        stopForwardingCommands.Deallocate( sfs, _FILE_AND_LINE_ );
     }
 
     for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); /**/ )

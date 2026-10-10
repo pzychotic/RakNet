@@ -13,6 +13,7 @@
 
 #include "Plugins/TelnetTransport.h"
 #include "TCPInterface.h"
+#include "RakAssert.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>

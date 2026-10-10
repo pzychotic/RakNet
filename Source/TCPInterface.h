@@ -23,7 +23,7 @@
 #include "RakNetDefines.h"
 #include "SocketIncludes.h"
 #include "TCPByteBuffer.h"
-#include "DS_ThreadsafeAllocatingQueue.h"
+#include "ThreadsafeQueue.h"
 #include "MTUSize.h"
 #include "PluginInterface2.h"
 
@@ -39,6 +39,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -206,9 +207,10 @@ protected:
     RemoteClient* remoteClients;
     int remoteClientsLength;
 
-    DataStructures::ThreadsafeAllocatingQueue<Packet> incomingMessages;
-    DataStructures::ThreadsafeAllocatingQueue<SystemAddress> newIncomingConnections, lostConnections, requestedCloseConnections;
-    DataStructures::ThreadsafeAllocatingQueue<RemoteClient*> newRemoteClients;
+    /// Made with new: Receive releases each to the application, and DeallocatePacket
+    /// deletes it.
+    ThreadsafeQueue<std::unique_ptr<Packet>> incomingMessages;
+    ThreadsafeQueue<SystemAddress> newIncomingConnections, lostConnections;
     std::mutex completedConnectionAttemptMutex, failedConnectionAttemptMutex;
     std::deque<SystemAddress> completedConnectionAttempts, failedConnectionAttempts;
 
@@ -393,7 +395,7 @@ protected:
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     SSL_CTX* ctx;
     SSL_METHOD* meth;
-    DataStructures::ThreadsafeAllocatingQueue<SystemAddress> startSSL;
+    ThreadsafeQueue<SystemAddress> startSSL;
     std::vector<SystemAddress> activeSSLConnections;
     std::mutex sharedSslMutex;
 #endif

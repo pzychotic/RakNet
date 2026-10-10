@@ -240,8 +240,6 @@ RakPeer::RakPeer()
     _extraPingVariance = 0;
 #endif
 
-    bufferedCommands.SetPageSize( sizeof( BufferedCommandStruct ) * 16 );
-
     GenerateGUID();
 
     quitAndDataEvents.InitEvent();
@@ -2086,12 +2084,12 @@ void RakPeer::SetTimeoutTime( RakNet::TimeMS timeMS, const SystemAddress target 
     if( target == UNASSIGNED_SYSTEM_ADDRESS )
         defaultTimeoutTime = timeMS;
 
-    BufferedCommandStruct* bcs = AllocateConnectionSetting( target );
+    std::optional<BufferedCommandStruct> bcs = MakeConnectionSetting( target );
     if( bcs )
     {
         bcs->command = BufferedCommandStruct::BCS_SET_TIMEOUT_TIME;
         bcs->timeMS = timeMS;
-        bufferedCommands.Push( bcs );
+        bufferedCommands.Push( std::move( *bcs ) );
     }
 }
 
@@ -2243,12 +2241,12 @@ void RakPeer::SetSplitMessageProgressInterval( int interval )
     RakAssert( interval >= 0 );
     splitMessageProgressInterval = interval;
 
-    BufferedCommandStruct* bcs = AllocateConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
+    std::optional<BufferedCommandStruct> bcs = MakeConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
     if( bcs )
     {
         bcs->command = BufferedCommandStruct::BCS_SET_SPLIT_MESSAGE_PROGRESS_INTERVAL;
         bcs->interval = interval;
-        bufferedCommands.Push( bcs );
+        bufferedCommands.Push( std::move( *bcs ) );
     }
 }
 
@@ -2270,12 +2268,12 @@ void RakPeer::SetUnreliableTimeout( RakNet::TimeMS timeoutMS )
 {
     unreliableTimeout = timeoutMS;
 
-    BufferedCommandStruct* bcs = AllocateConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
+    std::optional<BufferedCommandStruct> bcs = MakeConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
     if( bcs )
     {
         bcs->command = BufferedCommandStruct::BCS_SET_UNRELIABLE_TIMEOUT;
         bcs->timeMS = timeoutMS;
-        bufferedCommands.Push( bcs );
+        bufferedCommands.Push( std::move( *bcs ) );
     }
 }
 
@@ -2401,22 +2399,20 @@ void RakPeer::PushBackPacket( Packet* packet, bool pushAtHead )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ChangeSystemAddress( RakNetGUID guid, const SystemAddress& systemAddress )
 {
-    BufferedCommandStruct* bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-    bcs->data = 0;
-    bcs->systemIdentifier.systemAddress = systemAddress;
-    bcs->systemIdentifier.rakNetGuid = guid;
-    bcs->command = BufferedCommandStruct::BCS_CHANGE_SYSTEM_ADDRESS;
-    bufferedCommands.Push( bcs );
+    BufferedCommandStruct bcs{};
+    bcs.systemIdentifier.systemAddress = systemAddress;
+    bcs.systemIdentifier.rakNetGuid = guid;
+    bcs.command = BufferedCommandStruct::BCS_CHANGE_SYSTEM_ADDRESS;
+    bufferedCommands.Push( std::move( bcs ) );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-RakPeer::BufferedCommandStruct* RakPeer::AllocateConnectionSetting( const SystemAddress& target )
+std::optional<RakPeer::BufferedCommandStruct> RakPeer::MakeConnectionSetting( const SystemAddress& target )
 {
     if( IsActive() == false )
-        return 0;
+        return std::nullopt;
 
-    BufferedCommandStruct* bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-    bcs->data = 0;
-    bcs->systemIdentifier = target;
+    BufferedCommandStruct bcs{};
+    bcs.systemIdentifier = target;
     return bcs;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2500,14 +2496,14 @@ void RakPeer::ApplyNetworkSimulator( float packetloss, unsigned short minExtraPi
     _minExtraPing = minExtraPing;
     _extraPingVariance = extraPingVariance;
 
-    BufferedCommandStruct* bcs = AllocateConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
+    std::optional<BufferedCommandStruct> bcs = MakeConnectionSetting( UNASSIGNED_SYSTEM_ADDRESS );
     if( bcs )
     {
         bcs->command = BufferedCommandStruct::BCS_APPLY_NETWORK_SIMULATOR;
         bcs->packetloss = packetloss;
         bcs->minExtraPing = minExtraPing;
         bcs->extraPingVariance = extraPingVariance;
-        bufferedCommands.Push( bcs );
+        bufferedCommands.Push( std::move( *bcs ) );
     }
 #else
     (void)packetloss;
@@ -3953,14 +3949,12 @@ void RakPeer::CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bo
         }
         else
         {
-            BufferedCommandStruct* bcs;
-            bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-            bcs->command = BufferedCommandStruct::BCS_CLOSE_CONNECTION;
-            bcs->systemIdentifier = target;
-            bcs->data = 0;
-            bcs->orderingChannel = orderingChannel;
-            bcs->priority = disconnectionNotificationPriority;
-            bufferedCommands.Push( bcs );
+            BufferedCommandStruct bcs{};
+            bcs.command = BufferedCommandStruct::BCS_CLOSE_CONNECTION;
+            bcs.systemIdentifier = target;
+            bcs.orderingChannel = orderingChannel;
+            bcs.priority = disconnectionNotificationPriority;
+            bufferedCommands.Push( std::move( bcs ) );
         }
     }
 }
@@ -4008,14 +4002,11 @@ bool RakPeer::IsClosing( RemoteSystemStruct::ConnectMode connectMode )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
-    BufferedCommandStruct* bcs;
-
-    bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-    bcs->data = (char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsToSend ), _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
-    if( bcs->data == 0 )
+    BufferedCommandStruct bcs{};
+    bcs.data = (char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsToSend ), _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
+    if( bcs.data == 0 )
     {
         notifyOutOfMemory( _FILE_AND_LINE_ );
-        bufferedCommands.Deallocate( bcs, _FILE_AND_LINE_ );
         return;
     }
 
@@ -4023,17 +4014,17 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
-    memcpy( bcs->data, data, (size_t)BITS_TO_BYTES( numberOfBitsToSend ) );
-    bcs->numberOfBitsToSend = numberOfBitsToSend;
-    bcs->priority = priority;
-    bcs->reliability = reliability;
-    bcs->orderingChannel = orderingChannel;
-    bcs->systemIdentifier = systemIdentifier;
-    bcs->broadcast = broadcast;
-    bcs->connectionMode = connectionMode;
-    bcs->receipt = receipt;
-    bcs->command = BufferedCommandStruct::BCS_SEND;
-    bufferedCommands.Push( bcs );
+    memcpy( bcs.data, data, (size_t)BITS_TO_BYTES( numberOfBitsToSend ) );
+    bcs.numberOfBitsToSend = numberOfBitsToSend;
+    bcs.priority = priority;
+    bcs.reliability = reliability;
+    bcs.orderingChannel = orderingChannel;
+    bcs.systemIdentifier = systemIdentifier;
+    bcs.broadcast = broadcast;
+    bcs.connectionMode = connectionMode;
+    bcs.receipt = receipt;
+    bcs.command = BufferedCommandStruct::BCS_SEND;
+    bufferedCommands.Push( std::move( bcs ) );
 
     if( priority == IMMEDIATE_PRIORITY )
     {
@@ -4044,7 +4035,6 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SendBufferedList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
-    BufferedCommandStruct* bcs;
     uint64_t totalLength = 0;
     unsigned int lengthOffset;
     int i;
@@ -4092,18 +4082,18 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
-    bcs = bufferedCommands.Allocate( _FILE_AND_LINE_ );
-    bcs->data = dataAggregate;
-    bcs->numberOfBitsToSend = BYTES_TO_BITS( (BitSize_t)totalLength );
-    bcs->priority = priority;
-    bcs->reliability = reliability;
-    bcs->orderingChannel = orderingChannel;
-    bcs->systemIdentifier = systemIdentifier;
-    bcs->broadcast = broadcast;
-    bcs->connectionMode = connectionMode;
-    bcs->receipt = receipt;
-    bcs->command = BufferedCommandStruct::BCS_SEND;
-    bufferedCommands.Push( bcs );
+    BufferedCommandStruct bcs{};
+    bcs.data = dataAggregate;
+    bcs.numberOfBitsToSend = BYTES_TO_BITS( (BitSize_t)totalLength );
+    bcs.priority = priority;
+    bcs.reliability = reliability;
+    bcs.orderingChannel = orderingChannel;
+    bcs.systemIdentifier = systemIdentifier;
+    bcs.broadcast = broadcast;
+    bcs.connectionMode = connectionMode;
+    bcs.receipt = receipt;
+    bcs.command = BufferedCommandStruct::BCS_SEND;
+    bufferedCommands.Push( std::move( bcs ) );
 
     if( priority == IMMEDIATE_PRIORITY )
     {
@@ -4214,16 +4204,11 @@ void RakPeer::OnConnectedPong( RakNet::Time sendPingTime, RakNet::Time sendPongT
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearBufferedCommands( void )
 {
-    BufferedCommandStruct* bcs;
-
-    while( ( bcs = bufferedCommands.Pop() ) != 0 )
+    while( std::optional<BufferedCommandStruct> bcs = bufferedCommands.Pop() )
     {
         if( bcs->data )
             rakFree_Ex( bcs->data, _FILE_AND_LINE_ );
-
-        bufferedCommands.Deallocate( bcs, _FILE_AND_LINE_ );
     }
-    bufferedCommands.Clear( _FILE_AND_LINE_ );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearRequestedConnectionList( void )
@@ -5320,7 +5305,6 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
     unsigned int byteSize;
     unsigned char* data;
     SystemAddress systemAddress;
-    BufferedCommandStruct* bcs;
     bool callerDataAllocationUsed;
     RakNetStatistics* rnss;
     RakNet::TimeUS timeNS = 0;
@@ -5345,7 +5329,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 
     HandleBufferedPackets( updateBitStream );
 
-    while( ( bcs = bufferedCommands.Pop() ) != 0 )
+    while( std::optional<BufferedCommandStruct> bcs = bufferedCommands.Pop() )
     {
         if( bcs->command == BufferedCommandStruct::BCS_SEND )
         {
@@ -5408,12 +5392,6 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         {
             ApplyConnectionSetting( *bcs );
         }
-
-#ifdef _DEBUG
-        bcs->data = 0;
-#endif
-
-        bufferedCommands.Deallocate( bcs, _FILE_AND_LINE_ );
     }
 
     // Applying a burst of Sends can take longer than the retransmission timeout. Acks that

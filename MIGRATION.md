@@ -418,6 +418,15 @@ The comparison functions they were declared with are gone too: `RegisteredComman
 `UDPProxyCoordinator::ServerWithPingComp` and `UDPProxyCoordinator::ForwardingRequestComp`.
 `LocalSlotObject` and `SenderAndTargetAddress` have an `operator<` in their place.
 
+**`DS_ThreadsafeAllocatingQueue.h`, `DS_MemoryPool.h`.** Gone. The queues that
+`RakPeer`, `TCPInterface` and `UDPForwarder` hand work between threads with are now
+`RakNet::ThreadsafeQueue` (`ThreadsafeQueue.h`), which holds each item by value, so
+`Push` takes the item itself and `Pop` returns a `std::optional`. Nothing is allocated from
+the queue first, and there is no `Allocate`, `Deallocate` or `SetPageSize`.
+`TCPInterface::incomingMessages` holds `std::unique_ptr<Packet>`, and the unused
+`requestedCloseConnections` and `newRemoteClients` are gone. `MemoryPool` had no other
+user left, and `_DISABLE_MEMORY_POOL` is no longer read.
+
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 

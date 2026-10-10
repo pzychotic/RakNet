@@ -315,11 +315,10 @@ void TCPInterface::Stop( void )
     RakNet::OP_DELETE_ARRAY( remoteClients, _FILE_AND_LINE_ );
     remoteClients = 0;
 
-    incomingMessages.Clear( _FILE_AND_LINE_ );
-    newIncomingConnections.Clear( _FILE_AND_LINE_ );
-    newRemoteClients.Clear( _FILE_AND_LINE_ );
-    lostConnections.Clear( _FILE_AND_LINE_ );
-    requestedCloseConnections.Clear( _FILE_AND_LINE_ );
+    while( std::optional<std::unique_ptr<Packet>> packet = incomingMessages.Pop() )
+        DeallocatePacket( packet->release() );
+    newIncomingConnections.Clear();
+    lostConnections.Clear();
     failedConnectionAttempts.clear();
     completedConnectionAttempts.clear();
     for( Packet* pPacket : headPush )
@@ -331,7 +330,7 @@ void TCPInterface::Stop( void )
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     SSL_CTX_free( ctx );
-    startSSL.Clear( _FILE_AND_LINE_ );
+    startSSL.Clear();
     activeSSLConnections.clear();
 #endif
 
@@ -409,9 +408,7 @@ void TCPInterface::ReportLostRemoteClientLocked( RemoteClient& remoteClient )
     // Freed before the event is queued, so an application that has taken the event from
     // HasLostConnection no longer counts the connection in GetConnectionCount.
     remoteClient.Free();
-    SystemAddress* lostConnectionSystemAddress = lostConnections.Allocate( _FILE_AND_LINE_ );
-    *lostConnectionSystemAddress = remoteClient.systemAddress;
-    lostConnections.Push( lostConnectionSystemAddress );
+    lostConnections.Push( remoteClient.systemAddress );
 }
 void TCPInterface::CloseRemoteClientOverOutgoingCap( int index )
 {
@@ -645,9 +642,7 @@ void TCPInterface::StartSSLClient( SystemAddress systemAddress )
         RakAssert( ctx != 0 );
     }
 
-    SystemAddress* id = startSSL.Allocate( _FILE_AND_LINE_ );
-    *id = systemAddress;
-    startSSL.Push( id );
+    startSSL.Push( systemAddress );
 
     auto it = std::find( activeSSLConnections.begin(), activeSSLConnections.end(), systemAddress );
     if( it == activeSSLConnections.end() )
@@ -781,11 +776,10 @@ Packet* TCPInterface::ReceiveInt( void )
         headPush.pop_front();
         return p;
     }
-    Packet* p = incomingMessages.Pop();
-    if( p )
+    if( std::optional<std::unique_ptr<Packet>> p = incomingMessages.Pop() )
     {
-        ReleaseIncomingBytes( *p );
-        return p;
+        ReleaseIncomingBytes( **p );
+        return p->release();
     }
     if( !tailPush.empty() )
     {
@@ -864,8 +858,9 @@ void TCPInterface::DeallocatePacket( Packet* packet )
         return;
     if( packet->deleteData )
     {
+        // Came from incomingMessages
         rakFree_Ex( packet->data, _FILE_AND_LINE_ );
-        incomingMessages.Deallocate( packet, _FILE_AND_LINE_ );
+        delete packet;
     }
     else
     {
@@ -952,18 +947,14 @@ SystemAddress TCPInterface::HasFailedConnectionAttempt( void )
 }
 SystemAddress TCPInterface::HasNewIncomingConnection( void )
 {
-    SystemAddress* out = newIncomingConnections.Pop();
-    if( out )
+    if( std::optional<SystemAddress> out = newIncomingConnections.Pop() )
     {
-        SystemAddress out2 = *out;
-        newIncomingConnections.Deallocate( out, _FILE_AND_LINE_ );
-
         for( PluginInterface2* pPlugin : messageHandlerList )
         {
-            pPlugin->OnNewConnection( out2, UNASSIGNED_RAKNET_GUID, true );
+            pPlugin->OnNewConnection( *out, UNASSIGNED_RAKNET_GUID, true );
         }
 
-        return out2;
+        return *out;
     }
     else
     {
@@ -972,18 +963,14 @@ SystemAddress TCPInterface::HasNewIncomingConnection( void )
 }
 SystemAddress TCPInterface::HasLostConnection( void )
 {
-    SystemAddress* out = lostConnections.Pop();
-    if( out )
+    if( std::optional<SystemAddress> out = lostConnections.Pop() )
     {
-        SystemAddress out2 = *out;
-        lostConnections.Deallocate( out, _FILE_AND_LINE_ );
-
         for( PluginInterface2* pPlugin : messageHandlerList )
         {
-            pPlugin->OnClosedConnection( out2, UNASSIGNED_RAKNET_GUID, LCR_DISCONNECTION_NOTIFICATION );
+            pPlugin->OnClosedConnection( *out, UNASSIGNED_RAKNET_GUID, LCR_DISCONNECTION_NOTIFICATION );
         }
 
-        return out2;
+        return *out;
     }
     else
     {
@@ -1216,7 +1203,6 @@ void UpdateTCPInterfaceLoop( void* arg )
     const unsigned int BUFF_SIZE = 1048576;
     //char data[ BUFF_SIZE ];
     char* data = (char*)rakMalloc_Ex( BUFF_SIZE, _FILE_AND_LINE_ );
-    Packet* incomingMessage;
     fd_set readFD, exceptionFD, writeFD;
     sts->threadRunning++;
 
@@ -1244,9 +1230,7 @@ void UpdateTCPInterfaceLoop( void* arg )
     while( sts->isStarted > 0 )
     {
 #if OPEN_SSL_CLIENT_SUPPORT == 1
-        SystemAddress* sslSystemAddress;
-        sslSystemAddress = sts->startSSL.Pop();
-        if( sslSystemAddress )
+        if( std::optional<SystemAddress> sslSystemAddress = sts->startSSL.Pop() )
         {
             // Starts SSL on the entry at index if it is active at the address and has none.
             auto initSSLAt = [&]( int index ) {
@@ -1263,7 +1247,6 @@ void UpdateTCPInterfaceLoop( void* arg )
                 for( int i = 0; i < sts->remoteClientsLength; i++ )
                     initSSLAt( i );
             }
-            sts->startSSL.Deallocate( sslSystemAddress, _FILE_AND_LINE_ );
         }
 #endif
 
@@ -1379,9 +1362,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                         // when the connection is lost, not when this scope ends.
                         slot.Commit();
 
-                        SystemAddress* newConnectionSystemAddress = sts->newIncomingConnections.Allocate( _FILE_AND_LINE_ );
-                        *newConnectionSystemAddress = newSystemAddress;
-                        sts->newIncomingConnections.Push( newConnectionSystemAddress );
+                        sts->newIncomingConnections.Push( newSystemAddress );
                     }
                     else
                     {
@@ -1438,12 +1419,12 @@ void UpdateTCPInterfaceLoop( void* arg )
 
                     if( len > 0 )
                     {
-                        incomingMessage = sts->incomingMessages.Allocate( _FILE_AND_LINE_ );
+                        std::unique_ptr<Packet> incomingMessage = std::make_unique<Packet>();
                         incomingMessage->data = (unsigned char*)rakMalloc_Ex( len + 1, _FILE_AND_LINE_ );
                         memcpy( incomingMessage->data, data, len );
                         incomingMessage->data[len] = 0; // Null terminate this so we can print it out as regular strings.  This is different from RakNet which does not do this.
                         incomingMessage->length = len;
-                        incomingMessage->deleteData = true; // actually means came from SPSC, rather than AllocatePacket
+                        incomingMessage->deleteData = true; // actually means came from incomingMessages, rather than AllocatePacket
                         incomingMessage->systemAddress = remoteClient.systemAddress;
 
                         // Charged before it can be received, so Receive never gives back
@@ -1456,7 +1437,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                                 RAKNET_DEBUG_PRINTF( "TCPInterface: stopped reading a client with %u bytes from it waiting for Receive (SetMaxIncomingBytesPerClient). See GetIncomingBytesCapStallCount.\n", maxIncomingBytes );
                             }
                         }
-                        sts->incomingMessages.Push( incomingMessage );
+                        sts->incomingMessages.Push( std::move( incomingMessage ) );
                     }
                     else
                     {
