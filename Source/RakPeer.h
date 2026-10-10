@@ -1120,6 +1120,8 @@ protected:
     /// MAX_BUFFERED_RECEIVED_DATAGRAMS; the caller gives it back to the pool.
     bool PushBufferedPacket( RNS2RecvStruct* p );
     RNS2RecvStruct* PopBufferedPacket( void );
+    /// Handles every datagram the receive thread has queued. Network thread only.
+    void HandleBufferedPackets( BitStream& updateBitStream );
 
 
     bool AllowIncomingConnections( void ) const;

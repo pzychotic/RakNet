@@ -3888,6 +3888,16 @@ RNS2RecvStruct* RakPeer::PopBufferedPacket( void )
     return 0;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void RakPeer::HandleBufferedPackets( BitStream& updateBitStream )
+{
+    RNS2RecvStruct* recvFromStruct;
+    while( ( recvFromStruct = PopBufferedPacket() ) != 0 )
+    {
+        ProcessNetworkPacket( recvFromStruct->systemAddress, recvFromStruct->data, recvFromStruct->bytesRead, this, recvFromStruct->socket, recvFromStruct->timeRead, updateBitStream );
+        DeallocRNS2RecvStruct( recvFromStruct, _FILE_AND_LINE_ );
+    }
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::PingInternal( const SystemAddress target, bool performImmediate, PacketReliability reliability )
 {
     if( IsActive() == false )
@@ -5352,12 +5362,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         } while( len > 0 );
     }
 
-    RNS2RecvStruct* recvFromStruct;
-    while( ( recvFromStruct = PopBufferedPacket() ) != 0 )
-    {
-        ProcessNetworkPacket( recvFromStruct->systemAddress, recvFromStruct->data, recvFromStruct->bytesRead, this, recvFromStruct->socket, recvFromStruct->timeRead, updateBitStream );
-        DeallocRNS2RecvStruct( recvFromStruct, _FILE_AND_LINE_ );
-    }
+    HandleBufferedPackets( updateBitStream );
 
     while( ( bcs = bufferedCommands.Pop() ) != 0 )
     {
@@ -5428,6 +5433,16 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 #endif
 
         bufferedCommands.Deallocate( bcs, _FILE_AND_LINE_ );
+    }
+
+    // Applying a burst of Sends can take longer than the retransmission timeout. Acks that
+    // arrived meanwhile are handled before anything is checked for a resend, and the clock
+    // is read again, so datagrams sent below are timed from when they leave.
+    if( timeNS != 0 )
+    {
+        HandleBufferedPackets( updateBitStream );
+        timeNS = RakNet::GetTimeUS();
+        timeMS = (RakNet::TimeMS)( timeNS / (RakNet::TimeUS)1000 );
     }
 
     HandleConnectionCancelQueue();
