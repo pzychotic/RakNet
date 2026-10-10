@@ -981,8 +981,8 @@ protected:
     void DereferenceRemoteSystem( const SystemAddress& sa );
     RemoteSystemStruct* GetRemoteSystem( const SystemAddress& sa ) const;
     unsigned int GetRemoteSystemIndex( const SystemAddress& sa ) const;
-    void ClearRemoteSystemLookup( void );
-    DataStructures::MemoryPool<RemoteSystemIndex> remoteSystemIndexPool;
+    /// Deletes every RemoteSystemIndex in the first \a lookupSize buckets, then the table.
+    void ClearRemoteSystemLookup( unsigned int lookupSize );
 
     void AddToActiveSystemList( unsigned int remoteSystemListIndex );
     void RemoveFromActiveSystemList( const SystemAddress& sa );

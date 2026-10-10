@@ -257,8 +257,6 @@ RakPeer::RakPeer()
     packetAllocationPool.SetPageSize( sizeof( DataStructures::MemoryPool<Packet>::MemoryWithPage ) * 32 );
     packetAllocationPoolMutex.unlock();
 
-    remoteSystemIndexPool.SetPageSize( sizeof( DataStructures::MemoryPool<RemoteSystemIndex>::MemoryWithPage ) * 32 );
-
     GenerateGUID();
 
     quitAndDataEvents.InitEvent();
@@ -923,7 +921,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     RakNet::OP_DELETE_ARRAY( activeSystemList, _FILE_AND_LINE_ );
     activeSystemList = 0;
 
-    ClearRemoteSystemLookup();
+    ClearRemoteSystemLookup( systemListSize * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE );
 
     ResetSendReceipt();
 }
@@ -3363,12 +3361,9 @@ void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remot
     remoteSystemList[remoteSystemListIndex].systemAddress = sa;
 
     unsigned int hashIndex = RemoteSystemLookupHashIndex( sa );
-    RemoteSystemIndex* rsi;
-    rsi = remoteSystemIndexPool.Allocate( _FILE_AND_LINE_ );
+    RemoteSystemIndex* rsi = new RemoteSystemIndex{ remoteSystemListIndex, nullptr };
     if( remoteSystemLookup[hashIndex] == 0 )
     {
-        rsi->next = 0;
-        rsi->index = remoteSystemListIndex;
         remoteSystemLookup[hashIndex] = rsi;
     }
     else
@@ -3378,10 +3373,6 @@ void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remot
         {
             cur = cur->next;
         }
-
-        rsi = remoteSystemIndexPool.Allocate( _FILE_AND_LINE_ );
-        rsi->next = 0;
-        rsi->index = remoteSystemListIndex;
         cur->next = rsi;
     }
 
@@ -3419,7 +3410,7 @@ void RakPeer::DereferenceRemoteSystem( const SystemAddress& sa )
             {
                 last->next = cur->next;
             }
-            remoteSystemIndexPool.Release( cur, _FILE_AND_LINE_ );
+            delete cur;
             break;
         }
         last = cur;
@@ -3450,9 +3441,18 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const SystemAddress& sa )
     return remoteSystemList + remoteSystemIndex;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::ClearRemoteSystemLookup( void )
+void RakPeer::ClearRemoteSystemLookup( unsigned int lookupSize )
 {
-    remoteSystemIndexPool.Clear( _FILE_AND_LINE_ );
+    for( unsigned int i = 0; remoteSystemLookup != 0 && i < lookupSize; i++ )
+    {
+        RemoteSystemIndex* cur = remoteSystemLookup[i];
+        while( cur != 0 )
+        {
+            RemoteSystemIndex* next = cur->next;
+            delete cur;
+            cur = next;
+        }
+    }
     RakNet::OP_DELETE_ARRAY( remoteSystemLookup, _FILE_AND_LINE_ );
     remoteSystemLookup = 0;
 }
