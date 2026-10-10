@@ -11,6 +11,7 @@
 #include "RakNetTypes.h"
 #include "RakNetVersion.h"
 #include "RakPeerInterface.h"
+#include "SequenceRanges.h"
 #include "SocketDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -28,9 +29,14 @@ offline handshake completes, and there is no supported way to ask it for anythin
 Once the connection record exists, everything is framed the way
 ReliabilityLayerHarness writes it.
 
-It never sends acks, so a reliable send to it keeps the Peer's record of it open until the
-record's timeout, 10 s in Release. Shorten it with SetTimeoutTime on its address. A Half-open
-record has nothing reliable outstanding until that send, so it can't time out sooner.
+It plays either side. Constructed with the server's address it is a client and opens the
+handshake; constructed without one it is a server, answers a Peer's Connect, and learns
+the Peer's address from the first datagram it receives.
+
+It sends an ack only when SendAck is called, so a reliable send to it otherwise keeps the
+Peer's record of it open until the record's timeout, 10 s in Release. Shorten it with
+SetTimeoutTime on its address. A Half-open record has nothing reliable outstanding until
+that send, so it can't time out sooner.
 */
 
 namespace RawSystemHarness {
@@ -61,18 +67,11 @@ inline void WriteConnectionRequest( BitStream& out, RakNetGUID senderGuid, RakNe
         out.WriteAlignedBytes( (const unsigned char*)password, (unsigned int)passwordLength );
 }
 
-/// Whether any message in a datagram starts with \a messageId, mirroring
-/// ReliabilityLayer::CreateInternalPacketFromBitStream far enough to walk from one
-/// message to the next. False for an ACK or NAK datagram, which carries no message at all.
-/// A split message is recognised by its first chunk, the one its id is in.
-///
-/// Needed because everything the far side sends once the connection record exists is
-/// wrapped in this framing, and it coalesces: the message a test waits for may sit behind
-/// a ping in the same datagram.
-inline bool DatagramCarriesMessage( const char* data, int length, MessageID messageId )
+/// The header of a datagram that carries messages, as DatagramHeaderFormat::Deserialize
+/// (ReliabilityLayer.cpp) reads it, leaving \a in at the first message. False for an ACK or
+/// NAK datagram.
+inline bool ReadDataDatagramHeader( BitStream& in, DatagramSequenceNumberType& datagramNumber )
 {
-    BitStream in( (unsigned char*)data, (unsigned int)length, false );
-
     bool isValid = false, isACK = false, isNAK = false;
     bool isPacketPair = false, isContinuousSend = false, needsBAndAs = false;
     if( in.Read( isValid ) == false || in.Read( isACK ) == false )
@@ -89,8 +88,58 @@ inline bool DatagramCarriesMessage( const char* data, int length, MessageID mess
     if( in.Read( sourceSystemTime ) == false )
         return false;
 #endif
+    return in.Read( datagramNumber );
+}
+
+/// Whether a datagram is an ACK whose ranges cover \a datagramNumber, read as
+/// ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer reads one.
+inline bool AckCovers( const char* data, int length, DatagramSequenceNumberType datagramNumber )
+{
+    BitStream in( (unsigned char*)data, (unsigned int)length, false );
+
+    bool isValid = false, isACK = false, hasBAndAS = false;
+    if( in.Read( isValid ) == false || in.Read( isACK ) == false || isACK == false )
+        return false;
+    if( in.Read( hasBAndAS ) == false )
+        return false;
+    in.AlignReadToByteBoundary();
+#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
+    RakNet::TimeMS sourceSystemTime = 0;
+    if( in.Read( sourceSystemTime ) == false )
+        return false;
+#endif
+    if( hasBAndAS )
+    {
+        float AS = 0;
+        if( in.Read( AS ) == false )
+            return false;
+    }
+
+    SequenceRanges<DatagramSequenceNumberType> acked;
+    if( acked.Deserialize( &in ) == false )
+        return false;
+    for( const auto& range : acked.Ranges() )
+    {
+        if( range.first <= datagramNumber && datagramNumber <= range.last )
+            return true;
+    }
+    return false;
+}
+
+/// Whether any message in a datagram starts with \a messageId, mirroring
+/// ReliabilityLayer::CreateInternalPacketFromBitStream far enough to walk from one
+/// message to the next. False for an ACK or NAK datagram, which carries no message at all.
+/// A split message is recognised by its first chunk, the one its id is in.
+///
+/// Needed because everything the far side sends once the connection record exists is
+/// wrapped in this framing, and it coalesces: the message a test waits for may sit behind
+/// a ping in the same datagram.
+inline bool DatagramCarriesMessage( const char* data, int length, MessageID messageId )
+{
+    BitStream in( (unsigned char*)data, (unsigned int)length, false );
+
     DatagramSequenceNumberType datagramNumber;
-    if( in.Read( datagramNumber ) == false )
+    if( ReadDataDatagramHeader( in, datagramNumber ) == false )
         return false;
 
     for( ;; )
@@ -160,9 +209,18 @@ inline bool DatagramCarriesMessage( const char* data, int length, MessageID mess
 class RawSystem
 {
 public:
-    /// The port is OS-assigned; the server reads it off the datagram.
+    /// A client of \a serverAddress. The port is OS-assigned; the server reads it off the
+    /// datagram.
     RawSystem( const SystemAddress& serverAddress, uint64_t guid )
-    : m_serverAddress( serverAddress )
+    : m_farAddress( serverAddress )
+    , m_guid( guid )
+    {
+    }
+
+    /// A server on an OS-assigned port, GetBoundPort, for a Peer to Connect to. The Peer's
+    /// address is the one the first datagram received comes from.
+    explicit RawSystem( uint64_t guid )
+    : m_farAddress( UNASSIGNED_SYSTEM_ADDRESS )
     , m_guid( guid )
     {
     }
@@ -172,21 +230,93 @@ public:
         RNS2_SendParameters sendParameters;
         sendParameters.data = (char*)datagram.GetData();
         sendParameters.length = (int)datagram.GetNumberOfBytesUsed();
-        sendParameters.systemAddress = m_serverAddress;
+        sendParameters.systemAddress = m_farAddress;
 
         REQUIRE( m_socket.Get().Send( &sendParameters, _FILE_AND_LINE_ ) == (RNS2SendResult)sendParameters.length );
     }
 
-    /// One connected datagram carrying \a messages, with the next datagram number.
-    void SendMessages( const std::vector<WireMessage>& messages )
+    /// One connected datagram carrying \a messages, with the next datagram number, which
+    /// is returned.
+    DatagramSequenceNumberType SendMessages( const std::vector<WireMessage>& messages )
     {
+        const DatagramSequenceNumberType datagramNumber = m_datagramNumber++;
         BitStream datagram;
-        ReliabilityLayerHarness::WriteDatagramHeader( datagram, m_datagramNumber++ );
+        ReliabilityLayerHarness::WriteDatagramHeader( datagram, datagramNumber );
         for( const WireMessage& message : messages )
         {
             ReliabilityLayerHarness::WriteWireMessage( datagram, message );
         }
         Send( datagram );
+        return datagramNumber;
+    }
+
+    /// One connected datagram carrying one unsplit RELIABLE message, with the next reliable
+    /// message number. Returns the datagram number, which is what the far side acks.
+    DatagramSequenceNumberType SendReliable( const BitStream& message )
+    {
+        WireMessage wire;
+        wire.reliability = RELIABLE;
+        wire.reliableMessageNumber = m_reliableMessageNumber++;
+        wire.isSplit = false;
+        wire.payloadData = message.GetData();
+        wire.payloadBytes = (unsigned short)message.GetNumberOfBytesUsed();
+        return SendMessages( { wire } );
+    }
+
+    /// An ACK datagram for \a datagramNumber, as ReliabilityLayer::SendACKs writes one,
+    /// without the B and AS a far side asks for only with needsBAndAs.
+    void SendAck( DatagramSequenceNumberType datagramNumber )
+    {
+        BitStream datagram;
+        datagram.Write( true );  // isValid
+        datagram.Write( true );  // isACK
+        datagram.Write( false ); // hasBAndAS
+        datagram.AlignWriteToByteBoundary();
+#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
+        datagram.Write( (RakNet::TimeMS)0 );
+#endif
+        SequenceRanges<DatagramSequenceNumberType> acked;
+        acked.Insert( datagramNumber );
+        acked.Serialize( &datagram, BYTES_TO_BITS( MAXIMUM_MTU_SIZE ), false );
+        Send( datagram );
+    }
+
+    /// The datagram number of the last datagram a wait read. Only meaningful once a
+    /// Connected wait has returned true.
+    DatagramSequenceNumberType ReceivedDatagramNumber()
+    {
+        BitStream in( (unsigned char*)m_received, (unsigned int)m_receivedLength, false );
+        DatagramSequenceNumberType datagramNumber;
+        REQUIRE( ReadDataDatagramHeader( in, datagramNumber ) );
+        return datagramNumber;
+    }
+
+    /// Whether an ack covering \a datagramNumber arrives before the budget is spent.
+    /// Everything else is discarded.
+    bool WaitForAck( DatagramSequenceNumberType datagramNumber, int millisecondsToWait )
+    {
+        const RakNet::TimeMS deadline = RakNet::GetTimeMS() + (RakNet::TimeMS)millisecondsToWait;
+        while( !ConnectionWaits::Expired( deadline ) )
+        {
+            if( WaitForDatagram( (int)( deadline - RakNet::GetTimeMS() ) ) == false )
+                return false;
+            if( AckCovers( m_received, m_receivedLength, datagramNumber ) )
+                return true;
+        }
+        return false;
+    }
+
+    /// Whether an ack covering \a datagramNumber is among the datagrams already waiting.
+    /// Reads them all and does not block, so a caller can interleave it with driving a
+    /// Peer.
+    bool PollForAck( DatagramSequenceNumberType datagramNumber )
+    {
+        while( WaitForDatagram( 0 ) )
+        {
+            if( AckCovers( m_received, m_receivedLength, datagramNumber ) )
+                return true;
+        }
+        return false;
     }
 
     /// One connected datagram carrying one unsplit UNRELIABLE message.
@@ -290,7 +420,7 @@ public:
         BitStream request2;
         request2.Write( (MessageID)ID_OPEN_CONNECTION_REQUEST_2 );
         request2.WriteAlignedBytes( (const unsigned char*)OFFLINE_MESSAGE_DATA_ID, sizeof( OFFLINE_MESSAGE_DATA_ID ) );
-        request2.Write( m_serverAddress ); // Binding address: the address being connected to
+        request2.Write( m_farAddress ); // Binding address: the address being connected to
         request2.Write( mtu );
         request2.Write( RakNetGUID( m_guid ) );
         Send( request2 );
@@ -300,6 +430,51 @@ public:
         const bool replied = WaitForMessage( ID_OPEN_CONNECTION_REPLY_2, Framing::Offline, kHandshakeBudgetMs );
         INFO( "from port " << GetBoundPort() << ", the last offline message id was " << (int)(unsigned char)m_received[0] );
         REQUIRE( replied );
+    }
+
+    /// The server's half of CompleteOfflineHandshake: ID_OPEN_CONNECTION_REQUEST_1 and _2
+    /// from a Peer that called Connect on GetBoundPort, and the replies, field for field as
+    /// ProcessOfflineNetworkPacket reads and writes them (RakPeer.cpp).
+    ///
+    /// The Peer creates its connection record, as REQUESTED_CONNECTION, when the second
+    /// reply arrives, and sends ID_CONNECTION_REQUEST RELIABLE at once.
+    void AnswerOfflineHandshake()
+    {
+        REQUIRE( WaitForMessage( ID_OPEN_CONNECTION_REQUEST_1, Framing::Offline, kHandshakeBudgetMs ) );
+
+        // The request's length is the Peer's MTU probe.
+        const uint16_t mtu = (uint16_t)( m_receivedLength + UDP_HEADER_SIZE > MAXIMUM_MTU_SIZE ? MAXIMUM_MTU_SIZE : m_receivedLength + UDP_HEADER_SIZE );
+
+        BitStream reply1;
+        reply1.Write( (MessageID)ID_OPEN_CONNECTION_REPLY_1 );
+        reply1.WriteAlignedBytes( (const unsigned char*)OFFLINE_MESSAGE_DATA_ID, sizeof( OFFLINE_MESSAGE_DATA_ID ) );
+        reply1.Write( RakNetGUID( m_guid ) );
+        reply1.Write( (unsigned char)0 ); // HasCookie: LIBCAT_SECURITY never compiles here
+        reply1.Write( mtu );
+        reply1.PadWithZeroToByteLength( mtu - reply1.GetNumberOfBytesUsed() );
+        Send( reply1 );
+
+        REQUIRE( WaitForMessage( ID_OPEN_CONNECTION_REQUEST_2, Framing::Offline, kHandshakeBudgetMs ) );
+
+        BitStream request2( (unsigned char*)m_received, (unsigned int)m_receivedLength, false );
+        request2.IgnoreBytes( sizeof( MessageID ) );
+        request2.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
+
+        SystemAddress bindingAddress;
+        uint16_t requestedMtu = 0;
+        RakNetGUID peerGuid;
+        REQUIRE( request2.Read( bindingAddress ) );
+        REQUIRE( request2.Read( requestedMtu ) );
+        REQUIRE( request2.Read( peerGuid ) );
+
+        BitStream reply2;
+        reply2.Write( (MessageID)ID_OPEN_CONNECTION_REPLY_2 );
+        reply2.WriteAlignedBytes( (const unsigned char*)OFFLINE_MESSAGE_DATA_ID, sizeof( OFFLINE_MESSAGE_DATA_ID ) );
+        reply2.Write( RakNetGUID( m_guid ) );
+        reply2.Write( m_farAddress );
+        reply2.Write( requestedMtu );
+        reply2.Write( false ); // requiresSecurityOfThisClient
+        Send( reply2 );
     }
 
     /// CompleteOfflineHandshake, then everything that takes the server's record of this
@@ -346,7 +521,7 @@ public:
 
         BitStream newIncoming;
         newIncoming.Write( (MessageID)ID_NEW_INCOMING_CONNECTION );
-        newIncoming.Write( m_serverAddress );
+        newIncoming.Write( m_farAddress );
         for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
             newIncoming.Write( UNASSIGNED_SYSTEM_ADDRESS );
         newIncoming.Write( RakNet::GetTime() ); // sendPingTime
@@ -417,14 +592,24 @@ private:
         if( received <= 0 )
             return false;
 
+        // The socket is bound on loopback, so the far side is too. Binding sends the socket
+        // four zero bytes from itself (RNS2_Berkley::BindShared), which are not the far side.
+        if( m_farAddress == UNASSIGNED_SYSTEM_ADDRESS && from.ss_family == AF_INET )
+        {
+            const unsigned short fromPort = ntohs( ( (const sockaddr_in*)&from )->sin_port );
+            if( fromPort != GetBoundPort() )
+                m_farAddress = SystemAddress( "127.0.0.1", fromPort );
+        }
+
         m_receivedLength = received;
         return true;
     }
 
     ReliabilityLayerHarness::BoundSocket m_socket;
-    SystemAddress m_serverAddress;
+    SystemAddress m_farAddress;
     uint64_t m_guid;
     DatagramSequenceNumberType m_datagramNumber = 0;
+    MessageNumberType m_reliableMessageNumber = 0;
     // The last datagram WaitForDatagram read.
     char m_received[MAXIMUM_MTU_SIZE];
     int m_receivedLength = 0;

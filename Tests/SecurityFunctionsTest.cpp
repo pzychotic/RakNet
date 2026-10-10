@@ -40,10 +40,10 @@ password or the wrong one, ID_CONNECTION_BANNED for a ban - and by the client no
 connected after it. So a refusal for the wrong reason fails, and so does a refusal that
 stops sending its Message, even though the client is still kept out.
 
-The three cases after it pin how a refusal ends. A refused attempt leaves a record on
-both sides. The client acks the refusal before it drops its own record, which lets the
-server drop its record too. If that ack never comes, the server replaces the record when
-the same address tries again. Either way a retry is never told ID_ALREADY_CONNECTED.
+The four cases after it pin how a refusal ends. A refused attempt leaves a record on
+both sides. The client acks the refusal before it drops its own record, even inside its
+Ack delay, which lets the server drop its record too. If that ack never comes, the
+server replaces the record when the same address tries again. Either way a retry is never told ID_ALREADY_CONNECTED.
 
 RakPeerInterface functions explicitly tested:
 
@@ -265,31 +265,13 @@ constexpr TimeMS kRefusalReleaseBudgetMs = 2000;
 const char kRightPassword[] = "password";
 const char kWrongPassword[] = "badpass";
 
-// Connects with the wrong password and waits for the refusal, keeping the client's network
-// thread cycling meanwhile: GetStatistics is answered on that thread and wakes it. A client
-// holds the refusal's ack back only if it sent an ack datagram within the last millisecond,
-// and cycles that come faster than that hold are what would let it drop its record before
-// acking. Hence a spin rather than ConnectionWaits::WaitForMessage, whose sleep between
-// polls leaves the thread idle.
-bool RefuseWhileBusy( RakPeerInterface* client, const SystemAddress& server )
+// Connects with the wrong password and waits for the refusal to reach the application.
+bool Refuse( RakPeerInterface* client, const SystemAddress& server )
 {
     if( client->Connect( "127.0.0.1", server.GetPort(), kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) ) != CONNECTION_ATTEMPT_STARTED )
         return false;
 
-    const TimeMS deadline = GetTimeMS() + kRefusalArrivalBudgetMs;
-    while( !ConnectionWaits::Expired( deadline ) )
-    {
-        RakNetStatistics statistics;
-        client->GetStatistics( server, &statistics );
-
-        if( Packet* refusal = ConnectionWaits::TakeMessage( client, ID_INVALID_PASSWORD ) )
-        {
-            client->DeallocatePacket( refusal );
-            return true;
-        }
-    }
-
-    return false;
+    return ConnectionWaits::WaitForMessage( client, ID_INVALID_PASSWORD, kRefusalArrivalBudgetMs );
 }
 
 // Connects with the right password, re-issuing Connect whenever the client holds nothing
@@ -330,9 +312,11 @@ TEST_CASE( "A server lets go of a Refused System once the System acks the refusa
 
     RakPeerInterface* client = peers.Client();
 
-    // The server sets its record closing in the call that sends the refusal, so from
-    // here on the record exists and only the client's ack can let it go early.
-    REQUIRE( RefuseWhileBusy( client, SystemAddress( "127.0.0.1", kServerPort ) ) );
+    // The server's half: its record closes once the refusal is acked. The client's half,
+    // acking before it lets go, is pinned by the next test. The server sets its record
+    // closing in the call that sends the refusal, so from here on the record exists and
+    // only the client's ack can let it go early.
+    REQUIRE( Refuse( client, SystemAddress( "127.0.0.1", kServerPort ) ) );
 
     const RakNetGUID clientGuid = client->GetMyGUID();
     const TimeMS deadline = GetTimeMS() + kRefusalReleaseBudgetMs;
@@ -342,6 +326,108 @@ TEST_CASE( "A server lets go of a Refused System once the System acks the refusa
     }
 
     CHECK( server->GetConnectionState( clientGuid ) == IS_NOT_CONNECTED );
+}
+
+namespace {
+
+// A Peer holds an ack back while an ack datagram went out under this long ago (ACK_GAP in
+// CCRakNetSlidingWindow.cpp).
+constexpr TimeUS kAckGapUs = 1000;
+
+// The latest a refusal goes out and still counts as reaching the client inside its Ack
+// delay. Half the ack gap, because the gap starts when the client sends the lead-in's ack,
+// before that ack reaches the test, and ends before the refusal has to be handled.
+constexpr TimeUS kRefusalInsideAckDelayUs = kAckGapUs / 2;
+
+// The raw server's GUID, which its refusal carries.
+constexpr uint64_t kRawServerGuid = 0x5E2E2;
+
+// Attempts that may send the refusal too late to land inside the Ack delay before the test
+// gives up on the trigger. A miss takes a slow test thread, so five in a row mean the
+// trigger is broken rather than unlucky.
+constexpr int kAckDelayAttempts = 5;
+
+// For an ack the client owes: a millisecond's Ack delay and a cycle. A hang guard.
+constexpr TimeMS kAckBudgetMs = 1000;
+
+struct RefusalAttempt
+{
+    // The refusal went out within kRefusalInsideAckDelayUs of the lead-in's ack arriving,
+    // so it reached the client inside its Ack delay.
+    bool insideAckDelay = false;
+    TimeUS refusalSentAfterLeadInAckUs = 0;
+    bool sawAck = false;
+};
+
+// One refused attempt against \a server, timed so the refusal's ack is held: the refusal
+// follows straight on the client's ack of a lead-in message, so it is not the first
+// datagram the client's record acks. GetStatistics wakes the client's network thread, so
+// spinning on it gives the client cycles faster than its Ack delay, any one of which would
+// let it close a record whose ack is still held.
+RefusalAttempt RefuseInsideAckDelay( RakPeerInterface* client, RawSystemHarness::RawSystem& server )
+{
+    using RawSystemHarness::RawSystem;
+
+    RefusalAttempt attempt;
+    REQUIRE( client->Connect( "127.0.0.1", server.GetBoundPort(), kWrongPassword, static_cast<int>( strlen( kWrongPassword ) ) ) == CONNECTION_ATTEMPT_STARTED );
+    const SystemAddress serverAddress( "127.0.0.1", server.GetBoundPort() );
+
+    server.AnswerOfflineHandshake();
+
+    // Acked, so nothing outgoing is waiting on the client and a close that ignores owed
+    // acks is free to happen.
+    REQUIRE( server.WaitForMessage( ID_CONNECTION_REQUEST, RawSystem::Framing::Connected, RawSystemHarness::kHandshakeBudgetMs ) );
+    server.SendAck( server.ReceivedDatagramNumber() );
+
+    // A message the client ignores, to be acked first and start its Ack delay.
+    BitStream leadIn;
+    leadIn.Write( (MessageID)ID_DETECT_LOST_CONNECTIONS );
+    REQUIRE( server.WaitForAck( server.SendReliable( leadIn ), static_cast<int>( kAckBudgetMs ) ) );
+    const TimeUS leadInAckArrived = GetTimeUS();
+
+    BitStream refusal;
+    refusal.Write( (MessageID)ID_INVALID_PASSWORD );
+    refusal.Write( RakNetGUID( kRawServerGuid ) );
+    const DatagramSequenceNumberType refusalDatagram = server.SendReliable( refusal );
+    attempt.refusalSentAfterLeadInAckUs = GetTimeUS() - leadInAckArrived;
+    attempt.insideAckDelay = attempt.refusalSentAfterLeadInAckUs < kRefusalInsideAckDelayUs;
+
+    const TimeMS deadline = GetTimeMS() + kAckBudgetMs;
+    while( !attempt.sawAck && !ConnectionWaits::Expired( deadline ) )
+    {
+        RakNetStatistics statistics;
+        client->GetStatistics( serverAddress, &statistics );
+        attempt.sawAck = server.PollForAck( refusalDatagram );
+    }
+
+    ConnectionWaits::Drain( client );
+    return attempt;
+}
+
+} // namespace
+
+TEST_CASE( "A Peer acks a refusal before it lets go of its connection record, however long its Ack delay", "[network]" )
+{
+    using RawSystemHarness::RawSystem;
+
+    PeerScope peers;
+    RakPeerInterface* client = peers.Client();
+
+    // A RakPeer server sends nothing before the refusal, so the refusal is the first
+    // datagram the client acks and its ack is never held. A raw server can send one first.
+    for( int i = 0; i < kAckDelayAttempts; i++ )
+    {
+        // A fresh server each time, so each attempt is a fresh connection on both sides.
+        RawSystem server( kRawServerGuid );
+        const RefusalAttempt attempt = RefuseInsideAckDelay( client, server );
+
+        INFO( "attempt " << i + 1 << ", the refusal went out " << attempt.refusalSentAfterLeadInAckUs << " us after the lead-in's ack arrived" );
+        REQUIRE( attempt.sawAck );
+        if( attempt.insideAckDelay )
+            return;
+    }
+
+    FAIL( "the trigger missed: every refusal went out " << kRefusalInsideAckDelayUs << " us or more after the lead-in's ack arrived" );
 }
 
 TEST_CASE( "A Peer restarted on a Refused System's port gets in although the refusal was never acked", "[network]" )
@@ -387,7 +473,7 @@ TEST_CASE( "A client refused for a wrong password gets in with the right one", "
 
     const SystemAddress serverAddress( "127.0.0.1", kServerPort );
 
-    REQUIRE( RefuseWhileBusy( client, serverAddress ) );
+    REQUIRE( Refuse( client, serverAddress ) );
 
     bool sawAlreadyConnected = false;
     CHECK( ConnectWithin( client, serverAddress, kRefusalReleaseBudgetMs, sawAlreadyConnected ) );
