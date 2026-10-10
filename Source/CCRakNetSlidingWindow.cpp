@@ -14,6 +14,7 @@
 
 #include "MTUSize.h"
 #include <stdio.h>
+#include <climits>
 #include <cmath>
 #include <stdlib.h>
 #include "RakAssert.h"
@@ -31,6 +32,12 @@ static const CCTimeType SYN = 10;
 #else
 static const CCTimeType SYN = 10000;
 #endif
+
+// cwnd stops at RESEND_BUFFER_ARRAY_LENGTH full datagrams. The resend buffer holds that many
+// reliable messages, each at most a datagram, so reliable data never has more in flight;
+// unreliable data, which it doesn't hold, sends at most that much per update. A datagram is at
+// most MAXIMUM_MTU_SIZE, so the bound keeps GetTransmissionBandwidth's int from overflowing.
+static_assert( (long long)RESEND_BUFFER_ARRAY_LENGTH * MAXIMUM_MTU_SIZE <= INT_MAX, "cwnd must fit in an int" );
 
 // ****************************************************** PUBLIC METHODS ******************************************************
 
@@ -262,6 +269,10 @@ void CCRakNetSlidingWindow::OnAck( CCTimeType curTime, CCTimeType rtt, bool hasB
         // CC PRINTF
         // printf("+ %.0f Congestion avoidance increase.\n", cwnd);
     }
+
+    const double maxCwnd = (double)RESEND_BUFFER_ARRAY_LENGTH * MAXIMUM_MTU_INCLUDING_UDP_HEADER;
+    if( cwnd > maxCwnd )
+        cwnd = maxCwnd;
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 void CCRakNetSlidingWindow::OnDuplicateAck( CCTimeType curTime, DatagramSequenceNumberType sequenceNumber )

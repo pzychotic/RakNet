@@ -1,5 +1,6 @@
 #include "CCRakNetSlidingWindow.h"
 #include "MTUSize.h"
+#include "RakNetDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,6 +14,9 @@ MTU, the same as for a resend.
 
 After a loss the window grows by about one MTU per round trip, as TCP Reno's congestion
 avoidance does: every ack adds MTU * MTU / cwnd.
+
+Without a loss the window stops growing at what the resend buffer can hold, so it stays
+open however many bytes a connection has acked.
 
 Driven directly, the way ReliabilityLayer drives it: datagrams take sequence numbers
 from GetAndIncrementNextDatagramSequenceNumber, every ack and NAK names one, and
@@ -48,8 +52,9 @@ public:
         return first;
     }
 
-    /// One round trip: sends a full window of datagrams, and every one is acked.
-    void RoundTrip()
+    /// One round trip: sends a full window of datagrams, and every one is acked. Returns how
+    /// many were sent.
+    int RoundTrip()
     {
         const int count = Window() / (int)kMtu;
         const DatagramSequenceNumberType first = Send( count );
@@ -58,6 +63,7 @@ public:
         {
             m_window.OnAck( m_now, kRtt, false, 0, 0, 0, true, first + (uint32_t)i );
         }
+        return count;
     }
 
     /// NAKs \a count datagrams from \a first on, as a receiver does for a lost burst.
@@ -143,4 +149,27 @@ TEST_CASE( "After a loss the window grows by about one MTU per round trip", "[co
     INFO( "window grew from " << start << " to " << sender.Window() << " bytes" );
     CHECK( grownMtus >= kRoundTrips - 2 );
     CHECK( grownMtus <= kRoundTrips + 2 );
+}
+
+TEST_CASE( "A window that never loses a datagram stays open", "[congestion]" )
+{
+    Sender sender;
+
+    // Every ack in slow start adds an MTU, so this many acks without a loss would take an
+    // unbounded window past INT_MAX bytes.
+    constexpr int64_t kAcks = ( int64_t( 1 ) << 31 ) / kMtu + 1;
+    int64_t acked = 0;
+    while( acked < kAcks )
+    {
+        const int sent = sender.RoundTrip();
+        if( sent <= 0 )
+        {
+            break;
+        }
+        acked += sent;
+    }
+
+    INFO( "window " << sender.Window() << " bytes after " << acked << " acks" );
+    CHECK( sender.Window() > 0 );
+    CHECK( sender.Window() <= RESEND_BUFFER_ARRAY_LENGTH * (int)kMtu );
 }
