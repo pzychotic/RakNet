@@ -468,6 +468,11 @@ replaced by code that needs no scratch buffer at all.
 standard specifiers. Replace `"%" PRINTF_64_BIT_MODIFIER "u"` with `"%" PRIu64` (and `d` with
 `PRId64`) from `<cinttypes>`, and pass the `uint64_t`/`int64_t` value without a cast.
 
+**`BITS_TO_BYTES`, `BYTES_TO_BITS`.** Source-only. The `RakNetTypes.h` macros are gone. Use
+`RakNet::BitsToBytes` and `RakNet::BytesToBits`, which are `constexpr` functions that take
+and return `BitSize_t` (`uint32_t`). The macros computed in the argument's type, so a call
+on an `int` now converts it to `uint32_t` and returns `uint32_t`.
+
 `INTERNAL_PACKET_PAGE_SIZE` is no longer read. It sized the memory pool `ReliabilityLayer`
 kept its per-message objects in, and those are now made with `new`. A build that defines
 it still compiles.

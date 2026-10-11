@@ -99,7 +99,7 @@ struct DatagramHeaderFormat
 
     static constexpr BitSize_t GetDataHeaderBitLength()
     {
-        return BYTES_TO_BITS( GetDataHeaderByteLength() );
+        return BytesToBits( GetDataHeaderByteLength() );
     }
 
     static constexpr unsigned int GetDataHeaderByteLength()
@@ -208,7 +208,7 @@ struct DatagramHeaderFormat
 // header layout or the receive-side cap and the build stops, rather than the send limit and
 // MAXIMUM_SPLIT_PACKET_COUNT quietly ceasing to agree.
 //
-// The fourth input, BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() ) == 23, is checked in
+// The fourth input, BitsToBytes( GetMaxMessageHeaderLengthBits() ) == 23, is checked in
 // ReliabilityLayer::Reset instead: it builds an InternalPacket and calls a non-constexpr
 // member, so it cannot be evaluated at compile time without moving the message-header
 // serialization logic into the header, which is not worth the coupling.
@@ -289,7 +289,7 @@ void ReliabilityLayer::Reset( bool resetVariables, int MTUSize, bool _useSecurit
         // The fourth input to MAXIMUM_MESSAGE_SIZE's derivation (MTUSize.h). The other three
         // are static_asserts above; this one is not constexpr-evaluable, so it is checked
         // here, once per connection reset, instead.
-        RakAssert( BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() ) == 23 );
+        RakAssert( BitsToBytes( GetMaxMessageHeaderLengthBits() ) == 23 );
 
         congestionManager.Init( RakNet::GetTimeUS(), MTUSize - UDP_HEADER_SIZE );
     }
@@ -507,7 +507,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     {
         for( PluginInterface2* pPlugin : messageHandlerList )
         {
-            pPlugin->OnReliabilityLayerNotification( "length <= 2 || buffer == 0", BYTES_TO_BITS( length ), systemAddress, true );
+            pPlugin->OnReliabilityLayerNotification( "length <= 2 || buffer == 0", BytesToBits( length ), systemAddress, true );
         }
         return true;
     }
@@ -541,7 +541,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     {
         for( PluginInterface2* pPlugin : messageHandlerList )
         {
-            pPlugin->OnReliabilityLayerNotification( "dhf.isValid==false", BYTES_TO_BITS( length ), systemAddress, true );
+            pPlugin->OnReliabilityLayerNotification( "dhf.isValid==false", BytesToBits( length ), systemAddress, true );
         }
 
         return true;
@@ -583,7 +583,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         {
             for( PluginInterface2* pPlugin : messageHandlerList )
             {
-                pPlugin->OnReliabilityLayerNotification( "incomingAcks.Deserialize failed", BYTES_TO_BITS( length ), systemAddress, true );
+                pPlugin->OnReliabilityLayerNotification( "incomingAcks.Deserialize failed", BytesToBits( length ), systemAddress, true );
             }
 
             return false;
@@ -596,7 +596,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
                 for( PluginInterface2* pPlugin : messageHandlerList )
                 {
-                    pPlugin->OnReliabilityLayerNotification( "incomingAcks minIndex > maxIndex or maxIndex is max value", BYTES_TO_BITS( length ), systemAddress, true );
+                    pPlugin->OnReliabilityLayerNotification( "incomingAcks minIndex > maxIndex or maxIndex is max value", BytesToBits( length ), systemAddress, true );
                 }
                 return false;
             }
@@ -608,7 +608,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     {
                         InternalPacket* ackReceipt = AllocateInternalPacket();
                         AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
-                        ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
+                        ackReceipt->dataBitLength = BytesToBits( 5 );
                         ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_ACKED;
                         memcpy( ackReceipt->data + sizeof( MessageID ), &it->sendReceiptSerial, sizeof( uint32_t ) );
                         outputQueue.push_back( ackReceipt );
@@ -654,7 +654,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         {
             for( PluginInterface2* pPlugin : messageHandlerList )
             {
-                pPlugin->OnReliabilityLayerNotification( "incomingNAKs.Deserialize failed", BYTES_TO_BITS( length ), systemAddress, true );
+                pPlugin->OnReliabilityLayerNotification( "incomingNAKs.Deserialize failed", BytesToBits( length ), systemAddress, true );
             }
 
             return false;
@@ -667,7 +667,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
                 for( PluginInterface2* pPlugin : messageHandlerList )
                 {
-                    pPlugin->OnReliabilityLayerNotification( "incomingNAKs minIndex>maxIndex", BYTES_TO_BITS( length ), systemAddress, true );
+                    pPlugin->OnReliabilityLayerNotification( "incomingNAKs minIndex>maxIndex", BytesToBits( length ), systemAddress, true );
                 }
 
                 return false;
@@ -706,7 +706,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         {
             for( PluginInterface2* pPlugin : messageHandlerList )
             {
-                pPlugin->OnReliabilityLayerNotification( "congestionManager.OnGotPacket failed", BYTES_TO_BITS( length ), systemAddress, true );
+                pPlugin->OnReliabilityLayerNotification( "congestionManager.OnGotPacket failed", BytesToBits( length ), systemAddress, true );
             }
 
             return true;
@@ -736,7 +736,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         {
             for( PluginInterface2* pPlugin : messageHandlerList )
             {
-                pPlugin->OnReliabilityLayerNotification( "CreateInternalPacketFromBitStream failed", BYTES_TO_BITS( length ), systemAddress, true );
+                pPlugin->OnReliabilityLayerNotification( "CreateInternalPacketFromBitStream failed", BytesToBits( length ), systemAddress, true );
             }
 
             return true;
@@ -773,10 +773,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     {
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-                            pPlugin->OnReliabilityLayerNotification( "internalPacket->orderingChannel >= NUMBER_OF_ORDERED_STREAMS", BYTES_TO_BITS( length ), systemAddress, true );
+                            pPlugin->OnReliabilityLayerNotification( "internalPacket->orderingChannel >= NUMBER_OF_ORDERED_STREAMS", BytesToBits( length ), systemAddress, true );
                         }
 
-                        bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                        bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
                         FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
                         ReleaseInternalPacket( internalPacket );
@@ -806,11 +806,11 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     }
                     else if( holeCount > typeRange / (DatagramSequenceNumberType)2 )
                     {
-                        bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                        bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-                            pPlugin->OnReliabilityLayerNotification( "holeCount > typeRange/(DatagramSequenceNumberType) 2", BYTES_TO_BITS( length ), systemAddress, false );
+                            pPlugin->OnReliabilityLayerNotification( "holeCount > typeRange/(DatagramSequenceNumberType) 2", BytesToBits( length ), systemAddress, false );
                         }
 
                         // Duplicate packet
@@ -827,7 +827,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                             for( PluginInterface2* pPlugin : messageHandlerList )
                             {
-                                pPlugin->OnReliabilityLayerNotification( "Higher count pushed to hasReceivedPacketQueue", BYTES_TO_BITS( length ), systemAddress, false );
+                                pPlugin->OnReliabilityLayerNotification( "Higher count pushed to hasReceivedPacketQueue", BytesToBits( length ), systemAddress, false );
                             }
 #endif
 
@@ -836,12 +836,12 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         }
                         else
                         {
-                            bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                            bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                             for( PluginInterface2* pPlugin : messageHandlerList )
                             {
-                                pPlugin->OnReliabilityLayerNotification( "Duplicate packet ignored", BYTES_TO_BITS( length ), systemAddress, false );
+                                pPlugin->OnReliabilityLayerNotification( "Duplicate packet ignored", BytesToBits( length ), systemAddress, false );
                             }
 #endif
 
@@ -860,10 +860,10 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
                             for( PluginInterface2* pPlugin : messageHandlerList )
                             {
-                                pPlugin->OnReliabilityLayerNotification( "holeCount > 1000000", BYTES_TO_BITS( length ), systemAddress, true );
+                                pPlugin->OnReliabilityLayerNotification( "holeCount > 1000000", BytesToBits( length ), systemAddress, true );
                             }
 
-                            bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                            bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
                             // Would crash due to out of memory!
                             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
@@ -875,7 +875,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-                            pPlugin->OnReliabilityLayerNotification( "Adding to hasReceivedPacketQueue later ordered message", BYTES_TO_BITS( length ), systemAddress, false );
+                            pPlugin->OnReliabilityLayerNotification( "Adding to hasReceivedPacketQueue later ordered message", BytesToBits( length ), systemAddress, false );
                         }
 #endif
 
@@ -923,7 +923,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         internalPacket->reliability == UNRELIABLE_SEQUENCED ||
                         internalPacket->reliability == RELIABLE_ORDERED ) ) )
                 {
-                    bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                    bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
                     FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
                     ReleaseInternalPacket( internalPacket );
@@ -955,7 +955,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-                            pPlugin->OnReliabilityLayerNotification( "BuildPacketFromSplitPacketList did not return anything.", BYTES_TO_BITS( length ), systemAddress, false );
+                            pPlugin->OnReliabilityLayerNotification( "BuildPacketFromSplitPacketList did not return anything.", BytesToBits( length ), systemAddress, false );
                         }
 #endif
 
@@ -975,7 +975,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
 
                     // ___________________
-                    BitStream bitStream( internalPacket->data, BITS_TO_BYTES( internalPacket->dataBitLength ), false );
+                    BitStream bitStream( internalPacket->data, BitsToBytes( internalPacket->dataBitLength ), false );
                     unsigned int receivedPacketNumber;
                     RakNet::Time receivedTime;
                     unsigned char streamNumber;
@@ -1054,7 +1054,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                                 for( PluginInterface2* pPlugin : messageHandlerList )
                                 {
-                                    pPlugin->OnReliabilityLayerNotification( "Sequenced rejected: lower than highest known value", BYTES_TO_BITS( length ), systemAddress, false );
+                                    pPlugin->OnReliabilityLayerNotification( "Sequenced rejected: lower than highest known value", BytesToBits( length ), systemAddress, false );
                                 }
 #endif
 
@@ -1068,7 +1068,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         else
                         {
                             // Push to output buffer immediately
-                            bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_PROCESSED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                            bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_PROCESSED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
                             outputQueue.push_back( internalPacket );
 
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
@@ -1106,7 +1106,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                                 ReleaseHeldBytes( OrderingHeapEntryCost( internalPacket ) );
 
 #ifdef PRINT_TO_FILE_RELIABLE_ORDERED_TEST
-                                BitStream bitStream2( internalPacket->data, BITS_TO_BYTES( internalPacket->dataBitLength ), false );
+                                BitStream bitStream2( internalPacket->data, BitsToBytes( internalPacket->dataBitLength ), false );
                                 bitStream2.IgnoreBits( 8 ); // Ignore ID_TIMESTAMP
                                 bitStream2.Read( receivedTime );
                                 bitStream2.IgnoreBits( 8 ); // Ignore ID_USER_ENUM+1
@@ -1136,7 +1136,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                                 }
 #endif
 
-                                bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_PROCESSED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                                bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_PROCESSED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
                                 outputQueue.push_back( internalPacket );
 
                                 if( internalPacket->reliability == RELIABLE_ORDERED )
@@ -1194,7 +1194,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-                            pPlugin->OnReliabilityLayerNotification( "Larger number ordered packet leaving holes", BYTES_TO_BITS( length ), systemAddress, false );
+                            pPlugin->OnReliabilityLayerNotification( "Larger number ordered packet leaving holes", BytesToBits( length ), systemAddress, false );
                         }
 #endif
 
@@ -1210,7 +1210,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-                            pPlugin->OnReliabilityLayerNotification( "Rejected older resend", BYTES_TO_BITS( length ), systemAddress, false );
+                            pPlugin->OnReliabilityLayerNotification( "Rejected older resend", BytesToBits( length ), systemAddress, false );
                         }
 #endif
 
@@ -1219,7 +1219,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     }
                 }
 
-                bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_PROCESSED].Push1( timeRead, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_PROCESSED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
                 // Nothing special about this packet.  Add it to the output queue
                 outputQueue.push_back( internalPacket );
@@ -1294,7 +1294,7 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     if( orderingChannel >= NUMBER_OF_ORDERED_STREAMS )
         orderingChannel = 0;
 
-    unsigned int numberOfBytesToSend = (unsigned int)BITS_TO_BYTES( numberOfBitsToSend );
+    unsigned int numberOfBytesToSend = (unsigned int)BitsToBytes( numberOfBitsToSend );
     if( numberOfBitsToSend == 0 )
     {
         return false;
@@ -1336,9 +1336,9 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     internalPacket->sendReceiptSerial = receipt;
 
     // Calculate if I need to split the packet
-    //  int headerLength = BITS_TO_BYTES( GetMessageHeaderLengthBits( internalPacket, true ) );
+    //  int headerLength = BitsToBytes( GetMessageHeaderLengthBits( internalPacket, true ) );
 
-    unsigned int maxDataSizeBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() );
+    unsigned int maxDataSizeBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BitsToBytes( GetMaxMessageHeaderLengthBits() );
 
     bool splitPacket = numberOfBytesToSend > maxDataSizeBytes;
 
@@ -1386,15 +1386,15 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
         return true;
     }
 
-    RakAssert( internalPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+    RakAssert( internalPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
     AddToUnreliableLinkedList( internalPacket );
 
-    RakAssert( internalPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+    RakAssert( internalPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
     RakAssert( internalPacket->messageNumberAssigned == false );
     outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( internalPacket->priority ), internalPacket } );
-    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
     statistics.messageInSendBuffer[(int)internalPacket->priority]++;
-    statistics.bytesInSendBuffer[(int)internalPacket->priority] += (double)BITS_TO_BYTES( internalPacket->dataBitLength );
+    statistics.bytesInSendBuffer[(int)internalPacket->priority] += (double)BitsToBytes( internalPacket->dataBitLength );
 
     return true;
 }
@@ -1582,7 +1582,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     RakAssert( NUMBER_OF_PRIORITIES == 4 );
     congestionManager.Update( time, hasDataToSendOrResend );
 
-    statistics.BPSLimitByOutgoingBandwidthLimit = BITS_TO_BYTES( bitsPerSecondLimit );
+    statistics.BPSLimitByOutgoingBandwidthLimit = BitsToBytes( bitsPerSecondLimit );
     statistics.BPSLimitByCongestionControl = congestionManager.GetBytesPerSecondLimitByCongestionControl();
 
     if( time > lastBpsClear +
@@ -1608,7 +1608,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
         {
             InternalPacket* ackReceipt = AllocateInternalPacket();
             AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
-            ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
+            ackReceipt->dataBitLength = BytesToBits( 5 );
             ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_LOSS;
             memcpy( ackReceipt->data + sizeof( MessageID ), &it->sendReceiptSerial, sizeof( uint32_t ) );
             outputQueue.push_back( ackReceipt );
@@ -1641,7 +1641,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
             allDatagramSizesSoFar = 0;
 
             // Keep filling datagrams until we exceed retransmission bandwidth
-            while( (int)BITS_TO_BYTES( allDatagramSizesSoFar ) < retransmissionBandwidth )
+            while( (int)BitsToBytes( allDatagramSizesSoFar ) < retransmissionBandwidth )
             {
                 pushedAnything = false;
 
@@ -1666,7 +1666,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
                         CC_DEBUG_PRINTF_2( "Rs %i ", internalPacket->reliableMessageNumber.val );
 
-                        bpsMetrics[(int)USER_MESSAGE_BYTES_RESENT].Push1( time, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                        bpsMetrics[(int)USER_MESSAGE_BYTES_RESENT].Push1( time, BitsToBytes( internalPacket->dataBitLength ) );
 
                         // Testing1
                         //                      if (internalPacket->reliability==RELIABLE_ORDERED || internalPacket->reliability==RELIABLE_ORDERED_WITH_ACK_RECEIPT)
@@ -1714,35 +1714,35 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
             statistics.isLimitedByCongestionControl = true;
         }
 
-        if( (int)BITS_TO_BYTES( allDatagramSizesSoFar ) < transmissionBandwidth )
+        if( (int)BitsToBytes( allDatagramSizesSoFar ) < transmissionBandwidth )
         {
             //  printf("S+ ");
             allDatagramSizesSoFar = 0;
 
             // Keep filling datagrams until we exceed transmission bandwidth
             while( ResendBufferOverflow() == false &&
-                ( (int)BITS_TO_BYTES( allDatagramSizesSoFar ) < transmissionBandwidth ||
-                  // This condition means if we want to send a datagram pair, and only have one datagram buffered, exceed bandwidth to add another
-                  ( countdownToNextPacketPair == 0 && datagramsToSendThisUpdateIsPair.size() == 1 ) ) )
+                   ( (int)BitsToBytes( allDatagramSizesSoFar ) < transmissionBandwidth ||
+                     // This condition means if we want to send a datagram pair, and only have one datagram buffered, exceed bandwidth to add another
+                     ( countdownToNextPacketPair == 0 && datagramsToSendThisUpdateIsPair.size() == 1 ) ) )
             {
                 // Fill with packets until MTU is reached
                 pushedAnything = false;
 
-                statistics.isLimitedByOutgoingBandwidthLimit = bitsPerSecondLimit != 0 && BITS_TO_BYTES( bitsPerSecondLimit ) < bpsMetrics[USER_MESSAGE_BYTES_SENT].GetBPS1( time );
+                statistics.isLimitedByOutgoingBandwidthLimit = bitsPerSecondLimit != 0 && BitsToBytes( bitsPerSecondLimit ) < bpsMetrics[USER_MESSAGE_BYTES_SENT].GetBPS1( time );
 
                 while( !outgoingPacketBuffer.empty() &&
                        statistics.isLimitedByOutgoingBandwidthLimit == false )
                 {
                     internalPacket = outgoingPacketBuffer.top().pPacket;
                     RakAssert( internalPacket->messageNumberAssigned == false );
-                    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
 
                     if( internalPacket->data == 0 )
                     {
                         outgoingPacketBuffer.pop();
-                        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
                         statistics.messageInSendBuffer[(int)internalPacket->priority]--;
-                        statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BITS_TO_BYTES( internalPacket->dataBitLength );
+                        statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BitsToBytes( internalPacket->dataBitLength );
                         ReleaseInternalPacket( internalPacket );
                         continue;
                     }
@@ -1753,7 +1753,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                     {
                         // Hit MTU. May still push packets if smaller ones exist at a lower priority
                         RakAssert( datagramSizeSoFar != 0 );
-                        RakAssert( internalPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                        RakAssert( internalPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
                         break;
                     }
 
@@ -1765,10 +1765,10 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                                             internalPacket->reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT;
 
                     outgoingPacketBuffer.pop();
-                    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+                    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
                     RakAssert( internalPacket->messageNumberAssigned == false );
                     statistics.messageInSendBuffer[(int)internalPacket->priority]--;
-                    statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BITS_TO_BYTES( internalPacket->dataBitLength );
+                    statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BitsToBytes( internalPacket->dataBitLength );
                     if( isReliable
                         // I thought about this and agree that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT and RELIABLE_SEQUENCED_WITH_ACK_RECEIPT is not useful unless you also know if the message was discarded.
                         // The problem is that internally, message numbers are only assigned to reliable messages, because message numbers are only used to discard duplicate message receipt and only reliable messages get sent more than once. However, without message numbers getting assigned and transmitted, there is no way to tell the sender about which messages were discarded. In fact, in looking this over I realized that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT introduced a bug, because the remote system assumes all message numbers are used (no holes). With that send type, on packetloss, a permanent hole would have been created which eventually would cause the system to discard all further packets.
@@ -1801,7 +1801,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                         }
                         resendBuffer[internalPacket->reliableMessageNumber & (uint32_t)RESEND_BUFFER_ARRAY_MASK] = internalPacket;
                         statistics.messagesInResendBuffer++;
-                        statistics.bytesInResendBuffer += BITS_TO_BYTES( internalPacket->dataBitLength );
+                        statistics.bytesInResendBuffer += BitsToBytes( internalPacket->dataBitLength );
 
                         //      printf("pre:%i ", unacknowledgedBytes);
 
@@ -1821,7 +1821,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
                     // If isReliable is false, the packet and its contents will be added to a list to be freed in ClearPacketsAndDatagrams
                     // However, the internalPacket structure will remain allocated and be in the resendBuffer list if it requires a receipt
-                    bpsMetrics[(int)USER_MESSAGE_BYTES_SENT].Push1( time, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+                    bpsMetrics[(int)USER_MESSAGE_BYTES_SENT].Push1( time, BitsToBytes( internalPacket->dataBitLength ) );
 
                     // Testing1
                     //                  if (internalPacket->reliability==RELIABLE_ORDERED || internalPacket->reliability==RELIABLE_ORDERED_WITH_ACK_RECEIPT)
@@ -2142,10 +2142,10 @@ unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSeque
         CC_DEBUG_PRINTF_2( "AckRcv %i ", messageNumber );
 
         statistics.messagesInResendBuffer--;
-        statistics.bytesInResendBuffer -= BITS_TO_BYTES( internalPacket->dataBitLength );
+        statistics.bytesInResendBuffer -= BitsToBytes( internalPacket->dataBitLength );
 
         //      orderingIndex = internalPacket->orderingIndex;
-        totalUserDataBytesAcked += (double)BITS_TO_BYTES( internalPacket->headerLength + internalPacket->dataBitLength );
+        totalUserDataBytesAcked += (double)BitsToBytes( internalPacket->headerLength + internalPacket->dataBitLength );
 
         // Return receipt if asked for
         if( internalPacket->reliability >= RELIABLE_WITH_ACK_RECEIPT &&
@@ -2153,7 +2153,7 @@ unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSeque
         {
             InternalPacket* ackReceipt = AllocateInternalPacket();
             AllocInternalPacketData( ackReceipt, 5, false, _FILE_AND_LINE_ );
-            ackReceipt->dataBitLength = BYTES_TO_BITS( 5 );
+            ackReceipt->dataBitLength = BytesToBits( 5 );
             ackReceipt->data[0] = (MessageID)ID_SND_RECEIPT_ACKED;
             memcpy( ackReceipt->data + sizeof( MessageID ), &internalPacket->sendReceiptSerial, sizeof( internalPacket->sendReceiptSerial ) );
             outputQueue.push_back( ackReceipt );
@@ -2332,7 +2332,7 @@ BitSize_t ReliabilityLayer::WriteToBitStreamFromInternalPacket( BitStream* bitSt
     }
 
     // Write the actual data.
-    bitStream->WriteAlignedBytes( (unsigned char*)internalPacket->data, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+    bitStream->WriteAlignedBytes( (unsigned char*)internalPacket->data, BitsToBytes( internalPacket->dataBitLength ) );
 
     return bitStream->GetNumberOfBitsUsed() - start;
 }
@@ -2436,8 +2436,8 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
     }
 
     // Allocate memory to hold our data
-    AllocInternalPacketData( internalPacket, BITS_TO_BYTES( internalPacket->dataBitLength ), false, _FILE_AND_LINE_ );
-    RakAssert( BITS_TO_BYTES( internalPacket->dataBitLength ) < MAXIMUM_MTU_SIZE );
+    AllocInternalPacketData( internalPacket, BitsToBytes( internalPacket->dataBitLength ), false, _FILE_AND_LINE_ );
+    RakAssert( BitsToBytes( internalPacket->dataBitLength ) < MAXIMUM_MTU_SIZE );
 
     if( internalPacket->data == 0 )
     {
@@ -2448,10 +2448,10 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
     }
 
     // Set the last byte to 0 so if ReadBits does not read a multiple of 8 the last bits are 0'ed out
-    internalPacket->data[BITS_TO_BYTES( internalPacket->dataBitLength ) - 1] = 0;
+    internalPacket->data[BitsToBytes( internalPacket->dataBitLength ) - 1] = 0;
 
     // Read the data the packet holds
-    bitStreamSucceeded = bitStream->ReadAlignedBytes( (unsigned char*)internalPacket->data, BITS_TO_BYTES( internalPacket->dataBitLength ) );
+    bitStreamSucceeded = bitStream->ReadAlignedBytes( (unsigned char*)internalPacket->data, BitsToBytes( internalPacket->dataBitLength ) );
 
     if( bitStreamSucceeded == false )
     {
@@ -2527,21 +2527,21 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 {
     // Doing all sizes in bytes in this function so I don't write partial bytes with split packets
     internalPacket->splitPacketCount = 1; // This causes GetMessageHeaderLengthBits to account for the split packet header
-    unsigned int headerLength = (unsigned int)BITS_TO_BYTES( GetMessageHeaderLengthBits( internalPacket ) );
-    unsigned int dataByteLength = (unsigned int)BITS_TO_BYTES( internalPacket->dataBitLength );
+    unsigned int headerLength = (unsigned int)BitsToBytes( GetMessageHeaderLengthBits( internalPacket ) );
+    unsigned int dataByteLength = (unsigned int)BitsToBytes( internalPacket->dataBitLength );
     // Unsigned, matching dataByteLength. As int, byteOffset was a signed product of a chunk
     // index and a block size; MAXIMUM_MESSAGE_SIZE keeps it far below INT_MAX now, but the
     // signed arithmetic is gone rather than merely made unreachable.
     unsigned int maximumSendBlockBytes, byteOffset, bytesToSend;
 
-    maximumSendBlockBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() );
+    maximumSendBlockBytes = GetMaxDatagramSizeExcludingMessageHeaderBytes() - BitsToBytes( GetMaxMessageHeaderLengthBits() );
 
     // Calculate how many packets we need to create
     internalPacket->splitPacketCount = ( ( dataByteLength - 1 ) / ( maximumSendBlockBytes ) + 1 );
 
     InternalPacketRefCountedData* refCounter = 0;
 
-    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+    RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
 
     // One pass per chunk: every step touches only this chunk, so no array of chunks is needed.
     // Chunk i copies *internalPacket before internalOrderIndex advances for that i, which
@@ -2573,17 +2573,17 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
         chunk->splitPacketIndex = splitPacketIndex;
         chunk->splitPacketId = splitPacketId;
         chunk->splitPacketCount = internalPacket->splitPacketCount;
-        RakAssert( chunk->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+        RakAssert( chunk->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
 
         // Queue the chunk for sending
         chunk->headerLength = headerLength;
         AddToUnreliableLinkedList( chunk );
-        RakAssert( chunk->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+        RakAssert( chunk->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
         RakAssert( chunk->messageNumberAssigned == false );
         outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( chunk->priority ), chunk } );
-        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BYTES_TO_BITS( MAXIMUM_MTU_SIZE ) );
+        RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
         statistics.messageInSendBuffer[(int)chunk->priority]++;
-        statistics.bytesInSendBuffer[(int)chunk->priority] += (double)BITS_TO_BYTES( chunk->dataBitLength );
+        statistics.bytesInSendBuffer[(int)chunk->priority] += (double)BitsToBytes( chunk->dataBitLength );
     }
 
     splitPacketId++; // It's ok if this wraps to 0
@@ -2710,19 +2710,19 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         // Write byteLength (4)
         // Write data, channel->splitPacketList[0]->data
         InternalPacket* progressIndicator = AllocateInternalPacket();
-        unsigned int length = sizeof( MessageID ) + sizeof( unsigned int ) * 2 + sizeof( unsigned int ) + (unsigned int)BITS_TO_BYTES( channel->firstPacket->dataBitLength );
+        unsigned int length = sizeof( MessageID ) + sizeof( unsigned int ) * 2 + sizeof( unsigned int ) + (unsigned int)BitsToBytes( channel->firstPacket->dataBitLength );
         AllocInternalPacketData( progressIndicator, length, false, __FILE__, __LINE__ );
-        progressIndicator->dataBitLength = BYTES_TO_BITS( length );
+        progressIndicator->dataBitLength = BytesToBits( length );
         progressIndicator->data[0] = (MessageID)ID_DOWNLOAD_PROGRESS;
         unsigned int temp;
         temp = channel->splitPacketList.AddedPacketsCount();
         memcpy( progressIndicator->data + sizeof( MessageID ), &temp, sizeof( unsigned int ) );
         temp = (unsigned int)internalPacket->splitPacketCount;
         memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &temp, sizeof( unsigned int ) );
-        temp = (unsigned int)BITS_TO_BYTES( channel->firstPacket->dataBitLength );
+        temp = (unsigned int)BitsToBytes( channel->firstPacket->dataBitLength );
         memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &temp, sizeof( unsigned int ) );
 
-        memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, channel->firstPacket->data, (size_t)BITS_TO_BYTES( channel->firstPacket->dataBitLength ) );
+        memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, channel->firstPacket->data, (size_t)BitsToBytes( channel->firstPacket->dataBitLength ) );
         outputQueue.push_back( progressIndicator );
     }
 
@@ -2795,7 +2795,7 @@ uint64_t ReliabilityLayer::HeldPacketCost( const InternalPacket* internalPacket 
 {
     // The record as well as the data. Charging the data alone would let a System holding
     // one-byte chunks keep around a hundred times what the budget says.
-    return sizeof( InternalPacket ) + BITS_TO_BYTES( internalPacket->dataBitLength );
+    return sizeof( InternalPacket ) + BitsToBytes( internalPacket->dataBitLength );
 }
 
 uint64_t ReliabilityLayer::OrderingHeapEntryCost( const InternalPacket* internalPacket )
@@ -3013,16 +3013,16 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
     internalPacket->dataBitLength = 0;
     for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
         internalPacket->dataBitLength += splitPacketChannel->splitPacketList.Get( j )->dataBitLength;
-    // splitPacketPartLength=BITS_TO_BYTES(splitPacketChannel->firstPacket->dataBitLength);
+    // splitPacketPartLength=BitsToBytes(splitPacketChannel->firstPacket->dataBitLength);
 
-    internalPacket->data = (unsigned char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( internalPacket->dataBitLength ), _FILE_AND_LINE_ );
+    internalPacket->data = (unsigned char*)rakMalloc_Ex( (size_t)BitsToBytes( internalPacket->dataBitLength ), _FILE_AND_LINE_ );
     internalPacket->allocationScheme = InternalPacket::NORMAL;
 
     BitSize_t offset = 0;
     for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
     {
         splitPacket = splitPacketChannel->splitPacketList.Get( j );
-        memcpy( internalPacket->data + BITS_TO_BYTES( offset ), splitPacket->data, (size_t)BITS_TO_BYTES( splitPacket->dataBitLength ) );
+        memcpy( internalPacket->data + BitsToBytes( offset ), splitPacket->data, (size_t)BitsToBytes( splitPacket->dataBitLength ) );
         offset += splitPacket->dataBitLength;
     }
 
@@ -3071,7 +3071,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketCopy( InternalPacket* orig
 
     if( dataByteLength > 0 )
     {
-        AllocInternalPacketData( copy, BITS_TO_BYTES( dataByteLength ), false, _FILE_AND_LINE_ );
+        AllocInternalPacketData( copy, BitsToBytes( dataByteLength ), false, _FILE_AND_LINE_ );
         memcpy( copy->data, original->data + dataByteOffset, dataByteLength );
     }
     else
@@ -3215,9 +3215,9 @@ void ReliabilityLayer::ResetPacketsAndDatagrams( void )
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::PushPacket( CCTimeType time, InternalPacket* internalPacket, bool isReliable )
 {
-    BitSize_t bitsForThisPacket = BYTES_TO_BITS( BITS_TO_BYTES( internalPacket->dataBitLength ) + BITS_TO_BYTES( internalPacket->headerLength ) );
+    BitSize_t bitsForThisPacket = BytesToBits( BitsToBytes( internalPacket->dataBitLength ) + BitsToBytes( internalPacket->headerLength ) );
     datagramSizeSoFar += bitsForThisPacket;
-    RakAssert( BITS_TO_BYTES( datagramSizeSoFar ) < MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
+    RakAssert( BitsToBytes( datagramSizeSoFar ) < MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
     allDatagramSizesSoFar += bitsForThisPacket;
     packetsToSendThisUpdate.push_back( internalPacket );
     packetsToDeallocThisUpdate.push_back( isReliable == false );
@@ -3233,7 +3233,7 @@ void ReliabilityLayer::PushPacket( CCTimeType time, InternalPacket* internalPack
     //      RakNet::TimeMS diff = curTime-t;
     //  }
 
-    congestionManager.OnSendBytes( time, BITS_TO_BYTES( internalPacket->dataBitLength ) + BITS_TO_BYTES( internalPacket->headerLength ) );
+    congestionManager.OnSendBytes( time, BitsToBytes( internalPacket->dataBitLength ) + BitsToBytes( internalPacket->headerLength ) );
 }
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::PushDatagram( void )
@@ -3242,8 +3242,8 @@ void ReliabilityLayer::PushDatagram( void )
     {
         packetsToSendThisUpdateDatagramBoundaries.push_back( static_cast<uint32_t>( packetsToSendThisUpdate.size() ) );
         datagramsToSendThisUpdateIsPair.push_back( false );
-        RakAssert( BITS_TO_BYTES( datagramSizeSoFar ) < MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
-        datagramSizesInBytes.push_back( BITS_TO_BYTES( datagramSizeSoFar ) );
+        RakAssert( BitsToBytes( datagramSizeSoFar ) < MAXIMUM_MTU_SIZE - UDP_HEADER_SIZE );
+        datagramSizesInBytes.push_back( BitsToBytes( datagramSizeSoFar ) );
         datagramSizeSoFar = 0;
 
         // Disable packet pairs
@@ -3322,8 +3322,8 @@ void ReliabilityLayer::RemoveFromList( InternalPacket* internalPacket, bool modi
 
     if( modifyUnacknowledgedBytes )
     {
-        RakAssert( unacknowledgedBytes >= BITS_TO_BYTES( internalPacket->headerLength + internalPacket->dataBitLength ) );
-        unacknowledgedBytes -= BITS_TO_BYTES( internalPacket->headerLength + internalPacket->dataBitLength );
+        RakAssert( unacknowledgedBytes >= BitsToBytes( internalPacket->headerLength + internalPacket->dataBitLength ) );
+        unacknowledgedBytes -= BitsToBytes( internalPacket->headerLength + internalPacket->dataBitLength );
         // printf("-unacknowledgedBytes:%i ", unacknowledgedBytes);
 
 
@@ -3335,7 +3335,7 @@ void ReliabilityLayer::AddToListTail( InternalPacket* internalPacket, bool modif
 {
     if( modifyUnacknowledgedBytes )
     {
-        unacknowledgedBytes += BITS_TO_BYTES( internalPacket->headerLength + internalPacket->dataBitLength );
+        unacknowledgedBytes += BitsToBytes( internalPacket->headerLength + internalPacket->dataBitLength );
         // printf("+unacknowledgedBytes:%i ", unacknowledgedBytes);
     }
 
@@ -3646,7 +3646,7 @@ unsigned int ReliabilityLayer::GetMaxDatagramSizeExcludingMessageHeaderBytes( vo
 //-------------------------------------------------------------------------------------------------------
 BitSize_t ReliabilityLayer::GetMaxDatagramSizeExcludingMessageHeaderBits( void )
 {
-    return BYTES_TO_BITS( GetMaxDatagramSizeExcludingMessageHeaderBytes() );
+    return BytesToBits( GetMaxDatagramSizeExcludingMessageHeaderBytes() );
 }
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::InitHeapWeights( void )

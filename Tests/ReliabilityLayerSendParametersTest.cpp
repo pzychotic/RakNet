@@ -27,7 +27,7 @@ TEST_CASE( "ReliabilityLayer::Send repairs a priority of NUMBER_OF_PRIORITIES to
     // Two sends, so the second finds the first still buffered.
     for( int i = 0; i < 2; i++ )
     {
-        REQUIRE( layer.Layer().Send( data, BYTES_TO_BITS( sizeof( data ) ), (PacketPriority)NUMBER_OF_PRIORITIES, RELIABLE, 0, true, kMTUSize,
+        REQUIRE( layer.Layer().Send( data, BytesToBits( sizeof( data ) ), (PacketPriority)NUMBER_OF_PRIORITIES, RELIABLE, 0, true, kMTUSize,
                                      RakNet::GetTimeUS(), 0 ) );
     }
 

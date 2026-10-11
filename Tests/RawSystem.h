@@ -206,8 +206,8 @@ inline bool DatagramCarriesMessage( const char* data, int length, MessageID mess
                 return false;
         }
 
-        const unsigned int dataBytes = (unsigned int)BITS_TO_BYTES( dataBitLength );
-        if( in.GetNumberOfUnreadBits() < BYTES_TO_BITS( dataBytes ) )
+        const unsigned int dataBytes = (unsigned int)BitsToBytes( dataBitLength );
+        if( in.GetNumberOfUnreadBits() < BytesToBits( dataBytes ) )
             return false;
 
         MessageID received = 0;
@@ -291,7 +291,7 @@ public:
 #endif
         SequenceRanges<DatagramSequenceNumberType> acked;
         acked.Insert( datagramNumber );
-        acked.Serialize( &datagram, BYTES_TO_BITS( MAXIMUM_MTU_SIZE ), false );
+        acked.Serialize( &datagram, BytesToBits( MAXIMUM_MTU_SIZE ), false );
         Send( datagram );
     }
 

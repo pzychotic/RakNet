@@ -183,7 +183,7 @@ void PacketLogger::OnInternalPacket( InternalPacket* internalPacket, unsigned fr
 
     // A Timestamped Message's ID follows its time. One with no byte there has no ID and is logged by data[0].
     constexpr unsigned int idOffset = sizeof( MessageID ) + sizeof( RakNet::Time );
-    if( internalPacket->data[0] == ID_TIMESTAMP && BITS_TO_BYTES( internalPacket->dataBitLength ) > idOffset )
+    if( internalPacket->data[0] == ID_TIMESTAMP && BitsToBytes( internalPacket->dataBitLength ) > idOffset )
     {
         FormatLine( str, sendType, "Tms", reliableMessageNumber, frameNumber, internalPacket->data[idOffset], internalPacket->dataBitLength, (unsigned long long)time, localSystemAddress, remoteSystemAddress, internalPacket->splitPacketId, internalPacket->splitPacketIndex, internalPacket->splitPacketCount, internalPacket->orderingIndex );
     }

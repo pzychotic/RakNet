@@ -108,7 +108,7 @@ TEST_CASE( "A rejected password produces an ID_INVALID_PASSWORD carrying the ser
     client->DeallocatePacket( rejection );
 
     // The defect, stated directly. Nine bytes were built and nine BITS were sent,
-    // so BITS_TO_BYTES rounded the arrival up to two.
+    // so BitsToBytes rounded the arrival up to two.
     INFO( "received " << length << " bytes, expected " << kExpectedLength );
     CHECK( length == kExpectedLength );
 

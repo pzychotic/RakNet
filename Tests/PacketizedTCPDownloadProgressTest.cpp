@@ -118,7 +118,7 @@ TEST_CASE( "PacketizedTCP's first ID_DOWNLOAD_PROGRESS reports only the bytes bu
     memcpy( &partLength, progress->data + sizeof( MessageID ) + 2 * sizeof( unsigned int ), sizeof( partLength ) );
     CHECK( partLength == kPayloadLength );
     CHECK( progress->length == kPrefixLength + kPayloadLength );
-    CHECK( progress->bitSize == BYTES_TO_BITS( progress->length ) );
+    CHECK( progress->bitSize == BytesToBits( progress->length ) );
 
     // Compared over the whole reported length, so a chunk reported too long shows its fill.
     const std::vector<unsigned char> chunk( progress->data + kPrefixLength, progress->data + progress->length );

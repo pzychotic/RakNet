@@ -118,7 +118,7 @@ void BitStream::Reset( void )
 
     if( numberOfBitsUsed > 0 )
     {
-        //  memset(data, 0, BITS_TO_BYTES(numberOfBitsUsed));
+        //  memset(data, 0, BitsToBytes(numberOfBitsUsed));
     }
 
     // Don't free memory here for speed efficiency
@@ -130,7 +130,7 @@ void BitStream::Reset( void )
 
     //data=(unsigned char*)rakMalloc_Ex(1, _FILE_AND_LINE_);
     // if (numberOfBitsAllocated>0)
-    //  memset(data, 0, BITS_TO_BYTES(numberOfBitsAllocated));
+    //  memset(data, 0, BitsToBytes(numberOfBitsAllocated));
 }
 
 // Write an array or casted stream
@@ -142,9 +142,9 @@ void BitStream::Write( const char* inputByteArray, const unsigned int numberOfBy
     // Optimization:
     if( ( numberOfBitsUsed & 7 ) == 0 )
     {
-        AddBitsAndReallocate( BYTES_TO_BITS( numberOfBytes ) );
-        memcpy( data + BITS_TO_BYTES( numberOfBitsUsed ), inputByteArray, (size_t)numberOfBytes );
-        numberOfBitsUsed += BYTES_TO_BITS( numberOfBytes );
+        AddBitsAndReallocate( BytesToBits( numberOfBytes ) );
+        memcpy( data + BitsToBytes( numberOfBitsUsed ), inputByteArray, (size_t)numberOfBytes );
+        numberOfBitsUsed += BytesToBits( numberOfBytes );
     }
     else
     {
@@ -165,9 +165,9 @@ void BitStream::Write( BitStream* bitStream, BitSize_t numberOfBits )
         int readOffsetBytes = bitStream->GetReadOffset() / 8;
         int numBytes = numberOfBits / 8;
         memcpy( data + ( numberOfBitsUsed >> 3 ), bitStream->GetData() + readOffsetBytes, numBytes );
-        numberOfBits -= BYTES_TO_BITS( numBytes );
-        bitStream->SetReadOffset( BYTES_TO_BITS( numBytes + readOffsetBytes ) );
-        numberOfBitsUsed += BYTES_TO_BITS( numBytes );
+        numberOfBits -= BytesToBits( numBytes );
+        bitStream->SetReadOffset( BytesToBits( numBytes + readOffsetBytes ) );
+        numberOfBitsUsed += BytesToBits( numBytes );
     }
 
     while( numberOfBits-- > 0 && bitStream->readOffset + 1 <= bitStream->numberOfBitsUsed )
@@ -532,7 +532,7 @@ bool BitStream::ReadBits( unsigned char* inOutByteArray, BitSize_t numberOfBitsT
 
     BitSize_t offset = 0;
 
-    memset( inOutByteArray, 0, (size_t)BITS_TO_BYTES( numberOfBitsToRead ) );
+    memset( inOutByteArray, 0, (size_t)BitsToBytes( numberOfBitsToRead ) );
 
     while( numberOfBitsToRead > 0 )
     {
@@ -665,9 +665,9 @@ void BitStream::AddBitsAndReallocate( const BitSize_t numberOfBitsToWrite )
         if( newNumberOfBitsAllocated - ( numberOfBitsToWrite + numberOfBitsUsed ) > 1048576 )
             newNumberOfBitsAllocated = numberOfBitsToWrite + numberOfBitsUsed + 1048576;
 
-        //      BitSize_t newByteOffset = BITS_TO_BYTES( numberOfBitsAllocated );
+        //      BitSize_t newByteOffset = BitsToBytes( numberOfBitsAllocated );
         // Use realloc and free so we are more efficient than delete and new for resizing
-        BitSize_t amountToAllocate = BITS_TO_BYTES( newNumberOfBitsAllocated );
+        BitSize_t amountToAllocate = BitsToBytes( newNumberOfBitsAllocated );
         if( data == (unsigned char*)stackData )
         {
             if( amountToAllocate > BITSTREAM_STACK_ALLOCATION_SIZE )
@@ -676,7 +676,7 @@ void BitStream::AddBitsAndReallocate( const BitSize_t numberOfBitsToWrite )
                 RakAssert( data );
 
                 // need to copy the stack data over to our new memory area too
-                memcpy( (void*)data, (void*)stackData, (size_t)BITS_TO_BYTES( numberOfBitsAllocated ) );
+                memcpy( (void*)data, (void*)stackData, (size_t)BitsToBytes( numberOfBitsAllocated ) );
             }
         }
         else
@@ -701,9 +701,9 @@ void BitStream::PadWithZeroToByteLength( unsigned int bytes )
     {
         AlignWriteToByteBoundary();
         unsigned int numToWrite = bytes - GetNumberOfBytesUsed();
-        AddBitsAndReallocate( BYTES_TO_BITS( numToWrite ) );
-        memset( data + BITS_TO_BYTES( numberOfBitsUsed ), 0, (size_t)numToWrite );
-        numberOfBitsUsed += BYTES_TO_BITS( numToWrite );
+        AddBitsAndReallocate( BytesToBits( numToWrite ) );
+        memset( data + BitsToBytes( numberOfBitsUsed ), 0, (size_t)numToWrite );
+        numberOfBitsUsed += BytesToBits( numToWrite );
     }
 }
 
@@ -879,7 +879,7 @@ void BitStream::PrintBits( char* out ) const
     }
 
     unsigned int strIndex = 0;
-    for( BitSize_t counter = 0; counter < BITS_TO_BYTES( numberOfBitsUsed ) && strIndex < 2000; counter++ )
+    for( BitSize_t counter = 0; counter < BitsToBytes( numberOfBitsUsed ) && strIndex < 2000; counter++ )
     {
         BitSize_t stop;
 
@@ -933,8 +933,8 @@ BitSize_t BitStream::CopyData( unsigned char** _data ) const
 {
     RakAssert( numberOfBitsUsed > 0 );
 
-    *_data = (unsigned char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsUsed ), _FILE_AND_LINE_ );
-    memcpy( *_data, data, sizeof( unsigned char ) * (size_t)( BITS_TO_BYTES( numberOfBitsUsed ) ) );
+    *_data = (unsigned char*)rakMalloc_Ex( (size_t)BitsToBytes( numberOfBitsUsed ), _FILE_AND_LINE_ );
+    memcpy( *_data, data, sizeof( unsigned char ) * (size_t)( BitsToBytes( numberOfBitsUsed ) ) );
     return numberOfBitsUsed;
 }
 
@@ -946,7 +946,7 @@ void BitStream::IgnoreBits( const BitSize_t numberOfBits )
 
 void BitStream::IgnoreBytes( const unsigned int numberOfBytes )
 {
-    IgnoreBits( BYTES_TO_BITS( numberOfBytes ) );
+    IgnoreBits( BytesToBits( numberOfBytes ) );
 }
 
 // Move the write pointer to a position on the array.  Dangerous if you don't know what you are doing!
@@ -965,10 +965,10 @@ void BitStream::AssertCopyData( void )
 
         if( numberOfBitsAllocated > 0 )
         {
-            unsigned char* newdata = (unsigned char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsAllocated ), _FILE_AND_LINE_ );
+            unsigned char* newdata = (unsigned char*)rakMalloc_Ex( (size_t)BitsToBytes( numberOfBitsAllocated ), _FILE_AND_LINE_ );
             RakAssert( data );
 
-            memcpy( newdata, data, (size_t)BITS_TO_BYTES( numberOfBitsAllocated ) );
+            memcpy( newdata, data, (size_t)BitsToBytes( numberOfBitsAllocated ) );
             data = newdata;
         }
 
@@ -1183,7 +1183,7 @@ bool BitStream::Deserialize( std::string& str )
     // untrusted, and the string must not be grown past the bytes actually present.
     // Aligning first is what makes the two checks identical.
     AlignReadToByteBoundary();
-    if( readOffset + BYTES_TO_BITS( size ) > numberOfBitsUsed )
+    if( readOffset + BytesToBits( size ) > numberOfBitsUsed )
         return false;
 
     // resize can only fail by throwing, which ADR-0004 rules out reporting. No

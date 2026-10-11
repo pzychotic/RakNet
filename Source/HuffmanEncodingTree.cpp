@@ -234,7 +234,7 @@ void HuffmanEncodingTree::DecodeArray( unsigned char* input, BitSize_t sizeInBit
     if( sizeInBits <= 0 )
         return;
 
-    BitStream bitStream( input, BITS_TO_BYTES( sizeInBits ), false );
+    BitStream bitStream( input, BitsToBytes( sizeInBits ), false );
 
     currentNode = root;
 

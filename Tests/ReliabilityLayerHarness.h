@@ -94,7 +94,7 @@ inline void WriteWireMessage( BitStream& out, const WireMessage& message )
     out.Write( message.isSplit ); // hasSplitPacket
     out.AlignWriteToByteBoundary();
 
-    unsigned short dataBitLength = (unsigned short)BYTES_TO_BITS( message.payloadBytes );
+    unsigned short dataBitLength = (unsigned short)BytesToBits( message.payloadBytes );
     out.WriteAlignedVar16( (const char*)&dataBitLength );
 
     if( message.reliability == RELIABLE ||

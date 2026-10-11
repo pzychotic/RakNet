@@ -645,7 +645,7 @@ public:
     inline BitSize_t GetWriteOffset( void ) const { return numberOfBitsUsed; }
 
     /// \brief Returns the length in bytes of the stream
-    inline BitSize_t GetNumberOfBytesUsed( void ) const { return BITS_TO_BYTES( numberOfBitsUsed ); }
+    inline BitSize_t GetNumberOfBytesUsed( void ) const { return BitsToBytes( numberOfBitsUsed ); }
 
     /// \brief Returns the number of bits into the stream that we have read
     inline BitSize_t GetReadOffset( void ) const { return readOffset; }
@@ -942,7 +942,7 @@ bool BitStream::SerializeCasted( bool writeToBitstream, sourceType& value )
 template<class templateType>
 bool BitStream::SerializeBitsFromIntegerRange( bool writeToBitstream, templateType& value, const templateType minimum, const templateType maximum, bool allowOutsideRange )
 {
-    int requiredBits = BYTES_TO_BITS( sizeof( templateType ) ) - NumberOfLeadingZeroes( templateType( maximum - minimum ) );
+    int requiredBits = BytesToBits( sizeof( templateType ) ) - NumberOfLeadingZeroes( templateType( maximum - minimum ) );
     return SerializeBitsFromIntegerRange( writeToBitstream, value, minimum, maximum, requiredBits, allowOutsideRange );
 }
 template<class templateType>
@@ -1556,7 +1556,7 @@ void BitStream::WriteCasted( const sourceType& value )
 template<class templateType>
 void BitStream::WriteBitsFromIntegerRange( const templateType value, const templateType minimum, const templateType maximum, bool allowOutsideRange )
 {
-    int requiredBits = BYTES_TO_BITS( sizeof( templateType ) ) - NumberOfLeadingZeroes( templateType( maximum - minimum ) );
+    int requiredBits = BytesToBits( sizeof( templateType ) ) - NumberOfLeadingZeroes( templateType( maximum - minimum ) );
     WriteBitsFromIntegerRange( value, minimum, maximum, requiredBits, allowOutsideRange );
 }
 template<class templateType>
@@ -1683,7 +1683,7 @@ bool BitStream::ReadCasted( sourceType& value )
 template<class templateType>
 bool BitStream::ReadBitsFromIntegerRange( templateType& value, const templateType minimum, const templateType maximum, bool allowOutsideRange )
 {
-    int requiredBits = BYTES_TO_BITS( sizeof( templateType ) ) - NumberOfLeadingZeroes( templateType( maximum - minimum ) );
+    int requiredBits = BytesToBits( sizeof( templateType ) ) - NumberOfLeadingZeroes( templateType( maximum - minimum ) );
     return ReadBitsFromIntegerRange( value, minimum, maximum, requiredBits, allowOutsideRange );
 }
 template<class templateType>

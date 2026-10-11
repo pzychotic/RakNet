@@ -121,7 +121,7 @@ std::vector<std::string> LogTimestampedMessage( unsigned int claimedBytes )
 
     InternalPacket packet{};
     packet.data = buffer;
-    packet.dataBitLength = BYTES_TO_BITS( claimedBytes );
+    packet.dataBitLength = BytesToBits( claimedBytes );
     packet.reliability = UNRELIABLE;
     packet.allocationScheme = InternalPacket::STACK;
 
@@ -172,7 +172,7 @@ TEST_CASE( "PacketLogger logs a line with the longest prefix and suffix", "[pack
     unsigned char buffer[1] = { ID_USER_PACKET_ENUM };
     InternalPacket packet{};
     packet.data = buffer;
-    packet.dataBitLength = BYTES_TO_BITS( 1 );
+    packet.dataBitLength = BytesToBits( 1 );
     packet.reliability = RELIABLE_ORDERED;
     packet.allocationScheme = InternalPacket::STACK;
 

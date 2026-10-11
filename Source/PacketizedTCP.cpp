@@ -225,7 +225,7 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
         bytes.Consume( sizeof( PTCPHeader ) );
         Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
         outgoingPacket->length = dataLength;
-        outgoingPacket->bitSize = BYTES_TO_BITS( dataLength );
+        outgoingPacket->bitSize = BytesToBits( dataLength );
         outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
         outgoingPacket->systemAddress = systemAddressFromPacket;
         outgoingPacket->deleteData = false; // Did not come from the network
@@ -263,7 +263,7 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
                                     sizeof( unsigned int ) * 2 +
                                     sizeof( unsigned int ) +
                                     oneChunkSize;
-        outgoingPacket->bitSize = BYTES_TO_BITS( outgoingPacket->length );
+        outgoingPacket->bitSize = BytesToBits( outgoingPacket->length );
         outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
         outgoingPacket->systemAddress = incomingPacket.systemAddress;
         outgoingPacket->deleteData = false;

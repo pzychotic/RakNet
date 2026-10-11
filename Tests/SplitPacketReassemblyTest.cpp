@@ -135,7 +135,7 @@ void CheckOrdinarySplitMessageReassembles( LayerUnderTest& layer )
     second.payload = 'y';
     CHECK( layer.DeliverChunk( second ) );
 
-    CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 2 ) );
+    CHECK( layer.ReceiveBits() == BytesToBits( 2 ) );
 }
 
 /// Deliver every chunk of \a message but the last, in order, and check what each of those
@@ -298,7 +298,7 @@ TEST_CASE( "A chunk disagreeing with its channel's split packet count is dropped
     second.splitPacketIndex = 1;
     second.payload = 'y';
     CHECK( layer.DeliverChunk( second ) );
-    CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 2 ) );
+    CHECK( layer.ReceiveBits() == BytesToBits( 2 ) );
 
     CHECK_FALSE( layer.IsDeadConnection() );
 }
@@ -362,7 +362,7 @@ TEST_CASE( "A split packet channel that stalls is reaped, whatever its reliabili
         CHECK( layer.ReceiveBits() == 0 );
 
         CHECK( layer.DeliverChunk( second ) );
-        CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 2 ) );
+        CHECK( layer.ReceiveBits() == BytesToBits( 2 ) );
     }
 
     SECTION( "the second chunk after the timeout finds nothing to complete" )
@@ -428,7 +428,7 @@ TEST_CASE( "A partial split message reports download progress only when an inter
         // that had lost the ability to report progress at all.
         layer.SetProgressInterval( 1 );
 
-        CheckIncompleteArrivalsQueue( layer, chunk, BYTES_TO_BITS( kProgressPacketBytes ) );
+        CheckIncompleteArrivalsQueue( layer, chunk, BytesToBits( kProgressPacketBytes ) );
     }
 
     SECTION( "an interval of 2 reports every second incomplete arrival" )
@@ -441,7 +441,7 @@ TEST_CASE( "A partial split message reports download progress only when an inter
 
         chunk.splitPacketIndex = 1;
         CHECK( layer.DeliverChunk( chunk ) );
-        CHECK( layer.ReceiveBits() == BYTES_TO_BITS( kProgressPacketBytes ) );
+        CHECK( layer.ReceiveBits() == BytesToBits( kProgressPacketBytes ) );
     }
 
     SECTION( "a Reset clears an interval a previous connection had set" )
@@ -459,7 +459,7 @@ TEST_CASE( "A partial split message reports download progress only when an inter
     // packet: the block is guarded on the message being incomplete.
     chunk.splitPacketIndex = 2;
     CHECK( layer.DeliverChunk( chunk ) );
-    CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 3 ) );
+    CHECK( layer.ReceiveBits() == BytesToBits( 3 ) );
     CHECK( layer.ReceiveBits() == 0 );
 
     CHECK_FALSE( layer.IsDeadConnection() );

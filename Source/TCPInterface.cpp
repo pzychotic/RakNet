@@ -880,7 +880,7 @@ Packet* TCPInterface::AllocatePacket( unsigned dataSize )
     Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
     p->data = data;
     p->length = dataSize;
-    p->bitSize = BYTES_TO_BITS( dataSize );
+    p->bitSize = BytesToBits( dataSize );
     p->deleteData = false;
     p->guid = UNASSIGNED_RAKNET_GUID;
     p->systemAddress = UNASSIGNED_SYSTEM_ADDRESS;

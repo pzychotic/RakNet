@@ -148,7 +148,7 @@ Packet* RakPeer::AllocPacket( unsigned dataSize, const char* file, unsigned int 
     //  Packet *p = &((PacketFollowedByData *)data)->p;
     //  p->data=((PacketFollowedByData *)data)->data;
     //  p->length=dataSize;
-    //  p->bitSize=BYTES_TO_BITS(dataSize);
+    //  p->bitSize=BytesToBits(dataSize);
     //  p->deleteData=false;
     //  p->guid=UNASSIGNED_RAKNET_GUID;
     //  return p;
@@ -167,7 +167,7 @@ Packet* RakPeer::AllocPacket( unsigned dataSize, unsigned char* data )
     Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
     p->data = data;
     p->length = dataSize;
-    p->bitSize = BYTES_TO_BITS( dataSize );
+    p->bitSize = BytesToBits( dataSize );
     p->deleteData = true;
     p->guid = UNASSIGNED_RAKNET_GUID;
     p->wasGeneratedLocally = false;
@@ -1036,10 +1036,10 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
         return usedSendReceipt;
     }
 
-    // BYTES_TO_BITS on a BitSize_t, not `length * 8`: the latter is int arithmetic and is
+    // BytesToBits on a BitSize_t, not `length * 8`: the latter is int arithmetic and is
     // undefined for length > 268435455, which the size check above now rejects - but the
     // conversion is gone rather than merely made unreachable.
-    SendBuffered( data, BYTES_TO_BITS( (BitSize_t)length ), priority, reliability, orderingChannel, systemIdentifier, broadcast, RemoteSystemStruct::NO_ACTION, usedSendReceipt );
+    SendBuffered( data, BytesToBits( (BitSize_t)length ), priority, reliability, orderingChannel, systemIdentifier, broadcast, RemoteSystemStruct::NO_ACTION, usedSendReceipt );
 
     return usedSendReceipt;
 }
@@ -2290,7 +2290,7 @@ void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, uns
         bsp.ttl = ttl;
         for( PluginInterface2* pPlugin : pluginListNTS )
         {
-            pPlugin->OnDirectSocketSend( (const char*)bsp.data, BYTES_TO_BITS( bsp.length ), bsp.systemAddress );
+            pPlugin->OnDirectSocketSend( (const char*)bsp.data, BytesToBits( bsp.length ), bsp.systemAddress );
         }
         socketList[realIndex]->Send( &bsp, _FILE_AND_LINE_ );
     }
@@ -2586,7 +2586,7 @@ bool RakPeer::SendOutOfBand( const char* host, unsigned short remotePort, const 
     bsp.systemAddress.FixForIPVersion( socketList[realIndex]->GetBoundAddress() );
     for( PluginInterface2* pPlugin : pluginListNTS )
     {
-        pPlugin->OnDirectSocketSend( (const char*)bsp.data, BYTES_TO_BITS( bsp.length ), bsp.systemAddress );
+        pPlugin->OnDirectSocketSend( (const char*)bsp.data, BytesToBits( bsp.length ), bsp.systemAddress );
     }
     socketList[realIndex]->Send( &bsp, _FILE_AND_LINE_ );
 
@@ -3032,8 +3032,8 @@ bool RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
     }
 #endif // LIBCAT_SECURITY
 
-    unsigned char* password = bs.GetData() + BITS_TO_BYTES( bs.GetReadOffset() );
-    int passwordLength = byteSize - BITS_TO_BYTES( bs.GetReadOffset() );
+    unsigned char* password = bs.GetData() + BitsToBytes( bs.GetReadOffset() );
+    int passwordLength = byteSize - BitsToBytes( bs.GetReadOffset() );
     bool passwordMatches;
     {
         std::lock_guard<std::mutex> guard( incomingPasswordMutex );
@@ -3991,7 +3991,7 @@ bool RakPeer::IsClosing( RemoteSystemStruct::ConnectMode connectMode )
 void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
     BufferedCommandStruct bcs{};
-    bcs.data = (char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsToSend ), _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
+    bcs.data = (char*)rakMalloc_Ex( (size_t)BitsToBytes( numberOfBitsToSend ), _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
     if( bcs.data == 0 )
     {
         notifyOutOfMemory( _FILE_AND_LINE_ );
@@ -4002,7 +4002,7 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
-    memcpy( bcs.data, data, (size_t)BITS_TO_BYTES( numberOfBitsToSend ) );
+    memcpy( bcs.data, data, (size_t)BitsToBytes( numberOfBitsToSend ) );
     bcs.numberOfBitsToSend = numberOfBitsToSend;
     bcs.priority = priority;
     bcs.reliability = reliability;
@@ -4072,7 +4072,7 @@ void RakPeer::SendBufferedList( const char** data, const int* lengths, const int
 
     BufferedCommandStruct bcs{};
     bcs.data = dataAggregate;
-    bcs.numberOfBitsToSend = BYTES_TO_BITS( (BitSize_t)totalLength );
+    bcs.numberOfBitsToSend = BytesToBits( (BitSize_t)totalLength );
     bcs.priority = priority;
     bcs.reliability = reliability;
     bcs.orderingChannel = orderingChannel;
@@ -4482,7 +4482,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             if( data[sizeof( OFFLINE_MESSAGE_DATA_ID ) + sizeof( MessageID ) + RakNetGUID::size()] == ID_ADVERTISE_SYSTEM )
             {
                 packet->length--;
-                packet->bitSize = BYTES_TO_BITS( packet->length );
+                packet->bitSize = BytesToBits( packet->length );
                 packet->data[0] = ID_ADVERTISE_SYSTEM;
                 memcpy( packet->data + 1, data + sizeof( OFFLINE_MESSAGE_DATA_ID ) + sizeof( MessageID ) * 2 + RakNetGUID::size(), dataLength - 1 );
             }
@@ -5635,7 +5635,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
             }
 
             // Fast and easy - just use the data that was returned
-            byteSize = (unsigned int)BITS_TO_BYTES( bitSize );
+            byteSize = (unsigned int)BitsToBytes( bitSize );
 
             // For unknown senders we only accept a few specific packets
             if( remoteSystem->connectMode == RemoteSystemStruct::UNVERIFIED_SENDER )

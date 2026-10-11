@@ -75,10 +75,6 @@ enum ConnectionState
     IS_NOT_CONNECTED
 };
 
-/// Given a number of bits, return how many bytes are needed to represent that.
-#define BITS_TO_BYTES( x ) ( ( ( x ) + 7 ) >> 3 )
-#define BYTES_TO_BITS( x ) ( ( x ) << 3 )
-
 /// \sa NetworkIDObject.h
 typedef unsigned char UniqueIDType;
 typedef unsigned short SystemIndex;
@@ -90,6 +86,17 @@ const int UNDEFINED_RPC_INDEX = ( (RPCIndex)-1 );
 typedef unsigned char MessageID;
 
 typedef uint32_t BitSize_t;
+
+/// Given a number of bits, return how many bytes are needed to represent that.
+constexpr BitSize_t BitsToBytes( BitSize_t bits ) noexcept
+{
+    return ( bits + 7 ) >> 3;
+}
+
+constexpr BitSize_t BytesToBits( BitSize_t bytes ) noexcept
+{
+    return bytes << 3;
+}
 
 /// Used with the PublicKey structure
 enum PublicKeyMode

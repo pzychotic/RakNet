@@ -54,6 +54,12 @@ save.
 
 using namespace RakNet;
 
+static_assert( BitsToBytes( 0 ) == 0, "no bits need no bytes" );
+static_assert( BitsToBytes( 1 ) == 1, "a partial byte rounds up" );
+static_assert( BitsToBytes( 8 ) == 1, "a whole byte does not round up" );
+static_assert( BitsToBytes( 9 ) == 2, "one bit past a byte needs another byte" );
+static_assert( BytesToBits( 1 ) == 8, "a byte is eight bits" );
+
 namespace {
 
 constexpr uint32_t kSentinel = 0xDEADBEEF;

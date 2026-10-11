@@ -128,7 +128,7 @@ TEST_CASE( "A Half-open System's split chunks and ordered messages never reach r
         // An unsplit, unordered message is passed up for RakPeer to judge - its
         // connection request, or nonsense that gets the address banned.
         CHECK( layer.DeliverChunk( UnsplitMessage( RELIABLE, 1 ) ) );
-        CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 1 ) );
+        CHECK( layer.ReceiveBits() == BytesToBits( 1 ) );
 
         CHECK( StatisticsOf( layer ).bytesHeldForReassemblyAndOrdering == 0 );
         CHECK_FALSE( layer.Layer().TakeClosedOverBudget() );
@@ -174,7 +174,7 @@ TEST_CASE( "Split channels kept alive past the connection byte budget are stoppe
 
         // Still usable: something that needs no buffering is delivered as ever.
         CHECK( layer.DeliverChunk( UnsplitMessage( UNRELIABLE, 0 ) ) );
-        CHECK( layer.ReceiveBits() == BYTES_TO_BITS( 1 ) );
+        CHECK( layer.ReceiveBits() == BytesToBits( 1 ) );
     }
 
     SECTION( "reliable chunks close the connection" )
@@ -301,7 +301,7 @@ TEST_CASE( "A System closed at its byte budget cannot keep the connection alive 
 
     // What RakPeer sends next, and what this System will never acknowledge.
     unsigned char notification = (unsigned char)ID_DISCONNECTION_NOTIFICATION;
-    REQUIRE( layer.Layer().Send( (char*)&notification, BYTES_TO_BITS( 1 ), LOW_PRIORITY, RELIABLE_ORDERED, 0, true, kMTUSize, RakNet::GetTimeUS(), 0 ) );
+    REQUIRE( layer.Layer().Send( (char*)&notification, BytesToBits( 1 ), LOW_PRIORITY, RELIABLE_ORDERED, 0, true, kMTUSize, RakNet::GetTimeUS(), 0 ) );
 
     // Hang guard for the ack timeout to give up: three of its lengths.
     constexpr RakNet::TimeMS kDeadConnectionBudgetMs = kTimeoutTime * 3;
@@ -363,7 +363,7 @@ TEST_CASE( "At the Peer-wide byte budget the heaviest connection is closed, not 
         inFlight.splitPacketIndex = 2;
         inFlight.reliableMessageNumber = 4;
         CHECK( light.DeliverChunk( inFlight ) );
-        CHECK( light.ReceiveBits() == BYTES_TO_BITS( 3 ) );
+        CHECK( light.ReceiveBits() == BytesToBits( 3 ) );
     }
 
     SECTION( "when the connection asking is the heaviest, it is the one closed" )

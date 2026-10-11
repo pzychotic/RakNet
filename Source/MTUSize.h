@@ -62,7 +62,7 @@ namespace RakNet {
 ///     MINIMUM_NEGOTIATED_MTU_SIZE
 ///       - UDP_HEADER_SIZE                                    (28, CCRakNetSlidingWindow.h)
 ///       - DatagramHeaderFormat::GetDataHeaderByteLength()     (9, ReliabilityLayer.cpp)
-///       - BITS_TO_BYTES( GetMaxMessageHeaderLengthBits() )   (23, ReliabilityLayer.cpp)
+///       - BitsToBytes( GetMaxMessageHeaderLengthBits() )     (23, ReliabilityLayer.cpp)
 ///       - RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES
 ///
 /// = 516 bytes in a default build, so 65536 x 516 = 33,816,576.

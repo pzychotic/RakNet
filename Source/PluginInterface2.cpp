@@ -82,7 +82,7 @@ void PluginInterface2::SendUnified( const char* data, const int length, PacketPr
         //      Packet *packet = AllocatePacketUnified(bitStream->GetNumberOfBytesUsed());
         //      memcpy(packet->data, bitStream->GetData(), bitStream->GetNumberOfBytesUsed());
         Packet packet;
-        packet.bitSize = BYTES_TO_BITS( length );
+        packet.bitSize = BytesToBits( length );
         packet.data = (unsigned char*)data;
         packet.deleteData = false;
         packet.guid = UNASSIGNED_RAKNET_GUID;
@@ -117,7 +117,7 @@ Packet* PluginInterface2::AllocatePacketUnified( unsigned dataSize )
     Packet* packet = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
     packet->data = data;
     packet->length = dataSize;
-    packet->bitSize = BYTES_TO_BITS( dataSize );
+    packet->bitSize = BytesToBits( dataSize );
     packet->deleteData = true;
     packet->guid = UNASSIGNED_RAKNET_GUID;
     packet->systemAddress = UNASSIGNED_SYSTEM_ADDRESS;

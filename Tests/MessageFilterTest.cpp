@@ -52,7 +52,7 @@ public:
         packet.systemAddress = SystemAddress( address, 30000 );
         packet.guid = UNASSIGNED_RAKNET_GUID;
         packet.length = static_cast<unsigned int>( bytes.size() );
-        packet.bitSize = BYTES_TO_BITS( packet.length );
+        packet.bitSize = BytesToBits( packet.length );
         packet.data = bytes.data();
         packet.deleteData = false;
         packet.wasGeneratedLocally = false;
