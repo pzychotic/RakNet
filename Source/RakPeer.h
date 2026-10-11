@@ -34,6 +34,7 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
@@ -968,7 +969,7 @@ protected:
 
     struct BanStruct
     {
-        char* IP;
+        std::string IP;
         RakNet::TimeMS timeout; // 0 for none
     };
 
@@ -995,11 +996,11 @@ protected:
 
     };
 
-    std::vector<BanStruct*> banList;
+    std::vector<std::unique_ptr<BanStruct>> banList;
     // Threadsafe, and not thread safe
     std::vector<PluginInterface2*> pluginListTS, pluginListNTS;
 
-    std::deque<RequestedConnectionStruct*> requestedConnectionQueue;
+    std::deque<std::unique_ptr<RequestedConnectionStruct>> requestedConnectionQueue;
     /// Requests the network thread has taken out of requestedConnectionQueue to open a
     /// connection record since the view was last published. GetConnectionState still reports
     /// them as IS_PENDING, since the view doesn't show that record yet. PublishView empties

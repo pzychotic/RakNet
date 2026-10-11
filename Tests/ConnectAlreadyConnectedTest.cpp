@@ -110,7 +110,7 @@ public:
     bool AttemptQueued( const SystemAddress& target )
     {
         std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-        for( const RequestedConnectionStruct* request : requestedConnectionQueue )
+        for( const std::unique_ptr<RequestedConnectionStruct>& request : requestedConnectionQueue )
         {
             if( request->systemAddress == target )
                 return true;

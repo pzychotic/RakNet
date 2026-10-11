@@ -1138,7 +1138,6 @@ void RakPeer::HandleConnectionCancelQueue()
         {
             if( (*it)->systemAddress == requestedConnectionCancelQueue.front() )
             {
-                delete *it;
                 it = requestedConnectionQueue.erase( it );
                 break;
             }
@@ -1160,7 +1159,7 @@ ConnectionState RakPeer::GetConnectionState( const AddressOrGUID systemIdentifie
     if( systemIdentifier.systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
     {
         std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-        for( const RequestedConnectionStruct* pConnection : requestedConnectionQueue )
+        for( const std::unique_ptr<RequestedConnectionStruct>& pConnection : requestedConnectionQueue )
         {
             if( pConnection->systemAddress == systemIdentifier.systemAddress )
             {
@@ -1308,9 +1307,9 @@ void RakPeer::AddToBanList( const char* IP, RakNet::TimeMS milliseconds )
     // If this guy is already in the ban list, do nothing
     banListMutex.lock();
 
-    for( BanStruct* pBanStruct : banList )
+    for( const std::unique_ptr<BanStruct>& pBanStruct : banList )
     {
-        if( strcmp( IP, pBanStruct->IP ) == 0 )
+        if( pBanStruct->IP == IP )
         {
             // Already in the ban list.  Just update the time
             if( milliseconds == 0 )
@@ -1324,15 +1323,14 @@ void RakPeer::AddToBanList( const char* IP, RakNet::TimeMS milliseconds )
 
     banListMutex.unlock();
 
-    BanStruct* banStruct = new BanStruct;
-    banStruct->IP = (char*)rakMalloc_Ex( 16, _FILE_AND_LINE_ );
+    std::unique_ptr<BanStruct> banStruct = std::make_unique<BanStruct>();
+    banStruct->IP = IP;
     if( milliseconds == 0 )
         banStruct->timeout = 0; // Infinite
     else
         banStruct->timeout = time + milliseconds;
-    strcpy( banStruct->IP, IP );
     banListMutex.lock();
-    banList.push_back( banStruct );
+    banList.push_back( std::move( banStruct ) );
     banListMutex.unlock();
 }
 
@@ -1349,26 +1347,15 @@ void RakPeer::RemoveFromBanList( const char* IP )
     if( IP == 0 || IP[0] == 0 || strlen( IP ) > 15 )
         return;
 
-    BanStruct* temp = 0;
-
-    banListMutex.lock();
+    std::lock_guard<std::mutex> guard( banListMutex );
 
     for( auto it = banList.begin(); it != banList.end(); ++it )
     {
-        if( strcmp( IP, (*it)->IP ) == 0 )
+        if( ( *it )->IP == IP )
         {
-            temp = *it;
             banList.erase( it );
             break;
         }
-    }
-
-    banListMutex.unlock();
-
-    if( temp )
-    {
-        rakFree_Ex( temp->IP, _FILE_AND_LINE_ );
-        delete temp;
     }
 }
 
@@ -1379,13 +1366,6 @@ void RakPeer::RemoveFromBanList( const char* IP )
 void RakPeer::ClearBanList( void )
 {
     std::lock_guard<std::mutex> guard( banListMutex );
-
-    for( BanStruct* pBanStruct : banList )
-    {
-        rakFree_Ex( pBanStruct->IP, _FILE_AND_LINE_ );
-        delete pBanStruct;
-    }
-
     banList.clear();
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1417,14 +1397,12 @@ bool RakPeer::IsBanned( const char* IP )
 
     for( auto it = banList.begin(); it != banList.end(); /**/ )
     {
-        BanStruct* pBanStruct = *it;
+        const BanStruct* pBanStruct = it->get();
 
         if( pBanStruct->timeout > 0 && pBanStruct->timeout < time )
         {
             // Delete expired ban
             it = banList.erase( it );
-            rakFree_Ex( pBanStruct->IP, _FILE_AND_LINE_ );
-            delete pBanStruct;
         }
         else
         {
@@ -2450,7 +2428,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     if( GetPublishedByAddress( systemAddress, entry ) )
         return ALREADY_CONNECTED_TO_ENDPOINT;
 
-    RequestedConnectionStruct* rcs = new RequestedConnectionStruct;
+    std::unique_ptr<RequestedConnectionStruct> rcs = std::make_unique<RequestedConnectionStruct>();
 
     rcs->systemAddress = systemAddress;
     rcs->nextRequestTime = RakNet::GetTimeMS();
@@ -2469,16 +2447,14 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
 
     // Return false if already pending, else push on queue
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-    for( const RequestedConnectionStruct* pConnection : requestedConnectionQueue )
+    for( const std::unique_ptr<RequestedConnectionStruct>& pConnection : requestedConnectionQueue )
     {
         if( pConnection->systemAddress == systemAddress )
         {
-            // Not necessary
-            delete rcs;
             return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
         }
     }
-    requestedConnectionQueue.push_back( rcs );
+    requestedConnectionQueue.push_back( std::move( rcs ) );
 
     return CONNECTION_ATTEMPT_STARTED;
 }
@@ -2493,7 +2469,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     if( GetPublishedByAddress( systemAddress, entry ) )
         return ALREADY_CONNECTED_TO_ENDPOINT;
 
-    RequestedConnectionStruct* rcs = new RequestedConnectionStruct;
+    std::unique_ptr<RequestedConnectionStruct> rcs = std::make_unique<RequestedConnectionStruct>();
 
     rcs->systemAddress = systemAddress;
     rcs->nextRequestTime = RakNet::GetTimeMS();
@@ -2513,16 +2489,14 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
 
     // Return false if already pending, else push on queue
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-    for( const RequestedConnectionStruct* pConnection : requestedConnectionQueue )
+    for( const std::unique_ptr<RequestedConnectionStruct>& pConnection : requestedConnectionQueue )
     {
         if( pConnection->systemAddress == systemAddress )
         {
-            // Not necessary
-            delete rcs;
             return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
         }
     }
-    requestedConnectionQueue.push_back( rcs );
+    requestedConnectionQueue.push_back( std::move( rcs ) );
 
     return CONNECTION_ATTEMPT_STARTED;
 }
@@ -3787,16 +3761,11 @@ void RakPeer::ClearBufferedCommands( void )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ClearRequestedConnectionList( void )
 {
+    std::deque<std::unique_ptr<RequestedConnectionStruct>> freeQueue;
     requestedConnectionQueueMutex.lock();
-    std::deque<RequestedConnectionStruct*> freeQueue( requestedConnectionQueue );
-    requestedConnectionQueue.clear();
+    freeQueue.swap( requestedConnectionQueue );
     requestsHandedToRecords.clear();
     requestedConnectionQueueMutex.unlock();
-
-    for( RequestedConnectionStruct* pConnection : freeQueue )
-    {
-        delete pConnection;
-    }
 }
 std::list<Packet*>& RakPeer::QueueForPush( void )
 {
@@ -4107,7 +4076,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                 bsOut.Write( cookie );
 
             std::unique_lock<std::mutex> queueLock( rakPeer->requestedConnectionQueueMutex );
-            for( RakPeer::RequestedConnectionStruct* rcs : rakPeer->requestedConnectionQueue )
+            for( const std::unique_ptr<RakPeer::RequestedConnectionStruct>& rcs : rakPeer->requestedConnectionQueue )
             {
                 if( rcs->systemAddress == systemAddress )
                 {
@@ -4167,8 +4136,9 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             RakAssert( b );
 
             std::unique_lock<std::mutex> queueLock( rakPeer->requestedConnectionQueueMutex );
-            for( RakPeer::RequestedConnectionStruct* rcs : rakPeer->requestedConnectionQueue )
+            for( const std::unique_ptr<RakPeer::RequestedConnectionStruct>& queued : rakPeer->requestedConnectionQueue )
             {
+                RakPeer::RequestedConnectionStruct* rcs = queued.get();
                 if( rcs->systemAddress == systemAddress )
                 {
                     queueLock.unlock();
@@ -4230,19 +4200,19 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                         }
                     }
 
+                    std::unique_ptr<RakPeer::RequestedConnectionStruct> taken;
                     queueLock.lock();
                     for( auto it = rakPeer->requestedConnectionQueue.begin(); it != rakPeer->requestedConnectionQueue.end(); ++it )
                     {
                         if( (*it)->systemAddress == systemAddress )
                         {
+                            taken = std::move( *it );
                             rakPeer->requestedConnectionQueue.erase( it );
                             rakPeer->requestsHandedToRecords.push_back( systemAddress );
                             break;
                         }
                     }
                     queueLock.unlock();
-
-                    delete rcs;
 
                     break;
                 }
@@ -4272,13 +4242,11 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             rakPeer->requestedConnectionQueueMutex.lock();
             for( auto it = rakPeer->requestedConnectionQueue.begin(); it != rakPeer->requestedConnectionQueue.end(); ++it )
             {
-                RakPeer::RequestedConnectionStruct* rcs = (*it);
+                const RakPeer::RequestedConnectionStruct* rcs = it->get();
                 if( rcs->actionToTake == RakPeer::RequestedConnectionStruct::CONNECT && rcs->systemAddress == systemAddress )
                 {
                     connectionAttemptCancelled = true;
                     rakPeer->requestedConnectionQueue.erase( it );
-
-                    delete rcs;
                     break;
                 }
             }
@@ -4721,7 +4689,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 
         for( auto it = requestedConnectionQueue.begin(); it != requestedConnectionQueue.end(); )
         {
-            RequestedConnectionStruct* rcs = *it;
+            RequestedConnectionStruct* rcs = it->get();
             if( rcs->nextRequestTime < timeMS )
             {
                 bool condition1 = rcs->requestsMade == rcs->sendConnectionAttemptCount + 1;
@@ -4747,8 +4715,6 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                             AddPacketToProducer( packet );
                         }
                     }
-
-                    delete rcs;
 
                     it = requestedConnectionQueue.erase( it );
                 }
