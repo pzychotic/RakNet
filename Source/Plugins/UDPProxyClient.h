@@ -129,6 +129,9 @@ public:
     UDPProxyClient();
     ~UDPProxyClient();
 
+    UDPProxyClient( const UDPProxyClient& ) = delete;
+    UDPProxyClient& operator=( const UDPProxyClient& ) = delete;
+
     /// Receives the results of calling RequestForwarding()
     /// Set before calling RequestForwarding or you won't know what happened
     /// \param[in] resultHandler

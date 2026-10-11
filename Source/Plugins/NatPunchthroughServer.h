@@ -85,6 +85,9 @@ public:
     // Destructor
     virtual ~NatPunchthroughServer();
 
+    NatPunchthroughServer( const NatPunchthroughServer& ) = delete;
+    NatPunchthroughServer& operator=( const NatPunchthroughServer& ) = delete;
+
     /// Sets a callback to be called with debug messages
     /// \param[in] i Pointer to an interface. The pointer is stored, so don't delete it while in progress. Pass 0 to clear.
     void SetDebugInterface( NatPunchthroughServerDebugInterface* i );

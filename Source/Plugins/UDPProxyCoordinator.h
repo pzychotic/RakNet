@@ -49,6 +49,9 @@ public:
     UDPProxyCoordinator();
     virtual ~UDPProxyCoordinator();
 
+    UDPProxyCoordinator( const UDPProxyCoordinator& ) = delete;
+    UDPProxyCoordinator& operator=( const UDPProxyCoordinator& ) = delete;
+
     /// For UDPProxyServers logging in remotely, they must pass a password to UDPProxyServer::LoginToCoordinator(). It must match the password set here.
     /// If no password is set, they cannot login remotely.
     /// By default, no password is set
