@@ -2787,7 +2787,8 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     rcs->actionToTake = RequestedConnectionStruct::CONNECT;
     rcs->sendConnectionAttemptCount = sendConnectionAttemptCount;
     rcs->timeBetweenSendConnectionAttemptsMS = timeBetweenSendConnectionAttemptsMS;
-    memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
+    if( passwordDataLength > 0 )
+        memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
     rcs->outgoingPasswordLength = (unsigned char)passwordDataLength;
     rcs->timeoutTime = timeoutTime;
 
@@ -2838,7 +2839,8 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     rcs->actionToTake = RequestedConnectionStruct::CONNECT;
     rcs->sendConnectionAttemptCount = sendConnectionAttemptCount;
     rcs->timeBetweenSendConnectionAttemptsMS = timeBetweenSendConnectionAttemptsMS;
-    memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
+    if( passwordDataLength > 0 )
+        memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
     rcs->outgoingPasswordLength = (unsigned char)passwordDataLength;
     rcs->timeoutTime = timeoutTime;
     rcs->socket = socket;
