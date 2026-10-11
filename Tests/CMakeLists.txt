@@ -45,6 +45,7 @@ include( Catch )
 set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/AckDelayTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/BPSTrackerTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BulkSendResendTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CloseClosingConnectionTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandParserInterfaceTest.cpp

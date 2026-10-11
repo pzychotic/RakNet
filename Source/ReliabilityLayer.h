@@ -221,9 +221,14 @@ struct BPSTracker
     BPSTracker();
     ~BPSTracker();
     void Reset( const char* file, unsigned int line );
+    /// Values pushed at the time of the newest entry add to it, so a burst of Messages
+    /// applied in one update cycle is one entry for ClearExpired1 to pop, not one each.
     inline void Push1( CCTimeType time, uint64_t value1 )
     {
-        dataQueue.push_back( TimeAndValue2( time, value1 ) );
+        if( !dataQueue.empty() && dataQueue.back().time == time )
+            dataQueue.back().value1 += value1;
+        else
+            dataQueue.push_back( TimeAndValue2( time, value1 ) );
         total1 += value1;
         lastSec1 += value1;
     }
