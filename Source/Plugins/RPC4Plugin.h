@@ -23,6 +23,7 @@
 #include "BitStream.h"
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -79,6 +80,9 @@ public:
 
     // Destructor
     virtual ~RPC4();
+
+    RPC4( const RPC4& ) = delete;
+    RPC4& operator=( const RPC4& ) = delete;
 
     /// \deprecated Use RegisterSlot
     /// \brief Register a function pointer to be callable from a remote system
@@ -208,7 +212,7 @@ public:
     {
         std::set<LocalSlotObject> slotObjects;
     };
-    std::unordered_map<std::string, LocalSlot*> localSlots;
+    std::unordered_map<std::string, std::unique_ptr<LocalSlot>> localSlots;
 
 protected:
     // --------------------------------------------------------------------------------------------
@@ -219,7 +223,7 @@ protected:
 
     std::unordered_map<std::string, void ( * )( BitStream*, Packet* )> registeredNonblockingFunctions;
     std::unordered_map<std::string, void ( * )( BitStream*, BitStream*, Packet* )> registeredBlockingFunctions;
-    std::map<MessageID, LocalCallback*> localCallbacks;
+    std::map<MessageID, std::unique_ptr<LocalCallback>> localCallbacks;
 
     BitStream blockingReturnValue;
     bool gotBlockingReturnValue;

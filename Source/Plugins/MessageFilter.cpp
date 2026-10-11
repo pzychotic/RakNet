@@ -21,6 +21,8 @@
 #include <string.h>
 
 #include <iterator>
+#include <memory>
+#include <utility>
 
 namespace RakNet {
 
@@ -165,8 +167,7 @@ void MessageFilter::DeleteFilterSet( int filterSetID )
     const auto filterIt = filterList.find( filterSetID );
     if( filterIt != filterList.end() )
     {
-        FilterSet* filterSet = filterIt->second;
-        DeallocateFilterSet( filterSet );
+        const FilterSet* filterSet = filterIt->second.get();
         filterList.erase( filterIt );
 
         for( auto it = systemList.begin(); it != systemList.end(); )
@@ -186,14 +187,7 @@ void MessageFilter::DeleteFilterSet( int filterSetID )
 void MessageFilter::Clear( void )
 {
     systemList.clear();
-    for( const auto& [filterSetID, filterSet] : filterList )
-        DeallocateFilterSet( filterSet );
     filterList.clear();
-}
-
-void MessageFilter::DeallocateFilterSet( FilterSet* filterSet )
-{
-    delete filterSet;
 }
 
 FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
@@ -201,10 +195,11 @@ FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
     RakAssert( filterSetID >= 0 );
     const auto filterIt = filterList.find( filterSetID );
     if( filterIt != filterList.end() )
-        return filterIt->second;
+        return filterIt->second.get();
     else
     {
-        FilterSet* newFilterSet = new FilterSet;
+        auto owned = std::make_unique<FilterSet>();
+        FilterSet* newFilterSet = owned.get();
         memset( newFilterSet->allowedIDs, 0, MESSAGE_FILTER_MAX_MESSAGE_ID * sizeof( bool ) );
         newFilterSet->banOnFilterTimeExceed = false;
         newFilterSet->kickOnDisallowedMessage = false;
@@ -216,7 +211,7 @@ FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
         newFilterSet->invalidMessageCallback = 0;
         newFilterSet->timeoutCallback = 0;
         newFilterSet->timeoutUserData = 0;
-        filterList.emplace( filterSetID, newFilterSet );
+        filterList.emplace( filterSetID, std::move( owned ) );
         return newFilterSet;
     }
 }

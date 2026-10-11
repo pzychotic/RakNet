@@ -22,6 +22,7 @@
 #include "Export.h"
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -81,6 +82,9 @@ public:
 
     MessageFilter();
     virtual ~MessageFilter();
+
+    MessageFilter( const MessageFilter& ) = delete;
+    MessageFilter& operator=( const MessageFilter& ) = delete;
 
     // --------------------------------------------------------------------------------------------
     // User functions
@@ -173,11 +177,10 @@ public:
 
 protected:
     void Clear( void );
-    void DeallocateFilterSet( FilterSet* filterSet );
     FilterSet* GetFilterSetByID( int filterSetID );
     void OnInvalidMessage( FilterSet* filterSet, AddressOrGUID systemAddress, unsigned char messageID );
 
-    std::map<int, FilterSet*> filterList;
+    std::map<int, std::unique_ptr<FilterSet>> filterList;
     // Change to guid
     std::unordered_map<AddressOrGUID, FilteredSystem> systemList;
 

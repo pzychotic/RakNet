@@ -17,6 +17,8 @@
 #include "RakPeerInterface.h"
 
 #include <algorithm>
+#include <memory>
+#include <utility>
 
 namespace RakNet {
 
@@ -42,9 +44,9 @@ bool StatisticsHistory::AddObject( TrackedObjectData tod )
     const auto it = LowerBound( tod.objectId );
     if( it != objects.end() && ( *it )->trackedObjectData.objectId == tod.objectId )
         return false;
-    TrackedObject* to = new TrackedObject;
+    auto to = std::make_unique<TrackedObject>();
     to->trackedObjectData = tod;
-    objects.insert( it, to );
+    objects.insert( it, std::move( to ) );
     return true;
 }
 bool StatisticsHistory::RemoveObject( uint64_t objectId, void** userData )
@@ -59,16 +61,10 @@ bool StatisticsHistory::RemoveObject( uint64_t objectId, void** userData )
 }
 void StatisticsHistory::RemoveObjectAtIndex( unsigned int index )
 {
-    TrackedObject* to = objects[index];
     objects.erase( objects.begin() + index );
-    delete to;
 }
 void StatisticsHistory::Clear( void )
 {
-    for( TrackedObject* to : objects )
-    {
-        delete to;
-    }
     objects.clear();
 }
 unsigned int StatisticsHistory::GetObjectCount( void ) const { return static_cast<unsigned int>( objects.size() ); }
@@ -85,18 +81,17 @@ bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, const std::string
 void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes )
 {
     TimeAndValueQueue* queue = nullptr;
-    TrackedObject* to = objects[index];
+    TrackedObject* to = objects[index].get();
     auto it = to->dataQueues.find( key );
     if( it == to->dataQueues.end() )
     {
-        queue = new TimeAndValueQueue;
+        queue = to->dataQueues.emplace( key, std::make_unique<TimeAndValueQueue>() ).first->second.get();
         queue->key = key;
         queue->timeToTrackValues = timeToTrack;
-        to->dataQueues.insert( std::make_pair( key, queue ) );
     }
     else
     {
-        queue = it->second;
+        queue = it->second.get();
     }
 
     TimeAndValue tav;
@@ -140,11 +135,11 @@ StatisticsHistory::SHErrorCode StatisticsHistory::GetHistoryForKey( uint64_t obj
     unsigned int idx = GetObjectIndex( objectId );
     if( idx == (unsigned int)-1 )
         return SH_UKNOWN_OBJECT;
-    TrackedObject* to = objects[idx];
+    TrackedObject* to = objects[idx].get();
     auto it = to->dataQueues.find( key );
     if( it == to->dataQueues.end() )
         return SH_UKNOWN_KEY;
-    *values = it->second;
+    *values = it->second.get();
     ( *values )->CullExpiredValues( curTime );
     return SH_OK;
 }
@@ -154,14 +149,14 @@ bool StatisticsHistory::GetHistorySorted( uint64_t objectId, SHSortOperation sor
     unsigned int idx = GetObjectIndex( objectId );
     if( idx == (unsigned int)-1 )
         return false;
-    TrackedObject* to = objects[idx];
+    TrackedObject* to = objects[idx].get();
     Time curTime = GetTime();
 
     std::vector<TimeAndValueQueue*> sortedQueues;
     sortedQueues.reserve( to->dataQueues.size() );
     for( const auto& entry : to->dataQueues )
     {
-        TimeAndValueQueue* tavq = entry.second;
+        TimeAndValueQueue* tavq = entry.second.get();
         tavq->CullExpiredValues( curTime );
 
         if( sortType == SH_SORT_BY_RECENT_SUM_ASCENDING || sortType == SH_SORT_BY_RECENT_SUM_DESCENDING )
@@ -218,11 +213,11 @@ void StatisticsHistory::MergeAllObjectsOnKey( const std::string& key, TimeAndVal
     Time curTime = GetTime();
 
     // Find every object with this key
-    for( TrackedObject* to : objects )
+    for( const auto& to : objects )
     {
         if( auto it = to->dataQueues.find( key ); it != to->dataQueues.end() )
         {
-            TimeAndValueQueue* tavqInput = it->second;
+            TimeAndValueQueue* tavqInput = it->second.get();
             tavqInput->CullExpiredValues( curTime );
             TimeAndValueQueue::MergeSets( tavqOutput, dataCategory, tavqInput, dataCategory, tavqOutput );
         }
@@ -653,11 +648,6 @@ StatisticsHistory::TimeAndValueQueue& StatisticsHistory::TimeAndValueQueue::oper
     return *this;
 }
 StatisticsHistory::TrackedObject::TrackedObject() {}
-StatisticsHistory::TrackedObject::~TrackedObject()
-{
-    for( const auto& entry : dataQueues )
-        delete entry.second;
-}
 
 unsigned int StatisticsHistory::GetObjectIndex( uint64_t objectId ) const
 {
@@ -666,9 +656,9 @@ unsigned int StatisticsHistory::GetObjectIndex( uint64_t objectId ) const
         return static_cast<unsigned int>( it - objects.begin() );
     return (unsigned int)-1;
 }
-std::vector<StatisticsHistory::TrackedObject*>::const_iterator StatisticsHistory::LowerBound( uint64_t objectId ) const
+std::vector<std::unique_ptr<StatisticsHistory::TrackedObject>>::const_iterator StatisticsHistory::LowerBound( uint64_t objectId ) const
 {
-    return std::lower_bound( objects.begin(), objects.end(), objectId, []( const TrackedObject* to, uint64_t id ) { return to->trackedObjectData.objectId < id; } );
+    return std::lower_bound( objects.begin(), objects.end(), objectId, []( const std::unique_ptr<TrackedObject>& to, uint64_t id ) { return to->trackedObjectData.objectId < id; } );
 }
 StatisticsHistoryPlugin::StatisticsHistoryPlugin()
 {

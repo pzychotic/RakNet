@@ -19,6 +19,9 @@
 #include <stdarg.h>
 #include "LinuxStrings.h"
 
+#include <memory>
+#include <utility>
+
 // #define _PRINTF_DEBUG
 
 #define ECHO_INPUT
@@ -29,7 +32,6 @@ STATIC_FACTORY_DEFINITIONS( TelnetTransport, TelnetTransport );
 
 TelnetTransport::TelnetTransport()
 {
-    tcpInterface = 0;
     sendSuffix = 0;
     sendPrefix = 0;
 }
@@ -53,15 +55,12 @@ void TelnetTransport::Stop( void )
     if( tcpInterface == 0 )
         return;
     tcpInterface->Stop();
-    for( TelnetClient* pClient : remoteClients )
-        delete pClient;
     remoteClients.clear();
     // Before tcpInterface is cleared: DeallocatePacket does nothing without it.
     for( Packet* line : pendingLines )
         DeallocatePacket( line );
     pendingLines.clear();
-    delete tcpInterface;
-    tcpInterface = 0;
+    tcpInterface.reset();
 }
 void TelnetTransport::Send( SystemAddress systemAddress, const char* data, ... )
 {
@@ -135,11 +134,11 @@ Packet* TelnetTransport::Receive( void )
     // Get this guy's cursor buffer.  This is real bullcrap that I have to do this.
     // An entry with no open connection only holds a lost event drained before its new one.
     TelnetClient* remoteClient = 0;
-    for( TelnetClient* pClient : remoteClients )
+    for( const auto& pClient : remoteClients )
     {
         if( pClient->systemAddress == p->systemAddress && pClient->openConnections > 0 )
         {
-            remoteClient = pClient;
+            remoteClient = pClient.get();
         }
     }
     //RakAssert(remoteClient);
@@ -295,20 +294,19 @@ TelnetTransport::TelnetClient* TelnetTransport::CountConnection( const SystemAdd
     if( it == remoteClients.end() )
     {
         // Only for an address TCPInterface reported an event for, and one entry per address.
-        TelnetClient* remoteClient = new TelnetClient;
+        auto remoteClient = std::make_unique<TelnetClient>();
         remoteClient->lastSentTextInput[0] = 0;
         remoteClient->cursorPosition = 0;
         remoteClient->systemAddress = systemAddress;
         remoteClient->openConnections = 0;
         memset( remoteClient->textInput, 0, REMOTE_MAX_TEXT_INPUT );
-        it = remoteClients.insert( remoteClients.end(), remoteClient );
+        it = remoteClients.insert( remoteClients.end(), std::move( remoteClient ) );
     }
 
-    TelnetClient* remoteClient = *it;
+    TelnetClient* remoteClient = it->get();
     remoteClient->openConnections += delta;
     if( remoteClient->openConnections == 0 )
     {
-        delete remoteClient;
         remoteClients.erase( it );
         return 0;
     }
@@ -347,7 +345,7 @@ void TelnetTransport::SetSendPrefix( const char* prefix )
 void TelnetTransport::AutoAllocate( void )
 {
     if( tcpInterface == 0 )
-        tcpInterface = new TCPInterface;
+        tcpInterface = std::make_unique<TCPInterface>();
 }
 bool TelnetTransport::ReassembleLine( TelnetTransport::TelnetClient* remoteClient, unsigned char c )
 {

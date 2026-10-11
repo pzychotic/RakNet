@@ -23,6 +23,7 @@
 #include <float.h>
 #include <stdint.h>
 #include <deque>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -100,6 +101,10 @@ public:
 
     StatisticsHistory();
     virtual ~StatisticsHistory();
+
+    StatisticsHistory( const StatisticsHistory& ) = delete;
+    StatisticsHistory& operator=( const StatisticsHistory& ) = delete;
+
     void SetDefaultTimeToTrack( Time defaultTimeToTrack );
     Time GetDefaultTimeToTrack( void ) const;
     bool AddObject( TrackedObjectData tod );
@@ -178,19 +183,15 @@ protected:
     struct TrackedObject
     {
         TrackedObject();
-        ~TrackedObject();
-        TrackedObject( const TrackedObject& ) = delete;
-        TrackedObject& operator=( const TrackedObject& ) = delete;
         TrackedObjectData trackedObjectData;
-        // Owns its queues, which are made with new.
-        std::unordered_map<std::string, TimeAndValueQueue*> dataQueues;
+        std::unordered_map<std::string, std::unique_ptr<TimeAndValueQueue>> dataQueues;
     };
 
     // Sorted by objectId, so an object's index is its position in this order.
-    std::vector<TrackedObject*> objects;
+    std::vector<std::unique_ptr<TrackedObject>> objects;
 
     // The first object whose objectId is not less than objectId
-    std::vector<TrackedObject*>::const_iterator LowerBound( uint64_t objectId ) const;
+    std::vector<std::unique_ptr<TrackedObject>>::const_iterator LowerBound( uint64_t objectId ) const;
 
     Time timeToTrack;
 };

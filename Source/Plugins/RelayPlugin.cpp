@@ -16,8 +16,11 @@
 #include "RakPeerInterface.h"
 #include "BitStream.h"
 #include "ReliabilityLayer.h"
+#include "RakAssert.h"
 
 #include <algorithm>
+#include <memory>
+#include <utility>
 
 namespace RakNet {
 
@@ -67,14 +70,6 @@ RelayPlugin::RelayPlugin()
 RelayPlugin::~RelayPlugin()
 {
     guidToStrHash.clear();
-    for( const auto& entry : strToGuidHash )
-    {
-        delete entry.second;
-    }
-    for( RP_Group* pRoom : chatRooms )
-    {
-        delete pRoom;
-    }
 }
 
 RelayPluginEnums RelayPlugin::AddParticipantOnServer( const std::string& key, const RakNetGUID& guid )
@@ -92,17 +87,19 @@ RelayPluginEnums RelayPlugin::AddParticipantOnServer( const std::string& key, co
     {
         StrAndGuidAndRoom* strAndGuid = it->second;
         LeaveGroup( strAndGuid );
-        strToGuidHash.erase( strAndGuid->str );
+        const auto owner = strToGuidHash.find( strAndGuid->str );
+        RakAssert( owner != strToGuidHash.end() );
         guidToStrHash.erase( it );
-        delete strAndGuid;
+        strToGuidHash.erase( owner );
     }
 
-    StrAndGuidAndRoom* strAndGuid = new StrAndGuidAndRoom;
+    auto owned = std::make_unique<StrAndGuidAndRoom>();
+    StrAndGuidAndRoom* strAndGuid = owned.get();
     strAndGuid->guid = guid;
     strAndGuid->str = key;
 
-    strToGuidHash.insert( std::make_pair( key, strAndGuid ) );
-    guidToStrHash.insert( std::make_pair( guid, strAndGuid ) );
+    strToGuidHash.emplace( key, std::move( owned ) );
+    guidToStrHash.emplace( guid, strAndGuid );
 
     return RPE_ADD_CLIENT_SUCCESS;
 }
@@ -113,9 +110,10 @@ void RelayPlugin::RemoveParticipantOnServer( const RakNetGUID& guid )
     {
         StrAndGuidAndRoom* strAndGuid = it->second;
         LeaveGroup( strAndGuid );
-        strToGuidHash.erase( strAndGuid->str );
+        const auto owner = strToGuidHash.find( strAndGuid->str );
+        RakAssert( owner != strToGuidHash.end() );
         guidToStrHash.erase( it );
-        delete strAndGuid;
+        strToGuidHash.erase( owner );
     }
 }
 
@@ -319,19 +317,18 @@ RelayPlugin::RP_Group* RelayPlugin::JoinGroup( RakNetGUID userGuid, const std::s
         if( !strAndGuidSender->currentRoom.empty() )
             LeaveGroup( strAndGuidSender );
 
-        for( RP_Group* pRoom : chatRooms )
+        for( const auto& pRoom : chatRooms )
         {
             if( pRoom->roomName == roomName )
             {
                 // Join existing room
-                return JoinGroup( pRoom, strAndGuidSender );
+                return JoinGroup( pRoom.get(), strAndGuidSender );
             }
         }
 
         // Create new room
-        RP_Group* room = new RP_Group;
+        RP_Group* room = chatRooms.emplace_back( std::make_unique<RP_Group>() ).get();
         room->roomName = roomName;
-        chatRooms.push_back( room );
 
         return JoinGroup( room, strAndGuidSender );
     }
@@ -347,12 +344,12 @@ void RelayPlugin::LeaveGroup( StrAndGuidAndRoom* strAndGuidSender )
     const std::string& userName = strAndGuidSender->str;
 
     auto itRoom = std::find_if( chatRooms.begin(), chatRooms.end(),
-                                [strAndGuidSender]( const RP_Group* pRoom ) { return pRoom->roomName == strAndGuidSender->currentRoom; } );
+                                [strAndGuidSender]( const std::unique_ptr<RP_Group>& pRoom ) { return pRoom->roomName == strAndGuidSender->currentRoom; } );
     if( itRoom != chatRooms.end() )
     {
         strAndGuidSender->currentRoom.clear();
 
-        RP_Group* room = *itRoom;
+        RP_Group* room = itRoom->get();
         for( auto itUser = room->usersInRoom.begin(); itUser != room->usersInRoom.end(); /**/ )
         {
             if( itUser->guid == strAndGuidSender->guid )
@@ -361,7 +358,6 @@ void RelayPlugin::LeaveGroup( StrAndGuidAndRoom* strAndGuidSender )
 
                 if( room->usersInRoom.empty() )
                 {
-                    delete room;
                     chatRooms.erase( itRoom );
                     return;
                 }
@@ -397,7 +393,7 @@ void RelayPlugin::SendMessageToRoom( StrAndGuidAndRoom* strAndGuidSender, BitStr
     if( strAndGuidSender->currentRoom.empty() )
         return;
 
-    for( const RP_Group* pRoom : chatRooms )
+    for( const auto& pRoom : chatRooms )
     {
         if( pRoom->roomName == strAndGuidSender->currentRoom )
         {
@@ -428,7 +424,7 @@ void RelayPlugin::SendChatRoomsList( RakNetGUID target )
     bsOut.WriteCasted<MessageID>( ID_RELAY_PLUGIN );
     bsOut.WriteCasted<MessageID>( RPE_GET_GROUP_LIST_REPLY_FROM_SERVER );
     bsOut.WriteCasted<uint16_t>( static_cast<uint16_t>( chatRooms.size() ) );
-    for( const RP_Group* pRoom : chatRooms )
+    for( const auto& pRoom : chatRooms )
     {
         bsOut.WriteCompressed( pRoom->roomName );
         bsOut.WriteCasted<uint16_t>( static_cast<uint16_t>( pRoom->usersInRoom.size() ) );

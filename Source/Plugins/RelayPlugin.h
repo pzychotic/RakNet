@@ -19,6 +19,7 @@
 
 #include "PluginInterface2.h"
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -66,6 +67,9 @@ public:
 
     /// Destructor
     virtual ~RelayPlugin();
+
+    RelayPlugin( const RelayPlugin& ) = delete;
+    RelayPlugin& operator=( const RelayPlugin& ) = delete;
 
     /// \brief Forward messages from any system, to the system specified by the combination of key and guid. The sending system only needs to know the key.
     /// \param[in] key A string to identify the target's RakNetGUID. This is so the sending system does not need to know the RakNetGUID of the target system. The key should be unique among all guids added. If the key is not unique, only one system will be sent to (at random).
@@ -163,9 +167,9 @@ protected:
     void OnLeaveGroupRequestFromClient( Packet* packet );
     void CountNameRefused( size_t length );
 
-    std::unordered_map<std::string, StrAndGuidAndRoom*> strToGuidHash;
+    std::unordered_map<std::string, std::unique_ptr<StrAndGuidAndRoom>> strToGuidHash;
     std::unordered_map<RakNetGUID, StrAndGuidAndRoom*> guidToStrHash;
-    std::vector<RP_Group*> chatRooms;
+    std::vector<std::unique_ptr<RP_Group>> chatRooms;
     bool acceptAddParticipantRequests;
     size_t maxNameLength;
     uint64_t namesRefused;

@@ -33,6 +33,7 @@
 
 #include <stdint.h>
 #include <deque>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -120,6 +121,8 @@ public:
     {
         NonceGenerator();
         ~NonceGenerator();
+        NonceGenerator( const NonceGenerator& ) = delete;
+        NonceGenerator& operator=( const NonceGenerator& ) = delete;
         /// Draws a nonce for \a remoteSystem and keeps it under a new request ID.
         /// \return false if no nonce could be drawn. Nothing is kept and no request ID is used.
         bool GetNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH], unsigned short* requestId, AddressOrGUID remoteSystem );
@@ -131,7 +134,7 @@ public:
         void ClearByAddress( AddressOrGUID remoteSystem );
         void Update( RakNet::Time curTime );
 
-        std::vector<TwoWayAuthentication::NonceAndRemoteSystemRequest*> generatedNonces;
+        std::vector<std::unique_ptr<TwoWayAuthentication::NonceAndRemoteSystemRequest>> generatedNonces;
         unsigned short nextRequestId;
         unsigned int maxNoncesPerSystem;
         uint64_t noncesEvicted;

@@ -18,6 +18,9 @@
 #include "PlatformRandom.h"
 #include "RakPeerInterface.h"
 
+#include <memory>
+#include <utility>
+
 namespace RakNet {
 
 enum NegotiationIdentifiers
@@ -68,17 +71,16 @@ bool TwoWayAuthentication::NonceGenerator::GetNonce( char nonce[TWO_WAY_AUTHENTI
         // Once per plugin: a flood would otherwise flood the console too
         if( noncesEvicted++ == 0 )
             RAKNET_DEBUG_PRINTF( "TwoWayAuthentication: evicted a System's oldest nonce, over SetMaxNoncesPerSystem's %u. See GetNoncesEvicted.\n", maxNoncesPerSystem );
-        delete *oldest;
         generatedNonces.erase( oldest );
     }
 
-    TwoWayAuthentication::NonceAndRemoteSystemRequest* narsr = new TwoWayAuthentication::NonceAndRemoteSystemRequest;
+    auto narsr = std::make_unique<TwoWayAuthentication::NonceAndRemoteSystemRequest>();
     narsr->remoteSystem = remoteSystem;
     memcpy( narsr->nonce, nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
     narsr->requestId = nextRequestId++;
     *requestId = narsr->requestId;
     narsr->whenGenerated = RakNet::GetTime();
-    generatedNonces.push_back( narsr );
+    generatedNonces.push_back( std::move( narsr ) );
     return true;
 }
 bool TwoWayAuthentication::NonceGenerator::GenerateNonce( char nonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH] )
@@ -90,14 +92,13 @@ bool TwoWayAuthentication::NonceGenerator::GetNonceById( char nonce[TWO_WAY_AUTH
 {
     for( auto it = generatedNonces.begin(); it != generatedNonces.end(); ++it )
     {
-        TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = *it;
+        TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = it->get();
         // requestId wraps, so another System's nonce may carry the same one
         if( pNonce->requestId == requestId && remoteSystem == pNonce->remoteSystem )
         {
             memcpy( nonce, pNonce->nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
             if( popIfFound )
             {
-                delete pNonce;
                 generatedNonces.erase( it );
             }
             return true;
@@ -107,20 +108,15 @@ bool TwoWayAuthentication::NonceGenerator::GetNonceById( char nonce[TWO_WAY_AUTH
 }
 void TwoWayAuthentication::NonceGenerator::Clear( void )
 {
-    for( TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce : generatedNonces )
-    {
-        delete pNonce;
-    }
     generatedNonces.clear();
 }
 void TwoWayAuthentication::NonceGenerator::ClearByAddress( AddressOrGUID remoteSystem )
 {
     for( auto it = generatedNonces.begin(); it != generatedNonces.end(); /**/ )
     {
-        TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = *it;
+        TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = it->get();
         if( pNonce->remoteSystem == remoteSystem )
         {
-            delete pNonce;
             it = generatedNonces.erase( it );
         }
         else
@@ -134,10 +130,7 @@ void TwoWayAuthentication::NonceGenerator::Update( RakNet::Time curTime )
     // Nonces are in the order they were made, so the stale ones are a prefix
     auto firstFresh = generatedNonces.begin();
     while( firstFresh != generatedNonces.end() && (RakNet::Time)( curTime - ( *firstFresh )->whenGenerated ) > NONCE_TIMEOUT_MS )
-    {
-        delete *firstFresh;
         ++firstFresh;
-    }
     generatedNonces.erase( generatedNonces.begin(), firstFresh );
 }
 TwoWayAuthentication::TwoWayAuthentication()

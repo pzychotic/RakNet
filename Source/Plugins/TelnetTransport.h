@@ -21,6 +21,7 @@
 #include "Export.h"
 
 #include <deque>
+#include <memory>
 #include <vector>
 
 namespace RakNet {
@@ -41,6 +42,10 @@ public:
 
     TelnetTransport();
     virtual ~TelnetTransport();
+
+    TelnetTransport( const TelnetTransport& ) = delete;
+    TelnetTransport& operator=( const TelnetTransport& ) = delete;
+
     bool Start( unsigned short port, bool serverMode );
     void Stop( void );
     void Send( SystemAddress systemAddress, const char* data, ... );
@@ -69,7 +74,7 @@ protected:
         int openConnections;
     };
 
-    TCPInterface* tcpInterface;
+    std::unique_ptr<TCPInterface> tcpInterface;
     void AutoAllocate( void );
 
     // The entry for systemAddress, created if there is none, after adding delta to its
@@ -79,7 +84,7 @@ protected:
     Packet* PopPendingLine( void );
 
     // Crap this sucks but because windows telnet won't send line at a time, I have to reconstruct the lines at the server per player
-    std::vector<TelnetClient*> remoteClients;
+    std::vector<std::unique_ptr<TelnetClient>> remoteClients;
 
     // Lines a TCP packet completed that Receive has not returned yet, oldest first. Receive
     // returns these before it takes another TCP packet, so this only ever holds lines from

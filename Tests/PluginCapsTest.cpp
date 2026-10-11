@@ -327,7 +327,7 @@ public:
     std::vector<unsigned short> NonceIdsFor( RakNetGUID guid ) const
     {
         std::vector<unsigned short> ids;
-        for( const NonceAndRemoteSystemRequest* nonce : nonceGenerator.generatedNonces )
+        for( const auto& nonce : nonceGenerator.generatedNonces )
         {
             if( nonce->remoteSystem.rakNetGuid == guid )
                 ids.push_back( nonce->requestId );

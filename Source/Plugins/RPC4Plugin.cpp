@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <deque>
+#include <memory>
 #include <string.h>
 #include <thread>
 
@@ -109,19 +110,7 @@ RPC4::RPC4()
     interruptSignal = false;
 }
 
-RPC4::~RPC4()
-{
-    for( const auto& entry : localCallbacks )
-    {
-        delete entry.second;
-    }
-
-    for( const auto& entry : localSlots )
-    {
-        delete entry.second;
-    }
-    localSlots.clear();
-}
+RPC4::~RPC4() = default;
 
 bool RPC4::RegisterFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ) )
 {
@@ -138,12 +127,11 @@ void RPC4::RegisterSlot( const char* sharedIdentifier, void ( *functionPointer )
     auto it = localSlots.find( sharedIdentifier );
     if( it == localSlots.end() )
     {
-        localSlot = new LocalSlot;
-        localSlots.insert( std::make_pair( sharedIdentifier, localSlot ) );
+        localSlot = localSlots.emplace( sharedIdentifier, std::make_unique<LocalSlot>() ).first->second.get();
     }
     else
     {
-        localSlot = it->second;
+        localSlot = it->second.get();
     }
 
     LocalSlotObject lso( nextSlotRegistrationCount++, callPriority, functionPointer );
@@ -161,10 +149,10 @@ bool RPC4::RegisterBlockingFunction( const char* uniqueID, void ( *functionPoint
 
 void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )
 {
-    LocalCallback*& lc = localCallbacks[messageId];
+    std::unique_ptr<LocalCallback>& lc = localCallbacks[messageId];
     if( lc == nullptr )
     {
-        lc = new LocalCallback;
+        lc = std::make_unique<LocalCallback>();
         lc->messageId = messageId;
     }
     lc->functions.insert( uniqueID );
@@ -185,10 +173,9 @@ bool RPC4::UnregisterLocalCallback( const char* uniqueID, MessageID messageId )
     const auto it = localCallbacks.find( messageId );
     if( it != localCallbacks.end() )
     {
-        LocalCallback* lc = it->second;
+        LocalCallback* lc = it->second.get();
         if( lc->functions.erase( uniqueID ) != 0 && lc->functions.empty() )
         {
-            delete lc;
             localCallbacks.erase( it );
             return true;
         }
@@ -200,8 +187,6 @@ bool RPC4::UnregisterSlot( const char* sharedIdentifier )
 {
     if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
     {
-        LocalSlot* ls = it->second;
-        delete ls;
         localSlots.erase( it );
         return true;
     }
@@ -422,7 +407,7 @@ void RPC4::Signal( const char* sharedIdentifier, BitStream* bitStream, PacketPri
             bsptr = &bstemp;
         }
 
-        InvokeSignal( it->second, bsptr, &p );
+        InvokeSignal( it->second.get(), bsptr, &p );
     }
 }
 
@@ -531,7 +516,7 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
             bsIn.Read( &serializedParameters );
             if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
             {
-                InvokeSignal( it->second, &serializedParameters, packet );
+                InvokeSignal( it->second.get(), &serializedParameters, packet );
             }
         }
         else
