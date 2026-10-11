@@ -492,9 +492,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     RakNetSocket2* s, CCTimeType timeRead,
     BitStream& updateBitStream )
 {
-#ifdef _DEBUG
     RakAssert( !( buffer == 0 ) );
-#endif
 
 #if CC_TIME_TYPE_BYTES == 4
     timeRead /= 1000;
@@ -890,10 +888,8 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         while( (unsigned int)( holeCount ) > hasReceivedPacketQueue.size() )
                             hasReceivedPacketQueue.push_back( true ); // time+(CCTimeType)60 * (CCTimeType)1000 * (CCTimeType)1000); // Didn't get this packet - set the time to give up waiting
                         hasReceivedPacketQueue.push_back( false );    // Got the packet
-#ifdef _DEBUG
                         // If this assert hits then DatagramSequenceNumberType has overflowed
                         RakAssert( hasReceivedPacketQueue.size() < (unsigned int)( (DatagramSequenceNumberType)~0u ) );
-#endif
                     }
 
                     while( !hasReceivedPacketQueue.empty() && hasReceivedPacketQueue.front() == false )
@@ -1277,12 +1273,10 @@ BitSize_t ReliabilityLayer::Receive( unsigned char** data )
 //-------------------------------------------------------------------------------------------------------
 bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, unsigned char orderingChannel, bool makeDataCopy, int MTUSize, CCTimeType currentTime, uint32_t receipt )
 {
-#ifdef _DEBUG
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
     RakAssert( numberOfBitsToSend > 0 );
-#endif
 
 #if CC_TIME_TYPE_BYTES == 4
     currentTime /= 1000;

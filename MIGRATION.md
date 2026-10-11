@@ -33,6 +33,11 @@ to your clock, where stock handed it out with its bytes reversed. Nothing on the
 See
 [Timestamped Messages arrive shifted](#timestamped-messages-arrive-shifted).
 
+`RakAssert` now fires in every build without `NDEBUG`, not only under `_DEBUG`. It also no
+longer supplies a semicolon, so a call of your own written without one stops compiling;
+that is a build break outside the count above. See
+[`RakAssert` follows `NDEBUG`](#rakassert-follows-ndebug).
+
 **The short version:** four of the five breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
@@ -949,3 +954,20 @@ Stock took the `Packet` struct itself from a memory pool, and a pool that could 
 also fired it, and `AllocatePacket` returned null. Here the struct is made with `OP_NEW`, so
 failing to make it is fatal like any other allocation. `AllocatePacket` still returns null
 when the payload allocation fails.
+
+## `RakAssert` follows `NDEBUG`
+
+Stock defined `RakAssert( x )` as `assert( x );` under `_DEBUG` and as nothing otherwise.
+MSVC's Debug configuration defines `_DEBUG`, but a CMake Debug build with GCC or Clang
+defines neither `_DEBUG` nor `NDEBUG`, so there `RakAssert` was off while every `assert`
+was on. Now the default is `assert( x )` with no condition, so it is on exactly when
+`assert` is. Three things follow:
+
+- **GCC and Clang Debug builds assert where they did not before.** A call that broke a
+  `RakAssert` precondition, such as `Send` with an out-of-range priority, ran on there and
+  now stops. MSVC builds behave as before, as does any build that defines `NDEBUG`.
+- **You can still override it.** `RakNetDefines.h` defines `RakAssert` only if it isn't
+  defined yet, after including `RakNetDefinesOverrides.h`. Define it there to route it to
+  your own handler, or to nothing to turn it off.
+- **A `RakAssert` of your own needs its semicolon.** Stock's macro supplied one, so
+  `RakAssert( x )` without a `;` compiled in a `_DEBUG` build. Now it doesn't; add the `;`.

@@ -190,10 +190,7 @@ void HuffmanEncodingTree::EncodeArray( unsigned char* input, size_t sizeInBytes,
                 break;
             }
 
-#ifdef _DEBUG
         RakAssert( counter != 256 ); // Given 256 elements, we should always be able to find an input that would be >= 7 bits
-
-#endif
     }
 }
 

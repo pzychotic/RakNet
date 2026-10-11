@@ -44,9 +44,6 @@ BitStream::BitStream()
     //data = ( unsigned char* ) rakMalloc_Ex( 32, _FILE_AND_LINE_ );
     data = (unsigned char*)stackData;
 
-#ifdef _DEBUG
-    //  RakAssert( data );
-#endif
     //memset(data, 0, 32);
     copyData = true;
 }
@@ -65,9 +62,7 @@ BitStream::BitStream( const unsigned int initialBytesToAllocate )
         data = (unsigned char*)rakMalloc_Ex( (size_t)initialBytesToAllocate, _FILE_AND_LINE_ );
         numberOfBitsAllocated = initialBytesToAllocate << 3;
     }
-#ifdef _DEBUG
     RakAssert( data );
-#endif
     // memset(data, 0, initialBytesToAllocate);
     copyData = true;
 }
@@ -92,9 +87,7 @@ BitStream::BitStream( unsigned char* _data, const unsigned int lengthInBytes, bo
             {
                 data = (unsigned char*)rakMalloc_Ex( (size_t)lengthInBytes, _FILE_AND_LINE_ );
             }
-#ifdef _DEBUG
             RakAssert( data );
-#endif
             memcpy( data, _data, (size_t)lengthInBytes );
         }
         else
@@ -107,9 +100,7 @@ BitStream::BitStream( unsigned char* _data, const unsigned int lengthInBytes, bo
 // Use this if you pass a pointer copy to the constructor (_copyData==false) and want to overallocate to prevent reallocation
 void BitStream::SetNumberOfBitsAllocated( const BitSize_t lengthInBits )
 {
-#ifdef _DEBUG
     RakAssert( lengthInBits >= (BitSize_t)numberOfBitsAllocated );
-#endif
     numberOfBitsAllocated = lengthInBits;
 }
 
@@ -341,9 +332,7 @@ void BitStream::WriteAlignedBytesSafe( const char* inByteArray, const unsigned i
 // unless you byte align the coalesced packets.
 bool BitStream::ReadAlignedBytes( unsigned char* inOutByteArray, const unsigned int numberOfBytesToRead )
 {
-#ifdef _DEBUG
     RakAssert( numberOfBytesToRead > 0 );
-#endif
 
     if( numberOfBytesToRead <= 0 )
         return false;
@@ -523,9 +512,6 @@ void BitStream::WriteCompressed( const unsigned char* inByteArray,
 // It should be false if you used WriteBits with rightAlignedBits false
 bool BitStream::ReadBits( unsigned char* inOutByteArray, BitSize_t numberOfBitsToRead, const bool alignBitsToRight )
 {
-#ifdef _DEBUG
-    //  RakAssert( numberOfBitsToRead > 0 );
-#endif
     if( numberOfBitsToRead <= 0 )
         return false;
 
@@ -668,12 +654,10 @@ void BitStream::AddBitsAndReallocate( const BitSize_t numberOfBitsToWrite )
 
     if( numberOfBitsToWrite + numberOfBitsUsed > 0 && ( ( numberOfBitsAllocated - 1 ) >> 3 ) < ( ( newNumberOfBitsAllocated - 1 ) >> 3 ) ) // If we need to allocate 1 or more new bytes
     {
-#ifdef _DEBUG
         // If this assert hits then we need to specify true for the third parameter in the constructor
         // It needs to reallocate to hold all the data and can't do it unless we allocated to begin with
         // Often hits if you call Write or Serialize on a read-only bitstream
         RakAssert( copyData == true );
-#endif
 
         // Less memory efficient but saves on news and deletes
         /// Cap to 1 meg buffer to save on huge allocations
@@ -700,9 +684,7 @@ void BitStream::AddBitsAndReallocate( const BitSize_t numberOfBitsToWrite )
             data = (unsigned char*)rakRealloc_Ex( data, (size_t)amountToAllocate, _FILE_AND_LINE_ );
         }
 
-#ifdef _DEBUG
         RakAssert( data ); // Make sure realloc succeeded
-#endif
         //  memset(data+newByteOffset, 0,  ((newNumberOfBitsAllocated-1)>>3) - ((numberOfBitsAllocated-1)>>3)); // Set the new data block to 0
     }
 
@@ -949,9 +931,7 @@ void BitStream::PrintHex( void ) const
 // Data will point to the stream.  Returns the length in bits of the stream.
 BitSize_t BitStream::CopyData( unsigned char** _data ) const
 {
-#ifdef _DEBUG
     RakAssert( numberOfBitsUsed > 0 );
-#endif
 
     *_data = (unsigned char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsUsed ), _FILE_AND_LINE_ );
     memcpy( *_data, data, sizeof( unsigned char ) * (size_t)( BITS_TO_BYTES( numberOfBitsUsed ) ) );
@@ -986,10 +966,7 @@ void BitStream::AssertCopyData( void )
         if( numberOfBitsAllocated > 0 )
         {
             unsigned char* newdata = (unsigned char*)rakMalloc_Ex( (size_t)BITS_TO_BYTES( numberOfBitsAllocated ), _FILE_AND_LINE_ );
-#ifdef _DEBUG
-
             RakAssert( data );
-#endif
 
             memcpy( newdata, data, (size_t)BITS_TO_BYTES( numberOfBitsAllocated ) );
             data = newdata;

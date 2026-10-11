@@ -9,8 +9,8 @@
 /*
 Pins how ReliabilityLayer::Send repairs a priority out of range. NUMBER_OF_PRIORITIES is the
 count, not a priority, and is repaired to HIGH_PRIORITY like any other. Before, it got through
-and indexed the per-priority arrays one past their end. A debug build stops at Send's
-RakAssert instead, so the case runs in release builds only.
+and indexed the per-priority arrays one past their end. Without NDEBUG the default RakAssert
+stops at Send instead, so the case runs only in builds that define NDEBUG.
 */
 
 using namespace RakNet;
@@ -18,8 +18,8 @@ using namespace ReliabilityLayerHarness;
 
 TEST_CASE( "ReliabilityLayer::Send repairs a priority of NUMBER_OF_PRIORITIES to HIGH_PRIORITY", "[network]" )
 {
-#if defined( _DEBUG )
-    SKIP( "RakAssert stops a debug build at an out-of-range priority" );
+#if !defined( NDEBUG )
+    SKIP( "The default RakAssert stops a build without NDEBUG at an out-of-range priority" );
 #else
     LayerUnderTest layer;
     char data[] = { 'A' };

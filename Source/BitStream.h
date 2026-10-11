@@ -1590,9 +1590,7 @@ void BitStream::WriteBitsFromIntegerRange( const templateType value, const templ
 template<class templateType> // templateType for this function must be a float or double
 void BitStream::WriteNormVector( templateType x, templateType y, templateType z )
 {
-#ifdef _DEBUG
     RakAssert( x <= 1.01 && y <= 1.01 && z <= 1.01 && x >= -1.01 && y >= -1.01 && z >= -1.01 );
-#endif
 
     WriteFloat16( (float)x, -1.0f, 1.0f );
     WriteFloat16( (float)y, -1.0f, 1.0f );

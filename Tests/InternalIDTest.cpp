@@ -107,8 +107,8 @@ TEST_CASE( "An internal ID index outside the list reads and writes nothing", "[n
     CHECK( server->GetInternalID( UNASSIGNED_SYSTEM_ADDRESS, MAXIMUM_NUMBER_OF_INTERNAL_IDS ) == UNASSIGNED_SYSTEM_ADDRESS );
     CHECK( server->GetInternalID( UNASSIGNED_SYSTEM_ADDRESS, -1 ) == UNASSIGNED_SYSTEM_ADDRESS );
 
-#if !defined( _DEBUG )
-    // RakAssert stops a debug build here.
+#if defined( NDEBUG )
+    // The default RakAssert stops a build without NDEBUG here.
     server->SetInternalID( kSecondAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS );
     server->SetInternalID( kSecondAddress, -1 );
 #endif

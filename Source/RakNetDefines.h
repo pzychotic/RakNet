@@ -63,12 +63,9 @@
 #define MAXIMUM_NUMBER_OF_INTERNAL_IDS 10
 #endif
 
+// RakAssert follows NDEBUG like assert. Define it in RakNetDefinesOverrides.h to route it to your own handler.
 #ifndef RakAssert
-#if defined( _DEBUG )
-#define RakAssert( x ) assert( x );
-#else
-#define RakAssert( x )
-#endif
+#define RakAssert( x ) assert( x )
 #endif
 
 /// This controls the amount of memory used per connection.

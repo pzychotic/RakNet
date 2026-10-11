@@ -991,9 +991,7 @@ uint32_t RakPeer::IncrementNextSendReceipt( void )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 uint32_t RakPeer::Send( const char* data, const int length, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber )
 {
-#ifdef _DEBUG
     RakAssert( data && length > 0 );
-#endif
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
@@ -1062,9 +1060,7 @@ void RakPeer::SendLoopback( const char* data, const int length )
 
 uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber )
 {
-#ifdef _DEBUG
     RakAssert( bitStream->GetNumberOfBytesUsed() > 0 );
-#endif
 
     RakAssert( !( reliability >= NUMBER_OF_RELIABILITIES || reliability < 0 ) );
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
@@ -1134,9 +1130,7 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 uint32_t RakPeer::SendList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber )
 {
-#ifdef _DEBUG
     RakAssert( data );
-#endif
 
     if( data == 0 || lengths == 0 )
         return 0;
@@ -1277,9 +1271,7 @@ Packet* RakPeer::Receive( void )
 
     } while( packet == 0 );
 
-#ifdef _DEBUG
     RakAssert( packet->data );
-#endif
 
     return packet;
 }
@@ -3128,9 +3120,7 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
     RemoteSystemStruct* remoteSystem;
     unsigned i, j, assignedIndex;
     RakNet::TimeMS time = RakNet::GetTimeMS();
-#ifdef _DEBUG
     RakAssert( systemAddress != UNASSIGNED_SYSTEM_ADDRESS );
-#endif
 
     if( limitConnectionFrequencyFromTheSameIP )
     {
@@ -3264,10 +3254,8 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& systemAddress ) const
 {
-#ifdef _DEBUG
     RakAssert( IsActive() );
     RakAssert( data );
-#endif
 
     BitStream timeBS( data, sizeof( RakNet::Time ), false );
     RakNet::Time encodedTimestamp;
@@ -3893,9 +3881,7 @@ void RakPeer::PingInternal( const SystemAddress target, bool performImmediate, P
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bool sendDisconnectionNotification, bool performImmediate, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )
 {
-#ifdef _DEBUG
     RakAssert( orderingChannel < 32 );
-#endif
 
     if( systemIdentifier.IsUndefined() )
         return;
