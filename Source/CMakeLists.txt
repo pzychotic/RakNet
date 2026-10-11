@@ -2,8 +2,94 @@ if( RAKNET_ENABLE_PLUGINS )
     add_subdirectory( Plugins )
 endif()
 
-file( GLOB CURRENT_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/*.h )
-file( GLOB CURRENT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp )
+set( CURRENT_HEADER
+    ${CMAKE_CURRENT_SOURCE_DIR}/BitStream.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetSlidingWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetUDT.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/CommandParserInterface.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ConsoleServer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/DR_SHA1.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Export.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/GetTime.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTree.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTreeNode.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/InternalPacket.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/LinuxStrings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/LogCommandParser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/MTUSize.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/MessageIdentifiers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/NativeFeatureIncludes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/NativeFeatureIncludesOverrides.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/PacketPriority.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/PacketizedTCP.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/PlatformRandom.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/PluginInterface2.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakAssert.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakMemoryOverride.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetCommandParser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetDefines.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetDefinesOverrides.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetSocket2.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetStatistics.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetTime.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetTypes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetVersion.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakPeer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakPeerInterface.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakThread.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Rand.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SecureHandshake.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SequenceRanges.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SignaledEvent.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SocketDefines.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SocketIncludes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SocketLayer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressor.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/SuperFastHash.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/TCPByteBuffer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterface.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ThreadsafeQueue.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/TransportInterface.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/WSAStartupSingleton.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/WindowsIncludes.h
+)
+
+set( CURRENT_SOURCE
+    ${CMAKE_CURRENT_SOURCE_DIR}/BitStream.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetSlidingWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetUDT.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/CommandParserInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ConsoleServer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/DR_SHA1.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/GetTime.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LinuxStrings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LogCommandParser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PacketizedTCP.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PlatformRandom.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PluginInterface2.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakMemoryOverride.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetCommandParser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetSocket2.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetSocket2_Berkley.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetStatistics.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetTypes.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakPeer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakThread.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Rand.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SecureHandshake.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SignaledEvent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SocketLayer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StringUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SuperFastHash.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TCPByteBuffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/WSAStartupSingleton.cpp
+)
 
 set( TARGET_HEADER ${TARGET_HEADER} ${CURRENT_HEADER} )
 set( TARGET_SOURCE ${TARGET_SOURCE} ${CURRENT_SOURCE} )
