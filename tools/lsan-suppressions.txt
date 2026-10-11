@@ -6,8 +6,3 @@
 #
 # leak: matches any frame of the allocation stack, so name the function that makes the
 # leaked object, not an allocator it calls.
-
-# StatisticsHistory::TrackedObject never deletes the TimeAndValueQueue it makes for each key.
-# Its destructor frees nothing, so one queue and its deque nodes leak per key added. Every
-# leaked allocation has AddValueByIndex on its stack, and nothing else allocated there leaks.
-leak:RakNet::StatisticsHistory::AddValueByIndex

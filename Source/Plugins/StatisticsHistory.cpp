@@ -655,10 +655,8 @@ StatisticsHistory::TimeAndValueQueue& StatisticsHistory::TimeAndValueQueue::oper
 StatisticsHistory::TrackedObject::TrackedObject() {}
 StatisticsHistory::TrackedObject::~TrackedObject()
 {
-    // ??? WTF
-    //std::vector<StatisticsHistory::TimeAndValueQueue*> itemList;
-    //for( unsigned int idx = 0; idx < itemList.size(); idx++ )
-    //    RakNet::OP_DELETE( itemList[idx], _FILE_AND_LINE_ );
+    for( const auto& entry : dataQueues )
+        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
 }
 
 unsigned int StatisticsHistory::GetObjectIndex( uint64_t objectId ) const
