@@ -1294,7 +1294,7 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     if( orderingChannel >= NUMBER_OF_ORDERED_STREAMS )
         orderingChannel = 0;
 
-    unsigned int numberOfBytesToSend = (unsigned int)BitsToBytes( numberOfBitsToSend );
+    unsigned int numberOfBytesToSend = BitsToBytes( numberOfBitsToSend );
     if( numberOfBitsToSend == 0 )
     {
         return false;
@@ -1394,7 +1394,7 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( internalPacket->priority ), internalPacket } );
     RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
     statistics.messageInSendBuffer[(int)internalPacket->priority]++;
-    statistics.bytesInSendBuffer[(int)internalPacket->priority] += (double)BitsToBytes( internalPacket->dataBitLength );
+    statistics.bytesInSendBuffer[(int)internalPacket->priority] += BitsToBytes( internalPacket->dataBitLength );
 
     return true;
 }
@@ -1742,7 +1742,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                         outgoingPacketBuffer.pop();
                         RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
                         statistics.messageInSendBuffer[(int)internalPacket->priority]--;
-                        statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BitsToBytes( internalPacket->dataBitLength );
+                        statistics.bytesInSendBuffer[(int)internalPacket->priority] -= BitsToBytes( internalPacket->dataBitLength );
                         ReleaseInternalPacket( internalPacket );
                         continue;
                     }
@@ -1768,7 +1768,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                     RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
                     RakAssert( internalPacket->messageNumberAssigned == false );
                     statistics.messageInSendBuffer[(int)internalPacket->priority]--;
-                    statistics.bytesInSendBuffer[(int)internalPacket->priority] -= (double)BitsToBytes( internalPacket->dataBitLength );
+                    statistics.bytesInSendBuffer[(int)internalPacket->priority] -= BitsToBytes( internalPacket->dataBitLength );
                     if( isReliable
                         // I thought about this and agree that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT and RELIABLE_SEQUENCED_WITH_ACK_RECEIPT is not useful unless you also know if the message was discarded.
                         // The problem is that internally, message numbers are only assigned to reliable messages, because message numbers are only used to discard duplicate message receipt and only reliable messages get sent more than once. However, without message numbers getting assigned and transmitted, there is no way to tell the sender about which messages were discarded. In fact, in looking this over I realized that UNRELIABLE_SEQUENCED_WITH_ACK_RECEIPT introduced a bug, because the remote system assumes all message numbers are used (no holes). With that send type, on packetloss, a permanent hole would have been created which eventually would cause the system to discard all further packets.
@@ -2145,7 +2145,7 @@ unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSeque
         statistics.bytesInResendBuffer -= BitsToBytes( internalPacket->dataBitLength );
 
         //      orderingIndex = internalPacket->orderingIndex;
-        totalUserDataBytesAcked += (double)BitsToBytes( internalPacket->headerLength + internalPacket->dataBitLength );
+        totalUserDataBytesAcked += BitsToBytes( internalPacket->headerLength + internalPacket->dataBitLength );
 
         // Return receipt if asked for
         if( internalPacket->reliability >= RELIABLE_WITH_ACK_RECEIPT &&
@@ -2527,8 +2527,8 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 {
     // Doing all sizes in bytes in this function so I don't write partial bytes with split packets
     internalPacket->splitPacketCount = 1; // This causes GetMessageHeaderLengthBits to account for the split packet header
-    unsigned int headerLength = (unsigned int)BitsToBytes( GetMessageHeaderLengthBits( internalPacket ) );
-    unsigned int dataByteLength = (unsigned int)BitsToBytes( internalPacket->dataBitLength );
+    unsigned int headerLength = BitsToBytes( GetMessageHeaderLengthBits( internalPacket ) );
+    unsigned int dataByteLength = BitsToBytes( internalPacket->dataBitLength );
     // Unsigned, matching dataByteLength. As int, byteOffset was a signed product of a chunk
     // index and a block size; MAXIMUM_MESSAGE_SIZE keeps it far below INT_MAX now, but the
     // signed arithmetic is gone rather than merely made unreachable.
@@ -2583,7 +2583,7 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
         outgoingPacketBuffer.emplace( WeightedPacket{ GetNextWeight( chunk->priority ), chunk } );
         RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
         statistics.messageInSendBuffer[(int)chunk->priority]++;
-        statistics.bytesInSendBuffer[(int)chunk->priority] += (double)BitsToBytes( chunk->dataBitLength );
+        statistics.bytesInSendBuffer[(int)chunk->priority] += BitsToBytes( chunk->dataBitLength );
     }
 
     splitPacketId++; // It's ok if this wraps to 0
@@ -2710,7 +2710,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         // Write byteLength (4)
         // Write data, channel->splitPacketList[0]->data
         InternalPacket* progressIndicator = AllocateInternalPacket();
-        unsigned int length = sizeof( MessageID ) + sizeof( unsigned int ) * 2 + sizeof( unsigned int ) + (unsigned int)BitsToBytes( channel->firstPacket->dataBitLength );
+        unsigned int length = sizeof( MessageID ) + sizeof( unsigned int ) * 2 + sizeof( unsigned int ) + BitsToBytes( channel->firstPacket->dataBitLength );
         AllocInternalPacketData( progressIndicator, length, false, __FILE__, __LINE__ );
         progressIndicator->dataBitLength = BytesToBits( length );
         progressIndicator->data[0] = (MessageID)ID_DOWNLOAD_PROGRESS;
@@ -2719,10 +2719,10 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         memcpy( progressIndicator->data + sizeof( MessageID ), &temp, sizeof( unsigned int ) );
         temp = (unsigned int)internalPacket->splitPacketCount;
         memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 1, &temp, sizeof( unsigned int ) );
-        temp = (unsigned int)BitsToBytes( channel->firstPacket->dataBitLength );
+        temp = BitsToBytes( channel->firstPacket->dataBitLength );
         memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 2, &temp, sizeof( unsigned int ) );
 
-        memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, channel->firstPacket->data, (size_t)BitsToBytes( channel->firstPacket->dataBitLength ) );
+        memcpy( progressIndicator->data + sizeof( MessageID ) + sizeof( unsigned int ) * 3, channel->firstPacket->data, BitsToBytes( channel->firstPacket->dataBitLength ) );
         outputQueue.push_back( progressIndicator );
     }
 
@@ -3015,14 +3015,14 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
         internalPacket->dataBitLength += splitPacketChannel->splitPacketList.Get( j )->dataBitLength;
     // splitPacketPartLength=BitsToBytes(splitPacketChannel->firstPacket->dataBitLength);
 
-    internalPacket->data = (unsigned char*)rakMalloc_Ex( (size_t)BitsToBytes( internalPacket->dataBitLength ), _FILE_AND_LINE_ );
+    internalPacket->data = (unsigned char*)rakMalloc_Ex( BitsToBytes( internalPacket->dataBitLength ), _FILE_AND_LINE_ );
     internalPacket->allocationScheme = InternalPacket::NORMAL;
 
     BitSize_t offset = 0;
     for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
     {
         splitPacket = splitPacketChannel->splitPacketList.Get( j );
-        memcpy( internalPacket->data + BitsToBytes( offset ), splitPacket->data, (size_t)BitsToBytes( splitPacket->dataBitLength ) );
+        memcpy( internalPacket->data + BitsToBytes( offset ), splitPacket->data, BitsToBytes( splitPacket->dataBitLength ) );
         offset += splitPacket->dataBitLength;
     }
 

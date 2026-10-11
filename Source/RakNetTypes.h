@@ -93,6 +93,7 @@ constexpr BitSize_t BitsToBytes( BitSize_t bits ) noexcept
     return ( bits + 7 ) >> 3;
 }
 
+/// Given a number of bytes, return how many bits they hold.
 constexpr BitSize_t BytesToBits( BitSize_t bytes ) noexcept
 {
     return bytes << 3;

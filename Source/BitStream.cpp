@@ -532,7 +532,7 @@ bool BitStream::ReadBits( unsigned char* inOutByteArray, BitSize_t numberOfBitsT
 
     BitSize_t offset = 0;
 
-    memset( inOutByteArray, 0, (size_t)BitsToBytes( numberOfBitsToRead ) );
+    memset( inOutByteArray, 0, BitsToBytes( numberOfBitsToRead ) );
 
     while( numberOfBitsToRead > 0 )
     {
@@ -676,7 +676,7 @@ void BitStream::AddBitsAndReallocate( const BitSize_t numberOfBitsToWrite )
                 RakAssert( data );
 
                 // need to copy the stack data over to our new memory area too
-                memcpy( (void*)data, (void*)stackData, (size_t)BitsToBytes( numberOfBitsAllocated ) );
+                memcpy( (void*)data, (void*)stackData, BitsToBytes( numberOfBitsAllocated ) );
             }
         }
         else
@@ -933,8 +933,8 @@ BitSize_t BitStream::CopyData( unsigned char** _data ) const
 {
     RakAssert( numberOfBitsUsed > 0 );
 
-    *_data = (unsigned char*)rakMalloc_Ex( (size_t)BitsToBytes( numberOfBitsUsed ), _FILE_AND_LINE_ );
-    memcpy( *_data, data, sizeof( unsigned char ) * (size_t)( BitsToBytes( numberOfBitsUsed ) ) );
+    *_data = (unsigned char*)rakMalloc_Ex( BitsToBytes( numberOfBitsUsed ), _FILE_AND_LINE_ );
+    memcpy( *_data, data, sizeof( unsigned char ) * BitsToBytes( numberOfBitsUsed ) );
     return numberOfBitsUsed;
 }
 
@@ -965,10 +965,10 @@ void BitStream::AssertCopyData( void )
 
         if( numberOfBitsAllocated > 0 )
         {
-            unsigned char* newdata = (unsigned char*)rakMalloc_Ex( (size_t)BitsToBytes( numberOfBitsAllocated ), _FILE_AND_LINE_ );
+            unsigned char* newdata = (unsigned char*)rakMalloc_Ex( BitsToBytes( numberOfBitsAllocated ), _FILE_AND_LINE_ );
             RakAssert( data );
 
-            memcpy( newdata, data, (size_t)BitsToBytes( numberOfBitsAllocated ) );
+            memcpy( newdata, data, BitsToBytes( numberOfBitsAllocated ) );
             data = newdata;
         }
 

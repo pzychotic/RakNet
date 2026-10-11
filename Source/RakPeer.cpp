@@ -1036,10 +1036,10 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
         return usedSendReceipt;
     }
 
-    // BytesToBits on a BitSize_t, not `length * 8`: the latter is int arithmetic and is
+    // BytesToBits computes in BitSize_t, not `length * 8`: the latter is int arithmetic and is
     // undefined for length > 268435455, which the size check above now rejects - but the
     // conversion is gone rather than merely made unreachable.
-    SendBuffered( data, BytesToBits( (BitSize_t)length ), priority, reliability, orderingChannel, systemIdentifier, broadcast, RemoteSystemStruct::NO_ACTION, usedSendReceipt );
+    SendBuffered( data, BytesToBits( length ), priority, reliability, orderingChannel, systemIdentifier, broadcast, RemoteSystemStruct::NO_ACTION, usedSendReceipt );
 
     return usedSendReceipt;
 }
@@ -3991,7 +3991,7 @@ bool RakPeer::IsClosing( RemoteSystemStruct::ConnectMode connectMode )
 void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
     BufferedCommandStruct bcs{};
-    bcs.data = (char*)rakMalloc_Ex( (size_t)BitsToBytes( numberOfBitsToSend ), _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
+    bcs.data = (char*)rakMalloc_Ex( BitsToBytes( numberOfBitsToSend ), _FILE_AND_LINE_ ); // Making a copy doesn't lose efficiency because I tell the reliability layer to use this allocation for its own copy
     if( bcs.data == 0 )
     {
         notifyOutOfMemory( _FILE_AND_LINE_ );
@@ -4002,7 +4002,7 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
     RakAssert( !( priority >= NUMBER_OF_PRIORITIES || priority < 0 ) );
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
 
-    memcpy( bcs.data, data, (size_t)BitsToBytes( numberOfBitsToSend ) );
+    memcpy( bcs.data, data, BitsToBytes( numberOfBitsToSend ) );
     bcs.numberOfBitsToSend = numberOfBitsToSend;
     bcs.priority = priority;
     bcs.reliability = reliability;
@@ -5635,7 +5635,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
             }
 
             // Fast and easy - just use the data that was returned
-            byteSize = (unsigned int)BitsToBytes( bitSize );
+            byteSize = BitsToBytes( bitSize );
 
             // For unknown senders we only accept a few specific packets
             if( remoteSystem->connectMode == RemoteSystemStruct::UNVERIFIED_SENDER )

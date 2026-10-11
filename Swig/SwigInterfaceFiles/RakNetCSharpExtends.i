@@ -45,7 +45,7 @@
 	{
 		BitSize_t returnVal;
 		returnVal=self->GetNumberOfBitsAllocated();
-		memcpy(inOutByteArray, self->GetData(), sizeof(unsigned char) * (size_t) ( RakNet::BitsToBytes( returnVal ) ) );
+		memcpy(inOutByteArray, self->GetData(), sizeof(unsigned char) * RakNet::BitsToBytes( returnVal ) );
 		return returnVal;
 	}
 

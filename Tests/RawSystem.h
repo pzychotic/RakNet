@@ -206,7 +206,7 @@ inline bool DatagramCarriesMessage( const char* data, int length, MessageID mess
                 return false;
         }
 
-        const unsigned int dataBytes = (unsigned int)BitsToBytes( dataBitLength );
+        const unsigned int dataBytes = BitsToBytes( dataBitLength );
         if( in.GetNumberOfUnreadBits() < BytesToBits( dataBytes ) )
             return false;
 
