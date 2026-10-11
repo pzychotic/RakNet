@@ -1,15 +1,21 @@
 #include "Plugins/MessageFilter.h"
 
 #include "BitStream.h"
+#include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "RakNetTypes.h"
 #include "StringCompressorScope.h"
+#include "TCPInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <chrono>
+#include <future>
+#include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -237,4 +243,133 @@ TEST_CASE( "MessageFilter lists its filter sets in ID order and keeps the others
     filter.DeleteFilterSet( 5 );
 
     CHECK( filterSetIDs() == std::vector<int>{ 3, 7 } );
+}
+
+namespace {
+
+// Update checks timeouts at most once a second, counted from construction. Rewinding
+// the last check lets a test run one straight away.
+class CheckableMessageFilter : public MessageFilter
+{
+public:
+    void MakeTimeoutCheckDue( void ) { whenLastTimeoutCheck = RakNet::GetTime() - 2000; }
+};
+
+struct TimeoutCalls
+{
+    std::vector<SystemAddress> systems;
+    MessageFilter* deleteSetFrom = nullptr;
+};
+
+void RecordTimeout( RakPeerInterface*, AddressOrGUID system, int filterSetID, void* userData )
+{
+    auto* calls = static_cast<TimeoutCalls*>( userData );
+    calls->systems.push_back( system.systemAddress );
+    if( calls->deleteSetFrom )
+        calls->deleteSetFrom->DeleteFilterSet( filterSetID );
+}
+
+// An expired System is kicked through whichever interface the plugin is attached to,
+// and a bare plugin has neither. A TCPInterface that was never started takes the kick
+// and does nothing, and leaves rakPeerInterface null. The timeout callbacks record into
+// calls, which lives as long as the filter that calls them.
+struct UpdateRig
+{
+    UpdateRig() { tcp.AttachPlugin( &filter ); }
+    ~UpdateRig() { tcp.DetachPlugin( &filter ); }
+
+    CheckableMessageFilter filter;
+    TCPInterface tcp;
+    TimeoutCalls calls;
+};
+
+// A timeout check over a few Systems returns in well under a millisecond, so a check
+// still running after this long never returns.
+constexpr std::chrono::seconds kUpdateReturnBudget( 5 );
+
+// Runs one timeout check on another thread and waits for it. A check that never returns
+// can't be joined or stopped, so the thread is detached and the rig it is still using is
+// leaked to it. The test fails and the rest of the run goes on.
+bool UpdateReturns( std::unique_ptr<UpdateRig>& rig )
+{
+    rig->filter.MakeTimeoutCheckDue();
+
+    auto returned = std::make_shared<std::promise<void>>();
+    std::future<void> future = returned->get_future();
+    UpdateRig* raw = rig.get();
+    std::thread( [raw, returned] {
+        raw->filter.Update();
+        returned->set_value();
+    } ).detach();
+
+    if( future.wait_for( kUpdateReturnBudget ) == std::future_status::ready )
+        return true;
+
+    (void)rig.release();
+    return false;
+}
+
+constexpr int kLiveSetID = 1;
+constexpr int kExpiringSetID = 2;
+
+const SystemAddress kLiveSystem( "1.2.3.4", 30000 );
+const SystemAddress kExpiredSystem( "5.6.7.8", 30000 );
+const SystemAddress kOtherExpiredSystem( "9.10.11.12", 30000 );
+
+// Gives kExpiringSetID a 1 ms limit and a timeout callback that records into rig.calls,
+// puts kLiveSystem in a set with no limit and expiringSystems in kExpiringSetID, and
+// waits out the limit.
+void ExpireSystems( UpdateRig& rig, const std::vector<SystemAddress>& expiringSystems )
+{
+    rig.filter.SetFilterMaxTime( 1, false, 0, kExpiringSetID );
+    rig.filter.SetTimeoutCallback( kExpiringSetID, &rig.calls, RecordTimeout );
+    rig.filter.SetSystemFilterSet( kLiveSystem, kLiveSetID );
+    for( const SystemAddress& system : expiringSystems )
+        rig.filter.SetSystemFilterSet( system, kExpiringSetID );
+
+    const RakNet::TimeMS start = RakNet::GetTimeMS();
+    while( RakNet::GetTimeMS() - start < 2 )
+        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+}
+
+} // namespace
+
+TEST_CASE( "MessageFilter's timeout check returns with a System in a set that has no time limit", "[messagefilter]" )
+{
+    auto rig = std::make_unique<UpdateRig>();
+    rig->filter.SetSystemFilterSet( kLiveSystem, kLiveSetID );
+
+    REQUIRE( UpdateReturns( rig ) );
+
+    CHECK( rig->filter.GetSystemFilterSet( kLiveSystem ) == kLiveSetID );
+}
+
+TEST_CASE( "MessageFilter's timeout check removes the expired System and keeps the live one", "[messagefilter]" )
+{
+    auto rig = std::make_unique<UpdateRig>();
+    ExpireSystems( *rig, { kExpiredSystem } );
+
+    REQUIRE( UpdateReturns( rig ) );
+
+    CHECK( rig->calls.systems == std::vector<SystemAddress>{ kExpiredSystem } );
+    CHECK( rig->filter.GetSystemFilterSet( kExpiredSystem ) == -1 );
+    CHECK( rig->filter.GetSystemFilterSet( kLiveSystem ) == kLiveSetID );
+    CHECK( rig->filter.GetSystemCount( -1 ) == 1 );
+}
+
+TEST_CASE( "MessageFilter's timeout callback may delete the expired System's filter set", "[messagefilter]" )
+{
+    // Deleting the set takes the other expired System out with it, so it gets no
+    // callback of its own.
+    auto rig = std::make_unique<UpdateRig>();
+    rig->calls.deleteSetFrom = &rig->filter;
+    ExpireSystems( *rig, { kExpiredSystem, kOtherExpiredSystem } );
+
+    REQUIRE( UpdateReturns( rig ) );
+
+    CHECK( rig->calls.systems.size() == 1 );
+    CHECK( rig->filter.GetSystemFilterSet( kExpiredSystem ) == -1 );
+    CHECK( rig->filter.GetSystemFilterSet( kOtherExpiredSystem ) == -1 );
+    CHECK( rig->filter.GetSystemFilterSet( kLiveSystem ) == kLiveSetID );
+    CHECK( rig->filter.GetFilterSetCount() == 1 );
 }

@@ -23,6 +23,7 @@
 #include <iterator>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace RakNet {
 
@@ -30,6 +31,7 @@ STATIC_FACTORY_DEFINITIONS( MessageFilter, MessageFilter );
 
 MessageFilter::MessageFilter()
 {
+    autoAddNewConnectionsToFilter = -1;
     whenLastTimeoutCheck = RakNet::GetTime();
 }
 MessageFilter::~MessageFilter()
@@ -243,35 +245,50 @@ void MessageFilter::Update( void )
     RakNet::Time curTime = RakNet::GetTime();
     if( GreaterThan( curTime - 1000, whenLastTimeoutCheck ) )
     {
-        for( auto it = systemList.begin(); it != systemList.end(); )
+        const auto isExpired = [curTime]( const FilteredSystem& system ) {
+            const FilterSet* filter = system.filter;
+            return filter && filter->maxMemberTimeMS > 0 &&
+                   curTime - system.timeEnteredThisSet >= filter->maxMemberTimeMS;
+        };
+
+        // The timeout callback may change systemList and free filter sets, so the expired
+        // Systems are collected first, and each one is looked up again before it is acted on.
+        std::vector<AddressOrGUID> expired;
+        for( const auto& [key, system] : systemList )
         {
-            const AddressOrGUID& key = it->first;
-            const FilteredSystem& value = it->second;
-            const FilterSet* filter = value.filter;
+            if( isExpired( system ) )
+                expired.push_back( key );
+        }
 
-            if( filter && filter->maxMemberTimeMS > 0 &&
-                curTime - value.timeEnteredThisSet >= filter->maxMemberTimeMS )
+        for( const AddressOrGUID& key : expired )
+        {
+            const auto it = systemList.find( key );
+            if( it == systemList.end() || !isExpired( it->second ) )
+                continue;
+
+            // Read before the callback, which may delete the set.
+            const FilterSet* filter = it->second.filter;
+            const bool banOnFilterTimeExceed = filter->banOnFilterTimeExceed;
+            const RakNet::TimeMS timeExceedBanTimeMS = filter->timeExceedBanTimeMS;
+            if( filter->timeoutCallback )
             {
-                if( filter->timeoutCallback )
-                {
-                    filter->timeoutCallback( rakPeerInterface, key, filter->filterSetID, filter->timeoutUserData );
-                }
+                filter->timeoutCallback( rakPeerInterface, key, filter->filterSetID, filter->timeoutUserData );
+            }
 
-                if( filter->banOnFilterTimeExceed && rakPeerInterface )
-                {
-                    char str1[64];
-                    key.ToString( false, str1 );
-                    rakPeerInterface->AddToBanList( str1, filter->timeExceedBanTimeMS );
-                }
-                if( rakPeerInterface )
-                    rakPeerInterface->CloseConnection( key, true, 0 );
+            if( banOnFilterTimeExceed && rakPeerInterface )
+            {
+                char str1[64];
+                key.ToString( false, str1 );
+                rakPeerInterface->AddToBanList( str1, timeExceedBanTimeMS );
+            }
+            if( rakPeerInterface )
+                rakPeerInterface->CloseConnection( key, true, 0 );
 #if _RAKNET_SUPPORT_PacketizedTCP == 1 && _RAKNET_SUPPORT_TCPInterface == 1
-                else
-                    tcpInterface->CloseConnection( key.systemAddress );
+            else
+                tcpInterface->CloseConnection( key.systemAddress );
 #endif
 
-                it = systemList.erase( it );
-            }
+            systemList.erase( key );
         }
 
         whenLastTimeoutCheck = curTime + 1000;
