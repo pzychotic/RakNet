@@ -198,10 +198,7 @@ RakPeer::RakPeer()
     defaultMTUSize = mtuSizes[NUM_MTU_SIZES - 1];
     maximumIncomingConnections = 0;
     maximumNumberOfPeers = 0;
-    remoteSystemList = 0;
-    activeSystemList = 0;
     activeSystemListSize = 0;
-    remoteSystemLookup = 0;
     endThreads = true;
     isMainLoopThreadActive = false;
     incomingDatagramEventHandler = 0;
@@ -420,13 +417,13 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         maximumNumberOfPeers = maxConnections;
 
         // remoteSystemList in Single thread
-        remoteSystemList = RakNet::OP_NEW_ARRAY<RemoteSystemStruct>( maximumNumberOfPeers, _FILE_AND_LINE_ );
+        remoteSystemList = std::vector<RemoteSystemStruct>( maximumNumberOfPeers );
 
-        remoteSystemLookup = RakNet::OP_NEW_ARRAY<RemoteSystemIndex*>( (unsigned int)maximumNumberOfPeers * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE, _FILE_AND_LINE_ );
+        remoteSystemLookup = std::vector<RemoteSystemIndex*>( (size_t)maximumNumberOfPeers * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE );
 
-        activeSystemList = RakNet::OP_NEW_ARRAY<RemoteSystemStruct*>( maximumNumberOfPeers, _FILE_AND_LINE_ );
+        activeSystemList = std::vector<RemoteSystemStruct*>( maximumNumberOfPeers );
 
-        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+        for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
         {
             // remoteSystemList in Single thread
             remoteSystemList[i].isActive = false;
@@ -443,11 +440,6 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
 
             // All entries in activeSystemList have valid pointers all the time.
             activeSystemList[i] = &remoteSystemList[i];
-        }
-
-        for( unsigned int i = 0; i < (unsigned int)maximumNumberOfPeers * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE; i++ )
-        {
-            remoteSystemLookup[i] = 0;
         }
 
         // Empty, and big enough that PublishView never allocates.
@@ -777,8 +769,6 @@ ConnectionAttemptResult RakPeer::ConnectWithSocket( const char* host, unsigned s
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )
 {
-    unsigned int systemListSize = maximumNumberOfPeers;
-
     SetAcceptingQueries( false );
 
     if( blockDuration > 0 )
@@ -856,7 +846,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     ClearPublishedView();
 
     // remoteSystemList in Single thread
-    for( unsigned int i = 0; i < systemListSize; i++ )
+    for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
     {
         // Reserve this reliability layer for ourselves
         remoteSystemList[i].isActive = false;
@@ -895,13 +885,11 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     reliabilityBufferBudget.DetachAll();
 
     // Clear out the reliability layer list in case we want to reallocate it in a successive call to Init.
-    RemoteSystemStruct* temp = remoteSystemList;
-    remoteSystemList = 0;
-    RakNet::OP_DELETE_ARRAY( temp, _FILE_AND_LINE_ );
-    RakNet::OP_DELETE_ARRAY( activeSystemList, _FILE_AND_LINE_ );
-    activeSystemList = 0;
+    // Swapped out, so the member is already empty while the records are destroyed.
+    std::vector<RemoteSystemStruct>().swap( remoteSystemList );
+    std::vector<RemoteSystemStruct*>().swap( activeSystemList );
 
-    ClearRemoteSystemLookup( systemListSize * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE );
+    ClearRemoteSystemLookup();
 
     ResetSendReceipt();
 }
@@ -1007,7 +995,7 @@ uint32_t RakPeer::Send( const char* data, const int length, PacketPriority prior
     if( (unsigned int)length > MAXIMUM_MESSAGE_SIZE )
         return 0;
 
-    if( remoteSystemList == 0 || endThreads == true )
+    if( IsActive() == false )
         return 0;
 
     if( broadcast == false && systemIdentifier.IsUndefined() )
@@ -1073,7 +1061,7 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
     if( bitStream->GetNumberOfBytesUsed() > MAXIMUM_MESSAGE_SIZE )
         return 0;
 
-    if( remoteSystemList == 0 || endThreads == true )
+    if( IsActive() == false )
         return 0;
 
     if( broadcast == false && systemIdentifier.IsUndefined() )
@@ -1135,7 +1123,7 @@ uint32_t RakPeer::SendList( const char** data, const int* lengths, const int num
     if( data == 0 || lengths == 0 )
         return 0;
 
-    if( remoteSystemList == 0 || endThreads == true )
+    if( IsActive() == false )
         return 0;
 
     if( numParameters == 0 )
@@ -2010,11 +1998,11 @@ unsigned int RakPeer::GetSystemIndexFromGuid( const RakNetGUID input ) const
     if( input == myGuid )
         return (unsigned int)-1;
 
-    if( input.systemIndex != (SystemIndex)-1 && input.systemIndex < maximumNumberOfPeers && remoteSystemList[input.systemIndex].guid == input )
+    if( input.systemIndex != (SystemIndex)-1 && input.systemIndex < remoteSystemList.size() && remoteSystemList[input.systemIndex].guid == input )
         return input.systemIndex;
 
     unsigned int i;
-    for( i = 0; i < maximumNumberOfPeers; i++ )
+    for( i = 0; i < remoteSystemList.size(); i++ )
     {
         if( remoteSystemList[i].guid == input )
         {
@@ -2417,7 +2405,7 @@ void RakPeer::ApplyConnectionSetting( const BufferedCommandStruct& bcs )
     case BufferedCommandStruct::BCS_SET_TIMEOUT_TIME:
         if( bcs.systemIdentifier.systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         {
-            for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+            for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
                 if( remoteSystemList[i].isActive )
                     remoteSystemList[i].reliabilityLayer.SetTimeoutTime( bcs.timeMS );
         }
@@ -2429,17 +2417,17 @@ void RakPeer::ApplyConnectionSetting( const BufferedCommandStruct& bcs )
         }
         break;
     case BufferedCommandStruct::BCS_SET_SPLIT_MESSAGE_PROGRESS_INTERVAL:
-        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+        for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
             remoteSystemList[i].reliabilityLayer.SetSplitMessageProgressInterval( bcs.interval );
         break;
     case BufferedCommandStruct::BCS_SET_UNRELIABLE_TIMEOUT:
-        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+        for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
             remoteSystemList[i].reliabilityLayer.SetUnreliableTimeout( bcs.timeMS );
         break;
     case BufferedCommandStruct::BCS_APPLY_NETWORK_SIMULATOR:
         // Every slot, open or not: a new connection record keeps what its slot was given,
         // since ReliabilityLayer::Reset leaves the simulator alone.
-        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+        for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
             remoteSystemList[i].reliabilityLayer.ApplyNetworkSimulator( bcs.packetloss, bcs.minExtraPing, bcs.extraPingVariance );
         break;
     default:
@@ -2673,7 +2661,7 @@ int RakPeer::GetRecordIndexFromSystemAddress( const SystemAddress systemAddress 
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
         return -1;
 
-    if( systemAddress.systemIndex != (SystemIndex)-1 && systemAddress.systemIndex < maximumNumberOfPeers && remoteSystemList[systemAddress.systemIndex].systemAddress == systemAddress && remoteSystemList[systemAddress.systemIndex].isActive )
+    if( systemAddress.systemIndex != (SystemIndex)-1 && systemAddress.systemIndex < remoteSystemList.size() && remoteSystemList[systemAddress.systemIndex].systemAddress == systemAddress && remoteSystemList[systemAddress.systemIndex].isActive )
         return systemAddress.systemIndex;
 
     return GetRemoteSystemIndex( systemAddress );
@@ -2886,7 +2874,7 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromSystemAddress( const Sy
         if( onlyActive == false || remoteSystemList[index].isActive == true )
         {
             RakAssert( remoteSystemList[index].systemAddress == systemAddress );
-            return remoteSystemList + index;
+            return &remoteSystemList[index];
         }
     }
 
@@ -2901,11 +2889,11 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromGUID( const RakNetGUID 
         return 0;
 
     unsigned i;
-    for( i = 0; i < maximumNumberOfPeers; i++ )
+    for( i = 0; i < remoteSystemList.size(); i++ )
     {
         if( remoteSystemList[i].guid == guid && ( onlyActive == false || remoteSystemList[i].isActive ) )
         {
-            return remoteSystemList + i;
+            return &remoteSystemList[i];
         }
     }
     return 0;
@@ -3096,7 +3084,7 @@ void RakPeer::NotifyAndFlagForShutdown( const SystemAddress systemAddress, bool 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::GetNumberOfRemoteInitiatedConnections( void ) const
 {
-    if( remoteSystemList == 0 || endThreads == true )
+    if( IsActive() == false )
         return 0;
 
     unsigned int numberOfIncomingConnections;
@@ -3126,7 +3114,7 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
     {
         if( IsLoopbackAddressInCycle( systemAddress, false ) == false )
         {
-            for( i = 0; i < maximumNumberOfPeers; i++ )
+            for( i = 0; i < remoteSystemList.size(); i++ )
             {
                 if( remoteSystemList[i].isActive == true &&
                     remoteSystemList[i].systemAddress.EqualsExcludingPort( systemAddress ) &&
@@ -3147,13 +3135,13 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
     bindingAddress.CopyPort( incomingRakNetSocket->GetBoundAddress() );
 
     *thisIPConnectedRecently = false;
-    for( assignedIndex = 0; assignedIndex < maximumNumberOfPeers; assignedIndex++ )
+    for( assignedIndex = 0; assignedIndex < remoteSystemList.size(); assignedIndex++ )
     {
         if( remoteSystemList[assignedIndex].isActive == false )
         {
             // printf("--- Address %s has become active\n", systemAddress.ToString());
 
-            remoteSystem = remoteSystemList + assignedIndex;
+            remoteSystem = &remoteSystemList[assignedIndex];
             ReferenceRemoteSystem( systemAddress, assignedIndex );
             remoteSystem->MTUSize = defaultMTUSize;
             remoteSystem->guid = guid;
@@ -3278,7 +3266,7 @@ RakNet::Time RakPeer::GetBestClockDifferential( const SystemAddress systemAddres
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::RemoteSystemLookupHashIndex( const SystemAddress& sa ) const
 {
-    return SystemAddress::ToInteger( sa ) % ( (unsigned int)maximumNumberOfPeers * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE );
+    return (unsigned int)( SystemAddress::ToInteger( sa ) % remoteSystemLookup.size() );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remoteSystemListIndex )
@@ -3404,14 +3392,13 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const SystemAddress& sa )
     unsigned int remoteSystemIndex = GetRemoteSystemIndex( sa );
     if( remoteSystemIndex == (unsigned int)-1 )
         return 0;
-    return remoteSystemList + remoteSystemIndex;
+    return &remoteSystemList[remoteSystemIndex];
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::ClearRemoteSystemLookup( unsigned int lookupSize )
+void RakPeer::ClearRemoteSystemLookup( void )
 {
-    for( unsigned int i = 0; remoteSystemLookup != 0 && i < lookupSize; i++ )
+    for( RemoteSystemIndex* cur : remoteSystemLookup )
     {
-        RemoteSystemIndex* cur = remoteSystemLookup[i];
         while( cur != 0 )
         {
             RemoteSystemIndex* next = cur->next;
@@ -3419,8 +3406,7 @@ void RakPeer::ClearRemoteSystemLookup( unsigned int lookupSize )
             cur = next;
         }
     }
-    RakNet::OP_DELETE_ARRAY( remoteSystemLookup, _FILE_AND_LINE_ );
-    remoteSystemLookup = 0;
+    std::vector<RemoteSystemIndex*>().swap( remoteSystemLookup );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Copies the first entry of \a view that \a matches into \a out. The caller holds the view's mutex.
@@ -3476,7 +3462,7 @@ void RakPeer::PublishView( void )
     // vectors were reserved to maximumNumberOfPeers in Startup, and a swap keeps capacity,
     // so nothing here allocates.
     publishedViewBuilding.clear();
-    for( unsigned int i = 0; remoteSystemList != 0 && i < maximumNumberOfPeers; i++ )
+    for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
     {
         RemoteSystemStruct& remoteSystem = remoteSystemList[i];
         if( remoteSystem.isActive == false )
@@ -3605,14 +3591,14 @@ void RakPeer::AnswerQuery( ConnectionQuery& query ) const
         break;
     }
     case ConnectionQuery::STATISTICS_BY_INDEX:
-        if( query.index < maximumNumberOfPeers && remoteSystemList[query.index].isActive )
+        if( query.index < remoteSystemList.size() && remoteSystemList[query.index].isActive )
         {
             remoteSystemList[query.index].reliabilityLayer.GetStatistics( &query.statistics );
             query.found = true;
         }
         break;
     case ConnectionQuery::STATISTICS_SUM:
-        for( unsigned int i = 0; i < maximumNumberOfPeers; i++ )
+        for( unsigned int i = 0; i < remoteSystemList.size(); i++ )
         {
             if( remoteSystemList[i].isActive == false )
                 continue;
@@ -3705,7 +3691,7 @@ void RakPeer::SetAcceptingQueries( bool accepting )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::AddToActiveSystemList( unsigned int remoteSystemListIndex )
 {
-    activeSystemList[activeSystemListSize++] = remoteSystemList + remoteSystemListIndex;
+    activeSystemList[activeSystemListSize++] = &remoteSystemList[remoteSystemListIndex];
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::RemoveFromActiveSystemList( const SystemAddress& sa )
@@ -3886,7 +3872,7 @@ void RakPeer::CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bo
     if( systemIdentifier.IsUndefined() )
         return;
 
-    if( remoteSystemList == 0 || endThreads == true )
+    if( IsActive() == false )
         return;
 
     SystemAddress target;
@@ -4140,7 +4126,7 @@ bool RakPeer::SendImmediate( char* data, BitSize_t numberOfBitsToSend, PacketPri
     // caller's allocation, is known without listing them all first.
     // remoteSystemList in network thread
     unsigned int heldIndex = (unsigned int)-1;
-    for( unsigned int idx = 0; idx < maximumNumberOfPeers; idx++ )
+    for( unsigned int idx = 0; idx < remoteSystemList.size(); idx++ )
     {
         if( remoteSystemIndex != (unsigned int)-1 && idx == remoteSystemIndex )
             continue;

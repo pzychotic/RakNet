@@ -97,8 +97,6 @@ TCPInterface::TCPInterface()
     isStopping = false;
     connectAttemptCount = 0;
     listenSocket = INVALID_SOCKET;
-    remoteClients = 0;
-    remoteClientsLength = 0;
     maxIncomingBytesPerClient = DEFAULT_MAXIMUM_INCOMING_BYTES_PER_CLIENT;
     maxOutgoingBytesPerClient = DEFAULT_MAXIMUM_OUTGOING_BYTES_PER_CLIENT;
     incomingBytesCapStallCount = 0;
@@ -121,8 +119,6 @@ TCPInterface::~TCPInterface()
 #ifdef _WIN32
     WSAStartupSingleton::Deref();
 #endif
-
-    RakNet::OP_DELETE_ARRAY( remoteClients, _FILE_AND_LINE_ );
 
     StringCompressor::RemoveReference();
 }
@@ -219,8 +215,7 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
         maxConnections = maxIncomingConnections;
     if( maxConnections == 0 )
         maxConnections = 1;
-    remoteClientsLength = maxConnections;
-    remoteClients = RakNet::OP_NEW_ARRAY<RemoteClient>( maxConnections, _FILE_AND_LINE_ );
+    remoteClients = std::vector<RemoteClient>( maxConnections );
 
     listenSocket = INVALID_SOCKET;
     if( maxIncomingConnections > 0 )
@@ -266,7 +261,7 @@ void TCPInterface::Stop( void )
         return;
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
-    for( int i = 0; i < remoteClientsLength; i++ )
+    for( int i = 0; i < (int)remoteClients.size(); i++ )
     {
         std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
         remoteClients[i].DisconnectSSL();
@@ -306,14 +301,13 @@ void TCPInterface::Stop( void )
     listenSocket = INVALID_SOCKET;
 
     // Stuff from here on to the end of the function is not threadsafe
-    for( int i = 0; i < remoteClientsLength; i++ )
+    for( int i = 0; i < (int)remoteClients.size(); i++ )
     {
         std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
         remoteClients[i].Free();
     }
-    remoteClientsLength = 0;
-    RakNet::OP_DELETE_ARRAY( remoteClients, _FILE_AND_LINE_ );
-    remoteClients = 0;
+    // Swapped out, so the member is already empty while the entries are destroyed.
+    std::vector<RemoteClient>().swap( remoteClients );
 
     while( std::optional<std::unique_ptr<Packet>> packet = incomingMessages.Pop() )
         DeallocatePacket( packet->release() );
@@ -420,7 +414,7 @@ void TCPInterface::CloseRemoteClientOverOutgoingCap( int index )
 void TCPInterface::ReleaseIncomingBytes( const Packet& packet )
 {
     const SystemIndex index = packet.systemAddress.systemIndex;
-    if( index >= remoteClientsLength )
+    if( index >= (int)remoteClients.size() )
         return;
 
     // A packet read from a connection since closed is charged to nobody: the entry's count
@@ -437,17 +431,17 @@ void TCPInterface::ReleaseIncomingBytes( const Packet& packet )
 }
 TCPInterface::RemoteClientSlot::RemoteClientSlot( TCPInterface& owner )
 : tcpInterface( owner )
-, index( owner.remoteClientsLength )
+, index( (int)owner.remoteClients.size() )
 , isPublished( false )
 , isReleasePending( false )
 {
-    for( int i = 0; i < owner.remoteClientsLength; i++ )
+    for( int i = 0; i < (int)owner.remoteClients.size(); i++ )
     {
         std::unique_lock<std::mutex> lock( owner.remoteClients[i].isActiveMutex );
         if( owner.remoteClients[i].state == RemoteClient::State::FREE )
         {
             // Keeps the entry's lock, so nothing else can claim it and the caller's writes
-            // land before Activate() publishes it. index stops being remoteClientsLength
+            // land before Activate() publishes it. index stops being remoteClients.size()
             // here, which is what IsClaimed reads.
             entryLock = std::move( lock );
             index = i;
@@ -462,7 +456,7 @@ TCPInterface::RemoteClientSlot::~RemoteClientSlot()
 }
 bool TCPInterface::RemoteClientSlot::IsClaimed( void ) const
 {
-    return index != tcpInterface.remoteClientsLength;
+    return index != (int)tcpInterface.remoteClients.size();
 }
 int TCPInterface::RemoteClientSlot::GetIndex( void ) const
 {
@@ -508,7 +502,7 @@ void TCPInterface::RemoteClientSlot::Release( void )
 
     // The entry is anyone's again, so this handle no longer names it: IsClaimed goes
     // false, and Get and GetIndex stop handing out a reference to a slot already given up.
-    index = tcpInterface.remoteClientsLength;
+    index = (int)tcpInterface.remoteClients.size();
 }
 void TCPInterface::RemoteClientSlot::Commit( void )
 {
@@ -699,9 +693,9 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
 
     // Broadcast sends to all but systemAddress. Otherwise the entry systemIndex names is
     // tried first, and the search is for when it does not name the connection.
-    if( broadcast || systemAddress.systemIndex >= remoteClientsLength || bufferFor( remoteClients[systemAddress.systemIndex] ) == false )
+    if( broadcast || systemAddress.systemIndex >= (int)remoteClients.size() || bufferFor( remoteClients[systemAddress.systemIndex] ) == false )
     {
-        for( i = 0; i < remoteClientsLength; i++ )
+        for( i = 0; i < (int)remoteClients.size(); i++ )
             bufferFor( remoteClients[i] );
     }
 
@@ -836,9 +830,9 @@ bool TCPInterface::CloseConnection( const SystemAddress& systemAddress, PI2_Lost
     // by construction. Each test and release is one step under the entry's lock, so an
     // entry the update loop has reported lost is never closed, or reported, a second time.
     bool isClosed = false;
-    if( systemAddress.systemIndex < remoteClientsLength )
+    if( systemAddress.systemIndex < (int)remoteClients.size() )
         isClosed = CloseRemoteClientAt( systemAddress.systemIndex, systemAddress );
-    for( int i = 0; isClosed == false && i < remoteClientsLength; i++ )
+    for( int i = 0; isClosed == false && i < (int)remoteClients.size(); i++ )
         isClosed = CloseRemoteClientAt( i, systemAddress );
 
 
@@ -981,7 +975,7 @@ void TCPInterface::GetConnectionList( SystemAddress* remoteSystems, unsigned sho
 {
     unsigned short systemCount = 0;
     unsigned short maxToWrite = *numberOfSystems;
-    for( int i = 0; i < remoteClientsLength; i++ )
+    for( int i = 0; i < (int)remoteClients.size(); i++ )
     {
         std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
         if( remoteClients[i].state == RemoteClient::State::ACTIVE )
@@ -996,7 +990,7 @@ void TCPInterface::GetConnectionList( SystemAddress* remoteSystems, unsigned sho
 unsigned short TCPInterface::GetConnectionCount( void ) const
 {
     unsigned short systemCount = 0;
-    for( int i = 0; i < remoteClientsLength; i++ )
+    for( int i = 0; i < (int)remoteClients.size(); i++ )
     {
         std::lock_guard<std::mutex> guard( remoteClients[i].isActiveMutex );
         if( remoteClients[i].state == RemoteClient::State::ACTIVE )
@@ -1020,7 +1014,7 @@ unsigned int TCPInterface::GetOutgoingDataBufferSize( SystemAddress systemAddres
     };
 
     bool isMatched = false;
-    if( systemAddress.systemIndex < remoteClientsLength )
+    if( systemAddress.systemIndex < (int)remoteClients.size() )
     {
         unsigned int bytesWritten = bytesFor( systemAddress.systemIndex, isMatched );
         if( isMatched )
@@ -1028,7 +1022,7 @@ unsigned int TCPInterface::GetOutgoingDataBufferSize( SystemAddress systemAddres
     }
 
     unsigned int bytesWritten = 0;
-    for( int i = 0; i < remoteClientsLength; i++ )
+    for( int i = 0; i < (int)remoteClients.size(); i++ )
         bytesWritten += bytesFor( i, isMatched );
     return bytesWritten;
 }
@@ -1224,8 +1218,8 @@ void UpdateTCPInterfaceLoop( void* arg )
     tv.tv_usec = 30000;
 
     // Each entry's generation when its socket went into the select sets, or 0 if it did not.
-    // remoteClientsLength is fixed while this thread runs.
-    std::vector<uint32_t> selectedGenerations( sts->remoteClientsLength, 0 );
+    // remoteClients.size() is fixed while this thread runs.
+    std::vector<uint32_t> selectedGenerations( sts->remoteClients.size(), 0 );
 
     while( sts->isStarted > 0 )
     {
@@ -1242,9 +1236,9 @@ void UpdateTCPInterfaceLoop( void* arg )
                     remoteClient.InitSSL( sts->ctx, sts->meth );
                 return true;
             };
-            if( sslSystemAddress->systemIndex >= sts->remoteClientsLength || initSSLAt( sslSystemAddress->systemIndex ) == false )
+            if( sslSystemAddress->systemIndex >= (int)sts->remoteClients.size() || initSSLAt( sslSystemAddress->systemIndex ) == false )
             {
-                for( int i = 0; i < sts->remoteClientsLength; i++ )
+                for( int i = 0; i < (int)sts->remoteClients.size(); i++ )
                     initSSLAt( i );
             }
         }
@@ -1265,7 +1259,7 @@ void UpdateTCPInterfaceLoop( void* arg )
         {
             // Clients SendOrBuffer flagged at the outgoing cap. Not left to the select below,
             // which a client that does not read may never make writable.
-            for( int i = 0; i < sts->remoteClientsLength; i++ )
+            for( int i = 0; i < (int)sts->remoteClients.size(); i++ )
             {
                 if( sts->remoteClients[i].isOverOutgoingCap )
                     sts->CloseRemoteClientOverOutgoingCap( i );
@@ -1283,7 +1277,7 @@ void UpdateTCPInterfaceLoop( void* arg )
                 largestDescriptor = sts->listenSocket; // @see largestDescriptor def
             }
 
-            for( int i = 0; i < sts->remoteClientsLength; i++ )
+            for( int i = 0; i < (int)sts->remoteClients.size(); i++ )
             {
                 RemoteClient& remoteClient = sts->remoteClients[i];
                 std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );
@@ -1393,7 +1387,7 @@ void UpdateTCPInterfaceLoop( void* arg )
             // a connect fill it in, part way through. An entry whose generation has changed
             // since select holds another connection, or none, and select's answer is not
             // about it.
-            for( int i = 0; i < sts->remoteClientsLength; i++ )
+            for( int i = 0; i < (int)sts->remoteClients.size(); i++ )
             {
                 RemoteClient& remoteClient = sts->remoteClients[i];
                 std::lock_guard<std::mutex> guard( remoteClient.isActiveMutex );

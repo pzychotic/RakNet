@@ -204,8 +204,9 @@ protected:
     __TCPSOCKET__ listenSocket;
 
     std::deque<Packet*> headPush, tailPush;
-    RemoteClient* remoteClients;
-    int remoteClientsLength;
+    /// Sized in Start and never resized: the update thread and RemoteClientSlot handles
+    /// index it while the user thread runs. Mutable, since const queries lock its entries.
+    mutable std::vector<RemoteClient> remoteClients;
 
     /// Made with new: Receive releases each to the application, and DeallocatePacket
     /// deletes it.
@@ -382,7 +383,7 @@ protected:
         TCPInterface& tcpInterface;
         std::unique_lock<std::mutex> entryLock;
 
-        /// remoteClientsLength when this handle holds no entry.
+        /// remoteClients.size() when this handle holds no entry.
         int index;
 
         /// Whether Activate() or Reserve() has dropped the entry's lock.

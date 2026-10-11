@@ -965,25 +965,31 @@ protected:
     /// This allows us to preallocate the list when starting, so we don't have to allocate or delete at runtime.
     /// Another benefit is that is lets us add and remove active players simply by setting systemAddress
     /// and moving elements in the list by copying pointers variables without affecting running threads, even if they are in the reliability layer
-    RemoteSystemStruct* remoteSystemList;
+    ///
+    /// Sized in Startup and never resized: activeSystemList, the remoteSystemLookup chains
+    /// and reliabilityBufferBudget point into it. Mutable, since const lookups return
+    /// records for the caller to change.
+    mutable std::vector<RemoteSystemStruct> remoteSystemList;
     /// The Peer-wide byte budget over what every slot's reliability layer holds for its
     /// System. Each slot of remoteSystemList is attached to it for as long as the list exists.
     ReliabilityBufferBudget reliabilityBufferBudget;
     /// activeSystemList holds a list of pointers and is preallocated to be the same size as remoteSystemList. It is updated only by the network thread, but read by both threads
     /// When the isActive member of RemoteSystemStruct is set to true or false, that system is added to this list of pointers
     /// Threadsafe because RemoteSystemStruct is preallocated, and the list is only added to, not removed from
-    RemoteSystemStruct** activeSystemList;
+    /// Sized in Startup and never resized. Its first activeSystemListSize entries are in use.
+    std::vector<RemoteSystemStruct*> activeSystemList;
     unsigned int activeSystemListSize;
 
     // Use a hash, with binaryAddress plus port mod length as the index
-    RemoteSystemIndex** remoteSystemLookup;
+    // Sized in Startup and never resized.
+    std::vector<RemoteSystemIndex*> remoteSystemLookup;
     unsigned int RemoteSystemLookupHashIndex( const SystemAddress& sa ) const;
     void ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remoteSystemListIndex );
     void DereferenceRemoteSystem( const SystemAddress& sa );
     RemoteSystemStruct* GetRemoteSystem( const SystemAddress& sa ) const;
     unsigned int GetRemoteSystemIndex( const SystemAddress& sa ) const;
-    /// Deletes every RemoteSystemIndex in the first \a lookupSize buckets, then the table.
-    void ClearRemoteSystemLookup( unsigned int lookupSize );
+    /// Deletes every RemoteSystemIndex in remoteSystemLookup, then empties it.
+    void ClearRemoteSystemLookup( void );
 
     void AddToActiveSystemList( unsigned int remoteSystemListIndex );
     void RemoveFromActiveSystemList( const SystemAddress& sa );

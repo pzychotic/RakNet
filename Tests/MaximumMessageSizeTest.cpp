@@ -26,7 +26,7 @@ ReliabilityLayer.cpp rather than here; what these cases pin is the behaviour at 
 and the fact that all three entry points share it.
 
 Deliberately tagged [send] and NOT [network]: a peer is started so Send gets past its
-`remoteSystemList == 0` guard, but nothing connects and nothing reaches a socket. Send
+`IsActive() == false` guard, but nothing connects and nothing reaches a socket. Send
 buffers the message and the peer is destroyed before any Update sends it.
 
 The accepting case is the expensive one - a real 32 MiB message - and it is not optional:
