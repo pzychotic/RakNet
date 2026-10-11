@@ -6,10 +6,8 @@
 Pins that BPSTracker holds one entry per distinct time, not one per value.
 
 ReliabilityLayer::Send records every Message with the time of the update cycle that applied
-it, so a burst of Sends applied in one cycle shares a single time. One entry per value made
-the ClearExpired1 a second later pop the whole burst at once, in the Update that had already
-read its clock, and the datagrams that Update sent left timed tens of milliseconds in the
-past. Values pushed at one time now add to one entry, so the clear does one pop per time.
+it, so a burst of Sends applied in one cycle shares a single time. Values pushed at one time
+add to one entry, so ClearExpired1 does one pop per time however large the burst.
 */
 
 using namespace RakNet;
