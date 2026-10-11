@@ -164,6 +164,50 @@ jobs:
           ctest --test-dir build -C RelWithDebInfo --output-on-failure --no-tests=error \
             -E '^256 clients'
 
+  # AddressSanitizer and LeakSanitizer: a double free, a use-after-free, a new/delete[]
+  # mismatch or a leak fails the test that hit it, every time. The suite alone catches these
+  # only by luck. Built like thread-sanitizer: clang, RelWithDebInfo, RAKNET_SUPPORT_IPV6 at
+  # its default, the full suite.
+  #
+  # abort_on_error makes any report abort its test process: an ASan error when it happens,
+  # a leak when LSan checks at exit. Either fails the job. ASan errors cannot be suppressed.
+  # Known leaks are suppressed in tools/lsan-suppressions.txt where a suppression can name
+  # them narrowly.
+  #
+  # One test is left out instead: the connection request echo test leaks one received
+  # message payload. The leak is allocated on the ordinary receive path, so a suppression
+  # would hide every leaked payload in the suite, not just this one.
+  address-sanitizer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CXX: clang++
+      CXXFLAGS: -fsanitize=address -fno-omit-frame-pointer
+      LDFLAGS: -fsanitize=address
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check that every suppression is explained
+        run: |
+          awk '/^[[:space:]]*$/ { commented = 0; next }
+               /^[[:space:]]*#/ { commented = 1; next }
+               !commented { print FILENAME ":" FNR ": no comment above: " $0; bad = 1 }
+               END { exit bad }' tools/lsan-suppressions.txt
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - name: Build
+        run: cmake --build build --parallel
+      # Suppressions match function names, so a report without symbols cannot be suppressed.
+      # clang's own llvm-symbolizer first, as in thread-sanitizer.
+      - name: Test
+        run: |
+          symbolizer=$(clang++ -print-prog-name=llvm-symbolizer)
+          test -x "$symbolizer" || symbolizer=$(command -v llvm-symbolizer || true)
+          test -x "$symbolizer" || { echo "llvm-symbolizer not found"; exit 1; }
+          export ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:external_symbolizer_path=$symbolizer"
+          export LSAN_OPTIONS="suppressions=$PWD/tools/lsan-suppressions.txt"
+          ctest --test-dir build -C RelWithDebInfo --output-on-failure --no-tests=error \
+            -E '^A connection request arriving on an established connection is echoed back'
+
   # ADR-0004: Source/ builds with exceptions disabled. Both jobs build Source/ only, because
   # Catch2 needs exceptions. Neither runs tests: a throw from Source/ turns the same test red
   # in both modes, so the ordinary cells already catch it.

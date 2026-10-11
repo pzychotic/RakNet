@@ -1,0 +1,13 @@
+# LeakSanitizer suppressions for the CI job that runs the suite under -fsanitize=address.
+#
+# Every entry is a known leak in Source/ that is still unfixed. Each block starts with a
+# comment saying which leak it hides, and CI rejects an entry without one. Remove an entry
+# together with the fix for its leak. A leak in Tests/ is fixed, not suppressed.
+#
+# leak: matches any frame of the allocation stack, so name the function that makes the
+# leaked object, not an allocator it calls.
+
+# StatisticsHistory::TrackedObject never deletes the TimeAndValueQueue it makes for each key.
+# Its destructor frees nothing, so one queue and its deque nodes leak per key added. Every
+# leaked allocation has AddValueByIndex on its stack, and nothing else allocated there leaks.
+leak:RakNet::StatisticsHistory::AddValueByIndex
