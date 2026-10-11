@@ -60,7 +60,7 @@ public:
         sata.senderClientAddress = source;
         sata.targetClientAddress = target;
         const auto it = forwardingRequestList.find( sata );
-        return it != forwardingRequestList.end() ? it->second : nullptr;
+        return it != forwardingRequestList.end() ? it->second.get() : nullptr;
     }
     size_t RequestCount() const { return forwardingRequestList.size(); }
 };

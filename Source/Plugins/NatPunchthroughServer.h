@@ -23,6 +23,7 @@
 #include "SocketIncludes.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -138,7 +139,7 @@ public:
 
 protected:
     void OnNATPunchthroughRequest( Packet* packet );
-    std::map<RakNetGUID, User*> users;
+    std::map<RakNetGUID, std::unique_ptr<User>> users;
 
     void OnGetMostRecentPort( Packet* packet );
     void OnClientReady( Packet* packet );

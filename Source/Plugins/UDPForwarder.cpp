@@ -95,10 +95,6 @@ void UDPForwarder::Shutdown( void )
         std::this_thread::sleep_for( std::chrono::milliseconds( 30 ) );
     }
 
-    for( ForwardEntry* pEntry : forwardListNotUpdated )
-    {
-        delete pEntry;
-    }
     forwardListNotUpdated.clear();
 }
 void UDPForwarder::SetMaxForwardEntries( unsigned short maxEntries )
@@ -353,7 +349,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
         {
             sfos.result = UDPFORWARDER_RESULT_COUNT;
 
-            for( ForwardEntry* pEntry : forwardListNotUpdated )
+            for( const auto& pEntry : forwardListNotUpdated )
             {
                 if( ( pEntry->addr1Unconfirmed == sfis->source &&
                       pEntry->addr2Unconfirmed == sfis->destination ) ||
@@ -372,7 +368,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
                 int sock_opt;
                 sockaddr_in listenerSocketAddress;
                 listenerSocketAddress.sin_port = 0;
-                ForwardEntry* fe = new UDPForwarder::ForwardEntry;
+                auto fe = std::make_unique<UDPForwarder::ForwardEntry>();
                 fe->addr1Unconfirmed = sfis->source;
                 fe->addr2Unconfirmed = sfis->destination;
                 fe->timeoutOnNoDataMS = sfis->timeoutOnNoDataMS;
@@ -393,7 +389,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
                 int ret = bind__( fe->socket, (struct sockaddr*)&listenerSocketAddress, sizeof( listenerSocketAddress ) );
                 if( ret == -1 )
                 {
-                    delete fe;
+                    fe.reset();
                     sfos.result = UDPFORWARDER_BIND_FAILED;
                 }
                 else
@@ -458,7 +454,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
                     fcntl( fe->socket, F_SETFL, O_NONBLOCK );
 #endif
 
-                    forwardListNotUpdated.push_back( fe );
+                    forwardListNotUpdated.push_back( std::move( fe ) );
                 }
             }
         }
@@ -474,14 +470,13 @@ void UDPForwarder::UpdateUDPForwarder( void )
     {
         for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); ++it )
         {
-            ForwardEntry* pEntry = *it;
+            ForwardEntry* pEntry = it->get();
             if( ( pEntry->addr1Unconfirmed == sfs->source &&
                   pEntry->addr2Unconfirmed == sfs->destination ) ||
                 ( pEntry->addr1Unconfirmed == sfs->destination &&
                   pEntry->addr2Unconfirmed == sfs->source ) )
             {
                 forwardListNotUpdated.erase( it );
-                delete pEntry;
                 break;
             }
         }
@@ -489,11 +484,10 @@ void UDPForwarder::UpdateUDPForwarder( void )
 
     for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); /**/ )
     {
-        ForwardEntry* pEntry = *it;
+        ForwardEntry* pEntry = it->get();
         if( curTime > pEntry->timeLastDatagramForwarded && // Account for timestamp wrap
             curTime > pEntry->timeLastDatagramForwarded + pEntry->timeoutOnNoDataMS )
         {
-            delete pEntry;
             it = forwardListNotUpdated.erase( it );
         }
         else
@@ -502,9 +496,9 @@ void UDPForwarder::UpdateUDPForwarder( void )
         }
     }
 
-    for( ForwardEntry* pEntry : forwardListNotUpdated )
+    for( const auto& pEntry : forwardListNotUpdated )
     {
-        RecvFrom( curTime, pEntry );
+        RecvFrom( curTime, pEntry.get() );
     }
 }
 

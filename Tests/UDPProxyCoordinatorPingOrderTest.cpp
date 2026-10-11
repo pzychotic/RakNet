@@ -64,14 +64,15 @@ class CoordinatorProbe : public UDPProxyCoordinator
 public:
     ForwardingRequest* AddRequestAwaitingPings( const std::vector<SystemAddress>& servers )
     {
-        ForwardingRequest* fw = new ForwardingRequest;
+        auto request = std::make_unique<ForwardingRequest>();
+        ForwardingRequest* fw = request.get();
         fw->timeoutOnNoDataMS = 0;
         fw->timeoutAfterSuccess = 0;
         fw->sata.senderClientAddress = kSourceClient;
         fw->sata.targetClientAddress = kTargetClient;
         fw->timeRequestedPings = 1;
         fw->remainingServersToTry.assign( servers.begin(), servers.end() );
-        forwardingRequestList.emplace( fw->sata, fw );
+        forwardingRequestList.emplace( fw->sata, std::move( request ) );
         return fw;
     }
 

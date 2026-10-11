@@ -20,6 +20,7 @@
 #include "RakNetTypes.h"
 #include "PluginInterface2.h"
 
+#include <memory>
 #include <vector>
 
 /// \defgroup UDP_PROXY_GROUP UDPProxy
@@ -215,7 +216,7 @@ public:
         bool AreAllServersPinged( void ) const;
         void SendPingedServersToCoordinator( RakPeerInterface* rakPeerInterface );
     };
-    std::vector<PingServerGroup*> pingServerGroups;
+    std::vector<std::unique_ptr<PingServerGroup>> pingServerGroups;
 
 protected:
     // A RequestForwarding() call awaiting its final result. It has no source: the coordinator ignores the one passed and forwards from this Peer.

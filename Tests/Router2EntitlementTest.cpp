@@ -56,14 +56,14 @@ public:
     // leaves it.
     void AddRequest( RakNetGUID endpointGuid, RakNetGUID router )
     {
-        ConnnectRequest* request = new ConnnectRequest;
+        auto request = std::make_unique<ConnnectRequest>();
         request->requestState = REQUEST_STATE_REQUEST_FORWARDING;
         request->pingTimeout = 0;
         request->endpointGuid = endpointGuid;
         request->lastRequestedForwardingSystem = router;
         request->returnConnectionLostOnFailure = false;
         std::lock_guard<std::mutex> guard( connectionRequestsMutex );
-        connectionRequests.push_back( request );
+        connectionRequests.push_back( std::move( request ) );
     }
 
     bool HasRequest( RakNetGUID endpointGuid )

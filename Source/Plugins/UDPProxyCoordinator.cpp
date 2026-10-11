@@ -99,7 +99,7 @@ void UDPProxyCoordinator::Update( void )
     {
         // TryNextServer may forget the request, so the next one is found first.
         const auto next = std::next( it );
-        ForwardingRequest* fw = it->second;
+        ForwardingRequest* fw = it->second.get();
         if( fw->timeRequestedPings != 0 &&
             curTime > fw->timeRequestedPings + DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR )
         {
@@ -111,7 +111,6 @@ void UDPProxyCoordinator::Update( void )
                  curTime > fw->timeoutAfterSuccess )
         {
             // Forwarding request succeeded, we waited a bit to prevent duplicates. Can forget about the entry now.
-            delete fw;
             forwardingRequestList.erase( it );
         }
         it = next;
@@ -149,7 +148,6 @@ void UDPProxyCoordinator::OnClosedConnection( const SystemAddress& systemAddress
         if( requestIt->second->requestingAddress == systemAddress )
         {
             // Guy disconnected before the attempt completed
-            delete requestIt->second;
             requestIt = forwardingRequestList.erase( requestIt );
         }
         else
@@ -166,7 +164,7 @@ void UDPProxyCoordinator::OnClosedConnection( const SystemAddress& systemAddress
         {
             // TryNextServer may forget the request, so the next one is found first.
             const auto next = std::next( requestIt );
-            ForwardingRequest* fw = requestIt->second;
+            ForwardingRequest* fw = requestIt->second.get();
             if( fw->currentlyAttemptedServerAddress == systemAddress )
             {
                 // Try the next server
@@ -277,7 +275,8 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         return;
     }
 
-    ForwardingRequest* fw = new ForwardingRequest;
+    auto request = std::make_unique<ForwardingRequest>();
+    ForwardingRequest* fw = request.get();
     fw->timeoutAfterSuccess = 0;
     fw->timeoutOnNoDataMS = timeoutOnNoDataMS;
     if( hasServerSelectionBitstream )
@@ -305,13 +304,13 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         {
             fw->remainingServersToTry.push_back( rServer );
         }
-        forwardingRequestList.emplace( sata, fw );
+        forwardingRequestList.emplace( sata, std::move( request ) );
     }
     else
     {
         fw->timeRequestedPings = 0;
         fw->currentlyAttemptedServerAddress = serverList[0];
-        forwardingRequestList.emplace( sata, fw );
+        forwardingRequestList.emplace( sata, std::move( request ) );
         SendForwardingRequest( sourceAddress, targetAddress, fw->currentlyAttemptedServerAddress, fw->timeoutOnNoDataMS );
     }
 }
@@ -381,7 +380,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
         // The guy disconnected before the request finished
         return;
     }
-    ForwardingRequest* fw = requestIt->second;
+    ForwardingRequest* fw = requestIt->second.get();
     sata.senderClientGuid = fw->sata.senderClientGuid;
     sata.targetClientGuid = fw->sata.targetClientGuid;
 
@@ -449,7 +448,6 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
         outgoingBs.Write( forwardingPort );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, fw->requestingAddress, false );
         forwardingRequestList.erase( requestIt );
-        delete fw;
     }
 }
 void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* packet )
@@ -465,7 +463,7 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
     if( requestIt == forwardingRequestList.end() )
         return;
     ServerWithPing swp;
-    ForwardingRequest* fw = requestIt->second;
+    ForwardingRequest* fw = requestIt->second.get();
     if( fw->timeRequestedPings == 0 )
         return;
 
@@ -520,7 +518,6 @@ void UDPProxyCoordinator::TryNextServer( SenderAndTargetAddress sata, Forwarding
     {
         SendAllBusy( sata.senderClientAddress, sata.targetClientAddress, sata.targetClientGuid, fw->requestingAddress );
         forwardingRequestList.erase( sata );
-        delete fw;
         return;
     }
 
@@ -539,10 +536,6 @@ void UDPProxyCoordinator::SendAllBusy( SystemAddress senderClientAddress, System
 void UDPProxyCoordinator::Clear( void )
 {
     serverList.clear();
-    for( const auto& [sata, fw] : forwardingRequestList )
-    {
-        delete fw;
-    }
     forwardingRequestList.clear();
 }
 void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )

@@ -79,7 +79,6 @@ STATIC_FACTORY_DEFINITIONS( Router2, Router2 );
 
 Router2::Router2()
 {
-    udpForwarder = 0;
     maximumForwardingRequests = 0;
     debugInterface = 0;
     socketFamily = AF_INET;
@@ -94,7 +93,7 @@ Router2::~Router2()
     if( udpForwarder )
     {
         udpForwarder->Shutdown();
-        delete udpForwarder;
+        udpForwarder.reset();
     }
 }
 
@@ -107,10 +106,6 @@ void Router2::ClearMinipunches( void )
 void Router2::ClearConnectionRequests( void )
 {
     std::lock_guard<std::mutex> guard( connectionRequestsMutex );
-    for( ConnnectRequest* pRequest : connectionRequests )
-    {
-        delete pRequest;
-    }
     connectionRequests.clear();
 }
 
@@ -146,7 +141,7 @@ bool Router2::ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLos
     int largestPing = GetLargestPingAmongConnectedSystems();
     if( largestPing < 0 )
         largestPing = 0;
-    Router2::ConnnectRequest* cr = new Router2::ConnnectRequest;
+    auto cr = std::make_unique<Router2::ConnnectRequest>();
     cr->requestState = R2RS_REQUEST_STATE_QUERY_FORWARDING;
     cr->pingTimeout = RakNet::GetTimeMS() + largestPing * 2 + 1000;
     cr->endpointGuid = endpointGuid;
@@ -172,7 +167,7 @@ bool Router2::ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLos
             debugInterface->ShowDiagnostic( RakNet::format( "Router2::ConnectInternal: at %s:%i, pack_id = %d", __FILE__, __LINE__, pack_id ).c_str() );
         }
     }
-    connectionRequests.emplace_back( cr );
+    connectionRequests.emplace_back( std::move( cr ) );
 
     if( debugInterface )
     {
@@ -207,14 +202,13 @@ void Router2::SetMaximumForwardingRequests( int max )
 {
     if( max > 0 && maximumForwardingRequests <= 0 )
     {
-        udpForwarder = new UDPForwarder;
+        udpForwarder = std::make_unique<UDPForwarder>();
         udpForwarder->Startup();
     }
     else if( max <= 0 && maximumForwardingRequests > 0 )
     {
         udpForwarder->Shutdown();
-        delete udpForwarder;
-        udpForwarder = 0;
+        udpForwarder.reset();
     }
 
     maximumForwardingRequests = max;
@@ -362,7 +356,7 @@ void Router2::Update( void )
     connectionRequestsMutex.lock();
     while( connectionRequestIndex < connectionRequests.size() )
     {
-        ConnnectRequest* connectionRequest = connectionRequests[connectionRequestIndex];
+        ConnnectRequest* connectionRequest = connectionRequests[connectionRequestIndex].get();
 
         // pingTimeout is only used with R2RS_REQUEST_STATE_QUERY_FORWARDING
         if( connectionRequest->requestState == R2RS_REQUEST_STATE_QUERY_FORWARDING &&
@@ -465,7 +459,6 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
             unsigned int pos = GetConnectionRequestIndex( forwardedConnectionList[forwardedConnectionIndex].endpointGuid );
             if( pos != ~0u )
             {
-                delete connectionRequests[pos];
                 connectionRequests.erase( connectionRequests.begin() + pos ); // ??? perf
             }
             connectionRequestsMutex.unlock();
@@ -500,7 +493,7 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
     connectionRequestsMutex.lock();
     while( connectionRequestIndex < connectionRequests.size() )
     {
-        ConnnectRequest* cr = connectionRequests[connectionRequestIndex];
+        ConnnectRequest* cr = connectionRequests[connectionRequestIndex].get();
         cr->connectionRequestSystemsMutex.lock();
         unsigned int connectionRequestGuidIndex = cr->GetGuidIndex( rakNetGUID );
         if( connectionRequestGuidIndex != ~0u )
@@ -659,7 +652,6 @@ bool Router2::UpdateForwarding( ConnnectRequest* connectionRequest )
 // connectionRequestsMutex should already be locked
 void Router2::RemoveConnectionRequest( unsigned int connectionRequestIndex )
 {
-    delete connectionRequests[connectionRequestIndex];
     connectionRequests.erase( connectionRequests.begin() + connectionRequestIndex );
 }
 
@@ -721,7 +713,7 @@ void Router2::SendFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endp
 int Router2::ReturnFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid )
 {
     // If the number of systems we are currently forwarding>=maxForwarding, return ID_ROUTER_2_REPLY_FORWARDING,endpointGuid,false
-    if( udpForwarder == 0 || udpForwarder->GetUsedForwardEntries() / 2 > maximumForwardingRequests )
+    if( udpForwarder == nullptr || udpForwarder->GetUsedForwardEntries() / 2 > maximumForwardingRequests )
     {
         if( debugInterface )
             debugInterface->ShowFailure( RakNet::format( "Router2 failed (%" PRIu64 " -> %" PRIu64 ") at %s:%i\n",
@@ -855,7 +847,7 @@ void Router2::OnQueryForwardingReply( Packet* packet )
     }
     connectionRequests[connectionRequestIndex]->connectionRequestSystemsMutex.unlock();
 
-    if( UpdateForwarding( connectionRequests[connectionRequestIndex] ) == false )
+    if( UpdateForwarding( connectionRequests[connectionRequestIndex].get() ) == false )
     {
         RemoveConnectionRequest( connectionRequestIndex );
     }

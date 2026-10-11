@@ -25,6 +25,7 @@
 
 #include <atomic>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -141,7 +142,7 @@ protected:
     unsigned int nextInputId;
 
     // New entries are added to forwardListNotUpdated
-    std::vector<ForwardEntry*> forwardListNotUpdated;
+    std::vector<std::unique_ptr<ForwardEntry>> forwardListNotUpdated;
 
     unsigned short maxForwardEntries;
     std::atomic<uint32_t> isRunning, threadRunning;

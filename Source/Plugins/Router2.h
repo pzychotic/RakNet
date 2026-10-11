@@ -25,6 +25,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -208,10 +209,10 @@ protected:
     void ReturnNoRoute( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure );
     bool ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure );
 
-    UDPForwarder* udpForwarder;
+    std::unique_ptr<UDPForwarder> udpForwarder;
     int maximumForwardingRequests;
     std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
-    std::vector<ConnnectRequest*> connectionRequests;
+    std::vector<std::unique_ptr<ConnnectRequest>> connectionRequests;
     std::vector<MiniPunchRequest> miniPunchesInProgress;
     // Forwarding we have initiated, and forwarding a Designated intermediary announced to us as endpoint
     std::vector<ForwardedConnection> forwardedConnectionList;

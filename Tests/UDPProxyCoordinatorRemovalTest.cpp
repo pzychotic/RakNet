@@ -41,14 +41,15 @@ public:
     // A request from requester to kTargetClient, sent to a server and not yet answered.
     ForwardingRequest* AddRequest( const SystemAddress& requester )
     {
-        ForwardingRequest* fw = new ForwardingRequest;
+        auto request = std::make_unique<ForwardingRequest>();
+        ForwardingRequest* fw = request.get();
         fw->timeoutOnNoDataMS = 0;
         fw->timeoutAfterSuccess = 0;
         fw->timeRequestedPings = 0;
         fw->sata.senderClientAddress = requester;
         fw->sata.targetClientAddress = kTargetClient;
         fw->requestingAddress = requester;
-        forwardingRequestList.emplace( fw->sata, fw );
+        forwardingRequestList.emplace( fw->sata, std::move( request ) );
         return fw;
     }
 };

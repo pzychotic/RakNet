@@ -24,6 +24,7 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -137,7 +138,7 @@ protected:
     std::vector<SystemAddress> serverList;
 
     // Forwarding requests in progress
-    std::map<SenderAndTargetAddress, ForwardingRequest*> forwardingRequestList;
+    std::map<SenderAndTargetAddress, std::unique_ptr<ForwardingRequest>> forwardingRequestList;
 
     std::string remoteLoginPassword;
 

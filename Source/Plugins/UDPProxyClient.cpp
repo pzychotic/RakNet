@@ -176,7 +176,7 @@ void UDPProxyClient::Update( void )
 
     for( auto it = pingServerGroups.begin(); it != pingServerGroups.end(); /**/ )
     {
-        PingServerGroup* psg = *it;
+        PingServerGroup* psg = it->get();
 
         if( psg->serversToPing.empty() ||
             RakNet::GetTimeMS() > psg->startPingTime + DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR )
@@ -186,7 +186,6 @@ void UDPProxyClient::Update( void )
             if( !psg->serversToPing.empty() )
                 psg->SendPingedServersToCoordinator( rakPeerInterface );
 
-            delete psg;
             it = pingServerGroups.erase( it );
         }
         else
@@ -201,7 +200,7 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
     {
         for( auto it = pingServerGroups.begin(); it != pingServerGroups.end(); ++it )
         {
-            PingServerGroup* psg = *it;
+            PingServerGroup* psg = it->get();
 
             for( ServerWithPing& rServer : psg->serversToPing )
             {
@@ -219,7 +218,6 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
                     if( psg->AreAllServersPinged() )
                     {
                         psg->SendPingedServersToCoordinator( rakPeerInterface );
-                        delete psg;
                         pingServerGroups.erase( it );
                     }
 
@@ -336,7 +334,6 @@ void UDPProxyClient::OnClosedConnection( const SystemAddress& systemAddress, Rak
     {
         if( ( *it )->coordinatorAddressForPings == systemAddress )
         {
-            delete *it;
             it = pingServerGroups.erase( it );
         }
         else
@@ -395,19 +392,18 @@ void UDPProxyClient::OnPingServers( Packet* packet )
         return;
 
     // One live group per coordinator. The one it replaces reports what it has, as a timeout would.
-    auto existing = std::find_if( pingServerGroups.begin(), pingServerGroups.end(), [&]( const PingServerGroup* group ) {
+    auto existing = std::find_if( pingServerGroups.begin(), pingServerGroups.end(), [&]( const std::unique_ptr<PingServerGroup>& group ) {
         return group->coordinatorAddressForPings == packet->systemAddress;
     } );
     if( existing != pingServerGroups.end() )
     {
         ( *existing )->SendPingedServersToCoordinator( rakPeerInterface );
-        delete *existing;
         pingServerGroups.erase( existing );
         if( pingServerGroupsReplaced++ == 0 )
             RAKNET_DEBUG_PRINTF( "UDPProxyClient: a coordinator's request to ping replaced its live one, as each has at most one. See GetPingServerGroupsReplaced.\n" );
     }
 
-    PingServerGroup* psg = new PingServerGroup;
+    auto psg = std::make_unique<PingServerGroup>();
     psg->sata = sata;
     psg->startPingTime = RakNet::GetTimeMS();
     psg->coordinatorAddressForPings = packet->systemAddress;
@@ -418,7 +414,7 @@ void UDPProxyClient::OnPingServers( Packet* packet )
         server.ToString( false, ipStr );
         rakPeerInterface->Ping( ipStr, server.GetPort(), false, 0 );
     }
-    pingServerGroups.push_back( psg );
+    pingServerGroups.push_back( std::move( psg ) );
 }
 
 bool UDPProxyClient::PingServerGroup::AreAllServersPinged( void ) const
@@ -451,10 +447,6 @@ void UDPProxyClient::PingServerGroup::SendPingedServersToCoordinator( RakPeerInt
 }
 void UDPProxyClient::Clear( void )
 {
-    for( PingServerGroup* pGroup : pingServerGroups )
-    {
-        delete pGroup;
-    }
     pingServerGroups.clear();
     coordinators.clear();
     outstandingRequests.clear();
