@@ -15,7 +15,7 @@
 #include "ReliabilityLayer.h"
 #include "GetTime.h"
 #include "RakAssert.h"
-#include "Rand.h"
+#include "PlatformRandom.h"
 #include "MessageIdentifiers.h"
 #include <cinttypes>
 #include <math.h>
@@ -243,6 +243,10 @@ ReliabilityLayer::ReliabilityLayer()
 #ifdef _DEBUG
     minExtraPing = extraPingVariance = 0;
     packetloss = (double)minExtraPing;
+    // On failure the engine keeps its default seed.
+    std::uint32_t simulatorSeed;
+    if( RakNet::FillRandomBytes( &simulatorSeed, sizeof( simulatorSeed ) ) )
+        simulatorRandom.seed( simulatorSeed );
 #endif
 
 
@@ -1954,7 +1958,11 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
 #ifdef _DEBUG
     if( packetloss > 0.0 )
     {
-        if( frandomMT() < packetloss )
+        // Uniform in [0, 1). The parentheses keep windows.h's min and max macros out.
+        constexpr auto drawMin = (std::minstd_rand::min)();
+        constexpr double drawRange = static_cast<double>( (std::minstd_rand::max)() - drawMin ) + 1.0;
+        const double draw = static_cast<double>( simulatorRandom() - drawMin ) / drawRange;
+        if( draw < packetloss )
             return;
     }
 
@@ -1982,7 +1990,7 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
 #else
         RakNet::TimeMS delay = minExtraPing;
         if( extraPingVariance > 0 )
-            delay += ( randomMT() % extraPingVariance );
+            delay += ( simulatorRandom() % extraPingVariance );
         if( delay > 0 )
         {
             DataAndTime* dat = RakNet::OP_NEW<DataAndTime>( __FILE__, __LINE__ );

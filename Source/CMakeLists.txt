@@ -37,7 +37,6 @@ set( CURRENT_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/RakPeer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakPeerInterface.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakThread.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Rand.h
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/SecureHandshake.h
     ${CMAKE_CURRENT_SOURCE_DIR}/SequenceRanges.h
@@ -78,7 +77,6 @@ set( CURRENT_SOURCE
     ${CMAKE_CURRENT_SOURCE_DIR}/RakNetTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakPeer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakThread.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Rand.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliabilityLayer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SecureHandshake.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SignaledEvent.cpp

@@ -16,7 +16,6 @@
 #include "BitStream.h"
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
-#include "Rand.h"
 #include "GetTime.h"
 #include "UDPForwarder.h"
 

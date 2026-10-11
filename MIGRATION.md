@@ -380,9 +380,10 @@ or do without.
 
 **Utilities:** `RakString`, `RakWString`, `RakNetSmartPtr`, `RefCountedObj`, `SimpleMutex`,
 `RakSleep`, `LocklessTypes`, `Base64Encoder`, `CheckSum`, `FormatString`, `Itoa`,
-`EpochTimeToString`, `GridSectorizer`, `ThreadPool`, and the
+`EpochTimeToString`, `GridSectorizer`, `ThreadPool`, `Rand.h` (`RakNetRandom` and the
+`seedMT`/`randomMT`/`frandomMT`/`fillBufferMT` functions), and the
 `Gets`/`Getche`/`Kbhit`/`_FindFirst` platform shims. `<mutex>`, `<thread>`, `<atomic>` and
-`<chrono>` replace the threading and timing ones.
+`<chrono>` replace the threading and timing ones, and `<random>` replaces `Rand.h`.
 
 **`SingleProducerConsumer.h`.** Gone, with no replacement. Use a `std::mutex` and a
 `std::deque`. `ThreadsafePacketLogger`, its only user, now keeps its lines in private

@@ -14,7 +14,6 @@
 #include "BitStream.h"
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
-#include "Rand.h"
 #include "RakNetTime.h"
 #include "RakPeerInterface.h"
 
@@ -22,6 +21,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -64,17 +64,12 @@ constexpr unsigned char kPacketId = ID_USER_PACKET_ENUM + 1;
 constexpr TimeMS kTestDurationMs = 12000;
 constexpr TimeMS kSendIntervalMs = 30;
 
-// Payload size is 1 to kMaxPadBytes, drawn from the global Mersenne Twister.
+// Payload size is 1 to kMaxPadBytes, drawn from the test's own engine.
 // Random on purpose: varying the size across the split threshold is the only
-// reason this test sends anything but a header.
-//
-// This test never seeds, and an unseeded randomMT reloads from a fixed default
-// seed (Source/Rand.cpp), so under ctest - one process per test - the sizes repeat
-// run for run. The generator is global, though, so a whole-binary `RakNetTests`
-// run with no filter gets whatever the tests ahead of this one in link order left
-// behind; ComprehensiveConvert and DroppedConnectionConvert both seed it to 12345
-// and then draw from it.
+// reason this test sends anything but a header. The fixed seed makes the sizes
+// repeat run for run.
 constexpr unsigned int kMaxPadBytes = 5000;
+constexpr unsigned int kSeed = 12345;
 
 // Lets the packets still in flight land before the counts are compared.
 // RELIABLE_ORDERED promises they will, so this is a hang guard rather than a
@@ -150,6 +145,8 @@ TEST_CASE( "Every packet sent RELIABLE_ORDERED arrives, once, in the order it wa
         }
     };
 
+    std::mt19937 rng( kSeed );
+
     const TimeMS entryTime = GetTimeMS();
 
     while( GetTimeMS() - entryTime < kTestDurationMs )
@@ -174,7 +171,7 @@ TEST_CASE( "Every packet sent RELIABLE_ORDERED arrives, once, in the order it wa
 
             // Zeroed rather than uninitialised, so no heap contents go on the
             // wire. Nothing reads the padding; only its length matters.
-            const std::vector<char> pad( randomMT() % kMaxPadBytes + 1, 0 );
+            const std::vector<char> pad( rng() % kMaxPadBytes + 1, 0 );
             bitStream.Write( pad.data(), static_cast<unsigned int>( pad.size() ) );
 
             // Send fails on a null or empty buffer, not on a busy peer, so a false

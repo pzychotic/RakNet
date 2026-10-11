@@ -40,6 +40,7 @@
 #include <deque>
 #include <map>
 #include <queue>
+#include <random>
 #include <vector>
 
 /// Number of ordered streams available. You can use up to 32 ordered streams
@@ -692,6 +693,9 @@ private:
     // Internet simulator
     double packetloss;
     RakNet::TimeMS minExtraPing, extraPingVariance;
+    // Drives packet loss and ping variance. Seeded from the platform CSPRNG so connections
+    // don't drop in lockstep. Only the network thread that owns this layer touches it.
+    std::minstd_rand simulatorRandom;
 #endif
 
     CCTimeType elapsedTimeSinceLastUpdate;

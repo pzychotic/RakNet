@@ -47,7 +47,8 @@ to answer a nonce before it is issued can be impersonated by replaying the answe
 draw from `RakNet::FillRandomBytes` directly, with no generator between the CSPRNG and the
 nonce, and a nonce that cannot be drawn is never sent.
 
-The same seam, for the same reasons. The Mersenne Twister in `Source/Rand.h` remains for
-simulation and reproducible tests only. It never holds a secret, a nonce or an identifier,
-and nothing public seeds anything: not a clock value, and not a RakNetGUID, which a Peer
-sends in plaintext.
+The same seam, for the same reasons. The remaining non-cryptographic generators are the
+network simulator's per-connection engine in `ReliabilityLayer` and the tests' own engines,
+for simulation and reproducible tests only. They never hold a secret, a nonce or an
+identifier, and nothing public seeds them: not a clock value, and not a RakNetGUID, which a
+Peer sends in plaintext.

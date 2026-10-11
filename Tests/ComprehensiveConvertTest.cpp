@@ -15,7 +15,6 @@
 #include "GetTime.h"
 #include "MessageIdentifiers.h"
 #include "PacketPriority.h"
-#include "Rand.h"
 #include "RakNetStatistics.h"
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
@@ -26,6 +25,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -96,14 +96,10 @@ connects, closes, restarts and sends IS the coverage - a fixed script would
 exercise one interleaving of it - and the seed is what makes a red run
 reproducible rather than re-measurable.
 
-randomMT is process-global, and only the network simulator in Source/ touches
-it: ReliabilityLayer::SendBitStream draws from it twice, inside #ifdef _DEBUG and
-gated on packetloss / extraPingVariance, which only ApplyNetworkSimulator sets
-and this test never calls. Nothing in Source/ seeds it.
-
-So the seed does determine every draw in this process. What it does not fix is
-the schedule: packet timing and the loop cadence still vary, so a replay repeats
-the same sequence of actions, not the same milliseconds.
+The test owns its engine and nothing else draws from it, so the seed determines
+every draw. What it does not fix is the schedule: packet timing and the loop
+cadence still vary, so a replay repeats the same sequence of actions, not the
+same milliseconds.
 
 --- The empty action bands, which are load-bearing ---
 
@@ -115,7 +111,7 @@ GetConnectionList half as many draws again.
 
 --- A peer connecting to its own port ---
 
-Drawing a connect target as randomMT() % kPeerNum with no exclusion makes one
+Drawing a connect target as rng() % kPeerNum with no exclusion makes one
 attempt in ten a peer connecting to 127.0.0.1 on its own port. RakNet allows it:
 measured, peer 0 completes the connection and then lists port 30000 - itself - in
 its own system list, which fires the "never itself" assertion below with 0 != 0.
@@ -171,7 +167,7 @@ constexpr int kActionsPerInterval = 5;
 // See the header for why the seed is load-bearing.
 constexpr unsigned int kSeed = 12345;
 
-// The send length, 3 + randomMT() % 8000, split into its two halves so the buffer
+// The send length, 3 + rng() % 8000, split into its two halves so the buffer
 // below is derived from it rather than being a separate literal that happens to
 // be larger.
 constexpr int kMinSendBytes = 3;
@@ -184,9 +180,9 @@ constexpr int kStatisticsBufferBytes = 512;
 
 // Connection ends: one connection contributes two, one to each peer holding it.
 //
-// The setup draws its targets from the seed and settled at 18 ends - nine
-// connections - on every run measured, so this floor is there to rule out the
-// empty run rather than to describe a shape.
+// The setup draws its targets from the seed, which describes six connections -
+// 12 ends - so this floor is there to rule out the empty run rather than to
+// describe a shape.
 constexpr int kMinimumConnectionEndsAfterSetup = 8;
 
 // The degradation floor, and the assertion this test exists for. Measured at
@@ -195,7 +191,7 @@ constexpr int kMinimumConnectionEndsAfterSetup = 8;
 // 1.2 s onward.
 constexpr int kMinimumConnectionEnds = 30;
 
-// The mesh starts the churn at the setup's 18 ends and climbs past the floor
+// The mesh starts the churn at the setup's 12 ends and climbs past the floor
 // within about 200 ms. Two seconds of grace, so the floor is a statement about a
 // mesh that has had time to form rather than a race with the ramp.
 constexpr TimeMS kMeshFloorGraceMs = 2000;
@@ -225,7 +221,7 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
         peerList[i]->SetOfflinePingResponse( "Offline Ping Data", static_cast<int>( strlen( "Offline Ping Data" ) ) + 1 );
     }
 
-    seedMT( kSeed );
+    std::mt19937 rng( kSeed );
 
     std::vector<SystemAddress> systemList;
     std::vector<RakNetGUID> guidList;
@@ -265,8 +261,8 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
     // that slot holds a fully connected system, so most draws come back unassigned
     // and every caller has to expect it.
     auto drawPeerAndConnectedTarget = [&]() {
-        const int peerIndex = static_cast<int>( randomMT() % kPeerNum );
-        const SystemAddress target = peerList[peerIndex]->GetSystemAddressFromIndex( randomMT() % kPeerNum );
+        const int peerIndex = static_cast<int>( rng() % kPeerNum );
+        const SystemAddress target = peerList[peerIndex]->GetSystemAddressFromIndex( rng() % kPeerNum );
 
         return PeerAndTarget{ peerIndex, target };
     };
@@ -307,13 +303,13 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
     };
 
     auto takeOneAction = [&]() {
-        const float nextAction = frandomMT();
+        const float nextAction = static_cast<float>( rng() / ( static_cast<double>( ( rng.max )() ) + 1.0 ) );
 
         if( nextAction < .09f )
         {
             // Connect.
-            const int from = static_cast<int>( randomMT() % kPeerNum );
-            const int to = static_cast<int>( randomMT() % kPeerNum );
+            const int from = static_cast<int>( rng() % kPeerNum );
+            const int to = static_cast<int>( rng() % kPeerNum );
 
             // A peer connecting to its own port is skipped, not undrawn - see the
             // header. The draw stands, so the sequence the seed describes is
@@ -332,7 +328,7 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
             // GetConnectionList, into a caller-supplied buffer - the one call
             // site in the suite that exercises that overload rather than the
             // count-only one.
-            const int peerIndex = static_cast<int>( randomMT() % kPeerNum );
+            const int peerIndex = static_cast<int>( rng() % kPeerNum );
 
             SystemAddress remoteSystems[kPeerNum];
             unsigned short numSystems = kPeerNum;
@@ -363,20 +359,20 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
             // Send. The sender is drawn first and the target then drawn from that
             // same peer's list, or a directed send goes to an address the sender is
             // not connected to.
-            const int peerIndex = static_cast<int>( randomMT() % kPeerNum );
+            const int peerIndex = static_cast<int>( rng() % kPeerNum );
 
-            const int dataLength = kMinSendBytes + static_cast<int>( randomMT() % kSendBytesSpread );
-            const PacketPriority priority = static_cast<PacketPriority>( randomMT() % static_cast<int>( NUMBER_OF_PRIORITIES ) );
-            const PacketReliability reliability = static_cast<PacketReliability>( randomMT() % ( static_cast<int>( RELIABLE_SEQUENCED ) + 1 ) );
-            const char orderingChannel = static_cast<char>( randomMT() % 32 );
+            const int dataLength = kMinSendBytes + static_cast<int>( rng() % kSendBytesSpread );
+            const PacketPriority priority = static_cast<PacketPriority>( rng() % static_cast<int>( NUMBER_OF_PRIORITIES ) );
+            const PacketReliability reliability = static_cast<PacketReliability>( rng() % ( static_cast<int>( RELIABLE_SEQUENCED ) + 1 ) );
+            const char orderingChannel = static_cast<char>( rng() % 32 );
 
             SystemAddress target = UNASSIGNED_SYSTEM_ADDRESS;
-            if( ( randomMT() % kPeerNum ) != 0 )
+            if( ( rng() % kPeerNum ) != 0 )
             {
-                target = peerList[peerIndex]->GetSystemAddressFromIndex( randomMT() % kPeerNum );
+                target = peerList[peerIndex]->GetSystemAddressFromIndex( rng() % kPeerNum );
             }
 
-            const bool broadcast = ( randomMT() % 2 ) > 0;
+            const bool broadcast = ( rng() % 2 ) > 0;
 
             payload[0] = static_cast<char>( ID_USER_PACKET_ENUM );
 
@@ -410,7 +406,7 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
             // rather than a teardown.
             const PeerAndTarget drawn = drawPeerAndConnectedTarget();
 
-            peerList[drawn.peerIndex]->CloseConnection( drawn.target, ( randomMT() % 2 ) > 0, 0 );
+            peerList[drawn.peerIndex]->CloseConnection( drawn.target, ( rng() % 2 ) > 0, 0 );
         }
         else if( nextAction < .20f )
         {
@@ -421,10 +417,10 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
             // (Source/RakPeer.cpp), neither reachable from a string literal and a
             // port in range, so an assertion on it would be a tautology. What this
             // branch is for is the traffic, not the return code.
-            const int peerIndex = static_cast<int>( randomMT() % kPeerNum );
-            const unsigned short port = static_cast<unsigned short>( kBasePort + ( randomMT() % kPeerNum ) );
+            const int peerIndex = static_cast<int>( rng() % kPeerNum );
+            const unsigned short port = static_cast<unsigned short>( kBasePort + ( rng() % kPeerNum ) );
 
-            peerList[peerIndex]->Ping( "127.0.0.1", port, ( randomMT() % 2 ) > 0 );
+            peerList[peerIndex]->Ping( "127.0.0.1", port, ( rng() % 2 ) > 0 );
         }
         else if( nextAction < .21f )
         {
@@ -462,7 +458,7 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
 
     for( int i = 0; i < kPeerNum; i++ )
     {
-        const int target = static_cast<int>( randomMT() % kPeerNum );
+        const int target = static_cast<int>( rng() % kPeerNum );
 
         if( target != i )
         {

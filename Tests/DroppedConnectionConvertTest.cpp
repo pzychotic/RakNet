@@ -13,13 +13,13 @@
 #include "ConnectionWaits.h"
 
 #include "MessageIdentifiers.h"
-#include "Rand.h"
 #include "RakNetTime.h"
 #include "RakPeerInterface.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -55,14 +55,12 @@ silent closes, notified closes and reconnects is the coverage here - a fixed
 script would test one ordering of it - and the seed is what makes a red run
 reproducible rather than re-measurable.
 
-Nothing in Source/ draws from the global Mersenne Twister in this test's process:
-the only two sites (in ReliabilityLayer::SendBitStream) are _DEBUG-only and gated on
-ApplyNetworkSimulator settings this test never applies, so the seed really does
-determine every draw. What it does not fix is the schedule - packet timing and the
-loop cadence still vary - so a replay repeats the same sequence of actions, not the
-same milliseconds. The loop is bounded by its round count rather than by wall time
-for the same reason, so the seed also fixes how many of those rounds are drop
-rounds, and the test asserts that number exactly.
+The test owns its engine and nothing else draws from it, so the seed determines
+every draw. What it does not fix is the schedule - packet timing and the loop
+cadence still vary - so a replay repeats the same sequence of actions, not the same
+milliseconds. The loop is bounded by its round count rather than by wall time for
+the same reason, so the seed also fixes how many of those rounds are drop rounds,
+and the test asserts that number exactly.
 */
 
 using namespace RakNet;
@@ -82,11 +80,11 @@ constexpr unsigned short kFirstClientPort = kServerPort + 1;
 constexpr TimeMS kServerTimeoutMs = 1000;
 constexpr TimeMS kClientTimeoutMs = 5000;
 
-// The last of the 42 rounds is the drop round for the fifteenth wait. The seed
+// The last of the 41 rounds is the drop round for the nineteenth wait. The seed
 // fixes both numbers, so a change to its sequence fails the count at the end
 // rather than quietly thinning the test out.
-constexpr int kRounds = 42;
-constexpr int kExpectedDropRounds = 15;
+constexpr int kRounds = 41;
+constexpr int kExpectedDropRounds = 19;
 
 // Half the server's timeout, waited before the receive and again after it, so a
 // drop round ages out the connections that were actually dropped without idling
@@ -132,7 +130,7 @@ TEST_CASE( "A server times out clients that close silently, and never holds two 
         REQUIRE( CommonFunctions::ConnectionStateMatchesOptions( clients[i], serverAddress, true ) );
     }
 
-    seedMT( kSeed );
+    std::mt19937 rng( kSeed );
 
     // Reads the server's connected Systems and asserts that no two of them are the
     // same client, by RakNetGUID or by address. Each client is one Peer on its own
@@ -187,7 +185,7 @@ TEST_CASE( "A server times out clients that close silently, and never holds two 
 
         // Drawn before the check below, so the sequence of actions is the one the
         // seed describes whichever branch the check takes.
-        const unsigned int randomTest = randomMT() % 4;
+        const unsigned int randomTest = rng() % 4;
 
         if( dropTestPending )
         {
@@ -214,11 +212,11 @@ TEST_CASE( "A server times out clients that close silently, and never holds two 
         {
         case 0:
             // Close one client silently, so only the server's timeout can notice.
-            clients[randomMT() % kNumberOfClients]->CloseConnection( serverAddress, false, 0 );
+            clients[rng() % kNumberOfClients]->CloseConnection( serverAddress, false, 0 );
             break;
 
         case 1: {
-            RakPeerInterface* client = clients[randomMT() % kNumberOfClients];
+            RakPeerInterface* client = clients[rng() % kNumberOfClients];
 
             // Only if there is nothing already connected or in flight - a Connect()
             // on a live connection returns ALREADY_CONNECTED and queues nothing.
@@ -233,11 +231,11 @@ TEST_CASE( "A server times out clients that close silently, and never holds two 
             // Every client at once: half of them close, half of them reconnect.
             for( int i = 0; i < kNumberOfClients; i++ )
             {
-                if( randomMT() % 2 == 0 )
+                if( rng() % 2 == 0 )
                 {
                     if( clients[i]->IsActive() )
                     {
-                        const bool sendDisconnectionNotification = randomMT() % 2 == 0;
+                        const bool sendDisconnectionNotification = rng() % 2 == 0;
                         clients[i]->CloseConnection( serverAddress, sendDisconnectionNotification, 0 );
                     }
                 }
