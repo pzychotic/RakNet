@@ -5780,9 +5780,9 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                     }
                     else
                     {
-                        // Send to game even if already connected. This could happen when connecting to 127.0.0.1
-                        // Ignore, already connected
-                        //  rakFree_Ex(data, _FILE_AND_LINE_ );
+                        // A repeat on an open connection is dropped, not delivered: the connection
+                        // opened once.
+                        rakFree_Ex( data, _FILE_AND_LINE_ );
                     }
                 }
                 else if( (unsigned char)data[0] == ID_CONNECTED_PONG && byteSize == sizeof( unsigned char ) + sizeof( RakNet::Time ) * 2 )

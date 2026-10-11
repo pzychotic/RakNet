@@ -67,6 +67,20 @@ inline void WriteConnectionRequest( BitStream& out, RakNetGUID senderGuid, RakNe
         out.WriteAlignedBytes( (const unsigned char*)password, (unsigned int)passwordLength );
 }
 
+/// ID_NEW_INCOMING_CONNECTION: MessageID | SystemAddress the recipient was reached at |
+/// MAXIMUM_NUMBER_OF_INTERNAL_IDS internal SystemAddresses | send-ping time | send-pong
+/// time, field for field as the ID_CONNECTION_REQUEST_ACCEPTED handler in
+/// RakPeer::RunUpdateCycleBody writes it. Every internal address is \a internalId.
+inline void WriteNewIncomingConnection( BitStream& out, const SystemAddress& recipientAddress, const SystemAddress& internalId, RakNet::Time sendPingTime, RakNet::Time sendPongTime )
+{
+    out.Write( (MessageID)ID_NEW_INCOMING_CONNECTION );
+    out.Write( recipientAddress );
+    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
+        out.Write( internalId );
+    out.Write( sendPingTime );
+    out.Write( sendPongTime );
+}
+
 /// The header of a datagram that carries messages, as DatagramHeaderFormat::Deserialize
 /// (ReliabilityLayer.cpp) reads it, leaving \a in at the first message. False for an ACK or
 /// NAK datagram.
