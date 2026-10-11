@@ -38,7 +38,8 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kServerPort = 30000;
+// Ports no other test uses.
+constexpr unsigned short kServerPort = 32900;
 
 constexpr int kRepeats = 8;
 
@@ -151,7 +152,7 @@ TEST_CASE( "A repeated ID_NEW_INCOMING_CONNECTION on an open connection is freed
     REQUIRE( client->Send( (const char*)&marker, 1, IMMEDIATE_PRIORITY, RELIABLE_ORDERED, 0, serverGuid, false ) != 0 );
 
     int delivered = 0;
-    bool markerArrived = false;
+    bool sawMarker = false;
     ConnectionWaits::WaitUntil(
         [&] {
             for( Packet* packet = server->Receive(); packet != nullptr; packet = server->Receive() )
@@ -159,13 +160,13 @@ TEST_CASE( "A repeated ID_NEW_INCOMING_CONNECTION on an open connection is freed
                 if( packet->data[0] == ID_NEW_INCOMING_CONNECTION )
                     ++delivered;
                 else if( packet->data[0] == ID_USER_PACKET_ENUM )
-                    markerArrived = true;
+                    sawMarker = true;
                 server->DeallocatePacket( packet );
             }
-            return markerArrived;
+            return sawMarker;
         },
         kBudgetMs );
-    REQUIRE( markerArrived );
+    REQUIRE( sawMarker );
 
     CHECK( delivered == 0 );
 

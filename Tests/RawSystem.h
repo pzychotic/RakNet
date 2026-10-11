@@ -534,12 +534,7 @@ public:
         REQUIRE( WaitForMessage( ID_CONNECTION_REQUEST_ACCEPTED, Framing::Connected, kHandshakeBudgetMs ) );
 
         BitStream newIncoming;
-        newIncoming.Write( (MessageID)ID_NEW_INCOMING_CONNECTION );
-        newIncoming.Write( m_farAddress );
-        for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-            newIncoming.Write( UNASSIGNED_SYSTEM_ADDRESS );
-        newIncoming.Write( RakNet::GetTime() ); // sendPingTime
-        newIncoming.Write( RakNet::GetTime() ); // sendPongTime
+        WriteNewIncomingConnection( newIncoming, m_farAddress, UNASSIGNED_SYSTEM_ADDRESS, RakNet::GetTime(), RakNet::GetTime() );
         SendUnreliable( newIncoming );
     }
 
