@@ -524,9 +524,9 @@ private:
     /// GetSplitPacketChannelStallTime. Called from Update on a rate limiter.
     void FreeStalledSplitPacketChannels( CCTimeType time );
 
-    /// Creates a copy of the specified internal packet with data copied from the original starting at dataByteOffset for dataByteLength bytes.
-    /// Does not copy any split data parameters as that information is always generated does not have any reason to be copied
-    InternalPacket* CreateInternalPacketCopy( InternalPacket* original, int dataByteOffset, int dataByteLength, CCTimeType time );
+    /// Creates a packet with the original's header fields. The original's data and split fields
+    /// are not copied: data is null and dataBitLength is zero.
+    InternalPacket* CreateInternalPacketCopy( InternalPacket* original, CCTimeType time );
 
     /// Inserts a packet into the resend list in order
     void InsertPacketIntoResendList( InternalPacket* internalPacket, CCTimeType time, bool firstResend, bool modifyUnacknowledgedBytes );

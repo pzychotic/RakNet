@@ -2982,7 +2982,7 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
     ReleaseHeldBytes( SplitPacketChannelCost( splitPacketChannel ) );
 
     // Reconstruct
-    internalPacket = CreateInternalPacketCopy( splitPacketChannel->splitPacketList.Get( 0 ), 0, 0, time );
+    internalPacket = CreateInternalPacketCopy( splitPacketChannel->splitPacketList.Get( 0 ), time );
     internalPacket->dataBitLength = 0;
     for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
         internalPacket->dataBitLength += splitPacketChannel->splitPacketList.Get( j )->dataBitLength;
@@ -3030,27 +3030,18 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdT
 }
 
 //-------------------------------------------------------------------------------------------------------
-// Creates a copy of the specified internal packet with data copied from the original starting at dataByteOffset for dataByteLength bytes.
-// Does not copy any split data parameters as that information is always generated does not have any reason to be copied
+// Creates a packet with the original's header fields. The original's data and split fields are
+// not copied: data is null and dataBitLength is zero.
 //-------------------------------------------------------------------------------------------------------
-InternalPacket* ReliabilityLayer::CreateInternalPacketCopy( InternalPacket* original, int dataByteOffset, int dataByteLength, CCTimeType time )
+InternalPacket* ReliabilityLayer::CreateInternalPacketCopy( InternalPacket* original, CCTimeType time )
 {
     InternalPacket* copy = AllocateInternalPacket();
 #ifdef _DEBUG
     // Remove accessing undefined memory error
     memset( copy, 255, sizeof( InternalPacket ) );
 #endif
-    // Copy over our chunk of data
-
-    if( dataByteLength > 0 )
-    {
-        AllocInternalPacketData( copy, BitsToBytes( dataByteLength ), false, _FILE_AND_LINE_ );
-        memcpy( copy->data, original->data + dataByteOffset, dataByteLength );
-    }
-    else
-        copy->data = 0;
-
-    copy->dataBitLength = dataByteLength << 3;
+    copy->data = 0;
+    copy->dataBitLength = 0;
     copy->creationTime = time;
     copy->nextActionTime = 0;
     copy->orderingIndex = original->orderingIndex;
