@@ -429,6 +429,8 @@ void UDPForwarder::UpdateUDPForwarder( void )
                         }
                     }
                 }
+                if( servinfo )
+                    freeaddrinfo( servinfo );
 
                 if( fe->socket == INVALID_SOCKET )
                     sfos.result = UDPFORWARDER_BIND_FAILED;
