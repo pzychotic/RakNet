@@ -6029,37 +6029,41 @@ void UpdateNetworkLoop( void* arg )
 {
     RakPeer* rakPeer = (RakPeer*)arg;
 
-    BitStream updateBitStream( MAXIMUM_MTU_SIZE
-#if LIBCAT_SECURITY == 1
-                               + cat::AuthenticatedEncryption::OVERHEAD_BYTES
-#endif
-    );
-
     networkThreadOf = rakPeer;
 
-    while( rakPeer->endThreads == false )
+    // The bitstream is freed when this block ends, before the exit signal below. Once
+    // Shutdown returns, the caller may replace the allocator hooks (SetFree_Ex).
     {
-        // #ifdef _DEBUG
-        //      // Sanity check, make sure RunUpdateCycle does not block or not otherwise get called for a long time
-        //      RakNetTime thisCall=RakNet::GetTime();
-        //      RakAssert(thisCall-lastCall<250);
-        //      lastCall=thisCall;
-        // #endif
+        BitStream updateBitStream( MAXIMUM_MTU_SIZE
+#if LIBCAT_SECURITY == 1
+                                   + cat::AuthenticatedEncryption::OVERHEAD_BYTES
+#endif
+        );
+
+        while( rakPeer->endThreads == false )
         {
-            std::lock_guard<std::mutex> guard( rakPeer->userUpdateThreadMutex );
-            if( rakPeer->userUpdateThreadPtr )
+            // #ifdef _DEBUG
+            //      // Sanity check, make sure RunUpdateCycle does not block or not otherwise get called for a long time
+            //      RakNetTime thisCall=RakNet::GetTime();
+            //      RakAssert(thisCall-lastCall<250);
+            //      lastCall=thisCall;
+            // #endif
             {
-                insideUserUpdateCallbackOf = rakPeer;
-                rakPeer->userUpdateThreadPtr( rakPeer, rakPeer->userUpdateThreadData );
-                insideUserUpdateCallbackOf = nullptr;
+                std::lock_guard<std::mutex> guard( rakPeer->userUpdateThreadMutex );
+                if( rakPeer->userUpdateThreadPtr )
+                {
+                    insideUserUpdateCallbackOf = rakPeer;
+                    rakPeer->userUpdateThreadPtr( rakPeer, rakPeer->userUpdateThreadData );
+                    insideUserUpdateCallbackOf = nullptr;
+                }
             }
+
+            rakPeer->RunUpdateCycle( updateBitStream );
+
+            // Pending sends go out this often, unless quitAndDataEvents is set. Acks held back so
+            // they share a datagram fall due a millisecond after the last ack datagram.
+            rakPeer->quitAndDataEvents.WaitOnEvent( rakPeer->acksWaitingAfterCycle ? 1 : 10 );
         }
-
-        rakPeer->RunUpdateCycle( updateBitStream );
-
-        // Pending sends go out this often, unless quitAndDataEvents is set. Acks held back so
-        // they share a datagram fall due a millisecond after the last ack datagram.
-        rakPeer->quitAndDataEvents.WaitOnEvent( rakPeer->acksWaitingAfterCycle ? 1 : 10 );
     }
 
     networkThreadOf = nullptr;
