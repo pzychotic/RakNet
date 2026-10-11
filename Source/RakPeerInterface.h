@@ -49,6 +49,8 @@ struct RakNetStatistics;
 ///   connection's end message comes from the network thread, once its close is applied.
 /// - Only open connections are authoritative. IS_DISCONNECTED is a hint that may never
 ///   appear: a closed connection can go straight to IS_NOT_CONNECTED.
+/// - Startup() and Shutdown() must not overlap any other call on this Peer, from any
+///   thread.
 ///
 /// That is the contract. Some getters still read the connection records directly, and are
 /// being moved onto the network thread's snapshot.
@@ -68,6 +70,7 @@ public:
     /// \pre On Android, add the necessary permission to your application's androidmanifest.xml: <uses-permission android:name="android.permission.INTERNET" />
     /// Multiple calls while already active are ignored.  To call this function again with different settings, you must first call Shutdown().
     /// \note Call SetMaximumIncomingConnections if you want to accept incoming connections
+    /// \note Must not overlap any other call on this Peer; see Threading on RakPeerInterface.
     /// \param[in] maxConnections The maximum number of connections between this instance of RakPeer and another instance of RakPeer. Required so the network can preallocate and for thread safety. A pure client would set this to 1.  A pure server would set it to the number of allowed clients.- A hybrid would set it to the sum of both types of connections
     /// \param[in] localPort The port to listen for connections on. On linux the system may be set up so thast ports under 1024 are restricted for everything but the root user. Use a higher port for maximum compatibility.
     /// \param[in] socketDescriptors An array of SocketDescriptor structures to force RakNet to listen on a particular IP address or port (or both).  Each SocketDescriptor will represent one unique socket.  Do not pass redundant structures.  To listen on a specific port, you can pass SocketDescriptor(myPort,0); such as for a server.  For a client, it is usually OK to just pass SocketDescriptor().
@@ -149,7 +152,7 @@ public:
     /// \param[in] disconnectionNotificationPriority Priority to send ID_DISCONNECTION_NOTIFICATION on.
     /// If you set it to 0 then the disconnection notification won't be sent
     /// \note Under RAKPEER_USER_THREADED it runs the update cycles itself while it waits, so the notifications go out and it returns once every connection has closed.
-    /// \note No other call on this Peer may overlap Shutdown, from any thread.
+    /// \note Must not overlap any other call on this Peer; see Threading on RakPeerInterface.
     virtual void Shutdown( unsigned int blockDuration, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY ) = 0;
 
     /// Returns if the network thread is running

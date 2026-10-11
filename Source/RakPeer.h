@@ -71,6 +71,7 @@ public:
     /// \details You must call this before calling Connect().
     /// \note Multiple calls while already active are ignored.  To call this function again with different settings, you must first call Shutdown().
     /// \note Call SetMaximumIncomingConnections if you want to accept incoming connections.
+    /// \note Must not overlap any other call on this Peer; see Threading on RakPeerInterface.
     /// \param[in] maxConnections Maximum number of connections between this instance of RakPeer and another instance of RakPeer. Required so that the network can preallocate and for thread safety. A pure client would set this to 1.  A pure server would set it to the number of allowed clients.A hybrid would set it to the sum of both types of connections.
     /// \param[in] localPort The port to listen for connections on. On linux the system may be set up so thast ports under 1024 are restricted for everything but the root user. Use a higher port for maximum compatibility.
     /// \param[in] socketDescriptors An array of SocketDescriptor structures to force RakNet to listen on a particular IP address or port (or both).  Each SocketDescriptor will represent one unique socket.  Do not pass redundant structures.  To listen on a specific port, you can pass SocketDescriptor(myPort,0); such as for a server.  For a client, it is usually OK to just pass SocketDescriptor().
@@ -155,7 +156,7 @@ public:
     /// \param[in] disconnectionNotificationPriority Priority of sending ID_DISCONNECTION_NOTIFICATION.
     /// If set to 0, the disconnection notification won't be sent.
     /// \note Under RAKPEER_USER_THREADED it runs the update cycles itself while it waits, so the notifications go out and it returns once every connection has closed.
-    /// \note No other call on this Peer may overlap Shutdown, from any thread.
+    /// \note Must not overlap any other call on this Peer; see Threading on RakPeerInterface.
     void Shutdown( unsigned int blockDuration, unsigned char orderingChannel = 0, PacketPriority disconnectionNotificationPriority = LOW_PRIORITY );
 
     /// \brief Returns true if the network thread is running.
