@@ -22,7 +22,8 @@ MinGW before GCC 9.2 would also have needed a documented caveat, which the platf
 removes entirely rather than papering over.
 
 `LIBCAT_SECURITY` is not an option at all until libcat is vendored, and making the naming
-of Peers depend on an optional subsystem would be wrong even then.
+of Peers depend on an optional subsystem would be wrong even then. (Since ADR-0010 it is
+removed, and libcat will not be vendored.)
 
 ## Consequences
 
