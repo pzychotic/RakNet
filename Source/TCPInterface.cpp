@@ -182,6 +182,8 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
             }
         }
     }
+    if( servinfo )
+        freeaddrinfo( servinfo );
 
     if( listenSocket == INVALID_SOCKET )
         return false;

@@ -475,14 +475,14 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bin
         rns2Socket = socket__( aip->ai_family, aip->ai_socktype, aip->ai_protocol );
 
         if( rns2Socket == -1 )
+        {
+            freeaddrinfo( servinfo );
             return BR_FAILED_TO_BIND_SOCKET;
+        }
 
         ret = bind__( rns2Socket, aip->ai_addr, (int)aip->ai_addrlen );
         if( ret >= 0 )
         {
-            // Is this valid?
-            memcpy( &boundAddress.address.addr6, aip->ai_addr, sizeof( boundAddress.address.addr6 ) );
-
             freeaddrinfo( servinfo ); // free the linked-list
 
             SetSocketOptions();
@@ -499,6 +499,8 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bin
             closesocket__( rns2Socket );
         }
     }
+    if( servinfo )
+        freeaddrinfo( servinfo );
 
     return BR_FAILED_TO_BIND_SOCKET;
 
