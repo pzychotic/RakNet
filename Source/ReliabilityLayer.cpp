@@ -444,8 +444,6 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
     }
 
 #ifdef _DEBUG
-    for( DataAndTime* pTime : delayList )
-        delete pTime;
     delayList.clear();
 #endif
 
@@ -1405,7 +1403,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     {
         if( delayList.front()->sendTime <= timeMs )
         {
-            DataAndTime* dat = delayList.front();
+            const std::unique_ptr<DataAndTime> dat = std::move( delayList.front() );
             delayList.pop_front();
 
             RNS2_SendParameters bsp;
@@ -1413,8 +1411,6 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
             bsp.length = dat->length;
             bsp.systemAddress = systemAddress;
             dat->s->Send( &bsp, _FILE_AND_LINE_ );
-
-            delete dat;
         }
         else
         {
@@ -1953,12 +1949,12 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
         // LIFO. No per-packet delay is added, but the drain has already run by the time
         // Update() reaches us, so the whole batch goes out one tick later than it would
         // have. That skew is uniform and is not what this harness is measuring.
-        DataAndTime* dat = new DataAndTime;
+        auto dat = std::make_unique<DataAndTime>();
         memcpy( dat->data, (char*)bitStream->GetData(), length );
         dat->s = s;
         dat->length = length;
         dat->sendTime = 0;
-        delayList.push_front( dat );
+        delayList.push_front( std::move( dat ) );
         // Returning here is deliberate. Queueing the datagram and then also sending it
         // below would put it on the wire twice - that is a duplication harness, not a
         // reordering one, and reordering is what this macro is for. Upstream fell through
@@ -1972,22 +1968,15 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
             delay += ( simulatorRandom() % extraPingVariance );
         if( delay > 0 )
         {
-            DataAndTime* dat = new DataAndTime;
+            auto dat = std::make_unique<DataAndTime>();
             memcpy( dat->data, (char*)bitStream->GetData(), length );
             dat->s = s;
             dat->length = length;
             dat->sendTime = RakNet::GetTimeMS() + delay;
-            for( auto it = delayList.begin(); it != delayList.end(); ++it )
-            {
-                if( dat->sendTime < (*it)->sendTime )
-                {
-                    delayList.insert( it, dat );
-                    dat = 0;
-                    break;
-                }
-            }
-            if( dat != 0 )
-                delayList.push_back( dat );
+            auto it = delayList.begin();
+            while( it != delayList.end() && ( *it )->sendTime <= dat->sendTime )
+                ++it;
+            delayList.insert( it, std::move( dat ) );
             return;
         }
 #endif
@@ -2597,7 +2586,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
             return false;
         }
 
-        SplitPacketChannel* newChannel = new SplitPacketChannel;
+        auto newChannel = std::make_unique<SplitPacketChannel>();
         newChannel->lastUpdateTime = time;
         newChannel->firstPacket = 0;
 
@@ -2608,15 +2597,14 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         {
             // The allocation failed; the count was checked above. Drop the chunk and the
             // channel with it rather than the process - ADR-0004.
-            delete newChannel;
             ReleaseHeldBytes( newChannelCost );
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseInternalPacket( internalPacket );
             return false;
         }
 
-        channel = newChannel;
-        const auto insertedIt = splitPacketChannelList.emplace( internalPacket->splitPacketId, newChannel ).first;
+        channel = newChannel.get();
+        const auto insertedIt = splitPacketChannelList.emplace( internalPacket->splitPacketId, std::move( newChannel ) ).first;
 
         // CreateInternalPacketFromBitStream checked splitPacketIndex < splitPacketCount, and
         // the channel was just sized from this chunk's own count, so this does not fail
@@ -2633,7 +2621,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
     }
     else
     {
-        channel = channelIt->second;
+        channel = channelIt->second.get();
 
         // Refused before it is charged, as above: a duplicate or disagreeing chunk would be
         // dropped anyway, and must not be what closes the connection.
@@ -2703,7 +2691,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
 }
 
 //-------------------------------------------------------------------------------------------------------
-// Free a split packet channel and every chunk it is holding
+// Free every chunk a split packet channel is holding, and release its held bytes
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::FreeSplitPacketChannel( SplitPacketChannel* splitPacketChannel )
 {
@@ -2718,8 +2706,6 @@ void ReliabilityLayer::FreeSplitPacketChannel( SplitPacketChannel* splitPacketCh
             ReleaseInternalPacket( pPacket );
         }
     }
-
-    delete splitPacketChannel;
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -2751,7 +2737,7 @@ void ReliabilityLayer::FreeStalledSplitPacketChannels( CCTimeType time )
     {
         if( time > it->second->lastUpdateTime + stallTime )
         {
-            FreeSplitPacketChannel( it->second );
+            FreeSplitPacketChannel( it->second.get() );
             it = splitPacketChannelList.erase( it );
         }
         else
@@ -2845,7 +2831,7 @@ void ReliabilityLayer::FreeHeldReceiveBuffers( void )
 {
     for( const auto& [splitPacketId, channel] : splitPacketChannelList )
     {
-        FreeSplitPacketChannel( channel );
+        FreeSplitPacketChannel( channel.get() );
     }
     splitPacketChannelList.clear();
 
@@ -2977,7 +2963,7 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
     InternalPacket *internalPacket, *splitPacket;
     // int splitPacketPartLength;
 
-    // Released up front: the channel is freed below whatever happens. The reassembled copy is
+    // Released up front: the channel is emptied below whatever happens. The reassembled copy is
     // not charged here - it is the caller's, and is charged if it goes into an ordering heap.
     ReleaseHeldBytes( SplitPacketChannelCost( splitPacketChannel ) );
 
@@ -3004,7 +2990,6 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
         FreeInternalPacketData( splitPacketChannel->splitPacketList.Get( j ), _FILE_AND_LINE_ );
         ReleaseInternalPacket( splitPacketChannel->splitPacketList.Get( j ) );
     }
-    delete splitPacketChannel;
 
     return internalPacket;
 }
@@ -3015,7 +3000,7 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdT
 {
     // Find in splitPacketChannelList the SplitPacketChannel with this splitPacketId
     const auto channelIt = splitPacketChannelList.find( splitPacketId );
-    SplitPacketChannel* splitPacketChannel = channelIt->second;
+    SplitPacketChannel* splitPacketChannel = channelIt->second.get();
 
     if( splitPacketChannel->splitPacketList.AllocSize() == splitPacketChannel->splitPacketList.AddedPacketsCount() )
     {

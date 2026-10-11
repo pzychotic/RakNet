@@ -38,6 +38,7 @@
 #include <atomic>
 #include <deque>
 #include <map>
+#include <memory>
 #include <queue>
 #include <random>
 #include <vector>
@@ -512,7 +513,8 @@ private:
     InternalPacket* BuildPacketFromSplitPacketList( SplitPacketIdType splitPacketId, CCTimeType time );
     InternalPacket* BuildPacketFromSplitPacketList( SplitPacketChannel* splitPacketChannel, CCTimeType time );
 
-    /// Free a split packet channel and every chunk it is holding.
+    /// Free every chunk \a splitPacketChannel is holding and release its held bytes. The
+    /// channel itself stays; the caller erases it from splitPacketChannelList afterwards.
     void FreeSplitPacketChannel( SplitPacketChannel* splitPacketChannel );
 
     /// How long a split packet channel may take no new chunk before it counts as stalled,
@@ -610,7 +612,7 @@ private:
     void InitHeapWeights( void );
     reliabilityHeapWeightType GetNextWeight( int priorityLevel );
 
-    std::map<SplitPacketIdType, SplitPacketChannel*> splitPacketChannelList;
+    std::map<SplitPacketIdType, std::unique_ptr<SplitPacketChannel>> splitPacketChannelList;
 
     MessageNumberType sendReliableMessageNumberIndex;
     MessageNumberType internalOrderIndex;
@@ -687,7 +689,7 @@ private:
         unsigned int length;
         RakNet::TimeMS sendTime;
     };
-    std::deque<DataAndTime*> delayList;
+    std::deque<std::unique_ptr<DataAndTime>> delayList;
 
     // Internet simulator
     double packetloss;
