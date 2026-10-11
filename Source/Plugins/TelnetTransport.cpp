@@ -54,13 +54,13 @@ void TelnetTransport::Stop( void )
         return;
     tcpInterface->Stop();
     for( TelnetClient* pClient : remoteClients )
-        RakNet::OP_DELETE( pClient, _FILE_AND_LINE_ );
+        delete pClient;
     remoteClients.clear();
     // Before tcpInterface is cleared: DeallocatePacket does nothing without it.
     for( Packet* line : pendingLines )
         DeallocatePacket( line );
     pendingLines.clear();
-    RakNet::OP_DELETE( tcpInterface, _FILE_AND_LINE_ );
+    delete tcpInterface;
     tcpInterface = 0;
 }
 void TelnetTransport::Send( SystemAddress systemAddress, const char* data, ... )
@@ -295,7 +295,7 @@ TelnetTransport::TelnetClient* TelnetTransport::CountConnection( const SystemAdd
     if( it == remoteClients.end() )
     {
         // Only for an address TCPInterface reported an event for, and one entry per address.
-        TelnetClient* remoteClient = RakNet::OP_NEW<TelnetClient>( _FILE_AND_LINE_ );
+        TelnetClient* remoteClient = new TelnetClient;
         remoteClient->lastSentTextInput[0] = 0;
         remoteClient->cursorPosition = 0;
         remoteClient->systemAddress = systemAddress;
@@ -308,7 +308,7 @@ TelnetTransport::TelnetClient* TelnetTransport::CountConnection( const SystemAdd
     remoteClient->openConnections += delta;
     if( remoteClient->openConnections == 0 )
     {
-        RakNet::OP_DELETE( remoteClient, _FILE_AND_LINE_ );
+        delete remoteClient;
         remoteClients.erase( it );
         return 0;
     }

@@ -445,7 +445,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
 
 #ifdef _DEBUG
     for( DataAndTime* pTime : delayList )
-        RakNet::OP_DELETE( pTime, __FILE__, __LINE__ );
+        delete pTime;
     delayList.clear();
 #endif
 
@@ -1414,7 +1414,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
             bsp.systemAddress = systemAddress;
             dat->s->Send( &bsp, _FILE_AND_LINE_ );
 
-            RakNet::OP_DELETE( dat, __FILE__, __LINE__ );
+            delete dat;
         }
         else
         {
@@ -1953,7 +1953,7 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
         // LIFO. No per-packet delay is added, but the drain has already run by the time
         // Update() reaches us, so the whole batch goes out one tick later than it would
         // have. That skew is uniform and is not what this harness is measuring.
-        DataAndTime* dat = RakNet::OP_NEW<DataAndTime>( __FILE__, __LINE__ );
+        DataAndTime* dat = new DataAndTime;
         memcpy( dat->data, (char*)bitStream->GetData(), length );
         dat->s = s;
         dat->length = length;
@@ -1972,7 +1972,7 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
             delay += ( simulatorRandom() % extraPingVariance );
         if( delay > 0 )
         {
-            DataAndTime* dat = RakNet::OP_NEW<DataAndTime>( __FILE__, __LINE__ );
+            DataAndTime* dat = new DataAndTime;
             memcpy( dat->data, (char*)bitStream->GetData(), length );
             dat->s = s;
             dat->length = length;
@@ -2597,7 +2597,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
             return false;
         }
 
-        SplitPacketChannel* newChannel = RakNet::OP_NEW<SplitPacketChannel>( __FILE__, __LINE__ );
+        SplitPacketChannel* newChannel = new SplitPacketChannel;
         newChannel->lastUpdateTime = time;
         newChannel->firstPacket = 0;
 
@@ -2608,7 +2608,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         {
             // The allocation failed; the count was checked above. Drop the chunk and the
             // channel with it rather than the process - ADR-0004.
-            RakNet::OP_DELETE( newChannel, __FILE__, __LINE__ );
+            delete newChannel;
             ReleaseHeldBytes( newChannelCost );
             FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
             ReleaseInternalPacket( internalPacket );
@@ -2719,7 +2719,7 @@ void ReliabilityLayer::FreeSplitPacketChannel( SplitPacketChannel* splitPacketCh
         }
     }
 
-    RakNet::OP_DELETE( splitPacketChannel, _FILE_AND_LINE_ );
+    delete splitPacketChannel;
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -3004,7 +3004,7 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
         FreeInternalPacketData( splitPacketChannel->splitPacketList.Get( j ), _FILE_AND_LINE_ );
         ReleaseInternalPacket( splitPacketChannel->splitPacketList.Get( j ) );
     }
-    RakNet::OP_DELETE( splitPacketChannel, __FILE__, __LINE__ );
+    delete splitPacketChannel;
 
     return internalPacket;
 }

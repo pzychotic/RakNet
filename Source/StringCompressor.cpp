@@ -26,7 +26,7 @@ void StringCompressor::AddReference( void )
 {
     if( ++referenceCount == 1 )
     {
-        instance = RakNet::OP_NEW<StringCompressor>( _FILE_AND_LINE_ );
+        instance = new StringCompressor;
     }
 }
 void StringCompressor::RemoveReference( void )
@@ -37,7 +37,7 @@ void StringCompressor::RemoveReference( void )
     {
         if( --referenceCount == 0 )
         {
-            RakNet::OP_DELETE( instance, _FILE_AND_LINE_ );
+            delete instance;
             instance = 0;
         }
     }
@@ -70,13 +70,13 @@ unsigned int englishCharacterFrequencies[256] = {    0,    0,    0,    0,    0, 
 StringCompressor::StringCompressor()
 {
     // Make a default tree immediately, since this is used for RPC possibly from multiple threads at the same time
-    m_pHuffmanEncodingTree = RakNet::OP_NEW<HuffmanEncodingTree>( _FILE_AND_LINE_ );
+    m_pHuffmanEncodingTree = new HuffmanEncodingTree;
     m_pHuffmanEncodingTree->GenerateFromFrequencyTable( englishCharacterFrequencies );
 }
 
 StringCompressor::~StringCompressor()
 {
-    RakNet::OP_DELETE( m_pHuffmanEncodingTree, _FILE_AND_LINE_ );
+    delete m_pHuffmanEncodingTree;
 }
 
 void StringCompressor::EncodeString( const char* input, int maxCharsToWrite, BitStream* output )

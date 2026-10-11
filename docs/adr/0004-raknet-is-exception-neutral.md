@@ -22,7 +22,7 @@ a claim about `-fno-exceptions` that holds for no toolchain.
 3. **Fatal paths are observable.** An embedder can log before the process dies, in either
    mode.
 4. **The embedder controls memory.** Every allocation can be routed to the embedder's
-   allocator.
+   allocator, by replacing the global `operator new`/`delete`.
 
 Tests are exempt from all of this. Catch2 is built with exceptions.
 
@@ -95,7 +95,7 @@ A safe call is marked on its line with `// ADR-0004-allow(<rule>): <reason>`.
 returning null. Dereferencing that null is undefined behaviour, not a fatal error, so the
 result is always checked. Report the failure through `notifyOutOfMemory` and return failure,
 which is the shape the existing sites already use. For a `Packet` that covers only its
-payload: the `Packet` itself is made with `OP_NEW` (ADR-0009), so failing to make it is fatal
+payload: the `Packet` itself is made with `new` (ADR-0009), so failing to make it is fatal
 as above. One caveat: after `_set_new_mode(1)` on
 MSVC, `malloc` calls the new handler and can throw. An embedder can set that for the whole
 application without RakNet knowing. The throw is then allocation failure, so it is fatal as
@@ -114,8 +114,9 @@ above.
   kept as public API. It is not an OOM hook for the library as a whole.
 - **Replacing global `operator new`/`delete` is the way to control memory.** It covers the
   standard containers as well as RakNet's own `new`. `SetMalloc` and friends redirect only
-  the `rakMalloc` family. `_USE_RAK_MEMORY_OVERRIDE` is frozen: kept and correct, but it is
-  not the recommended hook, since it cannot reach containers.
+  the `rakMalloc` family. The `_USE_RAK_MEMORY_OVERRIDE` switch was removed, because
+  nothing built it and the objects already moved to `new` had left it. The `OP_NEW` family
+  remains as plain `new`/`delete` for embedders.
 
 ## Toolchain facts this rests on
 

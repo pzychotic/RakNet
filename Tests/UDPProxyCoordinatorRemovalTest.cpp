@@ -41,7 +41,7 @@ public:
     // A request from requester to kTargetClient, sent to a server and not yet answered.
     ForwardingRequest* AddRequest( const SystemAddress& requester )
     {
-        ForwardingRequest* fw = RakNet::OP_NEW<ForwardingRequest>( _FILE_AND_LINE_ );
+        ForwardingRequest* fw = new ForwardingRequest;
         fw->timeoutOnNoDataMS = 0;
         fw->timeoutAfterSuccess = 0;
         fw->timeRequestedPings = 0;

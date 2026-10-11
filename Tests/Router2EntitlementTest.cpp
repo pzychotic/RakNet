@@ -56,7 +56,7 @@ public:
     // leaves it.
     void AddRequest( RakNetGUID endpointGuid, RakNetGUID router )
     {
-        ConnnectRequest* request = RakNet::OP_NEW<ConnnectRequest>( _FILE_AND_LINE_ );
+        ConnnectRequest* request = new ConnnectRequest;
         request->requestState = REQUEST_STATE_REQUEST_FORWARDING;
         request->pingTimeout = 0;
         request->endpointGuid = endpointGuid;

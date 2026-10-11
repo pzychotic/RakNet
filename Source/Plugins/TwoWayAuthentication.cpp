@@ -68,11 +68,11 @@ bool TwoWayAuthentication::NonceGenerator::GetNonce( char nonce[TWO_WAY_AUTHENTI
         // Once per plugin: a flood would otherwise flood the console too
         if( noncesEvicted++ == 0 )
             RAKNET_DEBUG_PRINTF( "TwoWayAuthentication: evicted a System's oldest nonce, over SetMaxNoncesPerSystem's %u. See GetNoncesEvicted.\n", maxNoncesPerSystem );
-        RakNet::OP_DELETE( *oldest, _FILE_AND_LINE_ );
+        delete *oldest;
         generatedNonces.erase( oldest );
     }
 
-    TwoWayAuthentication::NonceAndRemoteSystemRequest* narsr = RakNet::OP_NEW<TwoWayAuthentication::NonceAndRemoteSystemRequest>( _FILE_AND_LINE_ );
+    TwoWayAuthentication::NonceAndRemoteSystemRequest* narsr = new TwoWayAuthentication::NonceAndRemoteSystemRequest;
     narsr->remoteSystem = remoteSystem;
     memcpy( narsr->nonce, nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
     narsr->requestId = nextRequestId++;
@@ -97,7 +97,7 @@ bool TwoWayAuthentication::NonceGenerator::GetNonceById( char nonce[TWO_WAY_AUTH
             memcpy( nonce, pNonce->nonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
             if( popIfFound )
             {
-                RakNet::OP_DELETE( pNonce, _FILE_AND_LINE_ );
+                delete pNonce;
                 generatedNonces.erase( it );
             }
             return true;
@@ -109,7 +109,7 @@ void TwoWayAuthentication::NonceGenerator::Clear( void )
 {
     for( TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce : generatedNonces )
     {
-        RakNet::OP_DELETE( pNonce, _FILE_AND_LINE_ );
+        delete pNonce;
     }
     generatedNonces.clear();
 }
@@ -120,7 +120,7 @@ void TwoWayAuthentication::NonceGenerator::ClearByAddress( AddressOrGUID remoteS
         TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = *it;
         if( pNonce->remoteSystem == remoteSystem )
         {
-            RakNet::OP_DELETE( pNonce, _FILE_AND_LINE_ );
+            delete pNonce;
             it = generatedNonces.erase( it );
         }
         else
@@ -135,7 +135,7 @@ void TwoWayAuthentication::NonceGenerator::Update( RakNet::Time curTime )
     auto firstFresh = generatedNonces.begin();
     while( firstFresh != generatedNonces.end() && (RakNet::Time)( curTime - ( *firstFresh )->whenGenerated ) > NONCE_TIMEOUT_MS )
     {
-        RakNet::OP_DELETE( *firstFresh, _FILE_AND_LINE_ );
+        delete *firstFresh;
         ++firstFresh;
     }
     generatedNonces.erase( generatedNonces.begin(), firstFresh );

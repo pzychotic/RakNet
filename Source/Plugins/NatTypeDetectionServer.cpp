@@ -61,7 +61,7 @@ void NatTypeDetectionServer::Shutdown()
     std::lock_guard<std::mutex> guard( bufferedPacketsMutex );
     for( RNS2RecvStruct* pPacket : bufferedPackets )
     {
-        RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
+        delete pPacket;
     }
     bufferedPackets.clear();
 }
@@ -313,12 +313,16 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void NatTypeDetectionServer::DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line )
 {
-    RakNet::OP_DELETE( s, file, line );
+    (void)file;
+    (void)line;
+    delete s;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RNS2RecvStruct* NatTypeDetectionServer::AllocRNS2RecvStruct( const char* file, unsigned int line )
 {
-    return RakNet::OP_NEW<RNS2RecvStruct>( file, line );
+    (void)file;
+    (void)line;
+    return new RNS2RecvStruct;
 }
 
 void NatTypeDetectionServer::OnRNS2Recv( RNS2RecvStruct* recvStruct )

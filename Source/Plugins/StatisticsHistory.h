@@ -182,7 +182,7 @@ protected:
         TrackedObject( const TrackedObject& ) = delete;
         TrackedObject& operator=( const TrackedObject& ) = delete;
         TrackedObjectData trackedObjectData;
-        // Owns its queues, which are made with OP_NEW.
+        // Owns its queues, which are made with new.
         std::unordered_map<std::string, TimeAndValueQueue*> dataQueues;
     };
 

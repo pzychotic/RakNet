@@ -505,6 +505,10 @@ compiles in 4.081, so nothing you were doing stops working.
   does not compile in 4.081. A build that still defines it now compiles and sends inline
   from the update cycle.
 
+**`_USE_RAK_MEMORY_OVERRIDE`.** Source-only. Replace the global `operator new`/`delete`
+instead. A build that still defines it compiles, and the `OP_NEW` templates are plain
+`new`/`delete` either way.
+
 **`RakAlloca.h`, `USE_ALLOCA`, `MAX_ALLOCA_STACK_ALLOCATION`.** Source-only, not
 wire-visible. `RakAlloca.h` is gone, and RakNet no longer uses `alloca` anywhere. The public
 `RakMemoryOverride.h` used to include it, which pulled `<malloc.h>` (and `<alloca.h>` outside
@@ -996,7 +1000,7 @@ the catch works but skips RakNet's destructors, so its locks stay held. To log b
 `std::set_new_handler`. The runtime calls it before throwing in both modes; on MSVC a
 fail-fast skips `std::set_terminate`, so that is not a reliable hook. To control RakNet's
 memory, replace the global `operator new`/`delete`. `SetMalloc` and friends redirect only
-the `rakMalloc` family, and `_USE_RAK_MEMORY_OVERRIDE` is frozen and not recommended. In
+the `rakMalloc` family, and `_USE_RAK_MEMORY_OVERRIDE` has been removed. In
 stock 4.081, `SetNotifyOutOfMemory` fired wherever a `rakMalloc`-family call returned null
 and was checked, and those checks covered every `RakString` and `RakWString` buffer. With
 `_USE_RAK_MEMORY_OVERRIDE` at 1, `SetMalloc` also reached the `DataStructures` containers.
@@ -1007,7 +1011,7 @@ handler.
 
 For a `Packet`, `SetNotifyOutOfMemory` now fires only when its payload can't be allocated.
 Stock took the `Packet` struct itself from a memory pool, and a pool that could not grow
-also fired it, and `AllocatePacket` returned null. Here the struct is made with `OP_NEW`, so
+also fired it, and `AllocatePacket` returned null. Here the struct is made with `new`, so
 failing to make it is fatal like any other allocation. `AllocatePacket` still returns null
 when the payload allocation fails.
 

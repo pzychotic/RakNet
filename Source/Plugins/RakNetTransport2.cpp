@@ -45,7 +45,7 @@ void RakNetTransport2::Stop( void )
     for( Packet* pPacket : packetQueue )
     {
         rakFree_Ex( pPacket->data, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
+        delete pPacket;
     }
     packetQueue.clear();
 }
@@ -104,7 +104,7 @@ SystemAddress RakNetTransport2::HasLostConnection( void )
 void RakNetTransport2::DeallocatePacket( Packet* packet )
 {
     rakFree_Ex( packet->data, _FILE_AND_LINE_ );
-    RakNet::OP_DELETE( packet, _FILE_AND_LINE_ );
+    delete packet;
 }
 PluginReceiveResult RakNetTransport2::OnReceive( Packet* packet )
 {
@@ -114,7 +114,7 @@ PluginReceiveResult RakNetTransport2::OnReceive( Packet* packet )
         if( packet->length == sizeof( MessageID ) )
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
 
-        Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+        Packet* p = new Packet;
         *p = *packet;
         p->bitSize -= 8;
         p->length--;

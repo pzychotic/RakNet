@@ -32,12 +32,6 @@
 /// Enabled by default.
 // #define __BITSTREAM_NATIVE_END
 
-/// Uncomment to use RakMemoryOverride for custom memory tracking
-/// See RakMemoryOverride.h.
-#ifndef _USE_RAK_MEMORY_OVERRIDE
-#define _USE_RAK_MEMORY_OVERRIDE 0
-#endif
-
 /// If defined, OpenSSL is enabled for the class TCPInterface
 /// This is necessary to use the SendEmail class with Google POP servers
 /// Note that OpenSSL carries its own license restrictions that you should be aware of. If you don't agree, don't enable this define

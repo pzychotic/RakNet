@@ -41,11 +41,11 @@ namespace RakNet {
 
 RakNetSocket2* RakNetSocket2Allocator::AllocRNS2( void )
 {
-    return RakNet::OP_NEW<RNS2_Berkley>( _FILE_AND_LINE_ );
+    return new RNS2_Berkley;
 }
 void RakNetSocket2Allocator::DeallocRNS2( RakNetSocket2* s )
 {
-    RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
+    delete s;
 }
 
 RakNetSocket2::RakNetSocket2() { eventHandler = 0; }

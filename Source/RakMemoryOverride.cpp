@@ -14,26 +14,6 @@
 
 namespace RakNet {
 
-#if _USE_RAK_MEMORY_OVERRIDE == 1
-#if defined( malloc )
-#pragma push_macro( "malloc" )
-#undef malloc
-#define RMO_MALLOC_UNDEF
-#endif
-
-#if defined( realloc )
-#pragma push_macro( "realloc" )
-#undef realloc
-#define RMO_REALLOC_UNDEF
-#endif
-
-#if defined( free )
-#pragma push_macro( "free" )
-#undef free
-#define RMO_FREE_UNDEF
-#endif
-#endif
-
 void DefaultOutOfMemoryHandler( const char* file, const long line )
 {
     (void)file;
@@ -101,25 +81,6 @@ void ( *GetFree_Ex() )( void* p, const char* file, unsigned int line )
 {
     return rakFree_Ex;
 }
-void* RakAllocateOrAbort( size_t size, const char* file, unsigned int line )
-{
-    // operator new's own contract: on failure call the new handler and retry, and end
-    // the process when there is none. ADR-0004 makes std::set_new_handler the embedder's
-    // OOM hook, so it has to run under the override too, not only under operator new.
-    // abort rather than throw keeps this usable when Source/ builds without exceptions.
-    for( ;; )
-    {
-        void* buffer = rakMalloc_Ex( size, file, line );
-        if( buffer != 0 )
-            return buffer;
-
-        notifyOutOfMemory( file, line );
-        std::new_handler handler = std::get_new_handler();
-        if( handler == 0 )
-            std::abort();
-        handler();
-    }
-}
 
 void* _RakMalloc( size_t size )
 {
@@ -159,22 +120,5 @@ void _RakFree_Ex( void* p, const char* file, unsigned int line )
 
     free( p );
 }
-
-#if _USE_RAK_MEMORY_OVERRIDE == 1
-#if defined( RMO_MALLOC_UNDEF )
-#pragma pop_macro( "malloc" )
-#undef RMO_MALLOC_UNDEF
-#endif
-
-#if defined( RMO_REALLOC_UNDEF )
-#pragma pop_macro( "realloc" )
-#undef RMO_REALLOC_UNDEF
-#endif
-
-#if defined( RMO_FREE_UNDEF )
-#pragma pop_macro( "free" )
-#undef RMO_FREE_UNDEF
-#endif
-#endif
 
 } // namespace RakNet

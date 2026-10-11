@@ -186,7 +186,7 @@ void UDPProxyClient::Update( void )
             if( !psg->serversToPing.empty() )
                 psg->SendPingedServersToCoordinator( rakPeerInterface );
 
-            RakNet::OP_DELETE( psg, _FILE_AND_LINE_ );
+            delete psg;
             it = pingServerGroups.erase( it );
         }
         else
@@ -219,7 +219,7 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
                     if( psg->AreAllServersPinged() )
                     {
                         psg->SendPingedServersToCoordinator( rakPeerInterface );
-                        RakNet::OP_DELETE( psg, _FILE_AND_LINE_ );
+                        delete psg;
                         pingServerGroups.erase( it );
                     }
 
@@ -336,7 +336,7 @@ void UDPProxyClient::OnClosedConnection( const SystemAddress& systemAddress, Rak
     {
         if( ( *it )->coordinatorAddressForPings == systemAddress )
         {
-            RakNet::OP_DELETE( *it, _FILE_AND_LINE_ );
+            delete *it;
             it = pingServerGroups.erase( it );
         }
         else
@@ -401,13 +401,13 @@ void UDPProxyClient::OnPingServers( Packet* packet )
     if( existing != pingServerGroups.end() )
     {
         ( *existing )->SendPingedServersToCoordinator( rakPeerInterface );
-        RakNet::OP_DELETE( *existing, _FILE_AND_LINE_ );
+        delete *existing;
         pingServerGroups.erase( existing );
         if( pingServerGroupsReplaced++ == 0 )
             RAKNET_DEBUG_PRINTF( "UDPProxyClient: a coordinator's request to ping replaced its live one, as each has at most one. See GetPingServerGroupsReplaced.\n" );
     }
 
-    PingServerGroup* psg = RakNet::OP_NEW<PingServerGroup>( _FILE_AND_LINE_ );
+    PingServerGroup* psg = new PingServerGroup;
     psg->sata = sata;
     psg->startPingTime = RakNet::GetTimeMS();
     psg->coordinatorAddressForPings = packet->systemAddress;
@@ -453,7 +453,7 @@ void UDPProxyClient::Clear( void )
 {
     for( PingServerGroup* pGroup : pingServerGroups )
     {
-        RakNet::OP_DELETE( pGroup, _FILE_AND_LINE_ );
+        delete pGroup;
     }
     pingServerGroups.clear();
     coordinators.clear();

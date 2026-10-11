@@ -42,7 +42,7 @@ bool StatisticsHistory::AddObject( TrackedObjectData tod )
     const auto it = LowerBound( tod.objectId );
     if( it != objects.end() && ( *it )->trackedObjectData.objectId == tod.objectId )
         return false;
-    TrackedObject* to = RakNet::OP_NEW<TrackedObject>( _FILE_AND_LINE_ );
+    TrackedObject* to = new TrackedObject;
     to->trackedObjectData = tod;
     objects.insert( it, to );
     return true;
@@ -61,13 +61,13 @@ void StatisticsHistory::RemoveObjectAtIndex( unsigned int index )
 {
     TrackedObject* to = objects[index];
     objects.erase( objects.begin() + index );
-    RakNet::OP_DELETE( to, _FILE_AND_LINE_ );
+    delete to;
 }
 void StatisticsHistory::Clear( void )
 {
     for( TrackedObject* to : objects )
     {
-        RakNet::OP_DELETE( to, _FILE_AND_LINE_ );
+        delete to;
     }
     objects.clear();
 }
@@ -89,7 +89,7 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& 
     auto it = to->dataQueues.find( key );
     if( it == to->dataQueues.end() )
     {
-        queue = RakNet::OP_NEW<TimeAndValueQueue>( _FILE_AND_LINE_ );
+        queue = new TimeAndValueQueue;
         queue->key = key;
         queue->timeToTrackValues = timeToTrack;
         to->dataQueues.insert( std::make_pair( key, queue ) );
@@ -656,7 +656,7 @@ StatisticsHistory::TrackedObject::TrackedObject() {}
 StatisticsHistory::TrackedObject::~TrackedObject()
 {
     for( const auto& entry : dataQueues )
-        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
+        delete entry.second;
 }
 
 unsigned int StatisticsHistory::GetObjectIndex( uint64_t objectId ) const

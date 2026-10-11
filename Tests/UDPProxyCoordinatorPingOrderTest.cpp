@@ -64,7 +64,7 @@ class CoordinatorProbe : public UDPProxyCoordinator
 public:
     ForwardingRequest* AddRequestAwaitingPings( const std::vector<SystemAddress>& servers )
     {
-        ForwardingRequest* fw = RakNet::OP_NEW<ForwardingRequest>( _FILE_AND_LINE_ );
+        ForwardingRequest* fw = new ForwardingRequest;
         fw->timeoutOnNoDataMS = 0;
         fw->timeoutAfterSuccess = 0;
         fw->sata.senderClientAddress = kSourceClient;

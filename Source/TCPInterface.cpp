@@ -585,7 +585,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     }
     else
     {
-        ThisPtrPlusSysAddr* s = RakNet::OP_NEW<ThisPtrPlusSysAddr>( _FILE_AND_LINE_ );
+        ThisPtrPlusSysAddr* s = new ThisPtrPlusSysAddr;
         s->systemAddress.FromStringExplicitPort( host, remotePort );
         s->systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
         // Bounded by the length check at the top of Connect.
@@ -607,7 +607,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         if( errorCode != 0 )
         {
             SystemAddress failedSystemAddress = s->systemAddress;
-            RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
+            delete s;
 
             // No thread was started, so nothing else will ever clear the slot. Released
             // before the failure is pushed, so the slot is free by the time the
@@ -860,7 +860,7 @@ void TCPInterface::DeallocatePacket( Packet* packet )
     {
         // Came from userspace AllocatePacket
         rakFree_Ex( packet->data, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( packet, _FILE_AND_LINE_ );
+        delete packet;
     }
 }
 Packet* TCPInterface::AllocatePacket( unsigned dataSize )
@@ -871,7 +871,7 @@ Packet* TCPInterface::AllocatePacket( unsigned dataSize )
         notifyOutOfMemory( _FILE_AND_LINE_ );
         return 0;
     }
-    Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+    Packet* p = new Packet;
     p->data = data;
     p->length = dataSize;
     p->bitSize = BytesToBits( dataSize );
@@ -1160,7 +1160,7 @@ void ConnectionAttemptLoop( void* arg )
     // bounded by Connect before the thread was started, so this copy cannot overrun.
     char bindAddress[sizeof( s->bindAddress )];
     strcpy( bindAddress, s->bindAddress );
-    RakNet::OP_DELETE( s, _FILE_AND_LINE_ );
+    delete s;
 
     char str1[64];
     systemAddress.ToString( false, str1 );

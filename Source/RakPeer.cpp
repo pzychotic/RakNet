@@ -112,7 +112,7 @@ Packet* RakPeer::AllocPacket( unsigned dataSize, const char* file, unsigned int 
 
 Packet* RakPeer::AllocPacket( unsigned dataSize, unsigned char* data )
 {
-    Packet* p = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+    Packet* p = new Packet;
     p->data = data;
     p->length = dataSize;
     p->bitSize = BytesToBits( dataSize );
@@ -1072,7 +1072,7 @@ void RakPeer::DeallocatePacket( Packet* packet )
     if( packet->deleteData )
     {
         rakFree_Ex( packet->data, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( packet, _FILE_AND_LINE_ );
+        delete packet;
     }
     else
     {
@@ -1138,7 +1138,7 @@ void RakPeer::HandleConnectionCancelQueue()
         {
             if( (*it)->systemAddress == requestedConnectionCancelQueue.front() )
             {
-                RakNet::OP_DELETE( (*it), _FILE_AND_LINE_ );
+                delete *it;
                 it = requestedConnectionQueue.erase( it );
                 break;
             }
@@ -1324,7 +1324,7 @@ void RakPeer::AddToBanList( const char* IP, RakNet::TimeMS milliseconds )
 
     banListMutex.unlock();
 
-    BanStruct* banStruct = RakNet::OP_NEW<BanStruct>( _FILE_AND_LINE_ );
+    BanStruct* banStruct = new BanStruct;
     banStruct->IP = (char*)rakMalloc_Ex( 16, _FILE_AND_LINE_ );
     if( milliseconds == 0 )
         banStruct->timeout = 0; // Infinite
@@ -1368,7 +1368,7 @@ void RakPeer::RemoveFromBanList( const char* IP )
     if( temp )
     {
         rakFree_Ex( temp->IP, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( temp, _FILE_AND_LINE_ );
+        delete temp;
     }
 }
 
@@ -1383,7 +1383,7 @@ void RakPeer::ClearBanList( void )
     for( BanStruct* pBanStruct : banList )
     {
         rakFree_Ex( pBanStruct->IP, _FILE_AND_LINE_ );
-        RakNet::OP_DELETE( pBanStruct, _FILE_AND_LINE_ );
+        delete pBanStruct;
     }
 
     banList.clear();
@@ -1424,7 +1424,7 @@ bool RakPeer::IsBanned( const char* IP )
             // Delete expired ban
             it = banList.erase( it );
             rakFree_Ex( pBanStruct->IP, _FILE_AND_LINE_ );
-            RakNet::OP_DELETE( pBanStruct, _FILE_AND_LINE_ );
+            delete pBanStruct;
         }
         else
         {
@@ -2450,7 +2450,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     if( GetPublishedByAddress( systemAddress, entry ) )
         return ALREADY_CONNECTED_TO_ENDPOINT;
 
-    RequestedConnectionStruct* rcs = RakNet::OP_NEW<RequestedConnectionStruct>( _FILE_AND_LINE_ );
+    RequestedConnectionStruct* rcs = new RequestedConnectionStruct;
 
     rcs->systemAddress = systemAddress;
     rcs->nextRequestTime = RakNet::GetTimeMS();
@@ -2474,8 +2474,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
         if( pConnection->systemAddress == systemAddress )
         {
             // Not necessary
-            //RakNet::OP_DELETE(rcs->client_handshake,_FILE_AND_LINE_);
-            RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
+            delete rcs;
             return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
         }
     }
@@ -2494,7 +2493,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     if( GetPublishedByAddress( systemAddress, entry ) )
         return ALREADY_CONNECTED_TO_ENDPOINT;
 
-    RequestedConnectionStruct* rcs = RakNet::OP_NEW<RequestedConnectionStruct>( _FILE_AND_LINE_ );
+    RequestedConnectionStruct* rcs = new RequestedConnectionStruct;
 
     rcs->systemAddress = systemAddress;
     rcs->nextRequestTime = RakNet::GetTimeMS();
@@ -2519,8 +2518,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
         if( pConnection->systemAddress == systemAddress )
         {
             // Not necessary
-            //RakNet::OP_DELETE(rcs->client_handshake,_FILE_AND_LINE_);
-            RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
+            delete rcs;
             return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
         }
     }
@@ -3374,6 +3372,8 @@ void RakPeer::DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsign
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RNS2RecvStruct* RakPeer::AllocRNS2RecvStruct( const char* file, unsigned int line )
 {
+    (void)file;
+    (void)line;
     std::lock_guard<std::mutex> guard( bufferedPacketsFreePoolMutex );
     if( !bufferedPacketsFreePool.empty() )
     {
@@ -3383,7 +3383,7 @@ RNS2RecvStruct* RakPeer::AllocRNS2RecvStruct( const char* file, unsigned int lin
     }
     else
     {
-        return RakNet::OP_NEW<RNS2RecvStruct>( file, line );
+        return new RNS2RecvStruct;
     }
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3404,7 +3404,7 @@ void RakPeer::ClearBufferedPackets( void )
     std::lock_guard<std::mutex> guard( bufferedPacketsFreePoolMutex );
     for( RNS2RecvStruct* pPacket : bufferedPacketsFreePool )
     {
-        RakNet::OP_DELETE( pPacket, _FILE_AND_LINE_ );
+        delete pPacket;
     }
     bufferedPacketsFreePool.clear();
 }
@@ -3795,7 +3795,7 @@ void RakPeer::ClearRequestedConnectionList( void )
 
     for( RequestedConnectionStruct* pConnection : freeQueue )
     {
-        RakNet::OP_DELETE( pConnection, _FILE_AND_LINE_ );
+        delete pConnection;
     }
 }
 std::list<Packet*>& RakPeer::QueueForPush( void )
@@ -4242,7 +4242,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     }
                     queueLock.unlock();
 
-                    RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
+                    delete rcs;
 
                     break;
                 }
@@ -4278,7 +4278,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     connectionAttemptCancelled = true;
                     rakPeer->requestedConnectionQueue.erase( it );
 
-                    RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
+                    delete rcs;
                     break;
                 }
             }
@@ -4748,7 +4748,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                         }
                     }
 
-                    RakNet::OP_DELETE( rcs, _FILE_AND_LINE_ );
+                    delete rcs;
 
                     it = requestedConnectionQueue.erase( it );
                 }

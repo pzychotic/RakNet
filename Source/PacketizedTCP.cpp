@@ -223,7 +223,7 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
             break;
 
         bytes.Consume( sizeof( PTCPHeader ) );
-        Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+        Packet* outgoingPacket = new Packet;
         outgoingPacket->length = dataLength;
         outgoingPacket->bitSize = BytesToBits( dataLength );
         outgoingPacket->guid = UNASSIGNED_RAKNET_GUID;
@@ -233,7 +233,7 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
         if( outgoingPacket->data == 0 )
         {
             notifyOutOfMemory( _FILE_AND_LINE_ );
-            RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
+            delete outgoingPacket;
             return;
         }
         bytes.Read( (char*)outgoingPacket->data, dataLength );
@@ -258,7 +258,7 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
         const unsigned int bufferedAfterHeader = newWritten - sizeof( PTCPHeader );
         const unsigned int oneChunkSize = bufferedAfterHeader < 65536 ? bufferedAfterHeader : 65536;
 
-        Packet* outgoingPacket = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+        Packet* outgoingPacket = new Packet;
         outgoingPacket->length = sizeof( MessageID ) +
                                     sizeof( unsigned int ) * 2 +
                                     sizeof( unsigned int ) +
@@ -271,7 +271,7 @@ void PacketizedTCP::FrameMessages( const Packet& incomingPacket, Connection& con
         if( outgoingPacket->data == 0 )
         {
             notifyOutOfMemory( _FILE_AND_LINE_ );
-            RakNet::OP_DELETE( outgoingPacket, _FILE_AND_LINE_ );
+            delete outgoingPacket;
             return;
         }
 
@@ -353,7 +353,7 @@ void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
     // connection it replaces rather than failing to insert its own.
     auto it = connections.find( sa );
     if( it == connections.end() )
-        it = connections.insert( std::make_pair( sa, RakNet::OP_NEW<Connection>( _FILE_AND_LINE_ ) ) ).first;
+        it = connections.insert( std::make_pair( sa, new Connection ) ).first;
 
     Connection* connection = it->second;
     if( delta > 0 )
@@ -366,7 +366,7 @@ void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
     connection->openConnections += delta;
     if( connection->openConnections == 0 )
     {
-        RakNet::OP_DELETE( connection, _FILE_AND_LINE_ );
+        delete connection;
         connections.erase( it );
     }
 }
@@ -375,7 +375,7 @@ void PacketizedTCP::ClearAllConnections( void )
 {
     for( const auto& kEntry : connections )
     {
-        RakNet::OP_DELETE( kEntry.second, _FILE_AND_LINE_ );
+        delete kEntry.second;
     }
     connections.clear();
 }

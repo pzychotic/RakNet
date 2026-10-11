@@ -43,7 +43,7 @@ void NatPunchthroughServer::User::DeleteConnectionAttempt( NatPunchthroughServer
     auto it = std::find( connectionAttempts.begin(), connectionAttempts.end(), ca );
     if( it != connectionAttempts.end() )
     {
-        RakNet::OP_DELETE( ca, _FILE_AND_LINE_ );
+        delete ca;
         connectionAttempts.erase( it );
     }
 }
@@ -127,9 +127,9 @@ NatPunchthroughServer::~NatPunchthroughServer()
         {
             User* otherUser = pConnectionAttempt->sender == user ? pConnectionAttempt->recipient : pConnectionAttempt->sender;
             otherUser->DerefConnectionAttempt( pConnectionAttempt );
-            RakNet::OP_DELETE( pConnectionAttempt, _FILE_AND_LINE_ );
+            delete pConnectionAttempt;
         }
-        RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
+        delete user;
         users.erase( users.begin() );
     }
 }
@@ -282,7 +282,7 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
             // An attempt to itself has no one else to tell, and user is about to be deleted.
             if( otherUser == user )
             {
-                RakNet::OP_DELETE( connectionAttempt, _FILE_AND_LINE_ );
+                delete connectionAttempt;
                 continue;
             }
 
@@ -302,10 +302,10 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
             }
 
             otherUser->DerefConnectionAttempt( connectionAttempt );
-            RakNet::OP_DELETE( connectionAttempt, _FILE_AND_LINE_ );
+            delete connectionAttempt;
         }
 
-        RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
+        delete user;
         users.erase( userIt );
 
         for( User* pUser : freedUpInProgressUsers )
@@ -320,14 +320,14 @@ void NatPunchthroughServer::OnNewConnection( const SystemAddress& systemAddress,
     (void)systemAddress;
     (void)isIncoming;
 
-    User* user = RakNet::OP_NEW<User>( _FILE_AND_LINE_ );
+    User* user = new User;
     user->guid = rakNetGUID;
     user->mostRecentPort = 0;
     user->systemAddress = systemAddress;
     user->isReady = true;
     // A guid already listed keeps its User.
     if( !users.emplace( rakNetGUID, user ).second )
-        RakNet::OP_DELETE( user, _FILE_AND_LINE_ );
+        delete user;
 }
 
 void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
@@ -363,7 +363,7 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
         return;
     }
 
-    ConnectionAttempt* ca = RakNet::OP_NEW<ConnectionAttempt>( _FILE_AND_LINE_ );
+    ConnectionAttempt* ca = new ConnectionAttempt;
     ca->sender = sender;
     ca->recipient = recipient;
     ca->sessionId = sessionId++;

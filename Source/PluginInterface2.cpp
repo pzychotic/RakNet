@@ -114,7 +114,7 @@ Packet* PluginInterface2::AllocatePacketUnified( unsigned dataSize )
         notifyOutOfMemory( _FILE_AND_LINE_ );
         return 0;
     }
-    Packet* packet = RakNet::OP_NEW<Packet>( _FILE_AND_LINE_ );
+    Packet* packet = new Packet;
     packet->data = data;
     packet->length = dataSize;
     packet->bitSize = BytesToBits( dataSize );
@@ -158,7 +158,7 @@ void PluginInterface2::DeallocPacketUnified( Packet* packet )
 #endif
 
     rakFree_Ex( packet->data, _FILE_AND_LINE_ );
-    RakNet::OP_DELETE( packet, _FILE_AND_LINE_ );
+    delete packet;
 }
 bool PluginInterface2::SendListUnified( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast )
 {

@@ -113,12 +113,12 @@ RPC4::~RPC4()
 {
     for( const auto& entry : localCallbacks )
     {
-        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
+        delete entry.second;
     }
 
     for( const auto& entry : localSlots )
     {
-        RakNet::OP_DELETE( entry.second, _FILE_AND_LINE_ );
+        delete entry.second;
     }
     localSlots.clear();
 }
@@ -138,7 +138,7 @@ void RPC4::RegisterSlot( const char* sharedIdentifier, void ( *functionPointer )
     auto it = localSlots.find( sharedIdentifier );
     if( it == localSlots.end() )
     {
-        localSlot = RakNet::OP_NEW<LocalSlot>( _FILE_AND_LINE_ );
+        localSlot = new LocalSlot;
         localSlots.insert( std::make_pair( sharedIdentifier, localSlot ) );
     }
     else
@@ -164,7 +164,7 @@ void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )
     LocalCallback*& lc = localCallbacks[messageId];
     if( lc == nullptr )
     {
-        lc = RakNet::OP_NEW<LocalCallback>( _FILE_AND_LINE_ );
+        lc = new LocalCallback;
         lc->messageId = messageId;
     }
     lc->functions.insert( uniqueID );
@@ -188,7 +188,7 @@ bool RPC4::UnregisterLocalCallback( const char* uniqueID, MessageID messageId )
         LocalCallback* lc = it->second;
         if( lc->functions.erase( uniqueID ) != 0 && lc->functions.empty() )
         {
-            RakNet::OP_DELETE( lc, _FILE_AND_LINE_ );
+            delete lc;
             localCallbacks.erase( it );
             return true;
         }
@@ -201,7 +201,7 @@ bool RPC4::UnregisterSlot( const char* sharedIdentifier )
     if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
     {
         LocalSlot* ls = it->second;
-        RakNet::OP_DELETE( ls, _FILE_AND_LINE_ );
+        delete ls;
         localSlots.erase( it );
         return true;
     }

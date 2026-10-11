@@ -111,7 +111,7 @@ void UDPProxyCoordinator::Update( void )
                  curTime > fw->timeoutAfterSuccess )
         {
             // Forwarding request succeeded, we waited a bit to prevent duplicates. Can forget about the entry now.
-            RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
+            delete fw;
             forwardingRequestList.erase( it );
         }
         it = next;
@@ -149,7 +149,7 @@ void UDPProxyCoordinator::OnClosedConnection( const SystemAddress& systemAddress
         if( requestIt->second->requestingAddress == systemAddress )
         {
             // Guy disconnected before the attempt completed
-            RakNet::OP_DELETE( requestIt->second, _FILE_AND_LINE_ );
+            delete requestIt->second;
             requestIt = forwardingRequestList.erase( requestIt );
         }
         else
@@ -277,7 +277,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
         return;
     }
 
-    ForwardingRequest* fw = RakNet::OP_NEW<ForwardingRequest>( _FILE_AND_LINE_ );
+    ForwardingRequest* fw = new ForwardingRequest;
     fw->timeoutAfterSuccess = 0;
     fw->timeoutOnNoDataMS = timeoutOnNoDataMS;
     if( hasServerSelectionBitstream )
@@ -449,7 +449,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
         outgoingBs.Write( forwardingPort );
         rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, fw->requestingAddress, false );
         forwardingRequestList.erase( requestIt );
-        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
+        delete fw;
     }
 }
 void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* packet )
@@ -520,7 +520,7 @@ void UDPProxyCoordinator::TryNextServer( SenderAndTargetAddress sata, Forwarding
     {
         SendAllBusy( sata.senderClientAddress, sata.targetClientAddress, sata.targetClientGuid, fw->requestingAddress );
         forwardingRequestList.erase( sata );
-        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
+        delete fw;
         return;
     }
 
@@ -541,7 +541,7 @@ void UDPProxyCoordinator::Clear( void )
     serverList.clear();
     for( const auto& [sata, fw] : forwardingRequestList )
     {
-        RakNet::OP_DELETE( fw, _FILE_AND_LINE_ );
+        delete fw;
     }
     forwardingRequestList.clear();
 }

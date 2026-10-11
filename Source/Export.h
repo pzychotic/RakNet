@@ -22,12 +22,12 @@
     static x* GetInstance( void );       \
     static void DestroyInstance( x* i );
 
-#define STATIC_FACTORY_DEFINITIONS( x, y )           \
-    x* x::GetInstance( void )                        \
-    {                                                \
-        return RakNet::OP_NEW<y>( _FILE_AND_LINE_ ); \
-    }                                                \
-    void x::DestroyInstance( x* i )                  \
-    {                                                \
-        RakNet::OP_DELETE( (y*)i, _FILE_AND_LINE_ ); \
+#define STATIC_FACTORY_DEFINITIONS( x, y ) \
+    x* x::GetInstance( void )              \
+    {                                      \
+        return new y;                      \
+    }                                      \
+    void x::DestroyInstance( x* i )        \
+    {                                      \
+        delete static_cast<y*>( i );       \
     }

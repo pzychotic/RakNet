@@ -15,7 +15,7 @@
 
 /*
 RakPeer builds every Packet it hands the user in two steps: the payload from rakMalloc_Ex,
-then the Packet itself with OP_NEW. The payload can come back null. When it does, the Packet
+then the Packet itself with new. The payload can come back null. When it does, the Packet
 is not built: notifyOutOfMemory is told, the message that needed it is dropped, and the
 Peer carries on. ADR-0004, "Null-returning allocators". Failing to make the Packet itself
 is fatal, like any other allocation.

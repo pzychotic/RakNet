@@ -94,7 +94,7 @@ Router2::~Router2()
     if( udpForwarder )
     {
         udpForwarder->Shutdown();
-        RakNet::OP_DELETE( udpForwarder, _FILE_AND_LINE_ );
+        delete udpForwarder;
     }
 }
 
@@ -109,7 +109,7 @@ void Router2::ClearConnectionRequests( void )
     std::lock_guard<std::mutex> guard( connectionRequestsMutex );
     for( ConnnectRequest* pRequest : connectionRequests )
     {
-        RakNet::OP_DELETE( pRequest, _FILE_AND_LINE_ );
+        delete pRequest;
     }
     connectionRequests.clear();
 }
@@ -146,7 +146,7 @@ bool Router2::ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLos
     int largestPing = GetLargestPingAmongConnectedSystems();
     if( largestPing < 0 )
         largestPing = 0;
-    Router2::ConnnectRequest* cr = RakNet::OP_NEW<Router2::ConnnectRequest>( _FILE_AND_LINE_ );
+    Router2::ConnnectRequest* cr = new Router2::ConnnectRequest;
     cr->requestState = R2RS_REQUEST_STATE_QUERY_FORWARDING;
     cr->pingTimeout = RakNet::GetTimeMS() + largestPing * 2 + 1000;
     cr->endpointGuid = endpointGuid;
@@ -207,13 +207,13 @@ void Router2::SetMaximumForwardingRequests( int max )
 {
     if( max > 0 && maximumForwardingRequests <= 0 )
     {
-        udpForwarder = RakNet::OP_NEW<UDPForwarder>( _FILE_AND_LINE_ );
+        udpForwarder = new UDPForwarder;
         udpForwarder->Startup();
     }
     else if( max <= 0 && maximumForwardingRequests > 0 )
     {
         udpForwarder->Shutdown();
-        RakNet::OP_DELETE( udpForwarder, _FILE_AND_LINE_ );
+        delete udpForwarder;
         udpForwarder = 0;
     }
 
@@ -465,7 +465,7 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
             unsigned int pos = GetConnectionRequestIndex( forwardedConnectionList[forwardedConnectionIndex].endpointGuid );
             if( pos != ~0u )
             {
-                RakNet::OP_DELETE( connectionRequests[pos], __FILE__, __LINE__ );
+                delete connectionRequests[pos];
                 connectionRequests.erase( connectionRequests.begin() + pos ); // ??? perf
             }
             connectionRequestsMutex.unlock();
@@ -659,7 +659,7 @@ bool Router2::UpdateForwarding( ConnnectRequest* connectionRequest )
 // connectionRequestsMutex should already be locked
 void Router2::RemoveConnectionRequest( unsigned int connectionRequestIndex )
 {
-    RakNet::OP_DELETE( connectionRequests[connectionRequestIndex], _FILE_AND_LINE_ );
+    delete connectionRequests[connectionRequestIndex];
     connectionRequests.erase( connectionRequests.begin() + connectionRequestIndex );
 }
 
