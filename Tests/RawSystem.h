@@ -426,8 +426,8 @@ public:
         REQUIRE( reply1Stream.Read( serverGuid ) );
         REQUIRE( reply1Stream.Read( serverHasSecurity ) );
 
-        // LIBCAT_SECURITY has never compiled in this fork, so the server never asks for a
-        // cookie and there is no branch here for one.
+        // This fork never sets HasSecurity, so the server never asks for a cookie and there
+        // is no branch here for one.
         REQUIRE( serverHasSecurity == 0 );
         REQUIRE( reply1Stream.Read( mtu ) );
 
@@ -463,7 +463,7 @@ public:
         reply1.Write( (MessageID)ID_OPEN_CONNECTION_REPLY_1 );
         reply1.WriteAlignedBytes( (const unsigned char*)OFFLINE_MESSAGE_DATA_ID, sizeof( OFFLINE_MESSAGE_DATA_ID ) );
         reply1.Write( RakNetGUID( m_guid ) );
-        reply1.Write( (unsigned char)0 ); // HasCookie: LIBCAT_SECURITY never compiles here
+        reply1.Write( (unsigned char)0 ); // HasCookie: this fork never sets HasSecurity
         reply1.Write( mtu );
         reply1.PadWithZeroToByteLength( mtu - reply1.GetNumberOfBytesUsed() );
         Send( reply1 );

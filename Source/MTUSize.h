@@ -34,22 +34,11 @@
 
 #endif
 
-#include "NativeFeatureIncludes.h"
-#include "SecureHandshake.h"
-
 /// The lowest MTU a connection can end up using. RakPeer offers { MAXIMUM_MTU_SIZE, 1200,
 /// 576 } in descending order during the handshake and there is no API to set an MTU
 /// directly, so no connection settles below this. Note this is *not* MINIMUM_MTU_SIZE,
 /// which is a floor on what the code tolerates rather than a value it ever selects.
 #define MINIMUM_NEGOTIATED_MTU_SIZE 576
-
-#if LIBCAT_SECURITY == 1
-/// Encryption overhead ReliabilityLayer::Reset subtracts from the MTU before the congestion
-/// manager ever sees it, so it comes off the usable payload of every datagram.
-#define RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES ( cat::AuthenticatedEncryption::OVERHEAD_BYTES )
-#else
-#define RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES 0
-#endif
 
 namespace RakNet {
 
@@ -63,9 +52,8 @@ namespace RakNet {
 ///       - UDP_HEADER_SIZE                                    (28, CCRakNetSlidingWindow.h)
 ///       - DatagramHeaderFormat::GetDataHeaderByteLength()     (9, ReliabilityLayer.cpp)
 ///       - BitsToBytes( GetMaxMessageHeaderLengthBits() )     (23, ReliabilityLayer.cpp)
-///       - RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES
 ///
-/// = 516 bytes in a default build, so 65536 x 516 = 33,816,576.
+/// = 516 bytes, so 65536 x 516 = 33,816,576.
 ///
 /// Deriving at the *floor* rather than at the MTU actually negotiated is what makes the two
 /// limits agree by construction: a message this Peer is willing to emit is one every Peer
@@ -79,6 +67,6 @@ namespace RakNet {
 /// changing a header layout or the MTU list breaks the build instead of silently letting the
 /// send and receive limits drift apart.
 constexpr unsigned int MAXIMUM_MESSAGE_SIZE =
-    65536u * ( MINIMUM_NEGOTIATED_MTU_SIZE - 28u - 9u - 23u - RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES );
+    65536u * ( MINIMUM_NEGOTIATED_MTU_SIZE - 28u - 9u - 23u );
 
 } // namespace RakNet

@@ -14,6 +14,10 @@
 // The user should not edit this file
 #include "NativeFeatureIncludesOverrides.h"
 
+#if defined( LIBCAT_SECURITY ) && LIBCAT_SECURITY
+#error "LIBCAT_SECURITY was removed; RakNet has no transport security (ADR-0010)"
+#endif
+
 // Uncomment below defines, and paste to NativeFeatureIncludesOverrides.h, to exclude plugins that you do not want to build into the static library, or DLL
 // These are not all the plugins, only those that are in the core library
 // Other plugins are located in DependentExtensions
@@ -38,9 +42,6 @@
 // #define _RAKNET_SUPPORT_TwoWayAuthentication 0
 
 // SET DEFAULTS IF UNDEFINED
-#ifndef LIBCAT_SECURITY
-#define LIBCAT_SECURITY 0
-#endif
 #ifndef _RAKNET_SUPPORT_MessageFilter
 #define _RAKNET_SUPPORT_MessageFilter 1
 #endif

@@ -238,7 +238,7 @@ TEST_CASE( "Connect accepted while the view lags leaves one connection and one I
     REQUIRE( a.WaitUntilPaused() );
 
     // A's network thread holds an open record for B that the view does not show yet.
-    const ConnectionAttemptResult second = a.Connect( "127.0.0.1", kStaleServerPort, 0, 0, 0, 0, kAttemptCount, kAttemptIntervalMs );
+    const ConnectionAttemptResult second = a.Connect( "127.0.0.1", kStaleServerPort, 0, 0, 0u, kAttemptCount, kAttemptIntervalMs );
     a.Release();
     REQUIRE( second == CONNECTION_ATTEMPT_STARTED );
 

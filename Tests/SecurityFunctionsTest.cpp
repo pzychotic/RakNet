@@ -57,13 +57,7 @@ RakPeerInterface functions explicitly tested:
 Exercised indirectly by getting to that point: Startup,
 SetMaximumIncomingConnections, Connect, CloseConnection, GetConnectionState.
 
-NOT covered, and this is the record that the gap is known rather than lost:
-InitializeSecurity, AddToSecurityExceptionList, IsInSecurityExceptionList and
-RemoveFromSecurityExceptionList. Nothing here could assert anything about them in
-this build - LIBCAT_SECURITY defaults to 0 (Source/NativeFeatureIncludes.h), which
-compiles all four out to no-ops. Covering them needs that build option on and a
-test written against the current three-argument InitializeSecurity( publicKey,
-privateKey, bRequireClientKey ).
+There is no transport security to test: RakNet has none (ADR-0010).
 */
 
 using namespace RakNet;

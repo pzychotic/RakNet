@@ -12,5 +12,3 @@
 // See NativeFeatureIncludes.h
 
 #pragma once
-
-//#define LIBCAT_SECURITY 1

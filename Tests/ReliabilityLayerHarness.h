@@ -268,7 +268,7 @@ public:
     /// System's slot in remoteSystemList is handed to the next connection.
     void ResetForReuse()
     {
-        m_layer.Reset( true, kMTUSize, false );
+        m_layer.Reset( true, kMTUSize );
         m_layer.SetTimeoutTime( kTimeoutTime );
         m_datagramNumber = 0;
     }

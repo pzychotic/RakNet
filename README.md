@@ -91,7 +91,6 @@ You might have to copy `*.dll` from `cygwin\bin` as well.
 Linux users
 -----------------------------------------
 Use `cmake`, or `g++ -lpthread -g *.cpp` in the /Source directory.
-With libcat, use `g++ -pthread -g -I./../DependentExtensions *.cpp` in the /Source directory.
 
 64 bit use -m64 command line
 Sometimes you need -pthread instead of -lpthread

@@ -76,35 +76,6 @@ public:
     /// \return RAKNET_STARTED on success, otherwise appropriate failure enumeration.
     virtual StartupResult Startup( unsigned int maxConnections, SocketDescriptor* socketDescriptors, unsigned socketDescriptorCount, int threadPriority = -99999 ) = 0;
 
-    /// If you accept connections, you must call this or else security will not be enabled for incoming connections.
-    /// This feature requires more round trips, bandwidth, and CPU time for the connection handshake
-    /// x64 builds require under 25% of the CPU time of other builds
-    /// See the Encryption sample for example usage
-    /// \pre Must be called while offline
-    /// \pre LIBCAT_SECURITY must be defined to 1 in NativeFeatureIncludes.h for this function to have any effect
-    /// \param[in] publicKey A pointer to the public key for accepting new connections
-    /// \param[in] privateKey A pointer to the private key for accepting new connections
-    /// \param[in] bRequireClientKey: Should be set to false for most servers.  Allows the server to accept a public key from connecting clients as a proof of identity but eats twice as much CPU time as a normal connection
-    virtual bool InitializeSecurity( const char* publicKey, const char* privateKey, bool bRequireClientKey = false ) = 0;
-
-    /// Disables security for incoming connections.
-    /// \note Must be called while offline
-    virtual void DisableSecurity( void ) = 0;
-
-    /// If secure connections are on, do not use secure connections for a specific IP address.
-    /// This is useful if you have a fixed-address internal server behind a LAN.
-    /// \note Secure connections are determined by the recipient of an incoming connection. This has no effect if called on the system attempting to connect.
-    /// \param[in] ip IP address to add. * wildcards are supported.
-    virtual void AddToSecurityExceptionList( const char* ip ) = 0;
-
-    /// Remove a specific connection previously added via AddToSecurityExceptionList
-    /// \param[in] ip IP address to remove. Pass 0 to remove all IP addresses. * wildcards are supported.
-    virtual void RemoveFromSecurityExceptionList( const char* ip ) = 0;
-
-    /// Checks to see if a given IP is in the security exception list
-    /// \param[in] IP address to check.
-    virtual bool IsInSecurityExceptionList( const char* ip ) = 0;
-
     /// Sets how many incoming connections are allowed. If this is less than the number of players currently connected,
     /// no more players will be allowed to connect.  If this is greater than the maximum number of peers allowed,
     /// it will be reduced to the maximum number of peers allowed.
@@ -141,7 +112,6 @@ public:
     /// \param[in] remotePort Which port to connect to on the remote machine.
     /// \param[in] passwordData A data block that must match the data block on the server passed to SetIncomingPassword.  This can be a string or can be a stream of data.  Use 0 for no password.
     /// \param[in] passwordDataLength The length in bytes of passwordData
-    /// \param[in] publicKey The public key the server is using. If 0, the server is not using security. If non-zero, the publicKeyMode member determines how to connect
     /// \param[in] connectionSocketIndex Index into the array of socket descriptors passed to socketDescriptors in RakPeer::Startup() to send on.
     /// \param[in] sendConnectionAttemptCount How many datagrams to send to the other system to try to connect.
     /// \param[in] timeBetweenSendConnectionAttemptsMS Time to elapse before a datagram is sent to the other system to try to connect. After sendConnectionAttemptCount number of attempts, ID_CONNECTION_ATTEMPT_FAILED is returned. Under low bandwidth conditions with multiple simultaneous outgoing connections, this value should be raised to 1000 or higher, or else the MTU detection can overrun the available bandwidth.
@@ -150,7 +120,12 @@ public:
     /// \note CONNECTION_ATTEMPT_STARTED does not mean you are already connected!
     /// \note ALREADY_CONNECTED_TO_ENDPOINT is best-effort: it comes from a snapshot up to one update cycle old (ADR-0007). Just after a connection closes it can still be returned, so call again later. Just after one opens, CONNECTION_ATTEMPT_STARTED can be returned instead. The existing connection carries on, and Receive() may get ID_ALREADY_CONNECTED for the redundant attempt.
     /// \note It is possible to immediately get back ID_CONNECTION_ATTEMPT_FAILED if you exceed the maxConnections parameter passed to Startup(). This could happen if you call CloseConnection() with sendDisconnectionNotificaiton true, then immediately call Connect() before the connection has closed.
-    virtual ConnectionAttemptResult Connect( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, PublicKey* publicKey = 0, unsigned connectionSocketIndex = 0, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = 0;
+    virtual ConnectionAttemptResult Connect( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex = 0, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = 0;
+
+    // Deleted: an int right after passwordDataLength is the PublicKey* slot of the old
+    // argument order, so such a call fails to compile. Pass connectionSocketIndex as
+    // unsigned (0u).
+    ConnectionAttemptResult Connect( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, int oldPublicKeySlot, unsigned connectionSocketIndex = 0, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = delete;
 
     /// \brief Connect to the specified host (ip or domain name) and server port, using a shared socket from another instance of RakNet
     /// \param[in] host Either a dotted IP address or a domain name
@@ -164,7 +139,9 @@ public:
     /// \return CONNECTION_ATTEMPT_STARTED on successful initiation. Otherwise, an appropriate enumeration indicating failure.
     /// \note CONNECTION_ATTEMPT_STARTED does not mean you are already connected!
     /// \note ALREADY_CONNECTED_TO_ENDPOINT is best-effort, as for Connect().
-    virtual ConnectionAttemptResult ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, PublicKey* publicKey = 0, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = 0;
+    virtual ConnectionAttemptResult ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = 0;
+    // Deleted, as for Connect: an int right after socket is the old key slot.
+    ConnectionAttemptResult ConnectWithSocket( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, RakNetSocket2* socket, int oldPublicKeySlot, unsigned sendConnectionAttemptCount = 12, unsigned timeBetweenSendConnectionAttemptsMS = 500, RakNet::TimeMS timeoutTime = 0 ) = delete;
 
     /// \brief Stops the network threads and closes all connections.
     /// \param[in] blockDuration How long, in milliseconds, you should wait for all remaining messages to go out, including ID_DISCONNECTION_NOTIFICATION.  If 0, it doesn't wait at all.
@@ -448,14 +425,6 @@ public:
     /// \param[in] input The RakNetGUID of the system we are checking to see if we are connected to
     virtual SystemAddress GetSystemAddressFromGuid( const RakNetGUID input ) const = 0;
 
-    /// Given the SystemAddress of a connected system, get the public key they provided as an identity
-    /// Returns false if system address was not found or client public key is not known
-    /// Blocks until the network thread's update cycle ends, and returns false if that takes
-    /// longer than BLOCKING_QUERY_TIMEOUT_MS or the peer is shut down.
-    /// \param[in] input The RakNetGUID of the system
-    /// \param[in] client_public_key The connected client's public key is copied to this address.  Buffer must be cat::EasyHandshake::PUBLIC_KEY_BYTES bytes in length.
-    virtual bool GetClientPublicKeyFromSystemAddress( const SystemAddress input, char* client_public_key ) const = 0;
-
     /// Set the time, in MS, to use before considering ourselves disconnected after not being able to deliver a reliable message.
     /// Default time is 10,000 or 10 seconds in release and 30,000 or 30 seconds in debug.
     /// Do not set different values for different computers that are connected to each other, or you won't be able to reconnect after ID_CONNECTION_LOST
@@ -627,10 +596,10 @@ public:
     /// \param[in] systemAddress: Which connected system to get statistics for
     /// \param[in] rns If you supply this structure, it will be written to it.  Otherwise it will use a static struct, which is not threadsafe
     /// \return 0 on can't find the specified system.  A pointer to a set of data otherwise.
-    /// \note The statistics functions and GetClientPublicKeyFromSystemAddress block until the
-    /// network thread's update cycle ends, since only that thread reads the reliability
-    /// layers. If that takes longer than BLOCKING_QUERY_TIMEOUT_MS, or the peer is shut down,
-    /// they fail as if the system weren't connected.
+    /// \note The statistics functions block until the network thread's update cycle ends,
+    /// since only that thread reads the reliability layers. If that takes longer than
+    /// BLOCKING_QUERY_TIMEOUT_MS, or the peer is shut down, they fail as if the system
+    /// weren't connected.
     /// \sa RakNetStatistics.h
     virtual RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 ) = 0;
     /// \brief Returns the network statistics of the system at the given index in the remoteSystemList.
@@ -663,11 +632,7 @@ public:
     /// \internal
     // Call manually if RAKPEER_USER_THREADED==1 at least every 30 milliseconds.
     // updateBitStream should be:
-    //  BitStream updateBitStream( MAXIMUM_MTU_SIZE
-    // #if LIBCAT_SECURITY==1
-    //  + cat::AuthenticatedEncryption::OVERHEAD_BYTES
-    // #endif
-    // );
+    //  BitStream updateBitStream( MAXIMUM_MTU_SIZE );
     virtual bool RunUpdateCycle( BitStream& updateBitStream ) = 0;
 
     /// \internal

@@ -171,9 +171,9 @@
 #define RAKPEER_USER_THREADED 0
 #endif
 
-/// How long RakPeer's blocking queries, GetStatistics, GetStatisticsList and
-/// GetClientPublicKeyFromSystemAddress, wait for the network thread to answer before they
-/// fail. An answer normally takes up to one update cycle, about 10 ms. See ADR-0007, point 4.
+/// How long RakPeer's blocking queries, GetStatistics and GetStatisticsList, wait for the
+/// network thread to answer before they fail. An answer normally takes up to one update
+/// cycle, about 10 ms. See ADR-0007, point 4.
 #ifndef BLOCKING_QUERY_TIMEOUT_MS
 #define BLOCKING_QUERY_TIMEOUT_MS 1000
 #endif

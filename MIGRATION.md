@@ -1,7 +1,7 @@
 # Migrating from stock RakNet 4.081
 
 This fork modernized the core of RakNet 4.081 to C++17. Most of that is invisible to you.
-Five things are not: they will either stop your build, or — in exactly one case — change
+Six things are not: they will either stop your build, or — in exactly one case — change
 bytes on the wire.
 
 This document is written for someone who has a working 4.081 integration and wants to move
@@ -38,7 +38,7 @@ longer supplies a semicolon, so a call of your own written without one stops com
 that is a build break outside the count above. See
 [`RakAssert` follows `NDEBUG`](#rakassert-follows-ndebug).
 
-**The short version:** four of the five breaks are source-only. The core wire protocol is
+**The short version:** five of the six breaks are source-only. The core wire protocol is
 byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
 wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
 parse anyway. One further reader-side difference — how an empty `std::string` is read back
@@ -52,6 +52,7 @@ protocol.
 | 3 | `RakString` / `RakWString` replaced by `std::string` | Source only |
 | 4 | `BitStream` rejects raw character buffers | Source only |
 | 5 | `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed | **Wire-visible** |
+| 6 | `Connect` and `ConnectWithSocket` lost their `PublicKey*` | Source only |
 
 ---
 
@@ -361,6 +362,44 @@ and treated it as a C string must read it with `BitStream::Read( std::string )` 
 
 ---
 
+## 6. `Connect` and `ConnectWithSocket` lost their `PublicKey*`
+
+**Source break, not a wire break.** RakNet has no transport security
+([ADR-0010](docs/adr/0010-raknet-has-no-transport-security.md)), so the parameter that
+carried a server's public key is gone, and every argument after it moves up one slot.
+
+### Before (stock 4.081)
+
+```cpp
+peer->Connect( host, port, password, passwordLength, 0, socketIndex, 12, 500, 0 );
+peer->ConnectWithSocket( host, port, password, passwordLength, socket, 0, 12, 500, 0 );
+```
+
+### After
+
+```cpp
+peer->Connect( host, port, password, passwordLength, socketIndex, 12, 500, 0 );
+peer->ConnectWithSocket( host, port, password, passwordLength, socket, 12, 500, 0 );
+```
+
+### What to do
+
+Delete the key argument. A call that passed only the first four arguments, or five with
+`ConnectWithSocket`, needs no change.
+
+Left alone, an old call would compile and shift every later argument by one slot: its
+`0` key would become the socket index, its socket index the attempt count, and so on.
+It doesn't, because `RakPeerInterface` declares deleted overloads that take an `int` in
+the key's old slot. An old call with `0` there picks a deleted overload, and one with
+`nullptr` or a `PublicKey` matches nothing, so either fails to compile. They reach
+through a `RakPeer` too.
+
+The same overloads catch a new-order call that passes an `int` literal in that slot, such
+as `Connect( host, port, 0, 0, 0, 12, 500 )`. Write that argument unsigned (`0u`), or
+leave it out if it is the default.
+
+---
+
 ## Also removed
 
 Not API breaks in the sense above — these features are simply not here. If you used one,
@@ -442,6 +481,19 @@ unchanged.
 
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
+
+**Security:** `LIBCAT_SECURITY` and `SecureHandshake.h`, which never compiled in this
+fork; `InitializeSecurity`, `DisableSecurity`, `AddToSecurityExceptionList`,
+`RemoveFromSecurityExceptionList`, `IsInSecurityExceptionList` and
+`GetClientPublicKeyFromSystemAddress`; `PublicKey`, `PublicKeyMode` and
+`SECURITY_INITIALIZATION_FAILED`. RakNet has no transport security, so provide it outside
+RakNet, for example with DTLS or an encrypted tunnel
+([ADR-0010](docs/adr/0010-raknet-has-no-transport-security.md)). A build that still defines
+`LIBCAT_SECURITY` to 1 stops with an `#error`. The wire is unchanged: this fork writes and
+reads the handshake's security fields as an insecure stock Peer does, and
+`ID_REMOTE_SYSTEM_REQUIRES_PUBLIC_KEY`, `ID_OUR_SYSTEM_REQUIRES_SECURITY` and
+`ID_PUBLIC_KEY_MISMATCH` keep their values. `TwoWayAuthentication` hashes with SHA1, as
+every buildable configuration already did.
 
 **Build switches:** `PREALLOCATE_LARGE_MESSAGES` and `USE_THREADED_SEND`. Neither
 compiles in 4.081, so nothing you were doing stops working.
@@ -788,13 +840,12 @@ to one cycle old. The identity, state, ping and clock getters have moved so far:
 `GetGuidFromSystemAddress`, `GetSystemAddressFromGuid`, `GetInternalID`, `GetExternalID`,
 `GetMTUSize`, `GetTimeoutTime`, `GetAveragePing`, `GetLastPing`, `GetLowestPing` and
 `GetClockDifferential`, as has the clock differential `Receive` subtracts from an
-`ID_TIMESTAMP`. The statistics functions and `GetClientPublicKeyFromSystemAddress` ask
-the network thread instead, and wait for its answer. `Connect` and `ConnectWithSocket`
-take their "already connected" answer from the snapshot too, and the setters that change
-open connections queue the change for the network thread. `GetSockets` and `GetSocket`
-answer without asking the network thread. Six things change at runtime.
-One return type changed, which stops a build only in the narrow cases in the last
-paragraph.
+`ID_TIMESTAMP`. The statistics functions ask the network thread instead, and wait for its
+answer. `Connect` and `ConnectWithSocket` take their "already connected" answer from the
+snapshot too, and the setters that change open connections queue the change for the
+network thread. `GetSockets` and `GetSocket` answer without asking the network thread.
+Six things change at runtime. One return type changed, which stops a build only in the
+narrow cases in the last paragraph.
 
 A handler can trust the snapshot about the Message it is handling, as it could trust the
 records in stock. When `Receive` hands out a Message from the network thread, the snapshot
@@ -831,20 +882,19 @@ If you need one of these after the connection closes, read it while the connecti
 or when `ID_DISCONNECTION_NOTIFICATION` or `ID_CONNECTION_LOST` arrives, since
 `Packet::systemAddress` and `Packet::guid` carry the identity.
 
-**`GetStatistics`, `GetStatisticsList` and `GetClientPublicKeyFromSystemAddress` wait up
-to one update cycle.** What they return is too large to copy into the snapshot every cycle,
-so each call wakes the network thread and blocks until it answers, at the end of its current
-cycle. That's up to one cycle per call, usually a few milliseconds. A loop that calls
-`GetStatistics` once per connection waits once per connection, so call `GetStatisticsList`
-once instead: it answers for every connection from one cycle. `StatisticsHistoryPlugin`
-calls `GetStatisticsList` from its `Update`, so with it attached every `Receive` waits
-once too. If the answer takes longer than `BLOCKING_QUERY_TIMEOUT_MS`
-(1000 by default, in `RakNetDefines.h`), or the peer is shut down, the call fails:
-`GetStatistics` returns 0 or `false`, `GetStatisticsList` returns empty lists, and
-`GetClientPublicKeyFromSystemAddress` returns `false`. That includes
-`GetStatistics( UNASSIGNED_SYSTEM_ADDRESS )`, which stock answered even after `Shutdown`.
-Under `RAKPEER_USER_THREADED`, and from the callback `SetUserUpdateThread` installs, they
-answer at once, since the calling thread is the one that runs the cycle.
+**`GetStatistics` and `GetStatisticsList` wait up to one update cycle.** What they return
+is too large to copy into the snapshot every cycle, so each call wakes the network thread
+and blocks until it answers, at the end of its current cycle. That's up to one cycle per
+call, usually a few milliseconds. A loop that calls `GetStatistics` once per connection
+waits once per connection, so call `GetStatisticsList` once instead: it answers for every
+connection from one cycle. `StatisticsHistoryPlugin` calls `GetStatisticsList` from its
+`Update`, so with it attached every `Receive` waits once too. If the answer takes longer
+than `BLOCKING_QUERY_TIMEOUT_MS` (1000 by default, in `RakNetDefines.h`), or the peer is
+shut down, the call fails: `GetStatistics` returns 0 or `false`, and `GetStatisticsList`
+returns empty lists. That includes `GetStatistics( UNASSIGNED_SYSTEM_ADDRESS )`, which
+stock answered even after `Shutdown`. Under `RAKPEER_USER_THREADED`, and from the callback
+`SetUserUpdateThread` installs, they answer at once, since the calling thread is the one
+that runs the cycle.
 
 **`ALREADY_CONNECTED_TO_ENDPOINT` is best-effort.** `Connect` and `ConnectWithSocket` check
 the snapshot, so for up to one cycle the answer can lag. Just after a connection closes they

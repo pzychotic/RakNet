@@ -35,7 +35,7 @@ can tear the ping and statistics fields the network thread writes on every datag
 4. **The user thread never reads or writes a connection record.** Once per cycle, the
    network thread copies what the getters need from each open connection record into a
    **published view**, under a mutex. User-thread getters read only the view.
-   - Data too large to copy every cycle (`RakNetStatistics`, a client's public key) is a
+   - Data too large to copy every cycle (`RakNetStatistics`) is a
      **blocking query**: the user thread posts a request and the network thread answers at
      the end of its cycle.
    - The bound sockets don't change between `Startup` and `Shutdown`, so `Startup` publishes

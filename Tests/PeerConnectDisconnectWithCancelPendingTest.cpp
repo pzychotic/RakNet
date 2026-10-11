@@ -199,7 +199,7 @@ TEST_CASE( "Eight peers cancelling a pending connection attempt before each reco
         {
             INFO( "peer " << i << " attempting the unbound port " << kUnboundPort );
 
-            REQUIRE( peerList[i]->Connect( "127.0.0.1", kUnboundPort, 0, 0, nullptr, 0, kUnboundAttemptCount, kUnboundAttemptIntervalMS ) == CONNECTION_ATTEMPT_STARTED );
+            REQUIRE( peerList[i]->Connect( "127.0.0.1", kUnboundPort, 0, 0, 0u, kUnboundAttemptCount, kUnboundAttemptIntervalMS ) == CONNECTION_ATTEMPT_STARTED );
 
             // Not decoration: it is the precondition the cancel assertion below is
             // about, and asserting it here is what makes that assertion impossible

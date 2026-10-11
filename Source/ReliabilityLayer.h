@@ -24,7 +24,6 @@
 #include "SequenceRanges.h"
 #include "RakNetDefines.h"
 #include "NativeFeatureIncludes.h"
-#include "SecureHandshake.h"
 #include "PluginInterface2.h"
 #include "RakNetSocket2.h"
 
@@ -319,7 +318,7 @@ public:
     ~ReliabilityLayer();
 
     /// Resets the layer for reuse
-    void Reset( bool resetVariables, int MTUSize, bool _useSecurity );
+    void Reset( bool resetVariables, int MTUSize );
 
     /// Set the time, in MS, to use before considering ourselves disconnected after not being able to deliver a reliable packet
     /// Default time is 10,000 or 10 seconds in release and 30,000 or 30 seconds in debug.
@@ -774,14 +773,6 @@ private:
     bool closedOverBudget;
     bool closedOverBudgetUnreported;
 
-#if LIBCAT_SECURITY == 1
-public:
-    cat::AuthenticatedEncryption* GetAuthenticatedEncryption( void ) { return &auth_enc; }
-
-protected:
-    cat::AuthenticatedEncryption auth_enc;
-    bool useSecurity;
-#endif // LIBCAT_SECURITY
 };
 
 } // namespace RakNet

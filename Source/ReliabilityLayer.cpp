@@ -222,8 +222,7 @@ static_assert( MAXIMUM_SPLIT_PACKET_COUNT == 65536,
 static_assert( MAXIMUM_MESSAGE_SIZE ==
                    MAXIMUM_SPLIT_PACKET_COUNT *
                        ( MINIMUM_NEGOTIATED_MTU_SIZE - UDP_HEADER_SIZE -
-                         DatagramHeaderFormat::GetDataHeaderByteLength() - 23u -
-                         RAKNET_DATAGRAM_SECURITY_OVERHEAD_BYTES ),
+                         DatagramHeaderFormat::GetDataHeaderByteLength() - 23u ),
                "The send-side limit no longer matches what the receive side will reassemble" );
 
 //-------------------------------------------------------------------------------------------------------
@@ -274,7 +273,7 @@ ReliabilityLayer::~ReliabilityLayer()
 //-------------------------------------------------------------------------------------------------------
 // Resets the layer for reuse
 //-------------------------------------------------------------------------------------------------------
-void ReliabilityLayer::Reset( bool resetVariables, int MTUSize, bool _useSecurity )
+void ReliabilityLayer::Reset( bool resetVariables, int MTUSize )
 {
 
     FreeMemory( true ); // true because making a memory reset pending in the update cycle causes resets after reconnects.  Instead, just call Reset from a single thread
@@ -282,14 +281,6 @@ void ReliabilityLayer::Reset( bool resetVariables, int MTUSize, bool _useSecurit
     {
         InitializeVariables();
 
-#if LIBCAT_SECURITY == 1
-        useSecurity = _useSecurity;
-
-        if( _useSecurity )
-            MTUSize -= cat::AuthenticatedEncryption::OVERHEAD_BYTES;
-#else
-        (void)_useSecurity;
-#endif // LIBCAT_SECURITY
         // The fourth input to MAXIMUM_MESSAGE_SIZE's derivation (MTUSize.h). The other three
         // are static_asserts above; this one is not constexpr-evaluable, so it is checked
         // here, once per connection reset, instead.
@@ -524,18 +515,6 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     {
         timeLastDatagramArrived = RakNet::GetTimeMS();
     }
-
-#if LIBCAT_SECURITY == 1
-    if( useSecurity )
-    {
-        unsigned int received = length;
-
-        if( !auth_enc.Decrypt( (cat::u8*)buffer, received ) )
-            return false;
-
-        length = received;
-    }
-#endif
 
     BitStream socketData( (unsigned char*)buffer, length, false ); // Convert the incoming data to a bitstream for easy parsing
 
@@ -1984,8 +1963,8 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
         // below would put it on the wire twice - that is a duplication harness, not a
         // reordering one, and reordering is what this macro is for. Upstream fell through
         // at this point; that is a bug we are not inheriting, so do not "restore" it.
-        // Like the delay branch below, this path bypasses the bpsMetrics accounting and
-        // LIBCAT_SECURITY encryption further down, because the drain calls Send() directly.
+        // Like the delay branch below, this path bypasses the bpsMetrics accounting
+        // further down, because the drain calls Send() directly.
         return;
 #else
         RakNet::TimeMS delay = minExtraPing;
@@ -2012,20 +1991,6 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
             return;
         }
 #endif
-    }
-#endif
-
-#if LIBCAT_SECURITY == 1
-    if( useSecurity )
-    {
-        unsigned char* buffer = reinterpret_cast<unsigned char*>( bitStream->GetData() );
-
-        int buffer_size = bitStream->GetNumberOfBitsAllocated() / 8;
-
-        // Verify there is enough room for encrypted output and encrypt
-        // Encrypt() will increase length
-        bool success = auth_enc.Encrypt( buffer, buffer_size, length );
-        RakAssert( success );
     }
 #endif
 
@@ -3642,14 +3607,7 @@ void ReliabilityLayer::FreeInternalPacketData( InternalPacket* internalPacket, c
 //-------------------------------------------------------------------------------------------------------
 unsigned int ReliabilityLayer::GetMaxDatagramSizeExcludingMessageHeaderBytes( void )
 {
-    unsigned int val = congestionManager.GetMTU() - DatagramHeaderFormat::GetDataHeaderByteLength();
-
-#if LIBCAT_SECURITY == 1
-    if( useSecurity )
-        val -= cat::AuthenticatedEncryption::OVERHEAD_BYTES;
-#endif
-
-    return val;
+    return congestionManager.GetMTU() - DatagramHeaderFormat::GetDataHeaderByteLength();
 }
 //-------------------------------------------------------------------------------------------------------
 BitSize_t ReliabilityLayer::GetMaxDatagramSizeExcludingMessageHeaderBits( void )

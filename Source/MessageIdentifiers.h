@@ -64,22 +64,22 @@ enum DefaultMessageIDTypes
     /// C2S: Initial query: Header(1), OfflineMesageID(16), Protocol number(1), Pad(toMTU), sent with no fragment set.
     /// If protocol fails on server, returns ID_INCOMPATIBLE_PROTOCOL_VERSION to client
     ID_OPEN_CONNECTION_REQUEST_1,
-    /// S2C: Header(1), OfflineMesageID(16), server GUID(8), HasSecurity(1), Cookie(4, if HasSecurity)
-    /// , public key (if do security is true), MTU(2). If public key fails on client, returns ID_PUBLIC_KEY_MISMATCH
+    /// S2C: Header(1), OfflineMesageID(16), server GUID(8), HasSecurity(1, always 0), MTU(2), Pad(toMTU).
+    /// A stock Peer with security on sets HasSecurity and follows it with Cookie(4) and a public key.
     ID_OPEN_CONNECTION_REPLY_1,
-    /// C2S: Header(1), OfflineMesageID(16), Cookie(4, if HasSecurity is true on the server), clientSupportsSecurity(1 bit),
-    /// handshakeChallenge (if has security on both server and client), remoteBindingAddress(6), MTU(2), client GUID(8)
-    /// Connection slot allocated if cookie is valid, server is not full, GUID and IP not already in use.
+    /// C2S: Header(1), OfflineMesageID(16), remoteBindingAddress(6), MTU(2), client GUID(8).
+    /// To a server that set HasSecurity, Cookie(4) and a zero "no challenge" byte come first.
+    /// Connection slot allocated if the server is not full and the GUID and IP are not already in use.
     ID_OPEN_CONNECTION_REQUEST_2,
-    /// S2C: Header(1), OfflineMesageID(16), server GUID(8), mtu(2), doSecurity(1 bit), handshakeAnswer (if do security is true)
+    /// S2C: Header(1), OfflineMesageID(16), server GUID(8), client address, MTU(2), doSecurity(1 bit, always 0)
     ID_OPEN_CONNECTION_REPLY_2,
-    /// C2S: Header(1), GUID(8), Timestamp, HasSecurity(1), Proof(32)
+    /// C2S: Header(1), GUID(8), Timestamp, doSecurity(1, always 0), password
     ID_CONNECTION_REQUEST,
-    /// RakPeer - Remote system requires secure connections, pass a public key to RakPeerInterface::Connect()
+    /// Sent by a stock Peer with security on; this fork never sends it.
     ID_REMOTE_SYSTEM_REQUIRES_PUBLIC_KEY,
-    /// RakPeer - We passed a public key to RakPeerInterface::Connect(), but the other system did not have security turned on
+    /// Sent by a stock Peer with security on; this fork never sends it.
     ID_OUR_SYSTEM_REQUIRES_SECURITY,
-    /// RakPeer - Wrong public key passed to RakPeerInterface::Connect()
+    /// Sent by a stock Peer with security on; this fork never sends it.
     ID_PUBLIC_KEY_MISMATCH,
     /// RakPeer - Same as ID_ADVERTISE_SYSTEM, but intended for internal use rather than being passed to the user.
     /// Second byte indicates type. Used currently for NAT punchthrough for receiver port advertisement. See ID_NAT_ADVERTISE_RECIPIENT_PORT
