@@ -13,39 +13,47 @@
 #if defined( _WIN32 )
 #include "WindowsIncludes.h"
 #else
+#include <condition_variable>
 #include <mutex>
-#include <pthread.h>
-#include <sys/types.h>
 #endif
 
 #include "Export.h"
 
 namespace RakNet {
 
+/// Wakes one waiting thread early.
+///
+/// The event is a binary latch. Any number of SetEvent calls before a wait make that wait
+/// return at once, and the wait clears the latch: signals coalesce, they are not counted.
+/// A SetEvent during a wait ends it early. Otherwise the wait returns after about
+/// timeoutMs. There is one waiter.
+///
+/// Windows uses an auto-reset event plus a high-resolution waitable timer. A plain wait
+/// there, std::condition_variable::wait_for included, rounds its timeout up to the 15.6 ms
+/// system timer tick, and a 1 ms wait would hold an ack for 15 ms. Where Windows has no
+/// high-resolution timer, the wait falls back to the plain one.
 class RAK_DLL_EXPORT SignaledEvent
 {
 public:
     SignaledEvent();
     ~SignaledEvent();
 
-    void InitEvent( void );
-    void CloseEvent( void );
+    SignaledEvent( const SignaledEvent& ) = delete;
+    SignaledEvent& operator=( const SignaledEvent& ) = delete;
+
     void SetEvent( void );
     void WaitOnEvent( int timeoutMs );
 
 protected:
 #ifdef _WIN32
-    HANDLE eventList;
-    /// Ends WaitOnEvent's timeout to the millisecond, where a plain wait rounds it up to
-    /// the 15.6 ms system timer tick. Null where Windows has no high-resolution timer.
+    HANDLE signalEvent;
+    /// Ends WaitOnEvent's timeout to the millisecond. Null where Windows has no
+    /// high-resolution timer.
     HANDLE waitTimer;
 #else
     std::mutex isSignaledMutex;
+    std::condition_variable isSignaledCondition;
     bool isSignaled;
-    pthread_condattr_t condAttr;
-    pthread_cond_t eventList;
-    pthread_mutex_t hMutex;
-    pthread_mutexattr_t mutexAttr;
 #endif
 };
 

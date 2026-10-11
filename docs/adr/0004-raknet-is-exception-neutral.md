@@ -38,7 +38,14 @@ report them, and it promises nothing after one:
   one mode and dead code in the other. Chromium, LLVM and Unreal make the same choice.
 - **Mutex lock failure.** This is `std::mutex::lock`, and `std::shared_mutex::lock` and
   `lock_shared`. Their `std::system_error` means misuse (a recursive lock or a destroyed
-  mutex) or OS resource exhaustion. There is no recovery to write.
+  mutex) or OS resource exhaustion. There is no recovery to write. The same holds for
+  constructing a `std::condition_variable`, which the standard lets throw on exhaustion
+  (libstdc++ and libc++ declare it `noexcept`).
+
+One failure is fatal without a throw: **failure to create a kernel synchronization
+object**, such as `SignaledEvent`'s Win32 event. It is OS resource exhaustion, and there is
+no recovery to write either. It calls `notifyOutOfMemory` and then `std::abort()`, so the
+embedder can log it like an allocation failure.
 
 ## What is input validation, not "allocation"
 

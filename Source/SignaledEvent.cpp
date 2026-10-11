@@ -10,9 +10,12 @@
 
 #include "SignaledEvent.h"
 
-#if defined( __GNUC__ )
-#include <sys/time.h>
-#include <unistd.h>
+#if defined( _WIN32 )
+#include "RakMemoryOverride.h"
+
+#include <cstdlib>
+#else
+#include <chrono>
 #endif
 
 namespace RakNet {
@@ -20,64 +23,38 @@ namespace RakNet {
 SignaledEvent::SignaledEvent()
 {
 #ifdef _WIN32
-    eventList = INVALID_HANDLE_VALUE;
-    waitTimer = NULL;
+    signalEvent = CreateEvent( 0, false, false, 0 );
+    if( signalEvent == NULL )
+    {
+        // Kernel object exhaustion is fatal, like allocation failure (ADR-0004).
+        notifyOutOfMemory( __FILE__, __LINE__ );
+        std::abort();
+    }
+    waitTimer = CreateWaitableTimerExW( NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS );
 #else
     isSignaled = false;
 #endif
 }
+
 SignaledEvent::~SignaledEvent()
 {
-    // Intentionally do not close event, so it doesn't close twice on linux
-}
-
-void SignaledEvent::InitEvent( void )
-{
-#if defined( _WIN32 )
-    eventList = CreateEvent( 0, false, false, 0 );
-    waitTimer = CreateWaitableTimerExW( NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS );
-#else
-    pthread_condattr_init( &condAttr );
-    pthread_cond_init( &eventList, &condAttr );
-    pthread_mutexattr_init( &mutexAttr );
-    pthread_mutex_init( &hMutex, &mutexAttr );
-#endif
-}
-
-void SignaledEvent::CloseEvent( void )
-{
 #ifdef _WIN32
-    if( eventList != INVALID_HANDLE_VALUE )
-    {
-        CloseHandle( eventList );
-        eventList = INVALID_HANDLE_VALUE;
-    }
+    CloseHandle( signalEvent );
     if( waitTimer != NULL )
-    {
         CloseHandle( waitTimer );
-        waitTimer = NULL;
-    }
-#else
-    pthread_cond_destroy( &eventList );
-    pthread_mutex_destroy( &hMutex );
-    pthread_condattr_destroy( &condAttr );
-    pthread_mutexattr_destroy( &mutexAttr );
 #endif
 }
 
 void SignaledEvent::SetEvent( void )
 {
 #ifdef _WIN32
-    ::SetEvent( eventList );
+    ::SetEvent( signalEvent );
 #else
-    // Different from SetEvent which stays signaled.
-    // We have to record manually that the event was signaled
-    isSignaledMutex.lock();
-    isSignaled = true;
-    isSignaledMutex.unlock();
-
-    // Unblock waiting threads
-    pthread_cond_broadcast( &eventList );
+    {
+        std::lock_guard<std::mutex> lock( isSignaledMutex );
+        isSignaled = true;
+    }
+    isSignaledCondition.notify_one();
 #endif
 }
 
@@ -88,80 +65,17 @@ void SignaledEvent::WaitOnEvent( int timeoutMs )
     dueTime.QuadPart = -(LONGLONG)timeoutMs * 10000; // Relative, in 100 ns units
     if( waitTimer != NULL && timeoutMs >= 0 && SetWaitableTimer( waitTimer, &dueTime, 0, NULL, NULL, FALSE ) )
     {
-        HANDLE handles[2] = { eventList, waitTimer };
+        HANDLE handles[2] = { signalEvent, waitTimer };
         WaitForMultipleObjectsEx( 2, handles, FALSE, timeoutMs, FALSE );
     }
     else
     {
-        WaitForSingleObjectEx( eventList, timeoutMs, FALSE );
+        WaitForSingleObjectEx( signalEvent, timeoutMs, FALSE );
     }
 #else
-
-    // If was previously set signaled, just unset and return
-    isSignaledMutex.lock();
-    if( isSignaled == true )
-    {
-        isSignaled = false;
-        isSignaledMutex.unlock();
-        return;
-    }
-    isSignaledMutex.unlock();
-
-    // Else wait for SetEvent to be called
-    struct timespec ts;
-    struct timeval tp;
-    int rc = gettimeofday( &tp, NULL );
-    ts.tv_sec = tp.tv_sec;
-    ts.tv_nsec = tp.tv_usec * 1000;
-
-    while( timeoutMs > 30 )
-    {
-        // Wait 30 milliseconds for the signal, then check again.
-        // This is in case we  missed the signal between the top of this function and pthread_cond_timedwait, or after the end of the loop and pthread_cond_timedwait
-        ts.tv_nsec += 30 * 1000000;
-        if( ts.tv_nsec >= 1000000000 )
-        {
-            ts.tv_nsec -= 1000000000;
-            ts.tv_sec++;
-        }
-
-        // [SBC] added mutex lock/unlock around cond_timedwait.
-        // this prevents airplay from generating a whole much of errors.
-        // not sure how this works on other platforms since according to
-        // the docs you are suppost to hold the lock before you wait
-        // on the cond.
-        pthread_mutex_lock( &hMutex );
-        pthread_cond_timedwait( &eventList, &hMutex, &ts );
-        pthread_mutex_unlock( &hMutex );
-
-        timeoutMs -= 30;
-
-        isSignaledMutex.lock();
-        if( isSignaled == true )
-        {
-            isSignaled = false;
-            isSignaledMutex.unlock();
-            return;
-        }
-        isSignaledMutex.unlock();
-    }
-
-    // Wait the remaining time, and turn off the signal in case it was set
-    ts.tv_nsec += timeoutMs * 1000000;
-    if( ts.tv_nsec >= 1000000000 )
-    {
-        ts.tv_nsec -= 1000000000;
-        ts.tv_sec++;
-    }
-
-    pthread_mutex_lock( &hMutex );
-    pthread_cond_timedwait( &eventList, &hMutex, &ts );
-    pthread_mutex_unlock( &hMutex );
-
-    isSignaledMutex.lock();
+    std::unique_lock<std::mutex> lock( isSignaledMutex );
+    isSignaledCondition.wait_for( lock, std::chrono::milliseconds( timeoutMs ), [this] { return isSignaled; } );
     isSignaled = false;
-    isSignaledMutex.unlock();
-
 #endif
 }
 

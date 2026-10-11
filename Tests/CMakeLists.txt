@@ -102,6 +102,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SequenceRangesWireTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ShutdownNotifiesTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ShutdownStopsReceiveThreadTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SignaledEventTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SlidingWindowAckTimingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SlidingWindowLossRecoveryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketQueryTest.cpp
