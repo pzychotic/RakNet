@@ -18,6 +18,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 namespace RakNet {
@@ -77,7 +78,7 @@ private:
     static StringCompressor* instance;
 
     /// Pointer to the huffman encoding tree.
-    HuffmanEncodingTree* m_pHuffmanEncodingTree;
+    std::unique_ptr<HuffmanEncodingTree> m_pHuffmanEncodingTree;
 
     static int referenceCount;
 };

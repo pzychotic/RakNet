@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <deque>
 #include <map>
+#include <memory>
 
 namespace RakNet {
 
@@ -120,7 +121,7 @@ protected:
 
     // A single TCP recieve may generate multiple split packets. They are stored in the waitingPackets list until Receive is called
     std::deque<Packet*> waitingPackets;
-    std::map<SystemAddress, Connection*> connections;
+    std::map<SystemAddress, std::unique_ptr<Connection>> connections;
 
     unsigned int maxMessageLength;
     uint64_t messageLengthCapCloseCount;

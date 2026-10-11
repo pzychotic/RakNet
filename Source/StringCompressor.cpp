@@ -70,14 +70,11 @@ unsigned int englishCharacterFrequencies[256] = {    0,    0,    0,    0,    0, 
 StringCompressor::StringCompressor()
 {
     // Make a default tree immediately, since this is used for RPC possibly from multiple threads at the same time
-    m_pHuffmanEncodingTree = new HuffmanEncodingTree;
+    m_pHuffmanEncodingTree = std::make_unique<HuffmanEncodingTree>();
     m_pHuffmanEncodingTree->GenerateFromFrequencyTable( englishCharacterFrequencies );
 }
 
-StringCompressor::~StringCompressor()
-{
-    delete m_pHuffmanEncodingTree;
-}
+StringCompressor::~StringCompressor() = default;
 
 void StringCompressor::EncodeString( const char* input, int maxCharsToWrite, BitStream* output )
 {

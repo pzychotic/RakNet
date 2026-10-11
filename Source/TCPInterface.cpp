@@ -585,7 +585,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     }
     else
     {
-        ThisPtrPlusSysAddr* s = new ThisPtrPlusSysAddr;
+        std::unique_ptr<ThisPtrPlusSysAddr> s = std::make_unique<ThisPtrPlusSysAddr>();
         s->systemAddress.FromStringExplicitPort( host, remotePort );
         s->systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
         // Bounded by the length check at the top of Connect.
@@ -602,12 +602,17 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         attempt.HandOn();
 
         // Start the connection thread
-        const int errorCode = RakThread::Create( ConnectionAttemptLoop, s, threadPriority );
+        const int errorCode = RakThread::Create( ConnectionAttemptLoop, s.get(), threadPriority );
 
-        if( errorCode != 0 )
+        if( errorCode == 0 )
+        {
+            // The thread owns it now.
+            s.release();
+        }
+        else
         {
             SystemAddress failedSystemAddress = s->systemAddress;
-            delete s;
+            s.reset();
 
             // No thread was started, so nothing else will ever clear the slot. Released
             // before the failure is pushed, so the slot is free by the time the
@@ -1150,7 +1155,7 @@ bool TCPInterface::ConnectUnlessStopping( __TCPSOCKET__ sockfd, const sockaddr* 
 
 void ConnectionAttemptLoop( void* arg )
 {
-    TCPInterface::ThisPtrPlusSysAddr* s = (TCPInterface::ThisPtrPlusSysAddr*)arg;
+    std::unique_ptr<TCPInterface::ThisPtrPlusSysAddr> s( static_cast<TCPInterface::ThisPtrPlusSysAddr*>( arg ) );
 
     SystemAddress systemAddress = s->systemAddress;
     TCPInterface* tcpInterface = s->tcpInterface;
@@ -1160,7 +1165,7 @@ void ConnectionAttemptLoop( void* arg )
     // bounded by Connect before the thread was started, so this copy cannot overrun.
     char bindAddress[sizeof( s->bindAddress )];
     strcpy( bindAddress, s->bindAddress );
-    delete s;
+    s.reset();
 
     char str1[64];
     systemAddress.ToString( false, str1 );

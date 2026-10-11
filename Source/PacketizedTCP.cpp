@@ -187,7 +187,7 @@ Packet* PacketizedTCP::Receive( void )
         {
             // Came from network. Nothing from a connection closed at the message length cap
             // is framed: the stream lost its framing there.
-            Connection* connection = it->second;
+            Connection* connection = it->second.get();
             if( connection->openConnections > 0 && connection->isClosed == false )
                 FrameMessages( *incomingPacket, *connection );
             DeallocatePacket( incomingPacket );
@@ -353,9 +353,9 @@ void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
     // connection it replaces rather than failing to insert its own.
     auto it = connections.find( sa );
     if( it == connections.end() )
-        it = connections.insert( std::make_pair( sa, new Connection ) ).first;
+        it = connections.insert( std::make_pair( sa, std::make_unique<Connection>() ) ).first;
 
-    Connection* connection = it->second;
+    Connection* connection = it->second.get();
     if( delta > 0 )
     {
         // A new stream: whatever the old connection left unframed is not part of it.
@@ -365,18 +365,11 @@ void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
 
     connection->openConnections += delta;
     if( connection->openConnections == 0 )
-    {
-        delete connection;
         connections.erase( it );
-    }
 }
 
 void PacketizedTCP::ClearAllConnections( void )
 {
-    for( const auto& kEntry : connections )
-    {
-        delete kEntry.second;
-    }
     connections.clear();
 }
 
