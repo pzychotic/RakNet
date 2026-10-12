@@ -544,7 +544,11 @@ ConnectionAttemptResult RakPeer::Connect( const char* host, unsigned short remot
     //      memcpy(outgoingPassword, passwordData, passwordDataLength);
     //  outgoingPasswordLength=(unsigned char) passwordDataLength;
 
-    return SendConnectionRequest( host, remotePort, passwordData, passwordDataLength, connectionSocketIndex, 0, sendConnectionAttemptCount, timeBetweenSendConnectionAttemptsMS, timeoutTime );
+    SystemAddress systemAddress;
+    if( !systemAddress.FromStringExplicitPort( host, remotePort, socketList[connectionSocketIndex]->GetBoundAddress().GetIPVersion() ) )
+        return CANNOT_RESOLVE_DOMAIN_NAME;
+
+    return SendConnectionRequest( systemAddress, passwordData, passwordDataLength, connectionSocketIndex, 0, sendConnectionAttemptCount, timeBetweenSendConnectionAttemptsMS, timeoutTime );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -560,7 +564,11 @@ ConnectionAttemptResult RakPeer::ConnectWithSocket( const char* host, unsigned s
     if( passwordData == 0 )
         passwordDataLength = 0;
 
-    return SendConnectionRequest( host, remotePort, passwordData, passwordDataLength, 0, 0, sendConnectionAttemptCount, timeBetweenSendConnectionAttemptsMS, timeoutTime, socket );
+    SystemAddress systemAddress;
+    if( !systemAddress.FromStringExplicitPort( host, remotePort ) )
+        return CANNOT_RESOLVE_DOMAIN_NAME;
+
+    return SendConnectionRequest( systemAddress, passwordData, passwordDataLength, 0, socket, sendConnectionAttemptCount, timeBetweenSendConnectionAttemptsMS, timeoutTime );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2415,13 +2423,9 @@ int RakPeer::GetRecordIndexFromSystemAddress( const SystemAddress systemAddress 
     return GetRemoteSystemIndex( systemAddress );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime )
+ConnectionAttemptResult RakPeer::SendConnectionRequest( const SystemAddress& systemAddress, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex, RakNetSocket2* socket, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime )
 {
     RakAssert( passwordDataLength <= 256 );
-    RakAssert( remotePort != 0 );
-    SystemAddress systemAddress;
-    if( !systemAddress.FromStringExplicitPort( host, remotePort, socketList[connectionSocketIndex]->GetBoundAddress().GetIPVersion() ) )
-        return CANNOT_RESOLVE_DOMAIN_NAME;
 
     // Already connected? Advisory (ADR-0007): the network thread checks again when it acts.
     PublishedRemoteSystem entry;
@@ -2434,58 +2438,15 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsign
     rcs->nextRequestTime = RakNet::GetTimeMS();
     rcs->requestsMade = 0;
     rcs->data = 0;
-    rcs->socket = 0;
-    rcs->extraData = extraData;
-    rcs->socketIndex = connectionSocketIndex;
-    rcs->actionToTake = RequestedConnectionStruct::CONNECT;
-    rcs->sendConnectionAttemptCount = sendConnectionAttemptCount;
-    rcs->timeBetweenSendConnectionAttemptsMS = timeBetweenSendConnectionAttemptsMS;
-    if( passwordDataLength > 0 )
-        memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
-    rcs->outgoingPasswordLength = (unsigned char)passwordDataLength;
-    rcs->timeoutTime = timeoutTime;
-
-    // Return false if already pending, else push on queue
-    std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-    for( const std::unique_ptr<RequestedConnectionStruct>& pConnection : requestedConnectionQueue )
-    {
-        if( pConnection->systemAddress == systemAddress )
-        {
-            return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
-        }
-    }
-    requestedConnectionQueue.push_back( std::move( rcs ) );
-
-    return CONNECTION_ATTEMPT_STARTED;
-}
-ConnectionAttemptResult RakPeer::SendConnectionRequest( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime, RakNetSocket2* socket )
-{
-    RakAssert( passwordDataLength <= 256 );
-    SystemAddress systemAddress;
-    systemAddress.FromStringExplicitPort( host, remotePort );
-
-    // Already connected? Advisory (ADR-0007): the network thread checks again when it acts.
-    PublishedRemoteSystem entry;
-    if( GetPublishedByAddress( systemAddress, entry ) )
-        return ALREADY_CONNECTED_TO_ENDPOINT;
-
-    std::unique_ptr<RequestedConnectionStruct> rcs = std::make_unique<RequestedConnectionStruct>();
-
-    rcs->systemAddress = systemAddress;
-    rcs->nextRequestTime = RakNet::GetTimeMS();
-    rcs->requestsMade = 0;
-    rcs->data = 0;
-    rcs->socket = 0;
-    rcs->extraData = extraData;
-    rcs->socketIndex = connectionSocketIndex;
-    rcs->actionToTake = RequestedConnectionStruct::CONNECT;
-    rcs->sendConnectionAttemptCount = sendConnectionAttemptCount;
-    rcs->timeBetweenSendConnectionAttemptsMS = timeBetweenSendConnectionAttemptsMS;
-    if( passwordDataLength > 0 )
-        memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
-    rcs->outgoingPasswordLength = (unsigned char)passwordDataLength;
-    rcs->timeoutTime = timeoutTime;
     rcs->socket = socket;
+    rcs->socketIndex = connectionSocketIndex;
+    rcs->actionToTake = RequestedConnectionStruct::CONNECT;
+    rcs->sendConnectionAttemptCount = sendConnectionAttemptCount;
+    rcs->timeBetweenSendConnectionAttemptsMS = timeBetweenSendConnectionAttemptsMS;
+    if( passwordDataLength > 0 )
+        memcpy( rcs->outgoingPassword, passwordData, passwordDataLength );
+    rcs->outgoingPasswordLength = (unsigned char)passwordDataLength;
+    rcs->timeoutTime = timeoutTime;
 
     // Return false if already pending, else push on queue
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );

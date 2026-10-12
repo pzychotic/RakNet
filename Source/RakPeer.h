@@ -717,9 +717,9 @@ protected:
     /// the user thread calls GetIndexFromSystemAddress, which reads the published view.
     int GetRecordIndexFromSystemAddress( const SystemAddress systemAddress ) const;
 
-    // Two versions needed because some buggy compilers strip the last parameter if unused, and crashes
-    ConnectionAttemptResult SendConnectionRequest( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime, RakNetSocket2* socket );
-    ConnectionAttemptResult SendConnectionRequest( const char* host, unsigned short remotePort, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex, unsigned int extraData, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime );
+    /// Queues a connection attempt to \a systemAddress. A null \a socket sends over
+    /// socketList[connectionSocketIndex].
+    ConnectionAttemptResult SendConnectionRequest( const SystemAddress& systemAddress, const char* passwordData, int passwordDataLength, unsigned connectionSocketIndex, RakNetSocket2* socket, unsigned sendConnectionAttemptCount, unsigned timeBetweenSendConnectionAttemptsMS, RakNet::TimeMS timeoutTime );
     void HandleConnectionCancelQueue();
     ///Get the reliability layer associated with a systemAddress.
     /// Network thread only, like GetRemoteSystemFromGUID.
@@ -983,7 +983,6 @@ protected:
         char outgoingPassword[256];
         unsigned char outgoingPasswordLength;
         unsigned socketIndex;
-        unsigned int extraData;
         unsigned sendConnectionAttemptCount;
         unsigned timeBetweenSendConnectionAttemptsMS;
         RakNet::TimeMS timeoutTime;

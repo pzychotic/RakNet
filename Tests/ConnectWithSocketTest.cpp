@@ -28,7 +28,7 @@ Connects a client to a server the ordinary way, disconnects it, then reconnects 
 twice more over a socket the test hands to RakNet itself - once with a socket taken
 from GetSockets, once with one taken from GetSocket. Each reconnection is followed
 by a send, because a connection that cannot carry a packet has not really been
-re-established.
+re-established. A host that does not resolve is refused up front.
 
 RakPeerInterface functions explicitly tested:
 
@@ -117,4 +117,16 @@ TEST_CASE( "A client reconnects and sends over a socket it supplies, from both G
 
     TestHelpers::BroadCastTestPacket( client );
     CHECK( TestHelpers::WaitForTestPacket( server, 5000 ) );
+}
+
+TEST_CASE( "ConnectWithSocket to a host that does not resolve returns CANNOT_RESOLVE_DOMAIN_NAME", "[network]" )
+{
+    PeerScope peers;
+
+    RakPeerInterface* client = peers.Client();
+
+    RakNetSocket2* socket = client->GetSocket( UNASSIGNED_SYSTEM_ADDRESS );
+    REQUIRE( socket != nullptr );
+
+    CHECK( client->ConnectWithSocket( "nonexistent.invalid", kServerPort, 0, 0, socket ) == CANNOT_RESOLVE_DOMAIN_NAME );
 }

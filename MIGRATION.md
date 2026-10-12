@@ -832,6 +832,15 @@ and the first one it listed if several tie. Stock meant to, but ordered the rout
 function that put a higher score first in some cases, so which router it asked depended on
 the order the pings came back in.
 
+## `ConnectWithSocket` refuses a host it can't resolve
+
+**`ConnectWithSocket` returns `CANNOT_RESOLVE_DOMAIN_NAME` when `host` doesn't resolve.**
+Stock ignored the failure, returned `CONNECTION_ATTEMPT_STARTED` and queued an attempt to an
+unassigned address, which could never connect. `Connect` already returned
+`CANNOT_RESOLVE_DOMAIN_NAME`. If you treat anything but `CONNECTION_ATTEMPT_STARTED` as
+failure, nothing to do. If you wait for a Message to learn that a `ConnectWithSocket`
+failed, check its return value too.
+
 ## Getters answer only for open connections
 
 Stock read the connection records from your thread while the network thread was changing
