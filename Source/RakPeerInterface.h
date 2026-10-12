@@ -519,7 +519,7 @@ public:
     /// \internal
     /// \brief For a given system identified by \a guid, change the SystemAddress to send to.
     /// \param[in] guid The connection we are referring to
-    /// \param[in] systemAddress The new address to send to
+    /// \param[in] systemAddress The new address to send to. Ignored if another active connection record holds it.
     virtual void ChangeSystemAddress( RakNetGUID guid, const SystemAddress& systemAddress ) = 0;
 
     /// \returns a packet for you to write to if you want to create a Packet for some reason.

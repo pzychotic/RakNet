@@ -4509,9 +4509,11 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
         }
         else if( bcs->command == BufferedCommandStruct::BCS_CHANGE_SYSTEM_ADDRESS )
         {
-            // Reroute
+            // Reroute. Refused onto an address another active record holds, which would
+            // leave two active records at one address.
             RakPeer::RemoteSystemStruct* rssFromGuid = GetRemoteSystem( bcs->systemIdentifier.rakNetGuid, true );
-            if( rssFromGuid != 0 )
+            RakPeer::RemoteSystemStruct* rssAtTarget = GetRemoteSystemFromSystemAddress( bcs->systemIdentifier.systemAddress, true );
+            if( rssFromGuid != 0 && ( rssAtTarget == 0 || rssAtTarget == rssFromGuid ) )
             {
                 unsigned int existingSystemIndex = GetRemoteSystemIndex( rssFromGuid->systemAddress );
                 ReferenceRemoteSystem( bcs->systemIdentifier.systemAddress, existingSystemIndex );

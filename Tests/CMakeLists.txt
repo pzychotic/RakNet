@@ -94,6 +94,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ReliableOrderedConvertedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RepeatedNewIncomingConnectionTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReplacedCallbackTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RerouteTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2EntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2ForwardingFlowTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2RequestForwardingTest.cpp

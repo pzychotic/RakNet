@@ -145,3 +145,15 @@ Intermediary relays every datagram between them, and the Endpoint is the System 
 reached, which asked for nothing. Each is a Peer connected to the Intermediary. Endpoint
 names this role only; it is not a synonym for System.
 _Avoid_: Router (except for the plugin itself), sender, relay, destination
+
+**Forwarded connection**:
+A connection between a Source and an Endpoint whose datagrams all pass through an
+Intermediary. Each end sees the other System at an address on the Intermediary, not at the
+other System's own address.
+_Avoid_: Routed connection, relayed connection
+
+**Reroute**:
+Moving an open connection record to a new address while the connection itself carries on:
+same System, same RakNetGUID, same connection record. A reroute never leaves two open
+connection records for one address.
+_Avoid_: Change system address, re-address
