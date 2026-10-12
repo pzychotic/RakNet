@@ -514,7 +514,7 @@ private:
     InternalPacket* BuildPacketFromSplitPacketList( SplitPacketChannel* splitPacketChannel, CCTimeType time );
 
     /// Free every chunk \a splitPacketChannel is holding and release its held bytes. The
-    /// channel itself stays; the caller erases it from splitPacketChannelList afterwards.
+    /// channel itself stays in splitPacketChannelList; EraseSplitPacketChannel does both.
     void FreeSplitPacketChannel( SplitPacketChannel* splitPacketChannel );
 
     /// How long a split packet channel may take no new chunk before it counts as stalled,
@@ -612,7 +612,12 @@ private:
     void InitHeapWeights( void );
     reliabilityHeapWeightType GetNextWeight( int priorityLevel );
 
-    std::map<SplitPacketIdType, std::unique_ptr<SplitPacketChannel>> splitPacketChannelList;
+    using SplitPacketChannelMap = std::map<SplitPacketIdType, std::unique_ptr<SplitPacketChannel>>;
+    SplitPacketChannelMap splitPacketChannelList;
+
+    /// Free every chunk the channel at \a it is holding, release its held bytes, then erase
+    /// it from splitPacketChannelList. Returns the iterator after it.
+    SplitPacketChannelMap::iterator EraseSplitPacketChannel( SplitPacketChannelMap::const_iterator it );
 
     MessageNumberType sendReliableMessageNumberIndex;
     MessageNumberType internalOrderIndex;
@@ -746,7 +751,8 @@ private:
     // Every 16 datagrams, we make sure the 17th datagram goes out the same update tick, and is the same size as the 16th
     int countdownToNextPacketPair;
     InternalPacket* AllocateInternalPacket( void );
-    void ReleaseInternalPacket( InternalPacket* ip );
+    /// Free \a internalPacket's data, then the packet itself.
+    void FreeInternalPacket( InternalPacket* internalPacket, const char* file, unsigned int line );
 
     SequenceRanges<DatagramSequenceNumberType> acknowlegements;
     SequenceRanges<DatagramSequenceNumberType> NAKs;

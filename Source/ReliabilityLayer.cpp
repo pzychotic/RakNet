@@ -400,8 +400,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
 
     for( InternalPacket* pPacket : outputQueue )
     {
-        FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
-        ReleaseInternalPacket( pPacket );
+        FreeInternalPacket( pPacket, _FILE_AND_LINE_ );
     }
     outputQueue.clear();
 
@@ -422,10 +421,10 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
             iter = iter->resendNext;
             if( iter == resendLinkedListHead )
             {
-                ReleaseInternalPacket( prev );
+                delete prev;
                 break;
             }
-            ReleaseInternalPacket( prev );
+            delete prev;
         }
         resendLinkedListHead = 0;
     }
@@ -438,7 +437,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
         {
             FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
         }
-        ReleaseInternalPacket( pPacket );
+        delete pPacket;
 
         outgoingPacketBuffer.pop();
     }
@@ -759,8 +758,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 
                         bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
-                        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                        ReleaseInternalPacket( internalPacket );
+                        FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
                         goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                     }
                 }
@@ -795,8 +793,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         }
 
                         // Duplicate packet
-                        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                        ReleaseInternalPacket( internalPacket );
+                        FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
 
                         goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                     }
@@ -827,8 +824,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #endif
 
                             // Duplicate packet
-                            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                            ReleaseInternalPacket( internalPacket );
+                            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
 
                             goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                         }
@@ -847,8 +843,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                             bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
                             // Would crash due to out of memory!
-                            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                            ReleaseInternalPacket( internalPacket );
+                            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
 
                             goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                         }
@@ -906,8 +901,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                 {
                     bpsMetrics[(int)USER_MESSAGE_BYTES_RECEIVED_IGNORED].Push1( timeRead, BitsToBytes( internalPacket->dataBitLength ) );
 
-                    FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                    ReleaseInternalPacket( internalPacket );
+                    FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
                     goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                 }
 
@@ -1040,8 +1034,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 #endif
 
                                 // Lower than highest known value
-                                FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                                ReleaseInternalPacket( internalPacket );
+                                FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
 
                                 goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                             }
@@ -1158,8 +1151,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         // buffered, and a hole the System never fills keeps it all here.
                         if( ChargeHeldBytes( OrderingHeapEntryCost( internalPacket ), internalPacket->reliability ) == false )
                         {
-                            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                            ReleaseInternalPacket( internalPacket );
+                            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
                             goto CONTINUE_SOCKET_DATA_PARSE_LOOP;
                         }
                         orderingHeaps[internalPacket->orderingChannel].emplace( WeightedPacket{ weight, internalPacket } );
@@ -1185,8 +1177,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                     else
                     {
                         // Out of order
-                        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-                        ReleaseInternalPacket( internalPacket );
+                        FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
 
 #ifdef LOG_TRIVIAL_NOTIFICATIONS
                         for( PluginInterface2* pPlugin : messageHandlerList )
@@ -1236,7 +1227,7 @@ BitSize_t ReliabilityLayer::Receive( unsigned char** data )
 
         *data = internalPacket->data;
         BitSize_t bitLength = internalPacket->dataBitLength;
-        ReleaseInternalPacket( internalPacket );
+        delete internalPacket;
         return bitLength;
     }
     else
@@ -1722,7 +1713,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                         RakAssert( outgoingPacketBuffer.empty() || outgoingPacketBuffer.top().pPacket->dataBitLength < BytesToBits( MAXIMUM_MTU_SIZE ) );
                         statistics.messageInSendBuffer[(int)internalPacket->priority]--;
                         statistics.bytesInSendBuffer[(int)internalPacket->priority] -= BitsToBytes( internalPacket->dataBitLength );
-                        ReleaseInternalPacket( internalPacket );
+                        delete internalPacket;
                         continue;
                     }
 
@@ -2133,8 +2124,7 @@ unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSeque
             isReliable = false;
 
         RemoveFromList( internalPacket, isReliable );
-        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-        ReleaseInternalPacket( internalPacket );
+        FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
 
 
         return 0;
@@ -2381,7 +2371,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         // value no conforming sender produces, and a System must not be able to fire
         // a local assert. Rejected here so nothing downstream ever sizes an allocation
         // from it - see MAXIMUM_SPLIT_PACKET_COUNT for where the bound comes from.
-        ReleaseInternalPacket( internalPacket );
+        delete internalPacket;
         return 0;
     }
 
@@ -2393,7 +2383,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
     {
         // If this assert hits, encoding is garbage
         RakAssert( "Encoding is garbage" && 0 );
-        ReleaseInternalPacket( internalPacket );
+        delete internalPacket;
         return 0;
     }
 
@@ -2405,7 +2395,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
     {
         RakAssert( "Out of memory in ReliabilityLayer::CreateInternalPacketFromBitStream" && 0 );
         notifyOutOfMemory( _FILE_AND_LINE_ );
-        ReleaseInternalPacket( internalPacket );
+        delete internalPacket;
         return 0;
     }
 
@@ -2420,8 +2410,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         // If this hits, most likely the variable buff is too small in RunUpdateCycle in RakPeer.cpp
         RakAssert( "Couldn't read all the data" && 0 );
 
-        FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-        ReleaseInternalPacket( internalPacket );
+        FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
         return 0;
     }
 
@@ -2550,9 +2539,8 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
 
     splitPacketId++; // It's ok if this wraps to 0
 
-    // Do not delete, original is referenced by all split packets to avoid numerous allocations. See AllocInternalPacketData above
-    //  FreeInternalPacketData(internalPacket, _FILE_AND_LINE_ );
-    ReleaseInternalPacket( internalPacket );
+    // Only the shell goes: every split chunk references the original's data, to avoid numerous allocations. See AllocInternalPacketData above
+    delete internalPacket;
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -2570,8 +2558,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         // and cannot be what pushes a connection over its budget.
         if( !SortedSplittedPackets::IsHonouredCount( internalPacket->splitPacketCount ) )
         {
-            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( internalPacket );
+            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
             return false;
         }
 
@@ -2581,8 +2568,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         const uint64_t newChannelCost = EmptySplitPacketChannelCost( internalPacket->splitPacketCount ) + chunkCost;
         if( ChargeHeldBytes( newChannelCost, internalPacket->reliability ) == false )
         {
-            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( internalPacket );
+            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
             return false;
         }
 
@@ -2598,8 +2584,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
             // The allocation failed; the count was checked above. Drop the chunk and the
             // channel with it rather than the process - ADR-0004.
             ReleaseHeldBytes( newChannelCost );
-            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( internalPacket );
+            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
             return false;
         }
 
@@ -2611,11 +2596,9 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         // today. If it ever does, the empty channel goes with the chunk.
         if( !channel->splitPacketList.Add( internalPacket, __FILE__, __LINE__ ) )
         {
-            FreeSplitPacketChannel( channel );
-            splitPacketChannelList.erase( insertedIt );
+            EraseSplitPacketChannel( insertedIt );
             ReleaseHeldBytes( chunkCost );
-            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( internalPacket );
+            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
             return false;
         }
     }
@@ -2627,8 +2610,7 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
         // dropped anyway, and must not be what closes the connection.
         if( !channel->splitPacketList.Accepts( internalPacket ) )
         {
-            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( internalPacket );
+            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
             return false;
         }
 
@@ -2640,11 +2622,9 @@ bool ReliabilityLayer::InsertIntoSplitPacketList( InternalPacket* internalPacket
             // channel already.
             if( !closedOverBudget )
             {
-                FreeSplitPacketChannel( channel );
-                splitPacketChannelList.erase( channelIt );
+                EraseSplitPacketChannel( channelIt );
             }
-            FreeInternalPacketData( internalPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( internalPacket );
+            FreeInternalPacket( internalPacket, _FILE_AND_LINE_ );
             return false;
         }
 
@@ -2702,10 +2682,18 @@ void ReliabilityLayer::FreeSplitPacketChannel( SplitPacketChannel* splitPacketCh
         InternalPacket* pPacket = splitPacketChannel->splitPacketList.Get( j );
         if( pPacket != nullptr )
         {
-            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( pPacket );
+            FreeInternalPacket( pPacket, _FILE_AND_LINE_ );
         }
     }
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Free a split packet channel's contents, then erase it
+//-------------------------------------------------------------------------------------------------------
+ReliabilityLayer::SplitPacketChannelMap::iterator ReliabilityLayer::EraseSplitPacketChannel( SplitPacketChannelMap::const_iterator it )
+{
+    FreeSplitPacketChannel( it->second.get() );
+    return splitPacketChannelList.erase( it );
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -2737,8 +2725,7 @@ void ReliabilityLayer::FreeStalledSplitPacketChannels( CCTimeType time )
     {
         if( time > it->second->lastUpdateTime + stallTime )
         {
-            FreeSplitPacketChannel( it->second.get() );
-            it = splitPacketChannelList.erase( it );
+            it = EraseSplitPacketChannel( it );
         }
         else
         {
@@ -2842,8 +2829,7 @@ void ReliabilityLayer::FreeHeldReceiveBuffers( void )
             InternalPacket* pPacket = orderingHeaps[i].top().pPacket;
             orderingHeaps[i].pop();
             ReleaseHeldBytes( OrderingHeapEntryCost( pPacket ) );
-            FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
-            ReleaseInternalPacket( pPacket );
+            FreeInternalPacket( pPacket, _FILE_AND_LINE_ );
         }
     }
 
@@ -2874,8 +2860,7 @@ void ReliabilityLayer::CloseOverBudget( bool atPeerBudget )
     // report would arrive from a System the application has been told is gone.
     for( InternalPacket* pPacket : outputQueue )
     {
-        FreeInternalPacketData( pPacket, _FILE_AND_LINE_ );
-        ReleaseInternalPacket( pPacket );
+        FreeInternalPacket( pPacket, _FILE_AND_LINE_ );
     }
     outputQueue.clear();
 }
@@ -2963,11 +2948,8 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
     InternalPacket *internalPacket, *splitPacket;
     // int splitPacketPartLength;
 
-    // Released up front: the channel is emptied below whatever happens. The reassembled copy is
+    // Reconstruct. The chunks stay in the channel; the caller erases it. The reassembled copy is
     // not charged here - it is the caller's, and is charged if it goes into an ordering heap.
-    ReleaseHeldBytes( SplitPacketChannelCost( splitPacketChannel ) );
-
-    // Reconstruct
     internalPacket = CreateInternalPacketCopy( splitPacketChannel->splitPacketList.Get( 0 ), time );
     internalPacket->dataBitLength = 0;
     for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
@@ -2985,12 +2967,6 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
         offset += splitPacket->dataBitLength;
     }
 
-    for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
-    {
-        FreeInternalPacketData( splitPacketChannel->splitPacketList.Get( j ), _FILE_AND_LINE_ );
-        ReleaseInternalPacket( splitPacketChannel->splitPacketList.Get( j ) );
-    }
-
     return internalPacket;
 }
 
@@ -3005,7 +2981,7 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketIdT
     if( splitPacketChannel->splitPacketList.AllocSize() == splitPacketChannel->splitPacketList.AddedPacketsCount() )
     {
         InternalPacket* internalPacket = BuildPacketFromSplitPacketList( splitPacketChannel, time );
-        splitPacketChannelList.erase( channelIt );
+        EraseSplitPacketChannel( channelIt );
         return internalPacket;
     }
     else
@@ -3227,9 +3203,7 @@ void ReliabilityLayer::ClearPacketsAndDatagrams( void )
         if( packetsToDeallocThisUpdate[i] )
         {
             RemoveFromUnreliableLinkedList( packetsToSendThisUpdate[i] );
-            FreeInternalPacketData( packetsToSendThisUpdate[i], _FILE_AND_LINE_ );
-            // if (keepInternalPacketIfNeedsAck==false || packetsToSendThisUpdate[i]->reliability<RELIABLE_WITH_ACK_RECEIPT)
-            ReleaseInternalPacket( packetsToSendThisUpdate[i] );
+            FreeInternalPacket( packetsToSendThisUpdate[i], _FILE_AND_LINE_ );
         }
     }
     packetsToDeallocThisUpdate.clear();
@@ -3372,9 +3346,10 @@ InternalPacket* ReliabilityLayer::AllocateInternalPacket( void )
     return ip;
 }
 //-------------------------------------------------------------------------------------------------------
-void ReliabilityLayer::ReleaseInternalPacket( InternalPacket* ip )
+void ReliabilityLayer::FreeInternalPacket( InternalPacket* internalPacket, const char* file, unsigned int line )
 {
-    delete ip;
+    FreeInternalPacketData( internalPacket, file, line );
+    delete internalPacket;
 }
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::RemoveFromUnreliableLinkedList( InternalPacket* internalPacket )
