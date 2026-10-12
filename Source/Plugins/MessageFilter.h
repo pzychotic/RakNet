@@ -38,18 +38,18 @@ class RakPeerInterface;
 /// \internal Has to be public so some of the shittier compilers can use it.
 struct FilterSet
 {
-    bool banOnFilterTimeExceed;
-    bool kickOnDisallowedMessage;
-    bool banOnDisallowedMessage;
-    RakNet::TimeMS disallowedMessageBanTimeMS;
-    RakNet::TimeMS timeExceedBanTimeMS;
-    RakNet::TimeMS maxMemberTimeMS;
-    void ( *invalidMessageCallback )( RakPeerInterface* peer, AddressOrGUID systemAddress, int filterSetID, void* userData, unsigned char messageID );
-    void* disallowedCallbackUserData;
-    void ( *timeoutCallback )( RakPeerInterface* peer, AddressOrGUID systemAddress, int filterSetID, void* userData );
-    void* timeoutUserData;
-    int filterSetID;
-    bool allowedIDs[MESSAGE_FILTER_MAX_MESSAGE_ID];
+    bool banOnFilterTimeExceed = false;
+    bool kickOnDisallowedMessage = false;
+    bool banOnDisallowedMessage = false;
+    RakNet::TimeMS disallowedMessageBanTimeMS = 0;
+    RakNet::TimeMS timeExceedBanTimeMS = 0;
+    RakNet::TimeMS maxMemberTimeMS = 0;
+    void ( *invalidMessageCallback )( RakPeerInterface* peer, AddressOrGUID systemAddress, int filterSetID, void* userData, unsigned char messageID ) = nullptr;
+    void* disallowedCallbackUserData = nullptr;
+    void ( *timeoutCallback )( RakPeerInterface* peer, AddressOrGUID systemAddress, int filterSetID, void* userData ) = nullptr;
+    void* timeoutUserData = nullptr;
+    int filterSetID = 0;
+    bool allowedIDs[MESSAGE_FILTER_MAX_MESSAGE_ID]{};
     std::set<std::string> allowedRPC4;
 };
 

@@ -18,7 +18,6 @@
 #include "RakPeerInterface.h"
 #include "TCPInterface.h"
 #include "BitStream.h"
-#include <string.h>
 
 #include <iterator>
 #include <memory>
@@ -200,20 +199,8 @@ FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
         return filterIt->second.get();
     else
     {
-        auto owned = std::make_unique<FilterSet>();
-        FilterSet* newFilterSet = owned.get();
-        memset( newFilterSet->allowedIDs, 0, MESSAGE_FILTER_MAX_MESSAGE_ID * sizeof( bool ) );
-        newFilterSet->banOnFilterTimeExceed = false;
-        newFilterSet->kickOnDisallowedMessage = false;
-        newFilterSet->banOnDisallowedMessage = false;
-        newFilterSet->disallowedMessageBanTimeMS = 0;
-        newFilterSet->timeExceedBanTimeMS = 0;
-        newFilterSet->maxMemberTimeMS = 0;
+        FilterSet* newFilterSet = filterList.emplace( filterSetID, std::make_unique<FilterSet>() ).first->second.get();
         newFilterSet->filterSetID = filterSetID;
-        newFilterSet->invalidMessageCallback = 0;
-        newFilterSet->timeoutCallback = 0;
-        newFilterSet->timeoutUserData = 0;
-        filterList.emplace( filterSetID, std::move( owned ) );
         return newFilterSet;
     }
 }
