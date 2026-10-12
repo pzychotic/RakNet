@@ -1,14 +1,8 @@
-Larku's fork of RakNet 4.081
+pzychotic's fork of RakNet 4.081
 ============
 
-Copyright (c) 2014, Oculus VR, Inc.
-
-Fork notes [updated 27-July-2015]
-------------------------------------------
-
-This fork contains most of the pending pull requests from the official Oculus VR original.
-
-This fork also contains other various fixes that I've found necessary - mostly addressing compilation issues on various platforms.
+This fork builds on Larku's fork of RakNet 4.081. The sections up to
+[Larku's fork notes](#larkus-fork-notes-updated-27-july-2015) describe what this fork changes.
 
 Upgrading from stock 4.081
 ------------------------------------------
@@ -43,6 +37,15 @@ disabled.
 
 A green run does not mean the suite is deterministic. The tests drive real sockets and
 threads, so a passing run is evidence, not proof.
+
+Larku's fork notes [updated 27-July-2015]
+------------------------------------------
+
+Copyright (c) 2014, Oculus VR, Inc.
+
+This fork contains most of the pending pull requests from the official Oculus VR original.
+
+This fork also contains other various fixes that I've found necessary - mostly addressing compilation issues on various platforms.
 
 Package notes
 ------------------------------------------
