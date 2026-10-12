@@ -1,7 +1,6 @@
 #include "TCPByteBuffer.h"
-#include "RakNetDefines.h"
+#include "RakAssert.h"
 
-#include <cassert>
 #include <cstring>
 
 namespace RakNet {
