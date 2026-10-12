@@ -19,6 +19,7 @@
 #include "WindowsIncludes.h"
 #include "WSAStartupSingleton.h"
 #include "SocketDefines.h"
+#include "AddrInfo.h"
 #include "RakNetSocket2.h"
 #include "LinuxStrings.h"
 
@@ -540,7 +541,7 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
 
     // This could be a domain, or a printable address such as "192.0.2.1" or "2001:db8:63b3:1::3490"
     // I want to convert it to its binary representation
-    addrinfo hints, *servinfo = 0;
+    addrinfo hints;
     memset( &hints, 0, sizeof hints );
     hints.ai_socktype = SOCK_DGRAM;
     if( ipVersion == 6 )
@@ -549,15 +550,15 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
         hints.ai_family = AF_INET;
     else
         hints.ai_family = AF_UNSPEC;
-    getaddrinfo( ipPart, "", &hints, &servinfo );
-    if( servinfo == 0 )
+    AddrInfoPtr servinfo = ResolveAddrInfo( ipPart, "", hints );
+    if( !servinfo )
     {
         if( ipVersion == 6 )
         {
             ipVersion = 4;
             hints.ai_family = AF_UNSPEC;
-            getaddrinfo( ipPart, "", &hints, &servinfo );
-            if( servinfo == 0 )
+            servinfo = ResolveAddrInfo( ipPart, "", hints );
+            if( !servinfo )
             {
                 WSAStartupSingleton::Deref();
                 return false;
@@ -597,7 +598,8 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     memcpy( &address.addr4, (struct sockaddr_in*)servinfo->ai_addr, sizeof( struct sockaddr_in ) );
 #endif
 
-    freeaddrinfo( servinfo ); // free the linked list
+    // Freed before the Deref, which can be the WSACleanup.
+    servinfo.reset();
 
     // needed for getaddrinfo
     WSAStartupSingleton::Deref();

@@ -87,7 +87,12 @@ set( CURRENT_SOURCE
     ${CMAKE_CURRENT_SOURCE_DIR}/WSAStartupSingleton.cpp
 )
 
-set( TARGET_HEADER ${TARGET_HEADER} ${CURRENT_HEADER} )
+# Internal headers build with the library but are not installed.
+set( INTERNAL_HEADER
+    ${CMAKE_CURRENT_SOURCE_DIR}/AddrInfo.h
+)
+
+set( TARGET_HEADER ${TARGET_HEADER} ${CURRENT_HEADER} ${INTERNAL_HEADER} )
 set( TARGET_SOURCE ${TARGET_SOURCE} ${CURRENT_SOURCE} )
 
 include_directories( ${RakNet_SOURCE_DIR}/Source )

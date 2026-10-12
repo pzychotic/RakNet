@@ -13,6 +13,8 @@
 #ifndef RAKNETSOCKET2_BERKLEY_CPP
 #define RAKNETSOCKET2_BERKLEY_CPP
 
+#include "AddrInfo.h"
+
 #include <charconv>
 
 #ifndef _WIN32
@@ -40,11 +42,11 @@ void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_I
     RakAssert( err != -1 );
 
     struct addrinfo hints;
-    struct addrinfo *servinfo = 0, *aip; // will point to the results
+    struct addrinfo* aip;
     PrepareAddrInfoHints2( &hints );
-    getaddrinfo( ac, "", &hints, &servinfo );
+    AddrInfoPtr servinfo = ResolveAddrInfo( ac, "", hints );
 
-    for( idx = 0, aip = servinfo; aip != NULL && idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS; aip = aip->ai_next, idx++ )
+    for( idx = 0, aip = servinfo.get(); aip != NULL && idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS; aip = aip->ai_next, idx++ )
     {
         if( aip->ai_family == AF_INET )
         {
@@ -57,8 +59,6 @@ void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_I
             memcpy( &addresses[idx].address.addr4, ipv6, sizeof( sockaddr_in6 ) );
         }
     }
-
-    freeaddrinfo( servinfo ); // free the linked-list
 
     while( idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS )
     {
@@ -446,9 +446,7 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bin
 
 #if RAKNET_SUPPORT_IPV6 == 1
 
-    int ret = 0;
     struct addrinfo hints;
-    struct addrinfo *servinfo = 0, *aip; // will point to the results
     PrepareAddrInfoHints2( &hints );
     hints.ai_family = bindParameters->addressFamily;
     char portStr[32];
@@ -457,52 +455,24 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bin
     *res.ptr = '\0';
 
     // On Ubuntu, "" returns "No address associated with hostname" while 0 works.
-    if( bindParameters->hostAddress &&
-        ( _stricmp( bindParameters->hostAddress, "UNASSIGNED_SYSTEM_ADDRESS" ) == 0 || bindParameters->hostAddress[0] == 0 ) )
-    {
-        getaddrinfo( 0, portStr, &hints, &servinfo );
-    }
-    else
-    {
-        getaddrinfo( bindParameters->hostAddress, portStr, &hints, &servinfo );
-    }
+    const char* node = bindParameters->hostAddress;
+    if( node && ( _stricmp( node, "UNASSIGNED_SYSTEM_ADDRESS" ) == 0 || node[0] == 0 ) )
+        node = 0;
+    AddrInfoPtr servinfo = ResolveAddrInfo( node, portStr, hints );
 
-    // Try all returned addresses until one works
-    for( aip = servinfo; aip != NULL; aip = aip->ai_next )
-    {
-        // Open socket. The address type depends on what
-        // getaddrinfo() gave us.
-        rns2Socket = socket__( aip->ai_family, aip->ai_socktype, aip->ai_protocol );
+    const __UDPSOCKET__ boundSocket = BindFirstAddress( servinfo.get() );
+    if( boundSocket == INVALID_SOCKET )
+        return BR_FAILED_TO_BIND_SOCKET;
+    rns2Socket = (RNS2Socket)boundSocket;
 
-        if( rns2Socket == -1 )
-        {
-            freeaddrinfo( servinfo );
-            return BR_FAILED_TO_BIND_SOCKET;
-        }
+    SetSocketOptions();
+    SetNonBlockingSocket( bindParameters->nonBlockingSocket );
+    SetBroadcastSocket( bindParameters->setBroadcast );
+    SetIPHdrIncl( bindParameters->setIPHdrIncl );
 
-        ret = bind__( rns2Socket, aip->ai_addr, (int)aip->ai_addrlen );
-        if( ret >= 0 )
-        {
-            freeaddrinfo( servinfo ); // free the linked-list
+    GetSystemAddressIPV4And6( rns2Socket, &boundAddress );
 
-            SetSocketOptions();
-            SetNonBlockingSocket( bindParameters->nonBlockingSocket );
-            SetBroadcastSocket( bindParameters->setBroadcast );
-            SetIPHdrIncl( bindParameters->setIPHdrIncl );
-
-            GetSystemAddressIPV4And6( rns2Socket, &boundAddress );
-
-            return BR_SUCCESS;
-        }
-        else
-        {
-            closesocket__( rns2Socket );
-        }
-    }
-    if( servinfo )
-        freeaddrinfo( servinfo );
-
-    return BR_FAILED_TO_BIND_SOCKET;
+    return BR_SUCCESS;
 
 #else
     return BR_REQUIRES_RAKNET_SUPPORT_IPV6_DEFINE;
@@ -662,19 +632,19 @@ void RNS2_Berkley::RecvFromBlocking( RNS2RecvStruct* recvFromStruct )
 
 void DomainNameToIP_Berkley_IPV4And6( const char* domainName, char ip[65] )
 {
-    struct addrinfo hints, *res, *p;
-    int status;
+    struct addrinfo hints, *p;
     memset( &hints, 0, sizeof hints );
     hints.ai_family = AF_UNSPEC; // AF_INET or AF_INET6 to force version
     hints.ai_socktype = SOCK_DGRAM;
 
-    if( ( status = getaddrinfo( domainName, NULL, &hints, &res ) ) != 0 )
+    AddrInfoPtr res = ResolveAddrInfo( domainName, NULL, hints );
+    if( !res )
     {
         memset( ip, 0, 65 ); // sizeof(ip) returns pointer size, not array size
         return;
     }
 
-    p = res;
+    p = res.get();
     void* addr;
 
     // get the pointer to the address itself,
@@ -694,7 +664,6 @@ void DomainNameToIP_Berkley_IPV4And6( const char* domainName, char ip[65] )
         // http://www.mail-archive.com/users@ipv6.org/msg02107.html
         getnameinfo( (struct sockaddr*)ipv6, sizeof( struct sockaddr_in6 ), ip, 1, NULL, 0, NI_NUMERICHOST );
     }
-    freeaddrinfo( res ); // free the linked list
 }
 
 #else

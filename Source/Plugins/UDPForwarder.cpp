@@ -19,6 +19,7 @@
 #include "WSAStartupSingleton.h"
 #include "RakThread.h"
 #include "SocketDefines.h"
+#include "AddrInfo.h"
 #include "errno.h"
 #include <string.h>
 #ifndef _WIN32
@@ -389,7 +390,6 @@ void UDPForwarder::UpdateUDPForwarder( void )
                 int ret = bind__( fe->socket, (struct sockaddr*)&listenerSocketAddress, sizeof( listenerSocketAddress ) );
                 if( ret == -1 )
                 {
-                    fe.reset();
                     sfos.result = UDPFORWARDER_BIND_FAILED;
                 }
                 else
@@ -401,36 +401,13 @@ void UDPForwarder::UpdateUDPForwarder( void )
                 struct addrinfo hints;
                 memset( &hints, 0, sizeof( addrinfo ) ); // make sure the struct is empty
                 hints.ai_family = sfis->socketFamily;
-                hints.ai_socktype = SOCK_DGRAM;      // UDP sockets
-                hints.ai_flags = AI_PASSIVE;         // fill in my IP for me
-                struct addrinfo *servinfo = 0, *aip; // will point to the results
+                hints.ai_socktype = SOCK_DGRAM; // UDP sockets
+                hints.ai_flags = AI_PASSIVE;    // fill in my IP for me
 
-                if( sfis->forceHostAddress.empty() || sfis->forceHostAddress == "UNASSIGNED_SYSTEM_ADDRESS" )
-                    getaddrinfo( 0, "0", &hints, &servinfo );
-                else
-                    getaddrinfo( sfis->forceHostAddress.c_str(), "0", &hints, &servinfo );
-
-                for( aip = servinfo; aip != NULL; aip = aip->ai_next )
-                {
-                    // Open socket. The address type depends on what
-                    // getaddrinfo() gave us.
-                    fe->socket = socket__( aip->ai_family, aip->ai_socktype, aip->ai_protocol );
-                    if( fe->socket != INVALID_SOCKET )
-                    {
-                        int ret = bind__( fe->socket, aip->ai_addr, (int)aip->ai_addrlen );
-                        if( ret >= 0 )
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            closesocket__( fe->socket );
-                            fe->socket = INVALID_SOCKET;
-                        }
-                    }
-                }
-                if( servinfo )
-                    freeaddrinfo( servinfo );
+                const char* node = 0;
+                if( !sfis->forceHostAddress.empty() && sfis->forceHostAddress != "UNASSIGNED_SYSTEM_ADDRESS" )
+                    node = sfis->forceHostAddress.c_str();
+                fe->socket = BindFirstAddress( ResolveAddrInfo( node, "0", hints ).get() );
 
                 if( fe->socket == INVALID_SOCKET )
                     sfos.result = UDPFORWARDER_BIND_FAILED;

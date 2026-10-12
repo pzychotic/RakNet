@@ -30,6 +30,7 @@ typedef int socklen_t;
 #include "StringCompressor.h"
 #include "SocketLayer.h"
 #include "SocketDefines.h"
+#include "AddrInfo.h"
 #if( defined( __GNUC__ ) || defined( __GCCXML__ ) ) && !defined( __WIN32__ )
 #include <netdb.h>
 #endif
@@ -156,35 +157,12 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
     hints.ai_family = socketFamily;          // don't care IPv4 or IPv6
     hints.ai_socktype = SOCK_STREAM;         // TCP sockets
     hints.ai_flags = AI_PASSIVE;             // fill in my IP for me
-    struct addrinfo *servinfo = 0, *aip;     // will point to the results
     char portStr[32];
     auto res = std::to_chars( portStr, portStr + 31, port );
     RakAssert( res.ec == std::errc() );
     *res.ptr = '\0';
 
-    getaddrinfo( 0, portStr, &hints, &servinfo );
-    for( aip = servinfo; aip != NULL; aip = aip->ai_next )
-    {
-        // Open socket. The address type depends on what
-        // getaddrinfo() gave us.
-        listenSocket = socket__( aip->ai_family, aip->ai_socktype, aip->ai_protocol );
-        if( listenSocket != INVALID_SOCKET )
-        {
-            int ret = bind__( listenSocket, aip->ai_addr, (int)aip->ai_addrlen );
-            if( ret >= 0 )
-            {
-                break;
-            }
-            else
-            {
-                closesocket__( listenSocket );
-                listenSocket = INVALID_SOCKET;
-            }
-        }
-    }
-    if( servinfo )
-        freeaddrinfo( servinfo );
-
+    listenSocket = BindFirstAddress( ResolveAddrInfo( 0, portStr, hints ).get() );
     if( listenSocket == INVALID_SOCKET )
         return false;
 
@@ -1041,14 +1019,14 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     sockaddr_in serverAddress;
 
     // getaddrinfo is thread-safe, and connect attempts resolve concurrently.
-    struct addrinfo hints, *res = 0;
+    struct addrinfo hints;
     memset( &hints, 0, sizeof hints );
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    if( getaddrinfo( host, 0, &hints, &res ) != 0 )
+    const AddrInfoPtr res = ResolveAddrInfo( host, 0, hints );
+    if( !res )
         return INVALID_SOCKET;
     const in_addr serverHostAddress = ( (const sockaddr_in*)res->ai_addr )->sin_addr;
-    freeaddrinfo( res );
 
     __TCPSOCKET__ sockfd = socket__( AF_INET, SOCK_STREAM, 0 );
     if( sockfd == INVALID_SOCKET )
@@ -1078,7 +1056,7 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
 
     (void)bindAddress;
 
-    struct addrinfo hints, *res = 0;
+    struct addrinfo hints;
     __TCPSOCKET__ sockfd;
     memset( &hints, 0, sizeof hints );
     hints.ai_family = socketFamily;
@@ -1088,17 +1066,14 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     RakAssert( portRes.ec == std::errc() );
     *portRes.ptr = '\0';
 
-    if( getaddrinfo( host, portStr, &hints, &res ) != 0 )
+    const AddrInfoPtr res = ResolveAddrInfo( host, portStr, hints );
+    if( !res )
         return INVALID_SOCKET;
 
     sockfd = socket__( res->ai_family, res->ai_socktype, res->ai_protocol );
     if( sockfd == INVALID_SOCKET )
-    {
-        freeaddrinfo( res );
         return INVALID_SOCKET;
-    }
     const bool isConnected = ConnectUnlessStopping( sockfd, res->ai_addr, (int)res->ai_addrlen );
-    freeaddrinfo( res ); // free the linked-list
 
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 

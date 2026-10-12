@@ -19,6 +19,7 @@
 #include "RakNetTypes.h"
 #include "RakPeer.h"
 #include "SocketDefines.h"
+#include "AddrInfo.h"
 #if( defined( __GNUC__ ) || defined( __GCCXML__ ) ) && !defined( __WIN32__ )
 #include <netdb.h>
 #endif
@@ -226,11 +227,11 @@ void GetMyIP_Win32( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 
 #if RAKNET_SUPPORT_IPV6 == 1
     struct addrinfo hints;
-    struct addrinfo *servinfo = 0, *aip; // will point to the results
+    struct addrinfo* aip;
     PrepareAddrInfoHints( &hints );
-    getaddrinfo( ac, "", &hints, &servinfo );
+    AddrInfoPtr servinfo = ResolveAddrInfo( ac, "", hints );
 
-    for( idx = 0, aip = servinfo; aip != NULL && idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS; aip = aip->ai_next, idx++ )
+    for( idx = 0, aip = servinfo.get(); aip != NULL && idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS; aip = aip->ai_next, idx++ )
     {
         if( aip->ai_family == AF_INET )
         {
@@ -243,8 +244,6 @@ void GetMyIP_Win32( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
             memcpy( &addresses[idx].address.addr4, ipv6, sizeof( sockaddr_in6 ) );
         }
     }
-
-    freeaddrinfo( servinfo ); // free the linked-list
 #else
     struct hostent* phe = gethostbyname( ac );
 
