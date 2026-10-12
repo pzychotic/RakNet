@@ -39,8 +39,6 @@
 #include "RakNetVersion.h"
 #include "WSAStartupSingleton.h"
 
-#define REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE 8
-
 #include <stdlib.h> // malloc
 #include <algorithm>
 #include <chrono>
@@ -347,7 +345,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
         // remoteSystemList in Single thread
         remoteSystemList = std::vector<RemoteSystemStruct>( maximumNumberOfPeers );
 
-        remoteSystemLookup = std::vector<RemoteSystemIndex*>( (size_t)maximumNumberOfPeers * REMOTE_SYSTEM_LOOKUP_HASH_MULTIPLE );
+        recordIndexByAddress.reserve( maximumNumberOfPeers );
 
         activeSystemList = std::vector<RemoteSystemStruct*>( maximumNumberOfPeers );
 
@@ -693,7 +691,7 @@ void RakPeer::Shutdown( unsigned int blockDuration, unsigned char orderingChanne
     std::vector<RemoteSystemStruct>().swap( remoteSystemList );
     std::vector<RemoteSystemStruct*>().swap( activeSystemList );
 
-    ClearRemoteSystemLookup();
+    recordIndexByAddress = {};
 
     ResetSendReceipt();
 }
@@ -2462,10 +2460,6 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const SystemAddress& sys
     return CONNECTION_ATTEMPT_STARTED;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::ValidateRemoteSystemLookup( void ) const
-{
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const AddressOrGUID systemIdentifier, bool onlyActive ) const
 {
     if( systemIdentifier.rakNetGuid != UNASSIGNED_RAKNET_GUID )
@@ -2676,7 +2670,6 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
                     // 4/13/09 Attackers can flood ID_OPEN_CONNECTION_REQUEST and use up all available connection slots
                     // Ignore connection attempts if this IP address connected within the last 100 milliseconds
                     *thisIPConnectedRecently = true;
-                    ValidateRemoteSystemLookup();
                     return 0;
                 }
             }
@@ -2816,26 +2809,9 @@ RakNet::Time RakPeer::GetBestClockDifferential( const SystemAddress systemAddres
     return entry.clockDifferential;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-unsigned int RakPeer::RemoteSystemLookupHashIndex( const SystemAddress& sa ) const
-{
-    return (unsigned int)( SystemAddress::ToInteger( sa ) % remoteSystemLookup.size() );
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remoteSystemListIndex )
 {
     AssertInsideUpdateCycle();
-
-    // #ifdef _DEBUG
-    //  for ( int remoteSystemIndex = 0; remoteSystemIndex < maximumNumberOfPeers; ++remoteSystemIndex )
-    //  {
-    //      if (remoteSystemList[remoteSystemIndex].isActive )
-    //      {
-    //          unsigned int hashIndex = GetRemoteSystemIndex(remoteSystemList[remoteSystemIndex].systemAddress);
-    //          RakAssert(hashIndex==remoteSystemIndex);
-    //      }
-    //  }
-    // #endif
-
 
     SystemAddress oldAddress = remoteSystemList[remoteSystemListIndex].systemAddress;
     if( oldAddress != UNASSIGNED_SYSTEM_ADDRESS )
@@ -2849,94 +2825,30 @@ void RakPeer::ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remot
     }
     DereferenceRemoteSystem( sa );
 
-    // #ifdef _DEBUG
-    //  for ( int remoteSystemIndex = 0; remoteSystemIndex < maximumNumberOfPeers; ++remoteSystemIndex )
-    //  {
-    //      if (remoteSystemList[remoteSystemIndex].isActive )
-    //      {
-    //          unsigned int hashIndex = GetRemoteSystemIndex(remoteSystemList[remoteSystemIndex].systemAddress);
-    //          if (hashIndex!=remoteSystemIndex)
-    //          {
-    //              RakAssert(hashIndex==remoteSystemIndex);
-    //          }
-    //      }
-    //  }
-    // #endif
-
-
     remoteSystemList[remoteSystemListIndex].systemAddress = sa;
-
-    unsigned int hashIndex = RemoteSystemLookupHashIndex( sa );
-    RemoteSystemIndex* rsi = new RemoteSystemIndex{ remoteSystemListIndex, nullptr };
-    if( remoteSystemLookup[hashIndex] == 0 )
-    {
-        remoteSystemLookup[hashIndex] = rsi;
-    }
-    else
-    {
-        RemoteSystemIndex* cur = remoteSystemLookup[hashIndex];
-        while( cur->next != 0 )
-        {
-            cur = cur->next;
-        }
-        cur->next = rsi;
-    }
-
-    // #ifdef _DEBUG
-    //  for ( int remoteSystemIndex = 0; remoteSystemIndex < maximumNumberOfPeers; ++remoteSystemIndex )
-    //  {
-    //      if (remoteSystemList[remoteSystemIndex].isActive )
-    //      {
-    //          unsigned int hashIndex = GetRemoteSystemIndex(remoteSystemList[remoteSystemIndex].systemAddress);
-    //          RakAssert(hashIndex==remoteSystemIndex);
-    //      }
-    //  }
-    // #endif
-
+    recordIndexByAddress.emplace( sa, remoteSystemListIndex );
 
     RakAssert( GetRemoteSystemIndex( sa ) == remoteSystemListIndex );
+    // ADR-0005: one entry per record at most, so the map never outgrows remoteSystemList.
+    RakAssert( recordIndexByAddress.size() <= remoteSystemList.size() );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::DereferenceRemoteSystem( const SystemAddress& sa )
 {
     AssertInsideUpdateCycle();
 
-    unsigned int hashIndex = RemoteSystemLookupHashIndex( sa );
-    RemoteSystemIndex* cur = remoteSystemLookup[hashIndex];
-    RemoteSystemIndex* last = 0;
-    while( cur != 0 )
-    {
-        if( remoteSystemList[cur->index].systemAddress == sa )
-        {
-            if( last == 0 )
-            {
-                remoteSystemLookup[hashIndex] = cur->next;
-            }
-            else
-            {
-                last->next = cur->next;
-            }
-            delete cur;
-            break;
-        }
-        last = cur;
-        cur = cur->next;
-    }
+    recordIndexByAddress.erase( sa );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::GetRemoteSystemIndex( const SystemAddress& sa ) const
 {
     AssertInsideUpdateCycle();
 
-    unsigned int hashIndex = RemoteSystemLookupHashIndex( sa );
-    RemoteSystemIndex* cur = remoteSystemLookup[hashIndex];
-    while( cur != 0 )
-    {
-        if( remoteSystemList[cur->index].systemAddress == sa )
-            return cur->index;
-        cur = cur->next;
-    }
-    return (unsigned int)-1;
+    auto it = recordIndexByAddress.find( sa );
+    if( it == recordIndexByAddress.end() )
+        return (unsigned int)-1;
+    RakAssert( remoteSystemList[it->second].systemAddress == sa );
+    return it->second;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const SystemAddress& sa ) const
@@ -2945,20 +2857,6 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const SystemAddress& sa )
     if( remoteSystemIndex == (unsigned int)-1 )
         return 0;
     return &remoteSystemList[remoteSystemIndex];
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::ClearRemoteSystemLookup( void )
-{
-    for( RemoteSystemIndex* cur : remoteSystemLookup )
-    {
-        while( cur != 0 )
-        {
-            RemoteSystemIndex* next = cur->next;
-            delete cur;
-            cur = next;
-        }
-    }
-    std::vector<RemoteSystemIndex*>().swap( remoteSystemLookup );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Copies the first entry of \a view that \a matches into \a out. The caller holds the view's mutex.
@@ -3443,9 +3341,6 @@ void RakPeer::CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bo
                     remoteSystemList[index].isActive = false;
 
                     remoteSystemList[index].guid = UNASSIGNED_RAKNET_GUID;
-
-                    // Reserve this reliability layer for ourselves
-                    //remoteSystemList[ remoteSystemLookup[index].index ].systemAddress = UNASSIGNED_SYSTEM_ADDRESS;
 
                     // Clear any remaining messages
                     RakAssert( remoteSystemList[index].MTUSize <= MAXIMUM_MTU_SIZE );

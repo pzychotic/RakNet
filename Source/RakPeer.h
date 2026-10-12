@@ -35,6 +35,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -42,14 +43,6 @@ namespace RakNet {
 
 /// Forward declarations
 class PluginInterface2;
-
-// Sucks but this struct has to be outside the class.  Inside and DevCPP won't let you refer to the struct as RakPeer::RemoteSystemIndex while GCC
-// forces you to do RakPeer::RemoteSystemIndex
-struct RemoteSystemIndex
-{
-    unsigned index;
-    RemoteSystemIndex* next;
-};
 
 ///\brief Main interface for network communications.
 /// \details It implements most of RakNet's functionality and is the primary interface for RakNet.
@@ -728,7 +721,6 @@ protected:
     RemoteSystemStruct* GetRemoteSystemFromSystemAddress( const SystemAddress systemAddress, bool onlyActive ) const;
     /// Network thread only, like GetRemoteSystemFromGUID.
     RakPeer::RemoteSystemStruct* GetRemoteSystem( const AddressOrGUID systemIdentifier, bool onlyActive ) const;
-    void ValidateRemoteSystemLookup( void ) const;
     /// Network thread only.
     RemoteSystemStruct* GetRemoteSystemFromGUID( const RakNetGUID guid, bool onlyActive ) const;
     ///Parse out a connection request packet. False if the header would not parse - see
@@ -913,8 +905,8 @@ protected:
     /// Another benefit is that is lets us add and remove active players simply by setting systemAddress
     /// and moving elements in the list by copying pointers variables without affecting running threads, even if they are in the reliability layer
     ///
-    /// Sized in Startup and never resized: activeSystemList, the remoteSystemLookup chains
-    /// and reliabilityBufferBudget point into it. Mutable, since const lookups return
+    /// Sized in Startup and never resized: activeSystemList and
+    /// reliabilityBufferBudget point into it, and recordIndexByAddress indexes it. Mutable, since const lookups return
     /// records for the caller to change.
     mutable std::vector<RemoteSystemStruct> remoteSystemList;
     /// The Peer-wide byte budget over what every slot's reliability layer holds for its
@@ -927,16 +919,14 @@ protected:
     std::vector<RemoteSystemStruct*> activeSystemList;
     unsigned int activeSystemListSize;
 
-    // Use a hash, with binaryAddress plus port mod length as the index
-    // Sized in Startup and never resized.
-    std::vector<RemoteSystemIndex*> remoteSystemLookup;
-    unsigned int RemoteSystemLookupHashIndex( const SystemAddress& sa ) const;
+    /// The remoteSystemList index of the record holding each referenced address. A key is
+    /// always its record's systemAddress, so there is at most one entry per record. Reserved
+    /// in Startup for maximumNumberOfPeers entries, so inserts never rehash.
+    std::unordered_map<SystemAddress, unsigned int> recordIndexByAddress;
     void ReferenceRemoteSystem( const SystemAddress& sa, unsigned int remoteSystemListIndex );
     void DereferenceRemoteSystem( const SystemAddress& sa );
     RemoteSystemStruct* GetRemoteSystem( const SystemAddress& sa ) const;
     unsigned int GetRemoteSystemIndex( const SystemAddress& sa ) const;
-    /// Deletes every RemoteSystemIndex in remoteSystemLookup, then empties it.
-    void ClearRemoteSystemLookup( void );
 
     void AddToActiveSystemList( unsigned int remoteSystemListIndex );
     void RemoveFromActiveSystemList( const SystemAddress& sa );

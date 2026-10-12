@@ -502,6 +502,15 @@ struct std::hash<RakNet::AddressOrGUID>
 };
 
 template<>
+struct std::hash<RakNet::SystemAddress>
+{
+    std::size_t operator()( RakNet::SystemAddress const& sa ) const noexcept
+    {
+        return RakNet::SystemAddress::ToInteger( sa );
+    }
+};
+
+template<>
 struct std::hash<RakNet::RakNetGUID>
 {
     std::size_t operator()( RakNet::RakNetGUID const& guid ) const noexcept
