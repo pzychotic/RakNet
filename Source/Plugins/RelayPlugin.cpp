@@ -83,15 +83,7 @@ RelayPluginEnums RelayPlugin::AddParticipantOnServer( const std::string& key, co
 
     // If GUID is already in use, remove existing. It leaves its room first, or its copy in
     // usersInRoom keeps the room alive after the System disconnects.
-    if( auto it = guidToStrHash.find( guid ); it != guidToStrHash.end() )
-    {
-        StrAndGuidAndRoom* strAndGuid = it->second;
-        LeaveGroup( strAndGuid );
-        const auto owner = strToGuidHash.find( strAndGuid->str );
-        RakAssert( owner != strToGuidHash.end() );
-        guidToStrHash.erase( it );
-        strToGuidHash.erase( owner );
-    }
+    RemoveParticipantOnServer( guid );
 
     auto owned = std::make_unique<StrAndGuidAndRoom>();
     StrAndGuidAndRoom* strAndGuid = owned.get();
