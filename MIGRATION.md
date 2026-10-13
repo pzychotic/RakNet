@@ -1,60 +1,32 @@
 # Migrating from stock RakNet 4.081
 
-This fork modernized the core of RakNet 4.081 to C++17. Most of that is invisible to you.
-Six things are not: they will either stop your build, or — in exactly one case — change
-bytes on the wire.
+This fork modernized the core of RakNet 4.081 to C++17. This document is written for someone
+who has a working 4.081 integration and wants to move it onto this fork. It is not a
+changelog. Each entry says what stock did, what this fork does, and what to do about it.
 
-This document is written for someone who has a working 4.081 integration and wants to move
-it onto this fork. It is not a changelog. Each entry says what the API was, what it is now,
-and what to do about it.
+**The short version:** the core wire protocol is byte-identical to stock 4.081, and this
+fork interoperates with a stock 4.081 peer. The one wire-visible change by intent is
+confined to a single RPC4 error payload that stock 4.081 could not parse anyway. One
+reader-side difference, how an empty `std::string` is read back, is described under break
+3; it fixes a bug stock had, and it cannot reach the core protocol.
 
-Hardening limits sit outside that count. They break no API and stop no build, but they
-reject inputs stock accepted, so they have a section of their own at the end:
-[Limits that stock did not have](#limits-that-stock-did-not-have). One of them adds fields
-to `RakNetStatistics`, which changes that struct's layout, and another adds two pure virtual
-getters to `RakPeerInterface`, which only a class of your own implementing it would notice.
+The [breaks to the core API](#breaks-to-the-core-api) are the ones nearly every integration
+meets. [Also removed](#also-removed) lists what is simply gone. The sections after it change
+behaviour, mostly at runtime, and each says when it can also stop a build.
 
-Some plugins no longer act on a remote System's word alone. They break no build either, but
-an integration that relied on them can stop working at runtime, so they are listed in
-[Plugins that act only on Solicited or Designated messages](#plugins-that-act-only-on-solicited-or-designated-messages).
-
-If you hooked out-of-memory with `SetNotifyOutOfMemory`, it now hears about far less. See
-[Exceptions and out-of-memory](#exceptions-and-out-of-memory).
-
-`RakPeer`'s getters now answer from a snapshot, and a closed connection no longer answers
-at all. See [Getters answer only for open connections](#getters-answer-only-for-open-connections).
-
-Setting `SetUserUpdateThread`'s callback or `SetIncomingDatagramEventHandler`'s handler now
-waits for the old one to return. See
-[Replacing a callback waits for the old one](#replacing-a-callback-waits-for-the-old-one).
-
-On a little-endian host, a Timestamped Message now carries the time its sender wrote, shifted
-to your clock, where stock handed it out with its bytes reversed. Nothing on the wire changed.
-See
-[Timestamped Messages arrive shifted](#timestamped-messages-arrive-shifted).
-
-`RakAssert` now fires in every build without `NDEBUG`, not only under `_DEBUG`. It also no
-longer supplies a semicolon, so a call of your own written without one stops compiling;
-that is a build break outside the count above. See
-[`RakAssert` follows `NDEBUG`](#rakassert-follows-ndebug).
-
-**The short version:** five of the six breaks are source-only. The core wire protocol is
-byte-identical to stock 4.081, and this fork interoperates with a stock 4.081 peer. The one
-wire-visible change is confined to a single RPC4 error payload that stock 4.081 could not
-parse anyway. One further reader-side difference — how an empty `std::string` is read back
-— is described under break 3; it fixes a bug stock had, and it cannot reach the core
-protocol.
-
-| # | Break | Kind |
-|---|-------|------|
-| 1 | Everything moved into `namespace RakNet` | Source only |
-| 2 | `DataStructures::List` gone from public signatures | Source only |
-| 3 | `RakString` / `RakWString` replaced by `std::string` | Source only |
-| 4 | `BitStream` rejects raw character buffers | Source only |
-| 5 | `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed | **Wire-visible** |
-| 6 | `Connect` and `ConnectWithSocket` lost their `PublicKey*` | Source only |
-
----
+- [What did not change: the core protocol](#what-did-not-change-the-core-protocol)
+- [Breaks to the core API](#breaks-to-the-core-api)
+- [Also removed](#also-removed)
+- [`RakAssert` follows `NDEBUG`](#rakassert-follows-ndebug)
+- [Exceptions and out-of-memory](#exceptions-and-out-of-memory)
+- [Limits that stock did not have](#limits-that-stock-did-not-have)
+- [Plugins that act only on Solicited or Designated messages](#plugins-that-act-only-on-solicited-or-designated-messages)
+- [`Receive` and plugin calls must not overlap](#receive-and-plugin-calls-must-not-overlap)
+- [Getters answer only for open connections](#getters-answer-only-for-open-connections)
+- [Replacing a callback waits for the old one](#replacing-a-callback-waits-for-the-old-one)
+- [Timestamped Messages arrive shifted](#timestamped-messages-arrive-shifted)
+- [Router2 and UDPForwarder do what they promised](#router2-and-udpforwarder-do-what-they-promised)
+- [`ConnectWithSocket` refuses a host it can't resolve](#connectwithsocket-refuses-a-host-it-cant-resolve)
 
 ## What did *not* change: the core protocol
 
@@ -104,9 +76,20 @@ Core RakNet does not serialize strings on the wire at all: neither `RakPeer.cpp`
 string on the wire belongs to a plugin or to your own code. That is why breaks 3, 4 and 5
 below, which are all about strings, cannot reach the core protocol.
 
----
+## Breaks to the core API
 
-## 1. Everything moved into `namespace RakNet`
+These change the API that ordinary RakNet code calls. Every one but break 5 is source-only.
+
+| # | Break | Kind |
+|---|-------|------|
+| 1 | Everything moved into `namespace RakNet` | Source only |
+| 2 | `DataStructures::List` gone from public signatures | Source only |
+| 3 | `RakString` / `RakWString` replaced by `std::string` | Source only |
+| 4 | `BitStream` rejects raw character buffers | Source only |
+| 5 | `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed | **Wire-visible** |
+| 6 | `Connect` and `ConnectWithSocket` lost their `PublicKey*` | Source only |
+
+### 1. Everything moved into `namespace RakNet`
 
 **Source break.** Most of RakNet was already in `namespace RakNet` in stock 4.081. A
 handful of headers were not, and they are now: `MessageIdentifiers.h`, `PacketPriority.h`,
@@ -123,7 +106,7 @@ The `DataStructures` namespace is gone. Every container it held was removed or r
 already `RakNet::HuffmanEncodingTree` and now lives in `HuffmanEncodingTree.h`. No header
 keeps the `DS_` prefix.
 
-### What to do
+#### What to do
 
 Add `using namespace RakNet;` in the translation units that need it, or qualify. If you
 already had `using namespace RakNet;` — which stock's own samples did — you will not notice
@@ -133,9 +116,7 @@ Watch for one thing a `using` directive will not fix: a forward declaration of a
 type at global scope, such as `class RakPeerInterface;` or `enum PacketPriority : int;`,
 now declares a *different* type. Include the header instead.
 
----
-
-## 2. `DataStructures::List` disappeared from public signatures
+### 2. `DataStructures::List` disappeared from public signatures
 
 **Source break.** `DS_List.h` no longer exists. `DataStructures::List` was a hand-rolled
 dynamic array with `Size()`, `Insert()`, `Push()` and `operator[]`; every use of it is now
@@ -169,7 +150,7 @@ or `std::deque` members now — but those are internal. The three above are the 
 `DataStructures::List`, and their signatures are unchanged in this fork. What does reach a
 plugin is the namespace nesting in break 1 and the `std::string` substitution in break 3.
 
-### What to do
+#### What to do
 
 Change the variables you pass to `std::vector`. If you derive from `RakPeerInterface` or
 override any of these three, update the overrides too — they are pure virtual, so a missed
@@ -179,9 +160,7 @@ _FILE_AND_LINE_ )` becomes `insert( begin() + pos, x )` — the trailing `_FILE_
 arguments every mutator took for the allocation tracker have no counterpart and are simply
 dropped.
 
----
-
-## 3. `RakString` and `RakWString` are gone
+### 3. `RakString` and `RakWString` are gone
 
 **Source break. The wire encodings are unchanged**, with one reader-side caveat noted at
 the end of this section. `RakString.h` and `RakWString.h` no longer exist. Everywhere they
@@ -216,7 +195,7 @@ static std::string GetSubNetForSocketAndIp( __UDPSOCKET__ inSock,
 The `RAKSTRING_TYPE` macro in `RakNetDefines.h`, which selected `RakString` or `RakWString`
 depending on `_UNICODE`, is gone with them.
 
-### What to do
+#### What to do
 
 Replace `RakNet::RakString` with `std::string`. `C_String()` becomes `c_str()`,
 `GetLength()` becomes `size()`. For the utility methods there is no drop-in: `RakString`'s
@@ -226,7 +205,7 @@ your project already uses.
 For `RakWString`: pick an encoding — UTF-8 is the obvious one — convert at your own
 boundary, and put a `std::string` on the wire.
 
-### One behavioural difference to know about
+#### One behavioural difference to know about
 
 `BitStream::Deserialize( std::string& )` calls `AlignReadToByteBoundary()` for a
 zero-length string. `RakString::Deserialize` did not: it read the `uint16` length and, on
@@ -241,14 +220,12 @@ core RakNet never reaches the case because it never serializes strings, so this 
 affect the connection handshake or the reliability layer. It can affect a plugin or an
 application payload that writes an empty string after a bit-packed field.
 
----
-
-## 4. `BitStream` and raw character buffers
+### 4. `BitStream` and raw character buffers
 
 **Source break, not a wire break.** `Write( std::string )` emits exactly what
 `RakString::Serialize` emitted.
 
-### Before (stock 4.081)
+#### Before (stock 4.081)
 
 ```cpp
 bs.Write( "hello" );        // five non-template overloads, char*/const char*/
@@ -256,7 +233,7 @@ bs.Write( charPtr );        // unsigned char*/const unsigned char*/const wchar_t
                             // each calling RakString::Serialize - length-prefixed
 ```
 
-### After
+#### After
 
 ```cpp
 bs.Write( std::string( s ) );    // same wire format as RakString::Serialize
@@ -290,7 +267,7 @@ the read side — so a rejected `Read` does not advise writing.
 `Read( RakString& )` and `Read( RakWString& )` are gone with the types; `Read( std::string& )`
 replaces them.
 
-### The entry points that forward
+#### The entry points that forward
 
 `WriteDelta()`, `Serialize()`, `WriteCompressedDelta()`, `SerializeCompressed()`,
 `ReadDelta()` and `ReadCompressedDelta()` have no deletions of their own. They forward a raw
@@ -298,31 +275,19 @@ buffer into one of the four guarded functions, so they are compile errors throug
 `WriteDelta( charPtr, charPtr )` names the deleted `Write( char*, … )`. The only difference
 is that the diagnostic is reported inside `BitStream.h` rather than at your call site.
 
-### The hazard this replaced (only in this fork, between `42353af` and the fix in `67276b7`)
-
-For that window the two calls compiled and silently mis-encoded: `Write( "hello" )`
-deduced `templateType = char[6]` and wrote six raw bytes with no length prefix
-(byte-reversed on a big-endian target), and `Write( charPtr )` deduced
-`templateType = char*` and wrote the pointer value onto the wire. The two
-declared-but-undefined specializations meant to force a linker error were never
-reached by deduction. Anyone who built against this fork in that window, rather than
-against stock 4.081, has to re-check those call sites for produced-and-stored data.
-
-### Why deleting rather than restoring `Write( const char* )` with `std::string` semantics
+#### Why deleting rather than restoring `Write( const char* )` with `std::string` semantics
 
 Deleting forces every call site to be read. A caller who wrote `Write( p )` may have
 meant the string at `p`, in which case `Write( std::string( p ) )` is right — or the
 bytes at `p`, in which case the string form is wrong and `Write( p, length )` is the
 replacement. A restored overload would silently pick one of those for them.
 
----
-
-## 5. `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed
+### 5. `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed
 
 **Wire-visible.** This is the one place this fork's bytes differ from stock 4.081 by
 intent.
 
-### Before (stock 4.081)
+#### Before (stock 4.081)
 
 The RPC4 plugin wrote the name of the unregistered function as a raw C string with its
 terminator and no length prefix, from all three sites that produce the error — the two
@@ -345,13 +310,13 @@ So upstream could not parse its own error packet: the reader took the first two
 characters of the function name as the length and then ran off the end. There was no
 working behaviour here to be compatible with.
 
-### After
+#### After
 
 All three sites write the length-prefixed form, `BitStream::Write( std::string )` — a
 `uint16` length followed by the characters, no terminator — which is what the reader
 already expected. The reader is unchanged.
 
-### What to do about it
+#### What to do about it
 
 It is confined to the RPC4 plugin's payload; the core protocol is untouched. A peer running
 stock 4.081 and a peer running this fork will disagree on the contents of an
@@ -360,29 +325,27 @@ what is lost is a message that never worked. Code that reached into `packet->dat
 and treated it as a C string must read it with `BitStream::Read( std::string )` instead.
 `ID_RPC4_CALL` is unaffected: it used `StringCompressor` before and after.
 
----
-
-## 6. `Connect` and `ConnectWithSocket` lost their `PublicKey*`
+### 6. `Connect` and `ConnectWithSocket` lost their `PublicKey*`
 
 **Source break, not a wire break.** RakNet has no transport security
 ([ADR-0010](docs/adr/0010-raknet-has-no-transport-security.md)), so the parameter that
 carried a server's public key is gone, and every argument after it moves up one slot.
 
-### Before (stock 4.081)
+#### Before (stock 4.081)
 
 ```cpp
 peer->Connect( host, port, password, passwordLength, 0, socketIndex, 12, 500, 0 );
 peer->ConnectWithSocket( host, port, password, passwordLength, socket, 0, 12, 500, 0 );
 ```
 
-### After
+#### After
 
 ```cpp
 peer->Connect( host, port, password, passwordLength, socketIndex, 12, 500, 0 );
 peer->ConnectWithSocket( host, port, password, passwordLength, socket, 12, 500, 0 );
 ```
 
-### What to do
+#### What to do
 
 Delete the key argument. A call that passed only the first four arguments, or five with
 `ConnectWithSocket`, needs no change.
@@ -398,13 +361,11 @@ The same overloads catch a new-order call that passes an `int` literal in that s
 as `Connect( host, port, 0, 0, 0, 12, 500 )`. Write that argument unsigned (`0u`), or
 leave it out if it is the default.
 
----
-
 ## Also removed
 
-Not API breaks in the sense above — these features are simply not here. If you used one,
-this fork is not a drop-in replacement, and you will need to keep the stock implementation
-or do without.
+These features are simply not here. Code that used one stops compiling, unless its entry
+says otherwise. Where an entry names no replacement, this fork is not a drop-in for it, and
+you will need to keep the stock implementation or do without.
 
 **Plugins:** `ReplicaManager3`, `FullyConnectedMesh2`, `ConnectionGraph2`, `ReadyEvent`,
 `TeamBalancer`, `TeamManager`, `FileListTransfer`, `DirectoryDeltaTransfer`,
@@ -429,11 +390,11 @@ or do without.
 members, so `ThreadsafePacketLogger::logMessages` is no longer visible to subclasses.
 
 **`DS_ByteQueue.h`.** Gone. `TCPInterface` and `PacketizedTCP`, its only users, now buffer
-through `TCPByteBuffer` (`TCPByteBuffer.h`), so `RemoteClient::outgoingData` and `PacketizedTCP::Connection::bytes`
-have that type. Code that reached them through a subclass calls `Append`, `Size`, `Peek`,
-`Read`, `Consume` and `Contiguous` instead of `WriteBytes`, `GetBytesWritten`,
-`ReadBytes`, `IncrementReadOffset` and `PeekContiguousBytes`. `Peek` and `Read` copy all
-the bytes asked for or none, where `ReadBytes` read what there was.
+through `TCPByteBuffer` (`TCPByteBuffer.h`), so `RemoteClient::outgoingData` and
+`PacketizedTCP::Connection::bytes` have that type. Code that reached them through a subclass
+calls `Append`, `Size`, `Peek`, `Read`, `Consume` and `Contiguous` instead of `WriteBytes`,
+`GetBytesWritten`, `ReadBytes`, `IncrementReadOffset` and `PeekContiguousBytes`. `Peek` and
+`Read` copy all the bytes asked for or none, where `ReadBytes` read what there was.
 `DecrementReadOffset` and `Print` have no counterpart.
 
 **`DS_RangeList.h`.** Gone. `ReliabilityLayer`, its only user, now keeps acknowledged and
@@ -475,10 +436,6 @@ the queue first, and there is no `Allocate`, `Deallocate` or `SetPageSize`.
 `requestedCloseConnections` and `newRemoteClients` are gone. `MemoryPool` had no other
 user left, and `_DISABLE_MEMORY_POOL` is no longer read.
 
-**`DS_HuffmanEncodingTree.h`, `DS_HuffmanEncodingTreeNode.h`.** Renamed to
-`HuffmanEncodingTree.h` and `HuffmanEncodingTreeNode.h`. The class and its encoding are
-unchanged.
-
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 
@@ -499,11 +456,10 @@ every buildable configuration already did.
 compiles in 4.081, so nothing you were doing stops working.
 
 - `PREALLOCATE_LARGE_MESSAGES` selected a different strategy for reassembling split packets.
-  Its code never compiled in any RakNet release, so no build can ever have had it set to `1`.
+  Its code never compiled in any RakNet release.
 - `USE_THREADED_SEND` sent outgoing datagrams from a worker thread, and `SendToThread.h` went
-  with it. Its code stopped compiling when stock moved sends onto `RakNetSocket2`, and it
-  does not compile in 4.081. A build that still defines it now compiles and sends inline
-  from the update cycle.
+  with it. Its code stopped compiling when stock moved sends onto `RakNetSocket2`. A build
+  that still defines it now compiles and sends inline from the update cycle.
 
 **`_USE_RAK_MEMORY_OVERRIDE`.** Source-only. Replace the global `operator new`/`delete`
 instead. A build that still defines it compiles, and the `OP_NEW` templates are plain
@@ -536,15 +492,64 @@ it still compiles.
 
 The plugins that remain are `NatPunchthroughClient`/`Server`, `NatTypeDetectionClient`/
 `Server`, `Router2`, `RelayPlugin`, `UDPProxyClient`/`Coordinator`/`Server`,
-`UDPForwarder`, `RPC4Plugin`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistory`,
+`UDPForwarder`, `RPC4`, `MessageFilter`, `TwoWayAuthentication`, `StatisticsHistoryPlugin`,
 `RakNetTransport2`, `TelnetTransport`, and the `PacketLogger` family.
+
+## `RakAssert` follows `NDEBUG`
+
+Stock defined `RakAssert( x )` as `assert( x );` under `_DEBUG` and as nothing otherwise.
+MSVC's Debug configuration defines `_DEBUG`, but a CMake Debug build with GCC or Clang
+defines neither `_DEBUG` nor `NDEBUG`, so there `RakAssert` was off while every `assert`
+was on. Now the default is `assert( x )` with no condition, so it is on exactly when
+`assert` is. Three things follow:
+
+- **GCC and Clang Debug builds assert where they did not before.** A call that broke a
+  `RakAssert` precondition, such as `Send` with an out-of-range priority, ran on there and
+  now stops. MSVC builds behave as before, as does any build that defines `NDEBUG`.
+- **You can still override it.** `RakNetDefines.h` defines `RakAssert` only if it isn't
+  defined yet, after including `RakNetDefinesOverrides.h`. Define it there to route it to
+  your own handler, or to nothing to turn it off.
+- **A `RakAssert` of your own needs its semicolon.** Stock's macro supplied one, so
+  `RakAssert( x )` without a `;` compiled in a `_DEBUG` build. Now it doesn't; add the `;`.
+
+## Exceptions and out-of-memory
+
+No signature changed here, but where you hook out-of-memory did. RakNet is
+*exception-neutral* ([ADR-0004](docs/adr/0004-raknet-is-exception-neutral.md)): it builds
+with exceptions disabled, never throws or catches, and fails the same way whether your build
+has exceptions or not. Recoverable failures come back as return values. Allocation failure
+and mutex lock failure (`std::mutex`, `std::shared_mutex`) are fatal, and RakNet promises
+nothing after one.
+
+Catching an exception thrown through RakNet is unsupported, including in the mixed build
+where RakNet is compiled without exceptions and your application with them: the catch works
+but skips RakNet's destructors, so its locks stay held. To log before the process dies,
+install `std::set_new_handler`. The runtime calls it before throwing in both modes; on MSVC
+a fail-fast skips `std::set_terminate`, so that is not a reliable hook.
+
+To control RakNet's memory, replace the global `operator new`/`delete`. `SetMalloc` and
+friends redirect only the `rakMalloc` family. In stock 4.081, `SetNotifyOutOfMemory` fired
+wherever a `rakMalloc`-family call returned null and was checked, and those checks covered
+every `RakString` and `RakWString` buffer. With `_USE_RAK_MEMORY_OVERRIDE` at 1, `SetMalloc`
+also reached the `DataStructures` containers. Here those are `std::string` and standard
+containers, which fail through `std::bad_alloc` and which neither hook reaches, so
+`SetNotifyOutOfMemory` is left with packet and buffer allocations in the core. If you relied
+on it as your OOM hook, move that code into a new handler.
+
+For a `Packet`, `SetNotifyOutOfMemory` now fires only when its payload can't be allocated.
+Stock took the `Packet` struct itself from a memory pool, and a pool that could not grow
+also fired it, and `AllocatePacket` returned null. Here the struct is made with `new`, so
+failing to make it is fatal like any other allocation. `AllocatePacket` still returns null
+when the payload allocation fails.
 
 ## Limits that stock did not have
 
-Neither of these is an API break — no signature changed and nothing stops compiling. Both
-reject inputs that stock 4.081 accepted, so an integration that was moving very large
-messages should read this. Both are the *same* limit seen from its two ends, and they are
-derived from one another rather than chosen separately.
+These reject inputs that stock 4.081 accepted. They break no build, except where an entry
+below adds a pure virtual function or changes a member a subclass can see.
+
+The first two concern an integration that moves very large messages. They are the *same*
+limit seen from its two ends, and they are derived from one another rather than chosen
+separately.
 
 **A Peer will not reassemble a message split into more than 65536 chunks.** Stock read
 `splitPacketCount` off the wire with no upper bound and immediately allocated a pointer
@@ -801,45 +806,26 @@ logged in to always passed. Any System could have a proxy server forward between
 addresses of its choosing. A proxy server now opens forwarding only for a coordinator that
 answered its `LoginToCoordinator` with success. Nothing to do.
 
-## Router2 reports a route it can't make
+## `Receive` and plugin calls must not overlap
 
-**`ID_ROUTER_2_FORWARDING_NO_PATH` reaches `Receive`.** `EstablishRouting` is documented to end
-in `ID_ROUTER_2_FORWARDING_ESTABLISHED` or `ID_ROUTER_2_FORWARDING_NO_PATH`. Stock's Router2
-consumed its own `NO_PATH` before `Receive` returned it, so the source never learned that no
-router could reach the endpoint. If you guarded `EstablishRouting` with a timer of your own,
-you can drop it.
+Stock never said which threads may be inside `Receive`, or call a plugin, at the same time.
+This fork does ([ADR-0011](docs/adr/0011-plugins-are-driven-from-the-application-thread.md)).
+No signature changed.
 
-**A router waits about 3 s for the punch, not 0.3 s.** Before forwarding, the router waits for
-the source and endpoint to answer a punch through the new route, and they answer only inside
-`Receive`. Stock gave up after eight pings plus 300 ms, so on a LAN any application that went
-a third of a second without calling `Receive` lost the route. The margin is now 3 s. A route
-that really can't be made is reported that much later, and a source with several routers
-spends that much longer on a dead one before trying the next.
+- **Calls to `Receive` must not overlap.** Any thread may call it, and the next call may
+  come from a different thread, but each call returns before the next begins. A handler
+  that calls back into the Peer from inside `Receive`, as `RPC4::CallBlocking` does, is
+  fine.
+- **Call a plugin's own functions only where they cannot overlap `Receive`**, such as
+  `Router2::EstablishRouting` from the loop that polls `Receive`. Stock's `Router2` locked
+  against such a call from another thread; it no longer does.
+- **Attach and detach plugins from that same thread.** A plugin whose
+  `UsesReliabilityLayer` returns true, such as `PacketLogger`, is attached or detached only
+  while the Peer is stopped: before `Startup` or after `Shutdown`.
 
-**A Source with no Intermediary to ask hears so at once.** Stock's `EstablishRouting` returned
-without a word when the Source was connected to nobody. When a forwarded connection lost its
-last Intermediary, stock started a re-route with no one to ask and kept it forever. The
-application heard only the forwarded connection's own `ID_CONNECTION_LOST`, once it timed
-out, and `EstablishRouting` to that Endpoint was ignored from then on. Now Router2 reports
-the first with `ID_ROUTER_2_FORWARDING_NO_PATH` and the second with `ID_CONNECTION_LOST`,
-straight away. The forwarded connection still times out later and reports its own
-`ID_CONNECTION_LOST`, as it does after any re-route that fails. A later `EstablishRouting`
-to that Endpoint works.
-
-**A source asks the router with the lowest ping.** A source asks the router whose ping to
-the endpoint, multiplied by one more than the forwarding entries it already uses, is lowest,
-and the first one it listed if several tie. Stock meant to, but ordered the routers with a
-function that put a higher score first in some cases, so which router it asked depended on
-the order the pings came back in.
-
-## `ConnectWithSocket` refuses a host it can't resolve
-
-**`ConnectWithSocket` returns `CANNOT_RESOLVE_DOMAIN_NAME` when `host` doesn't resolve.**
-Stock ignored the failure, returned `CONNECTION_ATTEMPT_STARTED` and queued an attempt to an
-unassigned address, which could never connect. `Connect` already returned
-`CANNOT_RESOLVE_DOMAIN_NAME`. If you treat anything but `CONNECTION_ATTEMPT_STARTED` as
-failure, nothing to do. If you wait for a Message to learn that a `ConnectWithSocket`
-failed, check its return value too.
+A build with assertions on checks the first and the last: `Receive` asserts that no other
+thread is inside it, and `AttachPlugin` and `DetachPlugin` assert that such a plugin is not
+attached or detached while the Peer is running. A plugin's own functions are not checked.
 
 ## Getters answer only for open connections
 
@@ -857,7 +843,7 @@ to one cycle old. The identity, state, ping and clock getters have moved so far:
 answer. `Connect` and `ConnectWithSocket` take their "already connected" answer from the
 snapshot too, and the setters that change open connections queue the change for the
 network thread. `GetSockets` and `GetSocket` answer without asking the network thread.
-Six things change at runtime. One return type changed, which stops a build only in the
+What follows changes at runtime, except one return type, which stops a build only in the
 narrow cases in the last paragraph.
 
 A handler can trust the snapshot about the Message it is handling, as it could trust the
@@ -996,47 +982,52 @@ Timestamped Message that is too short to hold a Message ID is disallowed, and th
 gets `ID_TIMESTAMP`. Stock dropped short ones from every System without calling back; an
 unfiltered System's now pass through.
 
-## Exceptions and out-of-memory
+## Router2 and UDPForwarder do what they promised
 
-No signature changed here, but where you hook out-of-memory did. RakNet is
-*exception-neutral* ([ADR-0004](docs/adr/0004-raknet-is-exception-neutral.md)): it builds
-with exceptions disabled, never throws or catches, and fails the same way whether your build
-has exceptions or not. Recoverable failures come back as return values. Allocation failure
-and mutex lock failure (`std::mutex`, `std::shared_mutex`) are fatal, and RakNet promises
-nothing after one. Catching an exception thrown through RakNet is unsupported, including in
-the mixed build where RakNet is compiled without exceptions and your application with them:
-the catch works but skips RakNet's destructors, so its locks stay held. To log before the process dies, install
-`std::set_new_handler`. The runtime calls it before throwing in both modes; on MSVC a
-fail-fast skips `std::set_terminate`, so that is not a reliable hook. To control RakNet's
-memory, replace the global `operator new`/`delete`. `SetMalloc` and friends redirect only
-the `rakMalloc` family, and `_USE_RAK_MEMORY_OVERRIDE` has been removed. In
-stock 4.081, `SetNotifyOutOfMemory` fired wherever a `rakMalloc`-family call returned null
-and was checked, and those checks covered every `RakString` and `RakWString` buffer. With
-`_USE_RAK_MEMORY_OVERRIDE` at 1, `SetMalloc` also reached the `DataStructures` containers.
-Here those are `std::string` and standard containers, which fail through `std::bad_alloc`
-and which neither hook reaches, so `SetNotifyOutOfMemory` is left with packet and buffer
-allocations in the core. If you relied on it as your OOM hook, move that code into a new
-handler.
+**`ID_ROUTER_2_FORWARDING_NO_PATH` reaches `Receive`.** `EstablishRouting` is documented to end
+in `ID_ROUTER_2_FORWARDING_ESTABLISHED` or `ID_ROUTER_2_FORWARDING_NO_PATH`. Stock's Router2
+consumed its own `NO_PATH` before `Receive` returned it, so the source never learned that no
+router could reach the endpoint. If you guarded `EstablishRouting` with a timer of your own,
+you can drop it.
 
-For a `Packet`, `SetNotifyOutOfMemory` now fires only when its payload can't be allocated.
-Stock took the `Packet` struct itself from a memory pool, and a pool that could not grow
-also fired it, and `AllocatePacket` returned null. Here the struct is made with `new`, so
-failing to make it is fatal like any other allocation. `AllocatePacket` still returns null
-when the payload allocation fails.
+**A router waits about 3 s for the punch, not 0.3 s.** Before forwarding, the router waits for
+the source and endpoint to answer a punch through the new route, and they answer only inside
+`Receive`. Stock gave up after eight pings plus 300 ms, so on a LAN any application that went
+a third of a second without calling `Receive` lost the route. The margin is now 3 s. A route
+that really can't be made is reported that much later, and a source with several routers
+spends that much longer on a dead one before trying the next.
 
-## `RakAssert` follows `NDEBUG`
+**A Source with no Intermediary to ask hears so at once.** Stock's `EstablishRouting` returned
+without a word when the Source was connected to nobody. When a forwarded connection lost its
+last Intermediary, stock started a re-route with no one to ask and kept it forever. The
+application heard only the forwarded connection's own `ID_CONNECTION_LOST`, once it timed
+out, and `EstablishRouting` to that Endpoint was ignored from then on. Now Router2 reports
+the first with `ID_ROUTER_2_FORWARDING_NO_PATH` and the second with `ID_CONNECTION_LOST`,
+straight away. The forwarded connection still times out later and reports its own
+`ID_CONNECTION_LOST`, as it does after any re-route that fails. A later `EstablishRouting`
+to that Endpoint works.
 
-Stock defined `RakAssert( x )` as `assert( x );` under `_DEBUG` and as nothing otherwise.
-MSVC's Debug configuration defines `_DEBUG`, but a CMake Debug build with GCC or Clang
-defines neither `_DEBUG` nor `NDEBUG`, so there `RakAssert` was off while every `assert`
-was on. Now the default is `assert( x )` with no condition, so it is on exactly when
-`assert` is. Three things follow:
+**A source asks the router with the lowest ping.** A source asks the router whose ping to
+the endpoint, multiplied by one more than the forwarding entries it already uses, is lowest,
+and the first one it listed if several tie. Stock meant to, but ordered the routers with a
+function that put a higher score first in some cases, so which router it asked depended on
+the order the pings came back in.
 
-- **GCC and Clang Debug builds assert where they did not before.** A call that broke a
-  `RakAssert` precondition, such as `Send` with an out-of-range priority, ran on there and
-  now stops. MSVC builds behave as before, as does any build that defines `NDEBUG`.
-- **You can still override it.** `RakNetDefines.h` defines `RakAssert` only if it isn't
-  defined yet, after including `RakNetDefinesOverrides.h`. Define it there to route it to
-  your own handler, or to nothing to turn it off.
-- **A `RakAssert` of your own needs its semicolon.** Stock's macro supplied one, so
-  `RakAssert( x )` without a `;` compiled in a `_DEBUG` build. Now it doesn't; add the `;`.
+**`UDPForwarder` holds at most the limit it is given.** Stock opened one forwarding entry past
+`SetMaxForwardEntries`, so a limit of N held N + 1 pairs. Now it holds N, for `Router2` and
+`UDPProxyServer` alike. A pair already forwarded is still found at the limit, so asking for it
+again returns `UDPFORWARDER_FORWARDING_ALREADY_EXISTS` with its port. `SetMaxForwardEntries`
+takes an `int` instead of an `unsigned short`, and lowering it closes nothing.
+
+**`Router2::SetMaximumForwardingRequests` above 64 takes effect.** Stock never passed the cap
+on to its `UDPForwarder`, so past the forwarder's default of 64 (65 pairs, as above) a router
+refused new pairs whatever cap you had set. Now every positive cap also sizes the forwarder.
+
+## `ConnectWithSocket` refuses a host it can't resolve
+
+**`ConnectWithSocket` returns `CANNOT_RESOLVE_DOMAIN_NAME` when `host` doesn't resolve.**
+Stock ignored the failure, returned `CONNECTION_ATTEMPT_STARTED` and queued an attempt to an
+unassigned address, which could never connect. `Connect` already returned
+`CANNOT_RESOLVE_DOMAIN_NAME`. If you treat anything but `CONNECTION_ATTEMPT_STARTED` as
+failure, nothing to do. If you wait for a Message to learn that a `ConnectWithSocket`
+failed, check its return value too.
