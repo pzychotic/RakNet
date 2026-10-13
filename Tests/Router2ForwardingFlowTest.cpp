@@ -157,6 +157,48 @@ RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRo
     return ConnectThroughRoute( peers, source, endpoint );
 }
 
+// Router2's internal sub-identifiers for a forwarding query and its reply.
+constexpr unsigned char kQueryForwarding = 0;
+constexpr unsigned char kReplyForwarding = 1;
+
+struct ForwardingReply
+{
+    bool canForward = false;
+    unsigned short forwardedPairs = 0;
+};
+
+// Sends router a forwarding query for endpoint from prober, a peer with no Router2 attached,
+// and reads the reply.
+ForwardingReply QueryForwarding( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* prober, RakPeerInterface* router, RakPeerInterface* endpoint )
+{
+    BitStream query;
+    query.Write( (MessageID)ID_ROUTER_2_INTERNAL );
+    query.Write( kQueryForwarding );
+    query.Write( endpoint->GetMyGUID() );
+    prober->Send( &query, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, router->GetMyGUID(), false );
+
+    const Received received = PumpUntil( peers, [prober]( const Received& each ) {
+        return each.peer == prober && each.id == ID_ROUTER_2_INTERNAL && each.data.size() > 1 && each.data[1] == kReplyForwarding;
+    } );
+    REQUIRE( received.peer == prober );
+
+    std::vector<unsigned char> data = received.data;
+    BitStream bs( data.data(), (unsigned int)data.size(), false );
+    bs.IgnoreBytes( sizeof( MessageID ) + sizeof( unsigned char ) );
+    RakNetGUID endpointGuid;
+    ForwardingReply reply;
+    REQUIRE( bs.Read( endpointGuid ) );
+    CHECK( endpointGuid == endpoint->GetMyGUID() );
+    REQUIRE( bs.Read( reply.canForward ) );
+    if( reply.canForward )
+    {
+        unsigned short pingToEndpoint = 0;
+        REQUIRE( bs.Read( pingToEndpoint ) );
+        REQUIRE( bs.Read( reply.forwardedPairs ) );
+    }
+    return reply;
+}
+
 // Whether EstablishRouting from peer would treat other as not connected.
 bool IsClosedTo( RakPeerInterface* peer, RakPeerInterface* other )
 {
@@ -485,13 +527,46 @@ TEST_CASE( "Router2 routes again to an endpoint whose re-route found no Intermed
     endpoint->DetachPlugin( &endpointPlugin );
 }
 
+// The prober asks about a second endpoint, so its pair is not the one forwarded.
+TEST_CASE( "Router2 forwards no more pairs than its forwarding cap", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 1 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    RakPeerInterface* secondEndpoint = scope.Server( kSecondEndpointPort, 4 );
+    RakPeerInterface* prober = scope.Server( kStrayPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint, secondEndpoint, prober };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    Connect( peers, secondEndpoint, kRouterPort );
+    Connect( peers, prober, kRouterPort );
+
+    CHECK( QueryForwarding( peers, prober, router, secondEndpoint ).canForward );
+    REQUIRE( Route( peers, sourcePlugin, source, endpoint ) == router->GetMyGUID() );
+    CHECK_FALSE( QueryForwarding( peers, prober, router, secondEndpoint ).canForward );
+
+    routerPlugin.SetMaximumForwardingRequests( 2 );
+    const ForwardingReply reply = QueryForwarding( peers, prober, router, secondEndpoint );
+    CHECK( reply.canForward );
+    CHECK( reply.forwardedPairs == 1 );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
 // A reply from a system the request never asked is dropped with the source's Router2 locks
 // released. A lock held past it would hang the source's next Update.
 TEST_CASE( "Router2 routes after a forwarding reply from a system it did not ask", "[router2][network]" )
 {
-    // Router2's internal sub-identifier for a reply to a forwarding query.
-    constexpr unsigned char kReplyForwarding = 1;
-
     Router2 routerPlugin, sourcePlugin, endpointPlugin, secondEndpointPlugin;
     routerPlugin.SetMaximumForwardingRequests( 4 );
 

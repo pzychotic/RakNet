@@ -715,8 +715,8 @@ void Router2::SendFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endp
 
 int Router2::ReturnFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid )
 {
-    // If the number of systems we are currently forwarding>=maxForwarding, return ID_ROUTER_2_REPLY_FORWARDING,endpointGuid,false
-    if( udpForwarder == nullptr || udpForwarder->GetUsedForwardEntries() / 2 > maximumForwardingRequests )
+    // At the forwarding cap, return ID_ROUTER_2_REPLY_FORWARDING,endpointGuid,false
+    if( udpForwarder == nullptr || udpForwarder->GetUsedForwardEntries() >= maximumForwardingRequests )
     {
         if( debugInterface )
             debugInterface->ShowFailure( RakNet::format( "Router2 failed (%" PRIu64 " -> %" PRIu64 ") at %s:%i\n",
@@ -787,7 +787,7 @@ void Router2::OnQueryForwarding( Packet* packet )
     bsOut.Write( endpointGuid );
     bsOut.Write( true );
     bsOut.Write( (unsigned short)pingToEndpoint );
-    bsOut.Write( (unsigned short)udpForwarder->GetUsedForwardEntries() / 2 );
+    bsOut.Write( (unsigned short)udpForwarder->GetUsedForwardEntries() );
     rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->guid, false );
 
     if( debugInterface )

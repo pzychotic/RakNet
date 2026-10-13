@@ -90,8 +90,9 @@ public:
     /// When the address changes, you will get ID_ROUTER_2_REROUTED
     void EstablishRouting( RakNetGUID endpointGuid );
 
-    /// Set the maximum number of bidirectional connections this system will support
-    /// Defaults to 0
+    /// Set the forwarding cap: the most Source/Endpoint pairs this system holds a forwarding
+    /// port for at once. A pair's port stays open a while after its connection closes.
+    /// Defaults to 0, which turns forwarding off
     void SetMaximumForwardingRequests( int max );
 
     /// \brief Designates the System connected at \a systemAddress as a router this Peer, as an endpoint, accepts ID_ROUTER_2_REROUTED from.
