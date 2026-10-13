@@ -4,14 +4,15 @@ Status: accepted.
 
 RakPeer runs two threads: the network thread, which runs `RunUpdateCycle`, and the user's
 thread, which calls `Receive`, the getters and the setters. Plugins run on the user's thread,
-inside `Receive`. Upstream never stated which of these threads may touch the connection
-records. Its code assumed both could: the lookups take a `calledFromNetworkThread` flag, and
-the user-thread branch skips the hash chain and scans the array linearly, under the comment
-"remoteSystemList in user and network thread". That made the reads *stale-but-safe* in
-intent, but not in fact. No mutex guards the connection records, so every user-thread read
-is a data race. A getter can see a connection record half built, with `isActive` already set
-while the previous connection's `connectMode`, RakNetGUID or socket is still in place, and it
-can tear the ping and statistics fields the network thread writes on every datagram.
+inside `Receive` (ADR-0011 says which threads may enter them). Upstream never stated which
+of these threads may touch the connection records. Its code assumed both could: the lookups
+take a `calledFromNetworkThread` flag, and the user-thread branch skips the hash chain and
+scans the array linearly, under the comment "remoteSystemList in user and network thread".
+That made the reads *stale-but-safe* in intent, but not in fact. No mutex guards the
+connection records, so every user-thread read is a data race. A getter can see a connection
+record half built, with `isActive` already set while the previous connection's
+`connectMode`, RakNetGUID or socket is still in place, and it can tear the ping and
+statistics fields the network thread writes on every datagram.
 
 **Decision.**
 

@@ -494,13 +494,13 @@ public:
 
     // -------------------------------------------------------------------------------------------- Plugin Functions--------------------------------------------------------------------------------------------
     /// \brief Attaches a Plugin interface to an instance of the base class (RakPeer or PacketizedTCP) to run code automatically on message receipt in the Receive call.
-    /// If the plugin returns false from PluginInterface::UsesReliabilityLayer(), which is the case for all plugins except PacketLogger, you can call AttachPlugin() and DetachPlugin() for this plugin while RakPeer is active.
+    /// \note Must not overlap Receive(). A plugin whose UsesReliabilityLayer() returns true, such as PacketLogger, is attached only while the Peer is stopped; any other plugin may be attached while it runs. See Threading on RakPeerInterface.
     /// \param[in] messageHandler Pointer to the plugin to attach.
     void AttachPlugin( PluginInterface2* plugin );
 
     /// \brief Detaches a Plugin interface from the instance of the base class (RakPeer or PacketizedTCP) it is attached to.
     /// \details This method disables the plugin code from running automatically on base class's updates or message receipt.
-    /// If the plugin returns false from PluginInterface::UsesReliabilityLayer(), which is the case for all plugins except PacketLogger, you can call AttachPlugin() and DetachPlugin() for this plugin while RakPeer is active.
+    /// \note Must not overlap Receive(). A plugin whose UsesReliabilityLayer() returns true, such as PacketLogger, is detached only while the Peer is stopped; any other plugin may be detached while it runs. See Threading on RakPeerInterface.
     /// \param[in] messageHandler Pointer to a plugin to detach.
     void DetachPlugin( PluginInterface2* messageHandler );
 

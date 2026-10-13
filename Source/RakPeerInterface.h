@@ -34,8 +34,8 @@ struct RakNetStatistics;
 ///
 /// \par Threading
 /// A Peer runs a network thread of its own, which does the sending, receiving and
-/// connection handling; plugins run on your thread, inside Receive(). What that means for
-/// calls made from your thread (ADR-0007):
+/// connection handling; plugins run on your thread, inside Receive(), except as set out
+/// below. What that means for calls made from your thread (ADR-0007):
 /// - You may call any getter from any thread. Each answer is a snapshot taken by the
 ///   network thread, and may be up to one update cycle old. It can describe a connection
 ///   that closes right after the call returns.
@@ -51,6 +51,18 @@ struct RakNetStatistics;
 ///   appear: a closed connection can go straight to IS_NOT_CONNECTED.
 /// - Startup() and Shutdown() must not overlap any other call on this Peer, from any
 ///   thread.
+///
+/// Plugins are driven from your thread (ADR-0011):
+/// - Calls to Receive() must not overlap. Any thread may make the next one, once the last
+///   has returned.
+/// - Calls to a plugin's own functions, and AttachPlugin() and DetachPlugin(), must not
+///   overlap Receive() or each other. A plugin locks nothing to keep them apart.
+/// - A plugin callback may call back into the Peer or a plugin on the same thread, and so
+///   reach plugins again before it returns.
+/// - A plugin whose UsesReliabilityLayer() returns true, such as PacketLogger, also gets the
+///   socket and reliability-layer callbacks on the network thread, at the same time, and
+///   locks what the two share. It is attached and detached only while the Peer is stopped.
+/// - A plugin that starts threads of its own locks what they share with your thread.
 ///
 /// That is the contract. Some getters still read the connection records directly, and are
 /// being moved onto the network thread's snapshot.
@@ -500,13 +512,13 @@ public:
 
     // -------------------------------------------------------------------------------------------- Plugin Functions--------------------------------------------------------------------------------------------
     /// \brief Attaches a Plugin interface to an instance of the base class (RakPeer or PacketizedTCP) to run code automatically on message receipt in the Receive call.
-    /// If the plugin returns false from PluginInterface::UsesReliabilityLayer(), which is the case for all plugins except PacketLogger, you can call AttachPlugin() and DetachPlugin() for this plugin while RakPeer is active.
+    /// \note Must not overlap Receive(). A plugin whose UsesReliabilityLayer() returns true, such as PacketLogger, is attached only while the Peer is stopped; any other plugin may be attached while it runs. See Threading on RakPeerInterface.
     /// \param[in] messageHandler Pointer to the plugin to attach.
     virtual void AttachPlugin( PluginInterface2* plugin ) = 0;
 
     /// \brief Detaches a Plugin interface from the instance of the base class (RakPeer or PacketizedTCP) it is attached to.
     /// \details This method disables the plugin code from running automatically on base class's updates or message receipt.
-    /// If the plugin returns false from PluginInterface::UsesReliabilityLayer(), which is the case for all plugins except PacketLogger, you can call AttachPlugin() and DetachPlugin() for this plugin while RakPeer is active.
+    /// \note Must not overlap Receive(). A plugin whose UsesReliabilityLayer() returns true, such as PacketLogger, is detached only while the Peer is stopped; any other plugin may be detached while it runs. See Threading on RakPeerInterface.
     /// \param[in] messageHandler Pointer to a plugin to detach.
     virtual void DetachPlugin( PluginInterface2* messageHandler ) = 0;
 

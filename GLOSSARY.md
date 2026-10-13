@@ -53,6 +53,12 @@ publishing a new view. A Peer runs one after another, on its own thread or when 
 application calls for one.
 _Avoid_: Tick, frame, update (unqualified)
 
+**Application thread**:
+The thread the application receives Messages and drives plugins from. It can be a
+different thread from one call to the next, but those calls never overlap. The Peer's own
+update cycles, and any thread a plugin starts for itself, are never the application thread.
+_Avoid_: User thread, main thread, game thread
+
 **Published view**:
 The snapshot a Peer makes at the end of each update cycle of every open connection record,
 and of what the Peer has learned about itself from them, such as its external address.
