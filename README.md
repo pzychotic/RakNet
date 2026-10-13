@@ -3,14 +3,15 @@ pzychotic's fork of RakNet 4.081
 
 This fork builds on Larku's fork of RakNet 4.081. The sections up to
 [Larku's fork notes](#larkus-fork-notes-updated-27-july-2015) describe what this fork changes.
+Everything from there on is the upstream README, kept as history.
 
 Upgrading from stock 4.081
 ------------------------------------------
 
-The core has since been modernized to C++17, which broke the public API in five ways. See
+This fork modernized the core to C++17, which breaks the public API. See
 [MIGRATION.md](MIGRATION.md) for what changed and what to do about it, including which
-changes are source-only (four of the five) and which are visible on the wire (one). The core
-wire protocol is unchanged, and this fork still interoperates with a stock 4.081 peer.
+changes are visible on the wire. The core wire protocol is unchanged, and this fork still
+interoperates with a stock 4.081 peer.
 
 Security fixes
 ------------------------------------------
@@ -29,17 +30,28 @@ affected and what an attacker could do.
 Continuous integration
 ------------------------------------------
 
-`.github/workflows/ci.yml` builds the library and the test suite on every push and pull
-request with MSVC on Windows and GCC on Linux, both with and without `RAKNET_SUPPORT_IPV6`,
-and runs the suite in each configuration. Separate jobs build and test
-`FLIP_SEND_ORDER_TEST` and `RAKPEER_USER_THREADED`, and build `Source/` with exceptions
-disabled.
+`.github/workflows/ci.yml` runs on every push and pull request. It builds the library and the
+test suite with MSVC on Windows and GCC on Linux, both with and without
+`RAKNET_SUPPORT_IPV6`, and runs the suite in each configuration. Further jobs:
+
+- lint `Source/` for the APIs that ADR-0004 bans;
+- run the suite built with `FLIP_SEND_ORDER_TEST`;
+- run the tests that pump their own update cycles under `RAKPEER_USER_THREADED`;
+- run the suite under ThreadSanitizer and under AddressSanitizer with clang on Linux;
+- build `Source/` with exceptions disabled, with GCC and with MSVC.
+
+The comments in `ci.yml` say what each job leaves out and why.
 
 A green run does not mean the suite is deterministic. The tests drive real sockets and
 threads, so a passing run is evidence, not proof.
 
 Larku's fork notes [updated 27-July-2015]
 ------------------------------------------
+
+> **Historical.** This section and everything below it is the upstream README, unchanged.
+> It describes RakNet 4.081 as Oculus VR and Larku shipped it, not this fork. Many of the
+> directories, samples, plugins, build files and platforms it names are gone. To build this
+> fork, use the `CMakeLists.txt` at the repository root.
 
 Copyright (c) 2014, Oculus VR, Inc.
 
