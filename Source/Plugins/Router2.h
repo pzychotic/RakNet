@@ -23,10 +23,8 @@
 #include "UDPForwarder.h"
 #include "MessageIdentifiers.h"
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <vector>
 
 namespace RakNet {
@@ -159,7 +157,6 @@ public:
         ~ConnnectRequest();
 
         std::vector<ConnectionRequestSystem> connectionRequestSystems;
-        std::mutex connectionRequestSystemsMutex;
         Router2RequestStates requestState;
         RakNet::TimeMS pingTimeout;
         RakNetGUID endpointGuid;
@@ -214,18 +211,13 @@ protected:
 
     std::unique_ptr<UDPForwarder> udpForwarder;
     int maximumForwardingRequests;
-    // Lock order: connectionRequestsMutex, then forwardedConnectionListMutex. A request's
-    // connectionRequestSystemsMutex is taken only under connectionRequestsMutex, and no other
-    // mutex is taken while it is held.
-    std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
     std::vector<std::unique_ptr<ConnnectRequest>> connectionRequests;
     std::vector<MiniPunchRequest> miniPunchesInProgress;
     // Forwarding we have initiated, and forwarding a Designated intermediary announced to us as endpoint
     std::vector<ForwardedConnection> forwardedConnectionList;
-    // Guarded by forwardedConnectionListMutex
     std::vector<SystemAddress> intermediaries;
-    std::atomic<unsigned int> maxPendingForwardsPerIntermediary;
-    std::atomic<uint64_t> pendingForwardsRefused;
+    unsigned int maxPendingForwardsPerIntermediary;
+    uint64_t pendingForwardsRefused;
 
     void ClearConnectionRequests( void );
     void ClearMinipunches( void );

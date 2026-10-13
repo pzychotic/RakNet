@@ -305,8 +305,8 @@ TEST_CASE( "Router2 tells the source when no router can reach the endpoint", "[r
     endpoint->DetachPlugin( &endpointPlugin );
 }
 
-// Under TSAN this checks that the source takes its Router2 locks in one order: finding no
-// route, and restarting a forwarded connection whose router went, nest the same two.
+// Finding no route, and restarting a forwarded connection whose router went, both leave the
+// source able to route again.
 TEST_CASE( "Router2 routes after finding no route and loses the route with its router", "[router2][network]" )
 {
     Router2 routerPlugin, sourcePlugin, endpointPlugin;
@@ -708,8 +708,8 @@ TEST_CASE( "Router2 frees the forwarded pair of a punch whose endpoint disconnec
     secondEndpoint->DetachPlugin( &secondEndpointPlugin );
 }
 
-// A reply from a system the request never asked is dropped with the source's Router2 locks
-// released. A lock held past it would hang the source's next Update.
+// A reply from a system the request never asked is dropped, and the request goes on to
+// route through the system it did ask.
 TEST_CASE( "Router2 routes after a forwarding reply from a system it did not ask", "[router2][network]" )
 {
     Router2 routerPlugin, sourcePlugin, endpointPlugin, secondEndpointPlugin;

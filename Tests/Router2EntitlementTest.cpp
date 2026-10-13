@@ -62,13 +62,11 @@ public:
         request->endpointGuid = endpointGuid;
         request->lastRequestedForwardingSystem = router;
         request->returnConnectionLostOnFailure = false;
-        std::lock_guard<std::mutex> guard( connectionRequestsMutex );
         connectionRequests.push_back( std::move( request ) );
     }
 
     bool HasRequest( RakNetGUID endpointGuid )
     {
-        std::lock_guard<std::mutex> guard( connectionRequestsMutex );
         return GetConnectionRequestIndex( endpointGuid ) != ~0u;
     }
 
@@ -81,13 +79,11 @@ public:
         fc.intermediaryAddress = intermediaryAddress;
         fc.returnConnectionLostOnFailure = false;
         fc.weInitiatedForwarding = true;
-        std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
         forwardedConnectionList.push_back( fc );
     }
 
     size_t ForwardedCount()
     {
-        std::lock_guard<std::mutex> guard( forwardedConnectionListMutex );
         return forwardedConnectionList.size();
     }
 };
