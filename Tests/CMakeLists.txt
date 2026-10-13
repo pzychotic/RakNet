@@ -136,6 +136,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/TruncatedConnectionRequestTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TwoWayAuthenticationClosedConnectionTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TwoWayAuthenticationNonceTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UDPForwarderTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyClientEntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyClientForwardingFlowTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorEntitlementTest.cpp

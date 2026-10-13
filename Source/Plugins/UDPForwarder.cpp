@@ -144,7 +144,7 @@ UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAd
         {
             if( (*it).inputId == inputId )
             {
-                if( (*it).result == UDPFORWARDER_SUCCESS )
+                if( ( *it ).result == UDPFORWARDER_SUCCESS || ( *it ).result == UDPFORWARDER_FORWARDING_ALREADY_EXISTS )
                 {
                     if( forwardingPort )
                         *forwardingPort = (*it).forwardingPort;

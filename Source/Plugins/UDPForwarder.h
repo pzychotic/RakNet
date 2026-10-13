@@ -78,8 +78,8 @@ public:
     /// \param[in] timeoutOnNoDataMS If no messages are forwarded for this many MS, then automatically remove this entry.
     /// \param[in] forceHostAddress Force binding on a particular address. 0 to use any.
     /// \param[in] socketFamily IP version: For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
-    /// \param[out] forwardingPort New opened port for forwarding
-    /// \param[out] forwardingSocket New opened socket for forwarding
+    /// \param[out] forwardingPort New opened port for forwarding, or the existing entry's port on UDPFORWARDER_FORWARDING_ALREADY_EXISTS
+    /// \param[out] forwardingSocket New opened socket for forwarding, or the existing entry's socket on UDPFORWARDER_FORWARDING_ALREADY_EXISTS
     /// \return UDPForwarderResult
     UDPForwarderResult StartForwarding(
         SystemAddress source, SystemAddress destination, RakNet::TimeMS timeoutOnNoDataMS,
