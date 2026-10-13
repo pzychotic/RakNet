@@ -20,6 +20,8 @@
 #include "Plugins/PacketLogger.h"
 #include <stdio.h>
 
+#include <mutex>
+
 namespace RakNet {
 
 /// \ingroup PACKETLOGGER_GROUP
@@ -29,10 +31,15 @@ class RAK_DLL_EXPORT PacketFileLogger : public PacketLogger
 public:
     PacketFileLogger();
     virtual ~PacketFileLogger();
+    /// Opens filenamePrefix_<time>.csv, or PacketLog_<time>.csv if filenamePrefix is null,
+    /// writes the header to it, and logs to it from then on. Closes the file already open.
+    /// \note May be called while the Peer runs.
     void StartLog( const char* filenamePrefix );
     virtual void WriteLog( const char* str );
 
 protected:
+    // Guards packetLogFile.
+    std::mutex packetLogFileMutex;
     FILE* packetLogFile;
 };
 

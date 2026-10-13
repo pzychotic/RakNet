@@ -102,10 +102,14 @@ void PacketLogger::OnDirectSocketSend( const char* data, const BitSize_t bitsUse
     AddToLog( str );
 }
 
-void PacketLogger::LogHeader( void )
+const char* PacketLogger::HeaderLine( void )
 {
     // Last 5 are splitpacket id, split packet index, split packet count, ordering index, suffix
-    AddToLog( "Clock,S|R,Typ,Reliable#,Frm #,PktID,BitLn,Time     ,Local IP:Port   ,RemoteIP:Port,SPID,SPIN,SPCO,OI,Suffix,Miscellaneous\n" );
+    return "Clock,S|R,Typ,Reliable#,Frm #,PktID,BitLn,Time     ,Local IP:Port   ,RemoteIP:Port,SPID,SPIN,SPCO,OI,Suffix,Miscellaneous\n";
+}
+void PacketLogger::LogHeader( void )
+{
+    AddToLog( HeaderLine() );
 }
 void PacketLogger::OnDirectSocketReceive( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress )
 {
@@ -371,8 +375,8 @@ const char* PacketLogger::BaseIDTOString( unsigned char Id )
 }
 const char* PacketLogger::UserIDTOString( unsigned char Id )
 {
-    // Users should override this
-    static char str[256];
+    // Per thread, because the network thread and the application thread format at once.
+    thread_local char str[256];
     auto res = std::to_chars( str, str + 255, Id );
     RakAssert( res.ec == std::errc() );
     *res.ptr = '\0';
@@ -406,7 +410,7 @@ void PacketLogger::GetLocalTime( char buffer[128] )
     auto time_now = system_clock::to_time_t( clock_now );
     auto duration = clock_now.time_since_epoch();
 
-    // The network thread and the user thread both log, and std::localtime shares one buffer.
+    // The network thread and the application thread both log, and std::localtime shares one buffer.
     std::tm local_time{};
 #if defined( _WIN32 )
     localtime_s( &local_time, &time_now );

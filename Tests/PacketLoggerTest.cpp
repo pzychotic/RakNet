@@ -1,7 +1,9 @@
+#include "Plugins/PacketFileLogger.h"
 #include "Plugins/PacketLogger.h"
 #include "Plugins/ThreadsafePacketLogger.h"
 
 #include "ConnectionWaits.h"
+#include "GetTime.h"
 #include "InternalPacket.h"
 #include "MessageIdentifiers.h"
 #include "PeerScope.h"
@@ -10,6 +12,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -305,7 +309,7 @@ std::vector<std::string> FieldsOfRawLine( const std::string& line )
 
 } // namespace
 
-TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thread and the user thread at once", "[packetlogger][network]" )
+TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thread and the application thread at once", "[packetlogger][network]" )
 {
     constexpr int kPings = 2000;
 
@@ -375,9 +379,9 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
 
 /*
 PacketLogger's setters called while the network thread logs. The test thread alternates
-SetPrefix between two strings and toggles SetLogDirectMessages, while a second peer's
-offline pings make the network thread log raw lines. Every line's prefix must be exactly
-one of the two strings.
+SetPrefix between two strings and toggles SetLogDirectMessages, SetPrintID and
+SetPrintAcks, while a second peer's offline pings make the network thread log raw lines.
+Every line's prefix must be exactly one of the two strings.
 */
 
 namespace {
@@ -427,6 +431,8 @@ TEST_CASE( "PacketLogger's setters may be called while the network thread logs",
         logger.SetPrefix( ( i % 2 == 0 ? longPrefix : shortPrefix ).c_str() );
         logger.SetLogDirectMessages( false );
         logger.SetLogDirectMessages( true );
+        logger.SetPrintID( i % 2 == 0 );
+        logger.SetPrintAcks( i % 2 == 0 );
     }
 
     // Stops the network thread, so no line is written while they are checked.
@@ -446,6 +452,209 @@ TEST_CASE( "PacketLogger's setters may be called while the network thread logs",
         const std::string prefix = line.substr( prefixStart + 1, prefixEnd - prefixStart - 1 );
         CHECK( ( prefix == longPrefix || prefix == shortPrefix ) );
     }
+}
+
+/*
+PacketLogger::UserIDTOString reached from two threads at once. A connected client sends
+Messages with a user ID, so the network thread logs each one it receives through
+UserIDTOString. Meanwhile the test thread formats lines with a different user ID through
+the public FormatLine. Each line must carry its own ID.
+*/
+
+namespace {
+
+// Count of logger's lines whose ID field is id.
+size_t CountLinesWithID( LockedCapturingPacketLogger& logger, const std::string& id )
+{
+    std::lock_guard<std::mutex> lock( logger.linesMutex );
+    size_t count = 0;
+    for( const std::string& line : logger.lines )
+    {
+        const std::vector<std::string> fields = FieldsOfRawLine( line );
+        if( fields.size() > 4 && fields[4] == id )
+            ++count;
+    }
+    return count;
+}
+
+} // namespace
+
+TEST_CASE( "PacketLogger formats a user ID on the application thread while the network thread logs one", "[packetlogger][network]" )
+{
+    constexpr size_t kLines = 500;
+    constexpr unsigned char kNetworkID = ID_USER_PACKET_ENUM;
+    constexpr unsigned char kApplicationID = 250;
+
+    LockedCapturingPacketLogger logger;
+    logger.SetLogDirectMessages( false );
+    PeerScope peers;
+    // Attached before Startup, because the network thread walks the plugin list unlocked.
+    RakPeerInterface* logged = peers.Create();
+    logged->AttachPlugin( &logger );
+    SocketDescriptor socketDescriptor( 0, nullptr );
+    REQUIRE( logged->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
+    logged->SetMaximumIncomingConnections( 1 );
+    RakPeerInterface* sender = peers.Client();
+    ConnectionWaits::ConnectAndWait( sender, logged );
+
+    const std::string networkID = std::to_string( kNetworkID );
+    const std::string applicationID = std::to_string( kApplicationID );
+    const char message[] = { static_cast<char>( kNetworkID ), 'x' };
+    size_t formatted = 0;
+    size_t misformatted = 0;
+    for( int i = 0; i < 100000 && CountLinesWithID( logger, networkID ) < kLines; ++i )
+    {
+        sender->Send( message, sizeof( message ), HIGH_PRIORITY, RELIABLE, 0, logged->GetMyGUID(), false );
+        for( int j = 0; j < 10; ++j )
+        {
+            char line[1024];
+            logger.FormatLine( line, "Snd", "Raw", 0, 0, kApplicationID, 0, 0, UNASSIGNED_SYSTEM_ADDRESS, UNASSIGNED_SYSTEM_ADDRESS, 0, 0, 0, 0 );
+            const std::vector<std::string> fields = FieldsOfRawLine( line );
+            ++formatted;
+            if( fields.size() <= 4 || fields[4] != applicationID )
+                ++misformatted;
+        }
+        ConnectionWaits::Drain( logged );
+        ConnectionWaits::Drain( sender );
+    }
+
+    // Stops the network thread, so no line is written while they are checked.
+    logged->Shutdown( 0 );
+    logged->DetachPlugin( &logger );
+
+    CHECK( CountLinesWithID( logger, networkID ) >= kLines );
+    CHECK( formatted > 0 );
+    CHECK( misformatted == 0 );
+}
+
+/*
+PacketFileLogger::StartLog called while the network thread logs. A second peer's offline
+pings make the network thread write raw lines, while the test thread starts one log and
+then a second. Once the logger is destroyed, each file begins with the header, and the
+second holds raw lines.
+*/
+
+namespace {
+
+class CountingPacketFileLogger : public PacketFileLogger
+{
+public:
+    void WriteLog( const char* str ) override
+    {
+        PacketFileLogger::WriteLog( str );
+        ++linesLogged;
+    }
+
+    std::atomic<size_t> linesLogged{ 0 };
+};
+
+std::vector<std::string> ReadLines( const std::filesystem::path& path )
+{
+    std::vector<std::string> lines;
+    std::ifstream in( path );
+    std::string line;
+    while( std::getline( in, line ) )
+        lines.push_back( line );
+    return lines;
+}
+
+// The one file in directory whose name starts with stem.
+std::filesystem::path FileStartingWith( const std::filesystem::path& directory, const std::string& stem )
+{
+    std::filesystem::path found;
+    for( const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator( directory ) )
+    {
+        if( entry.path().filename().string().rfind( stem, 0 ) == 0 )
+        {
+            CHECK( found.empty() );
+            found = entry.path();
+        }
+    }
+    return found;
+}
+
+// Removes every file in directory whose name starts with stem, on destruction, so a
+// failed REQUIRE leaves none behind.
+struct FilesRemover
+{
+    std::filesystem::path directory;
+    std::string stem;
+
+    ~FilesRemover()
+    {
+        std::error_code ignored;
+        std::vector<std::filesystem::path> matches;
+        for( const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator( directory, ignored ) )
+        {
+            if( entry.path().filename().string().rfind( stem, 0 ) == 0 )
+                matches.push_back( entry.path() );
+        }
+        for( const std::filesystem::path& path : matches )
+            std::filesystem::remove( path, ignored );
+    }
+};
+
+} // namespace
+
+TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread logs", "[packetlogger][network]" )
+{
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::string stem = "PacketFileLoggerTest_" + std::to_string( RakNet::GetTimeUS() );
+    const std::string firstPrefix = ( directory / ( stem + "_first" ) ).string();
+    const std::string secondPrefix = ( directory / ( stem + "_second" ) ).string();
+    // Declared before the logger, so its files are closed by the time they are removed.
+    const FilesRemover remover{ directory, stem };
+
+    {
+        CountingPacketFileLogger logger;
+        PeerScope peers;
+        // Attached before Startup, because the network thread walks the plugin list unlocked.
+        RakPeerInterface* logged = peers.Create();
+        logged->AttachPlugin( &logger );
+        SocketDescriptor socketDescriptor( 0, nullptr );
+        REQUIRE( logged->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
+        RakPeerInterface* pinger = peers.Client();
+        const unsigned short loggedPort = logged->GetMyBoundAddress().GetPort();
+
+        // Pings until the network thread has logged count more lines.
+        const auto pingUntilLogged = [&]( size_t count ) {
+            const size_t target = logger.linesLogged + count;
+            for( int i = 0; i < 10000 && logger.linesLogged < target; ++i )
+            {
+                pinger->Ping( "127.0.0.1", loggedPort, false );
+                ConnectionWaits::Drain( pinger );
+                std::this_thread::yield();
+            }
+            REQUIRE( logger.linesLogged >= target );
+        };
+
+        pingUntilLogged( 20 );
+        logger.StartLog( firstPrefix.c_str() );
+        pingUntilLogged( 20 );
+        logger.StartLog( secondPrefix.c_str() );
+        pingUntilLogged( 20 );
+        logged->Shutdown( 0 );
+        logged->DetachPlugin( &logger );
+    }
+
+    const std::filesystem::path firstFile = FileStartingWith( directory, stem + "_first" );
+    const std::filesystem::path secondFile = FileStartingWith( directory, stem + "_second" );
+    REQUIRE( !firstFile.empty() );
+    REQUIRE( !secondFile.empty() );
+    const std::vector<std::string> firstLines = ReadLines( firstFile );
+    const std::vector<std::string> secondLines = ReadLines( secondFile );
+
+    REQUIRE( !firstLines.empty() );
+    CHECK( firstLines[0].rfind( "Clock,", 0 ) == 0 );
+    REQUIRE( !secondLines.empty() );
+    CHECK( secondLines[0].rfind( "Clock,", 0 ) == 0 );
+    size_t secondFileLines = 0;
+    for( const std::string& line : secondLines )
+    {
+        if( FieldsOfRawLine( line ).size() == 15 )
+            ++secondFileLines;
+    }
+    CHECK( secondFileLines > 0 );
 }
 
 /*

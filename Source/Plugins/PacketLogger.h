@@ -33,6 +33,13 @@ namespace RakNet {
 
 /// \brief Writes incoming and outgoing messages to the screen.
 /// This will write all incoming and outgoing messages to the console window, or to a file if you override it and give it this functionality.
+/// \details The network thread calls the socket and reliability-layer callbacks
+/// (OnDirectSocketSend, OnDirectSocketReceive, OnReliabilityLayerNotification,
+/// OnInternalPacket, OnAck), and through them FormatLine, AddToLog, WriteLog and
+/// UserIDTOString, at the same time as the application thread calls them: Ping, for one,
+/// runs OnDirectSocketSend on its caller's thread. An override of any of these guards its
+/// own state, or derives from ThreadsafePacketLogger so that WriteLog runs on the
+/// application thread.
 /// \ingroup PACKETLOGGER_GROUP
 class RAK_DLL_EXPORT PacketLogger : public PluginInterface2
 {
@@ -47,12 +54,14 @@ public:
     // and translates it into a string (numeric or textual representation based on printId); this calls the
     // second version which takes a const char* argument for the messageIdentifier.
     // into must hold 1024 bytes. A longer line is truncated.
+    // Called on the network thread and the application thread at the same time.
     virtual void FormatLine( char* into, const char* dir, const char* type, unsigned int reliableMessageNumber, unsigned int frame, unsigned char messageIdentifier, const BitSize_t bitLen, unsigned long long time, const SystemAddress& local, const SystemAddress& remote,
                              unsigned int splitPacketId, unsigned int splitPacketIndex, unsigned int splitPacketCount, unsigned int orderingIndex );
     virtual void FormatLine( char* into, const char* dir, const char* type, unsigned int reliableMessageNumber, unsigned int frame, const char* idToPrint, const BitSize_t bitLen, unsigned long long time, const SystemAddress& local, const SystemAddress& remote,
                              unsigned int splitPacketId, unsigned int splitPacketIndex, unsigned int splitPacketCount, unsigned int orderingIndex );
 
-    /// Events on low level sends and receives.  These functions may be called from different threads at the same time.
+    /// Events on low level sends and receives. Called on the network thread and the
+    /// application thread at the same time.
     virtual void OnDirectSocketSend( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress );
     virtual void OnDirectSocketReceive( const char* data, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress );
     virtual void OnReliabilityLayerNotification( const char* errorMessage, const BitSize_t bitsUsed, SystemAddress remoteSystemAddress, bool isError );
@@ -63,7 +72,9 @@ public:
     /// Logs out a header for all the data
     virtual void LogHeader( void );
 
-    /// Override this to log strings to wherever.  Log should be threadsafe
+    /// Override this to log strings to wherever. Called on the network thread and the
+    /// application thread at the same time, unless the logger derives from
+    /// ThreadsafePacketLogger.
     virtual void WriteLog( const char* str );
 
     // Write informational messages
@@ -97,9 +108,14 @@ public:
 
 protected:
     virtual bool UsesReliabilityLayer( void ) const { return true; }
+    /// The line LogHeader logs.
+    static const char* HeaderLine( void );
     const char* IDTOString( unsigned char Id );
+    /// Called on the network thread and the application thread at the same time.
     virtual void AddToLog( const char* str );
-    // Users should override this
+    /// Names a user ID, at or above ID_USER_PACKET_ENUM. Override it to name your own.
+    /// \note Called on the network thread and the application thread at the same time,
+    /// so an override returns a literal or per-thread storage.
     virtual const char* UserIDTOString( unsigned char Id );
     void GetLocalTime( char buffer[128] );
     std::atomic<bool> logDirectMessages;

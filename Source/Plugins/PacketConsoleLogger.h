@@ -17,7 +17,7 @@
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_LogCommandParser == 1 && _RAKNET_SUPPORT_PacketLogger == 1
 
-#include "Plugins/PacketLogger.h"
+#include "Plugins/ThreadsafePacketLogger.h"
 
 namespace RakNet {
 
@@ -26,11 +26,14 @@ class LogCommandParser;
 
 /// \ingroup PACKETLOGGER_GROUP
 /// \brief Packetlogger that logs to a remote command console
-class RAK_DLL_EXPORT PacketConsoleLogger : public PacketLogger
+/// \details Lines queue and are written in Update, on the application thread, so they
+/// reach the console at the next Receive. ThreadsafePacketLogger's queue cap applies.
+class RAK_DLL_EXPORT PacketConsoleLogger : public ThreadsafePacketLogger
 {
 public:
     PacketConsoleLogger();
     // Writes to the command parser used for logging, which is accessed through a secondary communication layer (such as Telnet or RakNet) - See ConsoleServer.h
+    // Call on the application thread.
     virtual void SetLogCommandParser( LogCommandParser* lcp );
     virtual void WriteLog( const char* str );
 

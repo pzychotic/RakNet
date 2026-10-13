@@ -9,7 +9,7 @@
  */
 
 /// \file
-/// \brief Derivation of the packet logger to defer the call to WriteLog until the user thread.
+/// \brief Derivation of the packet logger to defer the call to WriteLog until the application thread.
 ///
 
 #pragma once
@@ -27,7 +27,7 @@
 namespace RakNet {
 
 /// \ingroup PACKETLOGGER_GROUP
-/// \brief Same as PacketLogger, but writes output in the user thread.
+/// \brief Same as PacketLogger, but writes output on the application thread.
 class RAK_DLL_EXPORT ThreadsafePacketLogger : public PacketLogger
 {
 public:

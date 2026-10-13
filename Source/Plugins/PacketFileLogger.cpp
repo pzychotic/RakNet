@@ -32,19 +32,26 @@ void PacketFileLogger::StartLog( const char* filenamePrefix )
     // Open file for writing
     char filename[256];
     if( filenamePrefix )
-        sprintf( filename, "%s_%i.csv", filenamePrefix, (int)RakNet::GetTimeMS() );
+        snprintf( filename, sizeof( filename ), "%s_%i.csv", filenamePrefix, (int)RakNet::GetTimeMS() );
     else
-        sprintf( filename, "PacketLog_%i.csv", (int)RakNet::GetTimeMS() );
-    packetLogFile = fopen( filename, "wt" );
-    LogHeader();
+        snprintf( filename, sizeof( filename ), "PacketLog_%i.csv", (int)RakNet::GetTimeMS() );
+    FILE* file = fopen( filename, "wt" );
+
+    // WriteLog takes the lock, so the header is written directly.
+    std::lock_guard<std::mutex> lock( packetLogFileMutex );
+    if( packetLogFile )
+        fclose( packetLogFile );
+    packetLogFile = file;
     if( packetLogFile )
     {
+        fprintf( packetLogFile, "%s\n", HeaderLine() );
         fflush( packetLogFile );
     }
 }
 
 void PacketFileLogger::WriteLog( const char* str )
 {
+    std::lock_guard<std::mutex> lock( packetLogFileMutex );
     if( packetLogFile )
     {
         fprintf( packetLogFile, "%s\n", str );
