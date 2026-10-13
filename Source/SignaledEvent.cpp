@@ -66,7 +66,8 @@ void SignaledEvent::WaitOnEvent( int timeoutMs )
     if( waitTimer != NULL && timeoutMs >= 0 && SetWaitableTimer( waitTimer, &dueTime, 0, NULL, NULL, FALSE ) )
     {
         HANDLE handles[2] = { signalEvent, waitTimer };
-        WaitForMultipleObjectsEx( 2, handles, FALSE, timeoutMs, FALSE );
+        // The timer is the only timeout: a wait's own timeout runs on the timer tick and can end early.
+        WaitForMultipleObjectsEx( 2, handles, FALSE, INFINITE, FALSE );
     }
     else
     {
