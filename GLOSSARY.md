@@ -158,6 +158,19 @@ Intermediary. Each end sees the other System at an address on the Intermediary, 
 other System's own address.
 _Avoid_: Routed connection, relayed connection
 
+**Punch**:
+The Intermediary's check, before it reports a Forwarded connection to the Source, that both
+the Source and the Endpoint reach it at the forwarding port. A punch completes when both have
+bounced a reply through that port, or is abandoned when it times out or either end
+disconnects.
+_Avoid_: Mini-punch, NAT punch (that is NatPunchthrough's)
+
+**Forwarding cap**:
+The most Source/Endpoint pairs an Intermediary holds a forwarding port for at once. A pair
+counts from the moment its port is opened until the port goes idle, which outlasts the
+Forwarded connection's close. A request that would open a port beyond the cap is refused.
+_Avoid_: Forwarding requests, forward entries
+
 **Reroute**:
 Moving an open connection record to a new address while the connection itself carries on:
 same System, same RakNetGUID, same connection record. A reroute never leaves two open
