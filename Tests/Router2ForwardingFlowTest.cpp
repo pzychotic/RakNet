@@ -237,6 +237,49 @@ TEST_CASE( "Router2 tells the source when no router can reach the endpoint", "[r
     endpoint->DetachPlugin( &endpointPlugin );
 }
 
+// Under TSAN this checks that the source takes its Router2 locks in one order: finding no
+// route, and restarting a forwarded connection whose router went, nest the same two.
+TEST_CASE( "Router2 routes after finding no route and loses the route with its router", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    // The router is not yet connected to the endpoint, so it answers the query with no route.
+    Connect( peers, source, kRouterPort );
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received noPath = PumpUntil( peers, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( noPath.peer == source );
+    REQUIRE( noPath.id == ID_ROUTER_2_FORWARDING_NO_PATH );
+
+    Connect( peers, endpoint, kRouterPort );
+    const RakNetGUID used = Route( peers, sourcePlugin, source, endpoint );
+    REQUIRE( used == router->GetMyGUID() );
+
+    // With the router gone, the source has no one else to ask.
+    router->Shutdown( 100 );
+    peers = { source, endpoint };
+    const Received lost = PumpUntil( peers, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_REROUTED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( lost.peer == source );
+    CHECK( lost.id == ID_CONNECTION_LOST );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
 TEST_CASE( "Router2 re-routes a live forwarded connection through a Designated router", "[router2][network]" )
 {
     Router2 firstPlugin, secondPlugin, sourcePlugin, endpointPlugin;

@@ -109,10 +109,9 @@ void Router2::ClearConnectionRequests( void )
     connectionRequests.clear();
 }
 
+// connectionRequestsMutex should already be locked
 bool Router2::ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLostOnFailure )
 {
-    std::lock_guard<std::mutex> guard( connectionRequestsMutex );
-
     // The request in progress gives the answer for this endpoint
     if( GetConnectionRequestIndex( endpointGuid ) != ~0u )
     {
@@ -195,6 +194,7 @@ void Router2::EstablishRouting( RakNetGUID endpointGuid )
         return;
     }
 
+    std::lock_guard<std::mutex> guard( connectionRequestsMutex );
     ConnectInternal( endpointGuid, false );
 }
 
@@ -436,109 +436,108 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
 {
     (void)lostConnectionReason;
 
-    unsigned int forwardedConnectionIndex = 0;
-    forwardedConnectionListMutex.lock();
-    // The designation lapses with the connection it was made for
-    intermediaries.erase( std::remove( intermediaries.begin(), intermediaries.end(), systemAddress ), intermediaries.end() );
-    while( forwardedConnectionIndex < forwardedConnectionList.size() )
     {
-        if( forwardedConnectionList[forwardedConnectionIndex].endpointGuid == rakNetGUID )
+        std::lock_guard<std::mutex> requestsGuard( connectionRequestsMutex );
         {
-            if( debugInterface )
+            std::lock_guard<std::mutex> forwardedGuard( forwardedConnectionListMutex );
+            unsigned int forwardedConnectionIndex = 0;
+            // The designation lapses with the connection it was made for
+            intermediaries.erase( std::remove( intermediaries.begin(), intermediaries.end(), systemAddress ), intermediaries.end() );
+            while( forwardedConnectionIndex < forwardedConnectionList.size() )
             {
-                debugInterface->ShowDiagnostic( RakNet::format( "Closed connection to the %" PRIu64 ", removing forwarding from list at %s:%i\n", rakNetGUID.g, __FILE__, __LINE__ ).c_str() );
-            }
+                if( forwardedConnectionList[forwardedConnectionIndex].endpointGuid == rakNetGUID )
+                {
+                    if( debugInterface )
+                    {
+                        debugInterface->ShowDiagnostic( RakNet::format( "Closed connection to the %" PRIu64 ", removing forwarding from list at %s:%i\n", rakNetGUID.g, __FILE__, __LINE__ ).c_str() );
+                    }
 
-            // No longer need forwarding
-            forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex ); // ??? perf
+                    // No longer need forwarding
+                    forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex ); // ??? perf
+                }
+                else if( forwardedConnectionList[forwardedConnectionIndex].intermediaryGuid == rakNetGUID && forwardedConnectionList[forwardedConnectionIndex].weInitiatedForwarding )
+                {
+                    // Lost connection to intermediary. Restart process to connect to endpoint. If failed, push ID_CONNECTION_LOST. Also remove connection request if it already is in the list, to restart it
+                    unsigned int pos = GetConnectionRequestIndex( forwardedConnectionList[forwardedConnectionIndex].endpointGuid );
+                    if( pos != ~0u )
+                    {
+                        connectionRequests.erase( connectionRequests.begin() + pos ); // ??? perf
+                    }
+
+                    // Without an intermediary to ask, ConnectInternal has reported the connection lost
+                    if( ConnectInternal( forwardedConnectionList[forwardedConnectionIndex].endpointGuid, true ) )
+                        forwardedConnectionIndex++;
+                    else
+                        forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
+
+                    if( debugInterface )
+                    {
+                        debugInterface->ShowDiagnostic( RakNet::format( "Closed connection %" PRIu64 ", restarting forwarding at %s:%i\n", rakNetGUID.g, __FILE__, __LINE__ ).c_str() );
+                    }
+
+                    // This should not be removed - the connection is still forwarded, but perhaps through another system
+                    //          forwardedConnectionList.RemoveAtIndexFast(forwardedConnectionIndex);
+                }
+                else if( IsPendingForward( forwardedConnectionList[forwardedConnectionIndex], rakNetGUID ) )
+                {
+                    // Announced by the closed intermediary for an endpoint that never connected through it
+                    forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
+                }
+                else
+                {
+                    forwardedConnectionIndex++;
+                }
+            }
         }
-        else if( forwardedConnectionList[forwardedConnectionIndex].intermediaryGuid == rakNetGUID && forwardedConnectionList[forwardedConnectionIndex].weInitiatedForwarding )
-        {
-            // Lost connection to intermediary. Restart process to connect to endpoint. If failed, push ID_CONNECTION_LOST. Also remove connection request if it already is in the list, to restart it
-            connectionRequestsMutex.lock();
-            unsigned int pos = GetConnectionRequestIndex( forwardedConnectionList[forwardedConnectionIndex].endpointGuid );
-            if( pos != ~0u )
-            {
-                connectionRequests.erase( connectionRequests.begin() + pos ); // ??? perf
-            }
-            connectionRequestsMutex.unlock();
 
-            // Without an intermediary to ask, ConnectInternal has reported the connection lost
-            if( ConnectInternal( forwardedConnectionList[forwardedConnectionIndex].endpointGuid, true ) )
-                forwardedConnectionIndex++;
+        unsigned int connectionRequestIndex = 0;
+        while( connectionRequestIndex < connectionRequests.size() )
+        {
+            ConnnectRequest* cr = connectionRequests[connectionRequestIndex].get();
+            cr->connectionRequestSystemsMutex.lock();
+            unsigned int connectionRequestGuidIndex = cr->GetGuidIndex( rakNetGUID );
+            if( connectionRequestGuidIndex != ~0u )
+            {
+                cr->connectionRequestSystems.erase( cr->connectionRequestSystems.begin() + connectionRequestGuidIndex ); // ??? perf
+                cr->connectionRequestSystemsMutex.unlock();
+                if( UpdateForwarding( cr ) == false ) // If returns false, no connection request systems left
+                {
+                    if( debugInterface )
+                    {
+                        debugInterface->ShowDiagnostic( RakNet::format( "Aborted connection to the %" PRIu64 ", aborted forwarding at %s:%i\n", rakNetGUID.g, __FILE__, __LINE__ ).c_str() );
+                    }
+
+                    RemoveConnectionRequest( connectionRequestIndex );
+                }
+                else // Else a system in the connection request list dropped. If cr->requestState==R2RS_REQUEST_STATE_QUERY_FORWARDING then we are still waiting for other systems to respond.
+                {
+                    if( debugInterface )
+                    {
+                        debugInterface->ShowDiagnostic( RakNet::format( "Aborted connection attempt to %" PRIu64 ", restarting forwarding to %" PRIu64 " at %s:%i\n", rakNetGUID.g, cr->endpointGuid.g, __FILE__, __LINE__ ).c_str() );
+                    }
+                    //                 if(volatile bool is_my_fix_a_truth = true) { // A system in the list of potential systems to try routing to dropped. There is no need to restart the whole process.
+                    //                     connectionRequestsMutex.lock();
+                    //                     connectionRequests.RemoveAtIndexFast(connectionRequestIndex);
+                    //                     connectionRequestsMutex.unlock();
+                    //
+                    //                     if(false == ConnectInternal(cr->endpointGuid,cr->returnConnectionLostOnFailure))
+                    //                         if (debugInterface)
+                    //                         {
+                    //                             char buff[512];
+                    //                             debugInterface->ShowDiagnostic(FormatStringTS(buff,"ConnectInternal(cr->endpointGuid,cr->returnConnectionLostOnFailure) is false. at %s:%i\n", __FILE__, __LINE__));
+                    //                         }
+                    //                 }
+
+                    connectionRequestIndex++;
+                }
+            }
             else
-                forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
-
-            if( debugInterface )
             {
-                debugInterface->ShowDiagnostic( RakNet::format( "Closed connection %" PRIu64 ", restarting forwarding at %s:%i\n", rakNetGUID.g, __FILE__, __LINE__ ).c_str() );
-            }
-
-            // This should not be removed - the connection is still forwarded, but perhaps through another system
-            //          forwardedConnectionList.RemoveAtIndexFast(forwardedConnectionIndex);
-        }
-        else if( IsPendingForward( forwardedConnectionList[forwardedConnectionIndex], rakNetGUID ) )
-        {
-            // Announced by the closed intermediary for an endpoint that never connected through it
-            forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
-        }
-        else
-        {
-            forwardedConnectionIndex++;
-        }
-    }
-    forwardedConnectionListMutex.unlock();
-
-    unsigned int connectionRequestIndex = 0;
-    connectionRequestsMutex.lock();
-    while( connectionRequestIndex < connectionRequests.size() )
-    {
-        ConnnectRequest* cr = connectionRequests[connectionRequestIndex].get();
-        cr->connectionRequestSystemsMutex.lock();
-        unsigned int connectionRequestGuidIndex = cr->GetGuidIndex( rakNetGUID );
-        if( connectionRequestGuidIndex != ~0u )
-        {
-            cr->connectionRequestSystems.erase( cr->connectionRequestSystems.begin() + connectionRequestGuidIndex ); // ??? perf
-            cr->connectionRequestSystemsMutex.unlock();
-            if( UpdateForwarding( cr ) == false ) // If returns false, no connection request systems left
-            {
-                if( debugInterface )
-                {
-                    debugInterface->ShowDiagnostic( RakNet::format( "Aborted connection to the %" PRIu64 ", aborted forwarding at %s:%i\n", rakNetGUID.g, __FILE__, __LINE__ ).c_str() );
-                }
-
-                RemoveConnectionRequest( connectionRequestIndex );
-            }
-            else // Else a system in the connection request list dropped. If cr->requestState==R2RS_REQUEST_STATE_QUERY_FORWARDING then we are still waiting for other systems to respond.
-            {
-                if( debugInterface )
-                {
-                    debugInterface->ShowDiagnostic( RakNet::format( "Aborted connection attempt to %" PRIu64 ", restarting forwarding to %" PRIu64 " at %s:%i\n", rakNetGUID.g, cr->endpointGuid.g, __FILE__, __LINE__ ).c_str() );
-                }
-                //                 if(volatile bool is_my_fix_a_truth = true) { // A system in the list of potential systems to try routing to dropped. There is no need to restart the whole process.
-                //                     connectionRequestsMutex.lock();
-                //                     connectionRequests.RemoveAtIndexFast(connectionRequestIndex);
-                //                     connectionRequestsMutex.unlock();
-                //
-                //                     if(false == ConnectInternal(cr->endpointGuid,cr->returnConnectionLostOnFailure))
-                //                         if (debugInterface)
-                //                         {
-                //                             char buff[512];
-                //                             debugInterface->ShowDiagnostic(FormatStringTS(buff,"ConnectInternal(cr->endpointGuid,cr->returnConnectionLostOnFailure) is false. at %s:%i\n", __FILE__, __LINE__));
-                //                         }
-                //                 }
-
+                cr->connectionRequestSystemsMutex.unlock();
                 connectionRequestIndex++;
             }
         }
-        else
-        {
-            cr->connectionRequestSystemsMutex.unlock();
-            connectionRequestIndex++;
-        }
     }
-    connectionRequestsMutex.unlock();
-
 
     unsigned int i = 0;
     miniPunchesInProgressMutex.lock();

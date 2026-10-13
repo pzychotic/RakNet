@@ -211,6 +211,9 @@ protected:
 
     std::unique_ptr<UDPForwarder> udpForwarder;
     int maximumForwardingRequests;
+    // Lock order: connectionRequestsMutex, then forwardedConnectionListMutex. A request's
+    // connectionRequestSystemsMutex is taken only under connectionRequestsMutex, and no other
+    // mutex is taken while it is held.
     std::mutex connectionRequestsMutex, miniPunchesInProgressMutex, forwardedConnectionListMutex;
     std::vector<std::unique_ptr<ConnnectRequest>> connectionRequests;
     std::vector<MiniPunchRequest> miniPunchesInProgress;
