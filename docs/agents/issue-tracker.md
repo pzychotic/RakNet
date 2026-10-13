@@ -27,7 +27,13 @@ Read the file at the referenced path. The user will normally pass the path or th
 A ticket with `Type: bug` or `Type: task` moves through the triage states in
 `triage-labels.md`, then:
 
+- **Red test** (bugs, set at triage): the red test asserts the decided behaviour, not only the
+  symptom. When decisions land as separate commits, it stays red after each commit that
+  precedes the fix.
 - **Claim**: set `Status: claimed` and save before touching code.
+- **Race check**: when the change touches code another thread runs (plugins with a worker,
+  `UDPForwarder`, `RakPeer`), run the touched tag with `tools/repeat-test.sh "[<tag>]" 1 --tsan`
+  before the full suite.
 - **Measure** (bugs only) red-before and green-after rates with
   `tools/repeat-test.sh "<test name>" 20` (add `--wsl` for GCC). For the red run,
   `git stash push -- Source/` first and `git stash pop` after.

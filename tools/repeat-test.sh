@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Runs one RakNetTests case N times and prints how many runs passed and failed.
 #
-#   tools/repeat-test.sh "<Catch2 test name or filter>" [N] [--wsl]
+#   tools/repeat-test.sh "<Catch2 test name or filter>" [N] [--wsl | --tsan]
 #
 # N defaults to 20. Builds RakNetTests first: Windows Release in build/ (override with
 # RN_WINDOWS_BUILD), or with --wsl, GCC in WSL Ubuntu's ~/rn-build (override with
 # RN_LINUX_BUILD, set on the Linux side). Run from Git Bash on Windows, or from bash on
-# Linux without --wsl.
+# Linux without --wsl. --tsan builds and runs clang TSAN in ~/rn-tsan-clang++ (override
+# with RN_TSAN_BUILD), through WSL from Windows, with tools/tsan-suppressions.txt; a run
+# that reports a ThreadSanitizer warning counts as failed.
 #
 # Exits 2 when the build fails or the filter matches no test, so a typo never reads as
 # a red or green run. Otherwise exits 0, red or green: the summary is the result. The
@@ -17,34 +19,50 @@ set -u
 name=""
 runs=20
 via_wsl=0
+tsan=0
 for arg in "$@"; do
     case "$arg" in
         --wsl) via_wsl=1 ;;
+        --tsan) tsan=1 ;;
         --linux) ;; # Kept for the re-invocation below; Linux is detected from uname.
         ''|*[!0-9]*) name="$arg" ;;
         *) runs="$arg" ;;
     esac
 done
 if [ -z "$name" ]; then
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
 fi
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 
+if [ "$tsan" = 1 ] && [ "$(uname -s)" != Linux ]; then
+    via_wsl=1
+fi
 if [ "$via_wsl" = 1 ]; then
     # Git Bash rewrites /mnt/... arguments into C:/Program Files/Git/mnt/...;
     # MSYS_NO_PATHCONV stops it. --exec skips WSL's shell, which would split the name.
     windows_root=$(cd "$root" && pwd -W)
     drive=$(printf '%s' "${windows_root:0:1}" | tr '[:upper:]' '[:lower:]')
-    MSYS_NO_PATHCONV=1 exec wsl.exe -d Ubuntu --exec bash "/mnt/$drive${windows_root:2}/tools/repeat-test.sh" --linux "$name" "$runs"
+    tsan_flag=()
+    [ "$tsan" = 1 ] && tsan_flag=(--tsan)
+    MSYS_NO_PATHCONV=1 exec wsl.exe -d Ubuntu --exec bash "/mnt/$drive${windows_root:2}/tools/repeat-test.sh" --linux "${tsan_flag[@]}" "$name" "$runs"
 fi
 
 build_log=$(mktemp)
 case "$(uname -s)" in
     Linux)
-        build="${RN_LINUX_BUILD:-$HOME/rn-build}"
-        platform="Linux ($build)"
+        if [ "$tsan" = 1 ]; then
+            build="${RN_TSAN_BUILD:-$HOME/rn-tsan-clang++}"
+            platform="Linux TSAN ($build)"
+            # TSAN can't parse a suppressions file with CRLF, as a Windows checkout has.
+            suppressions=$(mktemp)
+            tr -d '\r' <"$root/tools/tsan-suppressions.txt" >"$suppressions"
+            export TSAN_OPTIONS="suppressions=$suppressions ${TSAN_OPTIONS:-}"
+        else
+            build="${RN_LINUX_BUILD:-$HOME/rn-build}"
+            platform="Linux ($build)"
+        fi
         make -C "$build" -j"$(nproc)" RakNetTests >"$build_log" 2>&1
         status=$?
         exe=$(find "$build" -name RakNetTests -type f -perm -u+x | head -1)
@@ -74,6 +92,9 @@ for _ in $(seq 1 "$runs"); do
         printf '%s\n' "$out" | grep "No test cases matched"
         echo "repeat-test: the filter matched no test (escape commas as \\, and use * only at an end)"
         exit 2
+    fi
+    if printf '%s\n' "$out" | grep -q "WARNING: ThreadSanitizer"; then
+        status=66
     fi
     if [ "$status" = 0 ]; then
         passed=$((passed + 1))
