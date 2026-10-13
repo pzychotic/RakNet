@@ -61,6 +61,35 @@ thread_local const RakPeer* insideUserUpdateCallbackOf = nullptr;
 /// call. Its setter, called from inside, already holds incomingDatagramEventHandlerMutex shared.
 thread_local const RakPeer* insideDatagramHandlerOf = nullptr;
 
+/// Records the calling thread as the one inside Receive for the guard's scope, asserting that
+/// no other thread is (ADR-0011, point 7). A nested call from the same thread leaves the
+/// record to the outer guard.
+class ReceiveThreadGuard
+{
+public:
+    explicit ReceiveThreadGuard( std::atomic<std::thread::id>& threadInside )
+    : threadInside( threadInside )
+    {
+        std::thread::id expected;
+        const std::thread::id self = std::this_thread::get_id();
+        owner = threadInside.compare_exchange_strong( expected, self );
+        RakAssert( owner || expected == self );
+    }
+
+    ~ReceiveThreadGuard()
+    {
+        if( owner )
+            threadInside.store( std::thread::id() );
+    }
+
+    ReceiveThreadGuard( const ReceiveThreadGuard& ) = delete;
+    ReceiveThreadGuard& operator=( const ReceiveThreadGuard& ) = delete;
+
+private:
+    std::atomic<std::thread::id>& threadInside;
+    bool owner;
+};
+
 } // namespace
 
 void UpdateNetworkLoop( void* arg );
@@ -975,6 +1004,8 @@ uint32_t RakPeer::SendList( const char** data, const int* lengths, const int num
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Packet* RakPeer::Receive( void )
 {
+    ReceiveThreadGuard receiveThreadGuard( threadInsideReceive );
+
     if( !( IsActive() ) )
         return 0;
 
@@ -2047,6 +2078,8 @@ void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, uns
 void RakPeer::AttachPlugin( PluginInterface2* plugin )
 {
     bool isNotThreadsafe = plugin->UsesReliabilityLayer();
+    // ADR-0011, point 7.
+    RakAssert( !( isNotThreadsafe && IsActive() ) );
     if( isNotThreadsafe )
     {
         if( std::find( pluginListNTS.begin(), pluginListNTS.end(), plugin ) == pluginListNTS.end() )
@@ -2078,6 +2111,8 @@ void RakPeer::DetachPlugin( PluginInterface2* plugin )
         return;
 
     bool isNotThreadsafe = plugin->UsesReliabilityLayer();
+    // ADR-0011, point 7.
+    RakAssert( !( isNotThreadsafe && IsActive() ) );
     if( isNotThreadsafe )
     {
         auto it = std::find( pluginListNTS.begin(), pluginListNTS.end(), plugin );

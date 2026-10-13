@@ -8,9 +8,14 @@ either end.
 ## Language
 
 **Peer**:
-One running copy of the library, created by `RakPeerInterface::GetInstance()`. A Peer
+One copy of the library, created by `RakPeerInterface::GetInstance()`. A Peer
 owns exactly one RakNetGUID for its lifetime.
 _Avoid_: Node, client, instance
+
+**Running**:
+A Peer between a successful `Startup` and its `Shutdown`. Otherwise it is stopped: freshly
+created, or shut down and able to start again.
+_Avoid_: Active, started
 
 **System**:
 A Peer as seen from another Peer — the far side of a connection, held in a connection

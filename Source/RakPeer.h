@@ -35,6 +35,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -1151,6 +1152,11 @@ protected:
     mutable SignaledEvent quitAndDataEvents;
     /// Set on the user thread and read on the network thread.
     std::atomic<bool> limitConnectionFrequencyFromTheSameIP;
+
+    /// The thread inside Receive, or the default id when none is. Receive asserts that no
+    /// other thread is inside it (ADR-0011, point 7). Kept in every build, so the layout
+    /// does not depend on NDEBUG.
+    std::atomic<std::thread::id> threadInsideReceive{ std::thread::id() };
 
     std::mutex packetReturnMutex;
     std::list<Packet*> packetReturnQueue;
