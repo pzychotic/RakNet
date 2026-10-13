@@ -58,6 +58,7 @@ UDPForwarder::UDPForwarder()
     threadRunning = 0;
     maxForwardEntries = DEFAULT_MAX_FORWARD_ENTRIES;
     nextInputId = 0;
+    usedForwardEntries = 0;
 }
 UDPForwarder::~UDPForwarder()
 {
@@ -97,6 +98,7 @@ void UDPForwarder::Shutdown( void )
     }
 
     forwardListNotUpdated.clear();
+    usedForwardEntries = 0;
 }
 void UDPForwarder::SetMaxForwardEntries( unsigned short maxEntries )
 {
@@ -109,7 +111,7 @@ int UDPForwarder::GetMaxForwardEntries( void ) const
 }
 int UDPForwarder::GetUsedForwardEntries( void ) const
 {
-    return (int)forwardListNotUpdated.size();
+    return usedForwardEntries;
 }
 UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAddress destination, RakNet::TimeMS timeoutOnNoDataMS, const char* forceHostAddress, unsigned short socketFamily,
                                                   unsigned short* forwardingPort, __UDPSOCKET__* forwardingSocket )
@@ -434,6 +436,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
 #endif
 
                     forwardListNotUpdated.push_back( std::move( fe ) );
+                    usedForwardEntries = (int)forwardListNotUpdated.size();
                 }
             }
         }
@@ -456,6 +459,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
                   pEntry->addr2Unconfirmed == sfs->source ) )
             {
                 forwardListNotUpdated.erase( it );
+                usedForwardEntries = (int)forwardListNotUpdated.size();
                 break;
             }
         }
@@ -468,6 +472,7 @@ void UDPForwarder::UpdateUDPForwarder( void )
             curTime > pEntry->timeLastDatagramForwarded + pEntry->timeoutOnNoDataMS )
         {
             it = forwardListNotUpdated.erase( it );
+            usedForwardEntries = (int)forwardListNotUpdated.size();
         }
         else
         {

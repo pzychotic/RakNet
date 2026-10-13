@@ -141,8 +141,10 @@ protected:
     ThreadsafeQueue<StopForwardingStruct> stopForwardingCommands;
     unsigned int nextInputId;
 
-    // New entries are added to forwardListNotUpdated
+    // New entries are added to forwardListNotUpdated. Only the forwarder thread touches it while running
     std::vector<std::unique_ptr<ForwardEntry>> forwardListNotUpdated;
+    // forwardListNotUpdated's size, published by the forwarder thread after each change for other threads to read
+    std::atomic<int> usedForwardEntries;
 
     unsigned short maxForwardEntries;
     std::atomic<uint32_t> isRunning, threadRunning;
