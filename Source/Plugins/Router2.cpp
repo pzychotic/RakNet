@@ -421,6 +421,7 @@ void Router2::Update( void )
     {
         if( miniPunchesInProgress[i].timeout < curTime )
         {
+            ReleaseForwarding( miniPunchesInProgress[i] );
             SendFailureOnCannotForward( miniPunchesInProgress[i].sourceGuid, miniPunchesInProgress[i].endpointGuid );
             miniPunchesInProgress.erase( miniPunchesInProgress.begin() + i ); // ??? perf
         }
@@ -552,6 +553,7 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
     {
         if( miniPunchesInProgress[i].sourceGuid == rakNetGUID || miniPunchesInProgress[i].endpointGuid == rakNetGUID )
         {
+            ReleaseForwarding( miniPunchesInProgress[i] );
             if( miniPunchesInProgress[i].sourceGuid != rakNetGUID )
             {
                 SendFailureOnCannotForward( miniPunchesInProgress[i].sourceGuid, miniPunchesInProgress[i].endpointGuid );
@@ -947,12 +949,34 @@ void Router2::SendOOBMessages( Router2::MiniPunchRequest* mpr )
     SendOOBFromRakNetPort( ID_ROUTER_2_REPLY_TO_SPECIFIED_PORT, &extraData, mpr->endpointAddress );
 }
 
+// A punch that reused an entry leaves it to the forwarder's idle timeout, since a connection may still be forwarded through it
+void Router2::ReleaseForwarding( const MiniPunchRequest& mpr )
+{
+    if( mpr.createdEntry && udpForwarder )
+        udpForwarder->StopForwarding( mpr.sourceAddress, mpr.endpointAddress );
+}
+
 void Router2::OnRequestForwarding( Packet* packet )
 {
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) + sizeof( unsigned char ) );
     RakNetGUID endpointGuid;
     bs.Read( endpointGuid );
+
+    // One punch per forwarder entry, which serves both directions: the running punch answers a repeat, and a request the other way round is refused
+    {
+        std::lock_guard<std::mutex> guard( miniPunchesInProgressMutex );
+        for( const MiniPunchRequest& mpr : miniPunchesInProgress )
+        {
+            if( mpr.sourceGuid == packet->guid && mpr.endpointGuid == endpointGuid )
+                return;
+            if( mpr.sourceGuid == endpointGuid && mpr.endpointGuid == packet->guid )
+            {
+                SendFailureOnCannotForward( packet->guid, endpointGuid );
+                return;
+            }
+        }
+    }
 
     int pingToEndpoint = ReturnFailureOnCannotForward( packet->guid, endpointGuid );
     if( pingToEndpoint == -1 )
@@ -971,19 +995,7 @@ void Router2::OnRequestForwarding( Packet* packet )
         packet->systemAddress, endpointSystemAddress, 30000, 0, socketFamily,
         &forwardingPort, &forwardingSocket );
 
-    if( result == UDPFORWARDER_FORWARDING_ALREADY_EXISTS )
-    {
-        if( debugInterface )
-        {
-            debugInterface->ShowDiagnostic( RakNet::format( "Got ID_ROUTER_2_REQUEST_FORWARDING, result=UDPFORWARDER_FORWARDING_ALREADY_EXISTS "
-                                                            "(packet->guid =%" PRIu64 ", endpointGuid = %" PRIu64 ") at %s:%i\n",
-                                                            packet->guid.g, endpointGuid.g, __FILE__, __LINE__ )
-                                                .c_str() );
-        }
-
-        SendForwardingSuccess( ID_ROUTER_2_FORWARDING_ESTABLISHED, packet->guid, endpointGuid, forwardingPort );
-    }
-    else if( result == UDPFORWARDER_NO_SOCKETS )
+    if( result == UDPFORWARDER_NO_SOCKETS )
     {
         char buff2[64];
         char buff3[64];
@@ -1027,14 +1039,14 @@ void Router2::OnRequestForwarding( Packet* packet )
             char buff3[32];
             endpointSystemAddress.ToString( true, buff2 );
             packet->systemAddress.ToString( true, buff3 );
-            debugInterface->ShowDiagnostic( RakNet::format( "Got ID_ROUTER_2_REQUEST_FORWARDING.\n"
+            debugInterface->ShowDiagnostic( RakNet::format( "Got ID_ROUTER_2_REQUEST_FORWARDING, result=%i.\n"
                                                             "endpointAddress=%s\nsourceAddress=%s\nforwardingPort=%i\n "
                                                             "calling SendOOBMessages at %s:%i\n",
-                                                            buff2, buff3, forwardingPort, _FILE_AND_LINE_ )
+                                                            (int)result, buff2, buff3, forwardingPort, _FILE_AND_LINE_ )
                                                 .c_str() );
         }
 
-        // Store the punch request
+        // A pair already forwarded is punched again on its existing port
         MiniPunchRequest miniPunchRequest;
         miniPunchRequest.endpointAddress = endpointSystemAddress;
         miniPunchRequest.endpointGuid = endpointGuid;
@@ -1044,6 +1056,7 @@ void Router2::OnRequestForwarding( Packet* packet )
         miniPunchRequest.sourceAddress = packet->systemAddress;
         miniPunchRequest.forwardingPort = forwardingPort;
         miniPunchRequest.forwardingSocket = forwardingSocket;
+        miniPunchRequest.createdEntry = result == UDPFORWARDER_SUCCESS;
         int ping1 = rakPeerInterface->GetAveragePing( packet->guid );
         int ping2 = rakPeerInterface->GetAveragePing( endpointGuid );
         // The 3 s floor covers either end's application not calling Receive for a while, since the punch is answered only there

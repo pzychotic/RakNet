@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <thread>
@@ -121,12 +122,21 @@ void FailNoRoute( const Received& each )
 }
 
 // After EstablishRouting, waits for the route and connects through the router it reports.
-// Returns the router's RakNetGUID.
-RakNetGUID ConnectThroughRoute( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* source, RakPeerInterface* endpoint )
+// With endpointRerouted, the wait also takes the endpoint's ID_ROUTER_2_REROUTED for the
+// source, which the router sends only after a completed punch and the endpoint passes on
+// only from a Designated router. Returns the router's RakNetGUID.
+RakNetGUID ConnectThroughRoute( const std::vector<RakPeerInterface*>& peers, RakPeerInterface* source, RakPeerInterface* endpoint, bool endpointRerouted = false )
 {
-    const Received established = PumpUntil( peers, [source, endpoint]( const Received& each ) {
-        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    Received established{ nullptr, 0, UNASSIGNED_RAKNET_GUID, {} };
+    bool sawRerouted = false;
+    const Received last = PumpUntil( peers, [&]( const Received& each ) {
+        if( each.peer == endpoint && each.id == ID_ROUTER_2_REROUTED )
+            sawRerouted = true;
+        if( ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint ) )
+            established = each;
+        return established.peer != nullptr && ( sawRerouted || !endpointRerouted || established.id != ID_ROUTER_2_FORWARDING_ESTABLISHED );
     } );
+    REQUIRE( last.peer != nullptr );
     REQUIRE( established.peer == source );
     if( established.id != ID_ROUTER_2_FORWARDING_ESTABLISHED )
         FailNoRoute( established );
@@ -139,6 +149,7 @@ RakNetGUID ConnectThroughRoute( const std::vector<RakPeerInterface*>& peers, Rak
     REQUIRE( bs.Read( endpointGuid ) );
     REQUIRE( bs.Read( forwardingPort ) );
     CHECK( endpointGuid == endpoint->GetMyGUID() );
+    REQUIRE( forwardingPort != 0 );
 
     REQUIRE( source->Connect( "127.0.0.1", forwardingPort, nullptr, 0 ) == CONNECTION_ATTEMPT_STARTED );
     const Received accepted = PumpUntil( peers, [source, endpoint]( const Received& each ) {
@@ -151,15 +162,27 @@ RakNetGUID ConnectThroughRoute( const std::vector<RakPeerInterface*>& peers, Rak
 
 // Runs EstablishRouting from source to endpoint and connects through the router it
 // reports. Returns the router's RakNetGUID.
-RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRouter, RakPeerInterface* source, RakPeerInterface* endpoint )
+RakNetGUID Route( const std::vector<RakPeerInterface*>& peers, Router2& sourceRouter, RakPeerInterface* source, RakPeerInterface* endpoint, bool endpointRerouted = false )
 {
     sourceRouter.EstablishRouting( endpoint->GetMyGUID() );
-    return ConnectThroughRoute( peers, source, endpoint );
+    return ConnectThroughRoute( peers, source, endpoint, endpointRerouted );
 }
 
-// Router2's internal sub-identifiers for a forwarding query and its reply.
+// Router2's internal sub-identifiers for a forwarding query, its reply, and a forwarding request.
 constexpr unsigned char kQueryForwarding = 0;
 constexpr unsigned char kReplyForwarding = 1;
+constexpr unsigned char kRequestForwarding = 2;
+
+// Sends router a forwarding request for endpoint from source, as source's Router2 does once
+// it has picked router.
+void RequestForwarding( RakPeerInterface* source, RakPeerInterface* router, RakPeerInterface* endpoint )
+{
+    BitStream request;
+    request.Write( (MessageID)ID_ROUTER_2_INTERNAL );
+    request.Write( kRequestForwarding );
+    request.Write( endpoint->GetMyGUID() );
+    source->Send( &request, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, router->GetMyGUID(), false );
+}
 
 struct ForwardingReply
 {
@@ -563,6 +586,128 @@ TEST_CASE( "Router2 forwards no more pairs than its forwarding cap", "[router2][
     endpoint->DetachPlugin( &endpointPlugin );
 }
 
+TEST_CASE( "Router2 routes again after the router's punch to the endpoint timed out", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    endpointPlugin.AddIntermediary( SystemAddress( "127.0.0.1", kRouterPort ) );
+
+    // The endpoint answers the router's punch only inside Receive, so never pumping it makes
+    // the punch time out.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received ended = PumpUntil( { router, source }, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( ended.peer == source );
+    REQUIRE( ended.id == ID_ROUTER_2_FORWARDING_NO_PATH );
+
+    // The retry punches again, so the endpoint hears of the route as on a first request.
+    const RakNetGUID used = Route( peers, sourcePlugin, source, endpoint, true );
+    CHECK( used == router->GetMyGUID() );
+    CheckReaches( peers, source, endpoint );
+    CheckReaches( peers, endpoint, source );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
+// The cap counts forwarded pairs, so a pair left behind by the timed-out punch would refuse
+// the second.
+TEST_CASE( "Router2 frees the forwarded pair of a punch that timed out", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin, secondEndpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 1 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    RakPeerInterface* secondEndpoint = scope.Server( kSecondEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    secondEndpoint->AttachPlugin( &secondEndpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint, secondEndpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    Connect( peers, secondEndpoint, kRouterPort );
+
+    // Never pumping the endpoint makes the punch time out.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received ended = PumpUntil( { router, source, secondEndpoint }, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( ended.peer == source );
+    REQUIRE( ended.id == ID_ROUTER_2_FORWARDING_NO_PATH );
+
+    REQUIRE( Route( peers, sourcePlugin, source, secondEndpoint ) == router->GetMyGUID() );
+    CheckReaches( peers, source, secondEndpoint );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+    secondEndpoint->DetachPlugin( &secondEndpointPlugin );
+}
+
+TEST_CASE( "Router2 frees the forwarded pair of a punch whose endpoint disconnected", "[router2][network]" )
+{
+    // Long enough for the request to reach the router, well short of the punch timeout.
+    constexpr TimeMS kPunchStallMs = 1000;
+
+    Router2 routerPlugin, sourcePlugin, endpointPlugin, secondEndpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 1 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    RakPeerInterface* secondEndpoint = scope.Server( kSecondEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    secondEndpoint->AttachPlugin( &secondEndpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint, secondEndpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    Connect( peers, secondEndpoint, kRouterPort );
+
+    // Not pumping the endpoint holds the punch back until it disconnects.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    const Received early = PumpUntil( { router, source, secondEndpoint }, [source, endpoint]( const Received& each ) { return IsNoRoute( each, source, endpoint ); }, kPunchStallMs );
+    if( early.peer != nullptr )
+        FailNoRoute( early );
+
+    endpoint->CloseConnection( router->GetMyGUID(), true );
+    const Received ended = PumpUntil( { router, source, secondEndpoint }, [source, endpoint]( const Received& each ) {
+        return ( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED ) || IsNoRoute( each, source, endpoint );
+    } );
+    REQUIRE( ended.peer == source );
+    REQUIRE( ended.id == ID_ROUTER_2_FORWARDING_NO_PATH );
+
+    REQUIRE( Route( { router, source, secondEndpoint }, sourcePlugin, source, secondEndpoint ) == router->GetMyGUID() );
+    CheckReaches( { router, source, secondEndpoint }, source, secondEndpoint );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+    secondEndpoint->DetachPlugin( &secondEndpointPlugin );
+}
+
 // A reply from a system the request never asked is dropped with the source's Router2 locks
 // released. A lock held past it would hang the source's next Update.
 TEST_CASE( "Router2 routes after a forwarding reply from a system it did not ask", "[router2][network]" )
@@ -616,4 +761,137 @@ TEST_CASE( "Router2 routes after a forwarding reply from a system it did not ask
     source->DetachPlugin( &sourcePlugin );
     endpoint->DetachPlugin( &endpointPlugin );
     secondEndpoint->DetachPlugin( &secondEndpointPlugin );
+}
+
+// The source's Router2 has no request outstanding, so it drops the router's answer, but the
+// endpoint hears of the punch from its Designated router.
+TEST_CASE( "Router2 punches again over a live forwarded connection without cutting it", "[router2][network]" )
+{
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    endpointPlugin.AddIntermediary( SystemAddress( "127.0.0.1", kRouterPort ) );
+    REQUIRE( Route( peers, sourcePlugin, source, endpoint, true ) == router->GetMyGUID() );
+    const SystemAddress sourceSeesEndpointAt = source->GetSystemAddressFromGuid( endpoint->GetMyGUID() );
+
+    RequestForwarding( source, router, endpoint );
+    REQUIRE( PumpUntil( peers, endpoint, ID_ROUTER_2_REROUTED ).peer == endpoint );
+
+    CheckReaches( peers, source, endpoint );
+    CheckReaches( peers, endpoint, source );
+    CHECK( source->GetSystemAddressFromGuid( endpoint->GetMyGUID() ) == sourceSeesEndpointAt );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
+// The re-punch reused the forwarded pair, so giving up on it leaves the pair to carry the
+// connection.
+TEST_CASE( "Router2 keeps a live forwarded connection when a punch over it times out", "[router2][network]" )
+{
+    // For the router's next Update to see its punch timed out.
+    constexpr TimeMS kTimeoutMarginMs = 500;
+
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    REQUIRE( Route( peers, sourcePlugin, source, endpoint ) == router->GetMyGUID() );
+
+    // Never pumping the endpoint makes the punch time out. Its Peer keeps the connection up
+    // meanwhile, since that needs no Receive. The source's Router2 consumes the router's
+    // refusal, so this waits out the router's timeout instead: 3 s plus eight of the larger
+    // of its pings to the two ends.
+    const int largerPing = (std::max)( { router->GetAveragePing( source->GetMyGUID() ), router->GetAveragePing( endpoint->GetMyGUID() ), 0 } );
+    RequestForwarding( source, router, endpoint );
+    PumpUntil( { router, source }, []( const Received& ) { return false; }, 3000 + 8 * (TimeMS)largerPing + kTimeoutMarginMs );
+
+    CheckReaches( peers, source, endpoint );
+    CheckReaches( peers, endpoint, source );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+}
+
+// Only the source's own request is outstanding, so the source would drop a second success
+// unseen. A second punch would also reach the endpoint, as a second ID_ROUTER_2_REROUTED.
+TEST_CASE( "Router2 answers a request repeated during its punch once", "[router2][network]" )
+{
+    // Long enough for the request to reach the router, well short of the punch timeout.
+    constexpr TimeMS kPunchStallMs = 1000;
+    // Long enough for a second success or refusal sent with the first to arrive.
+    constexpr TimeMS kSettleMs = 500;
+
+    Router2 routerPlugin, sourcePlugin, endpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    endpointPlugin.AddIntermediary( SystemAddress( "127.0.0.1", kRouterPort ) );
+
+    int established = 0;
+    int noRoute = 0;
+    int rerouted = 0;
+    const auto count = [&]( const Received& each ) {
+        if( each.peer == source && each.id == ID_ROUTER_2_FORWARDING_ESTABLISHED )
+            established++;
+        if( IsNoRoute( each, source, endpoint ) )
+            noRoute++;
+        if( each.peer == endpoint && each.id == ID_ROUTER_2_REROUTED )
+            rerouted++;
+        return false;
+    };
+
+    // Not pumping the endpoint holds the punch back while the repeat arrives.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    PumpUntil( { router, source }, count, kPunchStallMs );
+    RequestForwarding( source, router, endpoint );
+    PumpUntil( { router, source }, count, kPunchStallMs );
+    REQUIRE( established == 0 );
+    REQUIRE( noRoute == 0 );
+
+    PumpUntil( peers, [&]( const Received& each ) {
+        count( each );
+        return established > 0 && rerouted > 0;
+    } );
+    PumpUntil( peers, count, kSettleMs );
+    CHECK( established == 1 );
+    CHECK( noRoute == 0 );
+    CHECK( rerouted == 1 );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
 }

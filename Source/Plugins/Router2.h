@@ -182,6 +182,8 @@ public:
         RakNet::TimeMS nextAction;
         unsigned short forwardingPort;
         __UDPSOCKET__ forwardingSocket;
+        // Whether this punch created the forwarder entry, which it then releases if abandoned
+        bool createdEntry;
     };
 
     struct ForwardedConnection
@@ -236,6 +238,8 @@ protected:
     void SendOOBFromRakNetPort( OutOfBandIdentifiers oob, BitStream* extraData, SystemAddress sa );
     void SendOOBFromSpecifiedSocket( OutOfBandIdentifiers oob, SystemAddress sa, __UDPSOCKET__ socket );
     void SendOOBMessages( MiniPunchRequest* mpr );
+    // Releases the forwarder entry of an abandoned punch
+    void ReleaseForwarding( const MiniPunchRequest& mpr );
 
     Router2DebugInterface* debugInterface;
     unsigned short socketFamily;
