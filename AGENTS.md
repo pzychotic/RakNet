@@ -22,6 +22,8 @@ length off the wire or objects created per remote message, is bounded before all
 `tools/lint-banned-apis.pl` rejects the APIs that throw for a recoverable failure. Tests
 are exempt. See `docs/adr/0004-raknet-is-exception-neutral.md`.
 
+The judgement calls a reviewer checks a diff against are in `CODING_STANDARDS.md`.
+
 ### Conventions
 
 - In code comments, docs and commit messages, cite an ADR by number only ("ADR-0004"), not by file path.

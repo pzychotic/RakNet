@@ -85,8 +85,8 @@ request. It is dropped if the handshake does not finish in time.
 _Avoid_: Unverified sender, pending connection
 
 **Refused System**:
-A System whose connection request this Peer turned down, for a wrong password or a missing
-or invalid key. Its connection record lives only long enough to deliver the reason, and
+A System whose connection request this Peer turned down for a wrong password. Its
+connection record lives only long enough to deliver the reason, and
 never blocks a new attempt from the same address.
 _Avoid_: Rejected system, denied connection
 
