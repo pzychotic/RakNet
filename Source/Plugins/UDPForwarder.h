@@ -60,8 +60,9 @@ public:
 
     /// Sets the maximum number of forwarding entries allowed
     /// Set according to your available bandwidth and the estimated average bandwidth per forwarded address.
-    /// \param[in] maxEntries The maximum number of simultaneous forwarding entries. Defaults to 64 (32 connections)
-    void SetMaxForwardEntries( unsigned short maxEntries );
+    /// \param[in] maxEntries The maximum number of simultaneous forwarding entries. Defaults to 64
+    /// \note Lowering it below GetUsedForwardEntries() removes no entry. It only refuses new pairs
+    void SetMaxForwardEntries( int maxEntries );
 
     /// \return The \a maxEntries parameter passed to SetMaxForwardEntries(), or the default if it was never called
     int GetMaxForwardEntries( void ) const;
@@ -146,7 +147,8 @@ protected:
     // forwardListNotUpdated's size, published by the forwarder thread after each change for other threads to read
     std::atomic<int> usedForwardEntries;
 
-    unsigned short maxForwardEntries;
+    // Read by the forwarder thread when it pops a request, so a new limit applies from the next one
+    std::atomic<int> maxForwardEntries;
     std::atomic<uint32_t> isRunning, threadRunning;
 };
 

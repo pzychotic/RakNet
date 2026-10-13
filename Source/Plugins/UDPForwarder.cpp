@@ -31,7 +31,7 @@
 
 namespace RakNet {
 
-static const unsigned short DEFAULT_MAX_FORWARD_ENTRIES = 64;
+static const int DEFAULT_MAX_FORWARD_ENTRIES = 64;
 
 void UpdateUDPForwarderGlobal( void* arg );
 
@@ -100,9 +100,9 @@ void UDPForwarder::Shutdown( void )
     forwardListNotUpdated.clear();
     usedForwardEntries = 0;
 }
-void UDPForwarder::SetMaxForwardEntries( unsigned short maxEntries )
+void UDPForwarder::SetMaxForwardEntries( int maxEntries )
 {
-    RakAssert( maxEntries > 0 && maxEntries < 65535 / 2 );
+    RakAssert( maxEntries > 0 );
     maxForwardEntries = maxEntries;
 }
 int UDPForwarder::GetMaxForwardEntries( void ) const
@@ -344,29 +344,29 @@ void UDPForwarder::UpdateUDPForwarder( void )
 
     while( std::optional<StartForwardingInputStruct> sfis = startForwardingInput.Pop() )
     {
-        if( GetUsedForwardEntries() > maxForwardEntries )
-        {
-            sfos.result = UDPFORWARDER_NO_SOCKETS;
-        }
-        else
-        {
-            sfos.result = UDPFORWARDER_RESULT_COUNT;
+        sfos.result = UDPFORWARDER_RESULT_COUNT;
 
-            for( const auto& pEntry : forwardListNotUpdated )
+        for( const auto& pEntry : forwardListNotUpdated )
+        {
+            if( ( pEntry->addr1Unconfirmed == sfis->source &&
+                  pEntry->addr2Unconfirmed == sfis->destination ) ||
+                ( pEntry->addr1Unconfirmed == sfis->destination &&
+                  pEntry->addr2Unconfirmed == sfis->source ) )
             {
-                if( ( pEntry->addr1Unconfirmed == sfis->source &&
-                      pEntry->addr2Unconfirmed == sfis->destination ) ||
-                    ( pEntry->addr1Unconfirmed == sfis->destination &&
-                      pEntry->addr2Unconfirmed == sfis->source ) )
-                {
-                    sfos.forwardingPort = SocketLayer::GetLocalPort( pEntry->socket );
-                    sfos.forwardingSocket = pEntry->socket;
-                    sfos.result = UDPFORWARDER_FORWARDING_ALREADY_EXISTS;
-                    break;
-                }
+                sfos.forwardingPort = SocketLayer::GetLocalPort( pEntry->socket );
+                sfos.forwardingSocket = pEntry->socket;
+                sfos.result = UDPFORWARDER_FORWARDING_ALREADY_EXISTS;
+                break;
             }
+        }
 
-            if( sfos.result == UDPFORWARDER_RESULT_COUNT )
+        if( sfos.result == UDPFORWARDER_RESULT_COUNT )
+        {
+            if( GetUsedForwardEntries() >= maxForwardEntries )
+            {
+                sfos.result = UDPFORWARDER_NO_SOCKETS;
+            }
+            else
             {
                 int sock_opt;
                 sockaddr_in listenerSocketAddress;

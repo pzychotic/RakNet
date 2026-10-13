@@ -205,6 +205,9 @@ void Router2::SetMaximumForwardingRequests( int max )
         udpForwarder.reset();
     }
 
+    if( max > 0 )
+        udpForwarder->SetMaxForwardEntries( max );
+
     maximumForwardingRequests = max;
 }
 
