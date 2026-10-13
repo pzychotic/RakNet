@@ -29,10 +29,13 @@ using namespace RakNet;
 
 namespace {
 
+// Ports no other test uses.
 constexpr unsigned short kRouterPort = 31000;
 constexpr unsigned short kSecondRouterPort = 31001;
 constexpr unsigned short kSourcePort = 31002;
 constexpr unsigned short kEndpointPort = 31003;
+constexpr unsigned short kStrayPort = 31004;
+constexpr unsigned short kSecondEndpointPort = 31005;
 
 // Hang guard for each step. On loopback each takes a few update cycles, tens of
 // milliseconds, apart from the query step, which waits for every router to answer.
@@ -480,4 +483,62 @@ TEST_CASE( "Router2 routes again to an endpoint whose re-route found no Intermed
     second->DetachPlugin( &secondPlugin );
     source->DetachPlugin( &sourcePlugin );
     endpoint->DetachPlugin( &endpointPlugin );
+}
+
+// A reply from a system the request never asked is dropped with the source's Router2 locks
+// released. A lock held past it would hang the source's next Update.
+TEST_CASE( "Router2 routes after a forwarding reply from a system it did not ask", "[router2][network]" )
+{
+    // Router2's internal sub-identifier for a reply to a forwarding query.
+    constexpr unsigned char kReplyForwarding = 1;
+
+    Router2 routerPlugin, sourcePlugin, endpointPlugin, secondEndpointPlugin;
+    routerPlugin.SetMaximumForwardingRequests( 4 );
+
+    PeerScope scope;
+    RakPeerInterface* router = scope.Server( kRouterPort, 4 );
+    RakPeerInterface* source = scope.Server( kSourcePort, 4 );
+    RakPeerInterface* endpoint = scope.Server( kEndpointPort, 4 );
+    RakPeerInterface* secondEndpoint = scope.Server( kSecondEndpointPort, 4 );
+    RakPeerInterface* stray = scope.Server( kStrayPort, 4 );
+    router->AttachPlugin( &routerPlugin );
+    source->AttachPlugin( &sourcePlugin );
+    endpoint->AttachPlugin( &endpointPlugin );
+    secondEndpoint->AttachPlugin( &secondEndpointPlugin );
+    const std::vector<RakPeerInterface*> peers{ router, source, endpoint, secondEndpoint, stray };
+
+    Connect( peers, source, kRouterPort );
+    Connect( peers, endpoint, kRouterPort );
+    Connect( peers, secondEndpoint, kRouterPort );
+
+    // The router answers the query only inside Receive, so not pumping it keeps the request
+    // pending. The stray connects after the query went out, so the request never asked it.
+    sourcePlugin.EstablishRouting( endpoint->GetMyGUID() );
+    Connect( { source, stray }, stray, kSourcePort );
+
+    BitStream reply;
+    reply.Write( (MessageID)ID_ROUTER_2_INTERNAL );
+    reply.Write( kReplyForwarding );
+    reply.Write( endpoint->GetMyGUID() );
+    reply.Write( false );
+    stray->Send( &reply, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, source->GetMyGUID(), false );
+    // Ordered behind the reply, so the source has handled the reply once this arrives.
+    BitStream marker;
+    marker.Write( kUserMessage );
+    stray->Send( &marker, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, source->GetMyGUID(), false );
+    REQUIRE( PumpUntil( { source, stray }, source, kUserMessage ).peer == source );
+
+    const RakNetGUID used = ConnectThroughRoute( peers, source, endpoint );
+    CHECK( used == router->GetMyGUID() );
+    CheckReaches( peers, source, endpoint );
+
+    // The stray never answers this query, so the source's Update drops it once the ping
+    // timeout passes and routes through the router.
+    CHECK( Route( peers, sourcePlugin, source, secondEndpoint ) == router->GetMyGUID() );
+    CheckReaches( peers, source, secondEndpoint );
+
+    router->DetachPlugin( &routerPlugin );
+    source->DetachPlugin( &sourcePlugin );
+    endpoint->DetachPlugin( &endpointPlugin );
+    secondEndpoint->DetachPlugin( &secondEndpointPlugin );
 }
