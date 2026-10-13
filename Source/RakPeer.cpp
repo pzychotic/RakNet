@@ -72,13 +72,13 @@ public:
     {
         std::thread::id expected;
         const std::thread::id self = std::this_thread::get_id();
-        owner = threadInside.compare_exchange_strong( expected, self );
-        RakAssert( owner || expected == self );
+        ownsRecord = threadInside.compare_exchange_strong( expected, self );
+        RakAssert( ownsRecord || expected == self );
     }
 
     ~ReceiveThreadGuard()
     {
-        if( owner )
+        if( ownsRecord )
             threadInside.store( std::thread::id() );
     }
 
@@ -87,7 +87,7 @@ public:
 
 private:
     std::atomic<std::thread::id>& threadInside;
-    bool owner;
+    bool ownsRecord;
 };
 
 } // namespace

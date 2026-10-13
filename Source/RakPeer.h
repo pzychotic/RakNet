@@ -1154,8 +1154,8 @@ protected:
     std::atomic<bool> limitConnectionFrequencyFromTheSameIP;
 
     /// The thread inside Receive, or the default id when none is. Receive asserts that no
-    /// other thread is inside it (ADR-0011, point 7). Kept in every build, so the layout
-    /// does not depend on NDEBUG.
+    /// other thread is inside it (ADR-0011, point 7). Present in every build; only the
+    /// check is debug-only.
     std::atomic<std::thread::id> threadInsideReceive{ std::thread::id() };
 
     std::mutex packetReturnMutex;
