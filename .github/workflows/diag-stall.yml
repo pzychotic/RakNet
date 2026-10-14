@@ -18,7 +18,61 @@ permissions:
   contents: read
 
 jobs:
+  # [DEBUG-tcp] The bindAddress pair failed on linux-gcc IPv6=0 (run 38629115514, test #80,
+  # 0.09 s). Loops #79 then #80 in ctest's order and prints why the connect failed.
+  linux-tcp:
+    name: linux-tcp (gcc, IPv6=0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CXX: g++
+      CXXFLAGS: -DRAKNET_SUPPORT_IPV6=0 -DRAKNET_DIAG_STALL=1
+      RUNS: ${{ inputs.runs || '3000' }}
+      SUITES: ${{ inputs.suites || '5' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Runner
+        run: |
+          nproc; uname -a
+          cat /proc/sys/net/ipv4/ip_local_port_range
+          cat /proc/sys/net/ipv4/tcp_tw_reuse
+          ss -tanp 2>/dev/null | head -40
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel --target RakNetTests
+      - name: Loop the pair
+        run: |
+          set +e
+          T=build/Tests/RakNetTests
+          fail=0
+          for i in $(seq 1 "$RUNS"); do
+            "$T" "Connect accepts the longest bindAddress that fits\, blocking" >/tmp/p79.txt 2>&1 </dev/null
+            snap=$(ss -tanH '( sport = :31010 or dport = :31010 )')
+            if ! "$T" "Connect accepts the longest bindAddress that fits\, non-blocking" >/tmp/p80.txt 2>&1 </dev/null; then
+              fail=$((fail+1))
+              echo "===== run $i failed"
+              echo "--- #79 output"; grep -E "DEBUG-tcp|FAILED|passed|failed" /tmp/p79.txt
+              echo "--- sockets on 31010 between #79 and #80"; echo "$snap"
+              echo "--- #80 output"; cat /tmp/p80.txt
+              echo "--- sockets on 31010 now"; ss -tanH '( sport = :31010 or dport = :31010 )'
+            fi
+          done
+          echo "pair: fail=$fail of $RUNS"
+          echo "pair: fail=$fail of $RUNS" >> "$GITHUB_STEP_SUMMARY"
+      - name: Loop the suite
+        if: always()
+        run: |
+          set +e
+          for i in $(seq 1 "$SUITES"); do
+            out=$(ctest --test-dir build --output-on-failure --no-tests=error 2>&1); rc=$?
+            line=$(echo "$out" | grep -E "tests passed|tests failed")
+            echo "suite $i : $line"; echo "suite $i : $line" >> "$GITHUB_STEP_SUMMARY"
+            if [ $rc -ne 0 ]; then echo "$out" | grep -E "DEBUG-tcp|DEBUG-stall|\*\*\*Failed|FAILED:|with expansion" ; fi
+          done
+
   loop:
+    if: false # [DEBUG-tcp] Windows rounds are done; this round is Linux only.
     name: loop (windows-msvc, IPv6=${{ matrix.ipv6 }})
     strategy:
       fail-fast: false

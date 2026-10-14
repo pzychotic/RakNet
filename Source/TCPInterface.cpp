@@ -148,9 +148,23 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
     SocketLayer::SetSocketOptions( listenSocket, false, false );
 
     if( bind__( listenSocket, (struct sockaddr*)&serverAddress, sizeof( serverAddress ) ) < 0 )
+    {
+#if defined( RAKNET_DIAG_STALL )
+        printf( "[DEBUG-tcp] listen bind port %u failed errno=%d (%s)\n", (unsigned)port, errno, strerror( errno ) ); // [DEBUG-tcp]
+        fflush( stdout );
+#endif
         return false;
+    }
 
+#if defined( RAKNET_DIAG_STALL )
+    if( listen__( listenSocket, maxIncomingConnections ) != 0 ) // [DEBUG-tcp]
+    {
+        printf( "[DEBUG-tcp] listen port %u failed errno=%d (%s)\n", (unsigned)port, errno, strerror( errno ) );
+        fflush( stdout );
+    }
+#else
     listen__( listenSocket, maxIncomingConnections );
+#endif
 #else
     struct addrinfo hints;
     memset( &hints, 0, sizeof( addrinfo ) ); // make sure the struct is empty
@@ -1025,7 +1039,13 @@ __TCPSOCKET__ TCPInterface::SocketConnect( const char* host, unsigned short remo
     hints.ai_socktype = SOCK_STREAM;
     const AddrInfoPtr res = ResolveAddrInfo( host, 0, hints );
     if( !res )
+    {
+#if defined( RAKNET_DIAG_STALL )
+        printf( "[DEBUG-tcp] resolve '%s' failed\n", host ); // [DEBUG-tcp]
+        fflush( stdout );
+#endif
         return INVALID_SOCKET;
+    }
     const in_addr serverHostAddress = ( (const sockaddr_in*)res->ai_addr )->sin_addr;
 
     __TCPSOCKET__ sockfd = socket__( AF_INET, SOCK_STREAM, 0 );
@@ -1096,7 +1116,13 @@ bool TCPInterface::ConnectUnlessStopping( __TCPSOCKET__ sockfd, const sockaddr* 
     if( connect__( sockfd, address, addressLength ) != 0 )
     {
         if( IsConnectInProgress() == false )
+        {
+#if defined( RAKNET_DIAG_STALL )
+            printf( "[DEBUG-tcp] connect failed at once errno=%d (%s)\n", errno, strerror( errno ) ); // [DEBUG-tcp]
+            fflush( stdout );
+#endif
             return false;
+        }
 
         for( ;; )
         {
@@ -1117,13 +1143,25 @@ bool TCPInterface::ConnectUnlessStopping( __TCPSOCKET__ sockfd, const sockaddr* 
             if( selectResult > 0 )
                 break;
             if( selectResult < 0 && IsInterruptedCall() == false )
+            {
+#if defined( RAKNET_DIAG_STALL )
+                printf( "[DEBUG-tcp] connect select failed errno=%d (%s)\n", errno, strerror( errno ) ); // [DEBUG-tcp]
+                fflush( stdout );
+#endif
                 return false;
+            }
         }
 
         int connectError = 0;
         socklen_t connectErrorLength = sizeof( connectError );
         if( getsockopt__( sockfd, SOL_SOCKET, SO_ERROR, (char*)&connectError, &connectErrorLength ) != 0 || connectError != 0 )
+        {
+#if defined( RAKNET_DIAG_STALL )
+            printf( "[DEBUG-tcp] connect failed SO_ERROR=%d (%s)\n", connectError, strerror( connectError ) ); // [DEBUG-tcp]
+            fflush( stdout );
+#endif
             return false;
+        }
     }
 
     // The update loop and RemoteClient::Send rely on blocking sends.
@@ -1156,6 +1194,10 @@ void ConnectionAttemptLoop( void* arg )
     }
     else if( tcpInterface->ActivateConnectingClient( newRemoteClientIndex, sockfd, systemAddress ) == false )
     {
+#if defined( RAKNET_DIAG_STALL )
+        printf( "[DEBUG-tcp] ActivateConnectingClient refused slot %d\n", newRemoteClientIndex ); // [DEBUG-tcp]
+        fflush( stdout );
+#endif
         closesocket__( sockfd );
 
         std::lock_guard<std::mutex> guard( tcpInterface->failedConnectionAttemptMutex );
