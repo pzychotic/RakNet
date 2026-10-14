@@ -13,8 +13,7 @@
 #include <atomic>
 #include <cstdint>
 
-namespace RakNet {
-namespace DiagStall {
+namespace RakNet::DiagStall {
 
 enum Checkpoint : int
 {
@@ -111,10 +110,80 @@ inline void RecvPushed( const void* peer )
     recvPushed.fetch_add( 1, std::memory_order_relaxed );
 }
 
+// Timed sections inside the plugin's logging path, recorded only while a peer is watched.
+enum Section : int
+{
+    SEC_NONE = 0,
+    SEC_FORMAT_LINE,
+    SEC_GET_LOCAL_TIME,
+    SEC_FILE_LOCK,
+    SEC_FPRINTF,
+    SEC_FFLUSH,
+    SEC_COUNT
+};
+
+inline const char* SectionName( int s )
+{
+    static const char* names[SEC_COUNT] = { "NONE", "FORMAT_LINE", "GET_LOCAL_TIME", "FILE_LOCK", "FPRINTF", "FFLUSH" };
+    return s >= 0 && s < SEC_COUNT ? names[s] : "?";
 }
+
+inline std::atomic<int> currentSection{ SEC_NONE };
+inline std::atomic<uint64_t> currentSectionStartUs{ 0 };
+inline std::atomic<uint64_t> sectionMaxUs[SEC_COUNT];
+inline std::atomic<uint64_t> sectionCount[SEC_COUNT];
+
+inline void ResetSections()
+{
+    currentSection = SEC_NONE;
+    currentSectionStartUs = 0;
+    for( int i = 0; i < SEC_COUNT; ++i )
+    {
+        sectionMaxUs[i] = 0;
+        sectionCount[i] = 0;
+    }
+}
+
+// Times a section; nesting records the innermost one as current.
+struct SectionTimer
+{
+    int section;
+    int outer;
+    uint64_t outerStartUs;
+    uint64_t startUs;
+    bool active;
+
+    explicit SectionTimer( int s )
+    : section( s )
+    , outer( SEC_NONE )
+    , outerStartUs( 0 )
+    , startUs( 0 )
+    , active( watchedPeer.load( std::memory_order_relaxed ) != nullptr )
+    {
+        if( !active )
+            return;
+        startUs = RakNet::GetTimeUS();
+        outer = currentSection.load();
+        outerStartUs = currentSectionStartUs.load();
+        currentSectionStartUs = startUs;
+        currentSection = s;
+    }
+    ~SectionTimer()
+    {
+        if( !active )
+            return;
+        Max( sectionMaxUs[section], RakNet::GetTimeUS() - startUs );
+        sectionCount[section].fetch_add( 1, std::memory_order_relaxed );
+        currentSection = outer;
+        currentSectionStartUs = outerStartUs;
+    }
+};
+
 } // namespace RakNet::DiagStall
 
 #define RAKNET_DIAG_MARK( peer, cp ) ::RakNet::DiagStall::Mark( peer, ::RakNet::DiagStall::cp )
+#define RAKNET_DIAG_SECTION( name, s ) ::RakNet::DiagStall::SectionTimer name( ::RakNet::DiagStall::s )
 #else
 #define RAKNET_DIAG_MARK( peer, cp ) ( (void)0 )
+#define RAKNET_DIAG_SECTION( name, s ) ( (void)0 )
 #endif

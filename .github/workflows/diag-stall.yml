@@ -29,7 +29,7 @@ jobs:
     env:
       CXXFLAGS: -DRAKNET_SUPPORT_IPV6=${{ matrix.ipv6 }} -DRAKNET_DIAG_STALL=1
       RUNS: ${{ inputs.runs || '300' }}
-      SUITES: ${{ inputs.suites || '3' }}
+      SUITES: ${{ inputs.suites || '1' }}
     steps:
       - uses: actions/checkout@v7
       - name: Runner
@@ -38,6 +38,9 @@ jobs:
           Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version | Format-List
           Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
           Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl | Select-Object Win32PrioritySeparation | Format-List
+          try { Get-MpComputerStatus | Select-Object AMRunningMode, RealTimeProtectionEnabled, OnAccessProtectionEnabled | Format-List } catch { Write-Host "Get-MpComputerStatus: $_" }
+          try { (Get-MpPreference).ExclusionPath } catch { Write-Host "Get-MpPreference: $_" }
+          Write-Host "TEMP=$env:TEMP"
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build

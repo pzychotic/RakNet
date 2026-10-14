@@ -623,6 +623,7 @@ TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread lo
         logged->AttachPlugin( &logger );
         SocketDescriptor socketDescriptor( 0, nullptr );
 #if defined( RAKNET_DIAG_STALL )
+        DiagStall::ResetSections(); // [DEBUG-stall]
         DiagStall::Reset( logged ); // [DEBUG-stall]
         const uint64_t diagStartupUs = RakNet::GetTimeUS();
 #endif
@@ -653,6 +654,13 @@ TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread lo
                 printf( "[DEBUG-stall] stage=%d %s iters=%d stageUs=%llu lines=%zu cycles=%llu processed=%llu recvPushed=%llu maxCycleUs=%llu maxWaitUs=%llu\n", diagStage, met ? "OK" : "STALL", i,
                         (unsigned long long)( now - diagStageStartUs ), (size_t)logger.linesLogged, (unsigned long long)cycles.load(), (unsigned long long)datagramsProcessed.load(),
                         (unsigned long long)recvPushed.load(), (unsigned long long)maxCycleUs.load(), (unsigned long long)maxWaitUs.load() );
+                {
+                    const int sec = currentSection.load();
+                    printf( "[DEBUG-stall] stage=%d section now=%s for %lluus;", diagStage, SectionName( sec ), sec != SEC_NONE && currentSectionStartUs.load() <= now ? (unsigned long long)( now - currentSectionStartUs.load() ) : 0ull );
+                    for( int s = 1; s < SEC_COUNT; ++s )
+                        printf( " %s max=%lluus n=%llu;", SectionName( s ), (unsigned long long)sectionMaxUs[s].load(), (unsigned long long)sectionCount[s].load() );
+                    printf( "\n" );
+                }
                 if( !met )
                 {
                     printf( "[DEBUG-stall] now=+%lluus since Startup; last=%s at +%lluus\n", (unsigned long long)( now - diagStartupUs ), Name( lastCheckpoint.load() ),
@@ -676,6 +684,8 @@ TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread lo
                     printf( "[DEBUG-stall] threadId=%lu cycles %llu -> %llu (+%llu) over 200ms quiet; checkpoint %s -> %s; AFTER_WAIT hits %llu -> %llu; lines=%zu\n", updateThreadId.load(),
                             (unsigned long long)c0, (unsigned long long)c1, (unsigned long long)( c1 - c0 ), Name( cpBefore ), Name( lastCheckpoint.load() ), (unsigned long long)hitsBefore,
                             (unsigned long long)hits[DS_AFTER_WAIT].load(), (size_t)logger.linesLogged );
+                    printf( "[DEBUG-stall] after quiet: section=%s for %lluus\n", SectionName( currentSection.load() ),
+                            currentSection.load() != SEC_NONE ? (unsigned long long)( RakNet::GetTimeUS() - currentSectionStartUs.load() ) : 0ull );
                     SYSTEM_INFO si;
                     GetSystemInfo( &si );
                     printf( "[DEBUG-stall] processors=%lu\n", si.dwNumberOfProcessors );

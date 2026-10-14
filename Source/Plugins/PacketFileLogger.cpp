@@ -12,6 +12,7 @@
 #if _RAKNET_SUPPORT_PacketLogger == 1
 #include "Plugins/PacketFileLogger.h"
 #include "GetTime.h"
+#include "DiagStall.h" // [DEBUG-stall]
 
 namespace RakNet {
 
@@ -51,10 +52,15 @@ void PacketFileLogger::StartLog( const char* filenamePrefix )
 
 void PacketFileLogger::WriteLog( const char* str )
 {
+    RAKNET_DIAG_SECTION( diagLock, SEC_FILE_LOCK ); // [DEBUG-stall]
     std::lock_guard<std::mutex> lock( packetLogFileMutex );
     if( packetLogFile )
     {
-        fprintf( packetLogFile, "%s\n", str );
+        {
+            RAKNET_DIAG_SECTION( diagPrintf, SEC_FPRINTF ); // [DEBUG-stall]
+            fprintf( packetLogFile, "%s\n", str );
+        }
+        RAKNET_DIAG_SECTION( diagFlush, SEC_FFLUSH ); // [DEBUG-stall]
         fflush( packetLogFile );
     }
 }
