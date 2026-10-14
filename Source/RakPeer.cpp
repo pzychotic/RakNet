@@ -3758,7 +3758,16 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
 {
     char str1[64];
     systemAddress.ToString( false, str1 );
+#if defined( RAKNET_DIAG_STALL )
+    bool diagBanned;
+    {
+        RAKNET_DIAG_SECTION( diagIsBanned, SEC_IS_BANNED ); // [DEBUG-stall]
+        diagBanned = rakPeer->IsBanned( str1 );
+    }
+    if( diagBanned )
+#else
     if( rakPeer->IsBanned( str1 ) )
+#endif
     {
         for( PluginInterface2* pPlugin : rakPeer->pluginListNTS )
         {
@@ -5211,6 +5220,7 @@ void UpdateNetworkLoop( void* arg )
 #if defined( _WIN32 )
         ::RakNet::DiagStall::updateThreadId = GetCurrentThreadId(); // [DEBUG-stall]
 #endif
+        ::RakNet::DiagStall::onWatchedThread = true;
     }
 #endif
     RAKNET_DIAG_MARK( rakPeer, DS_LOOP_ENTERED ); // [DEBUG-stall]

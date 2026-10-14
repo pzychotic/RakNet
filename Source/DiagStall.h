@@ -119,14 +119,19 @@ enum Section : int
     SEC_FILE_LOCK,
     SEC_FPRINTF,
     SEC_FFLUSH,
+    SEC_TO_STRING,
+    SEC_IS_BANNED,
     SEC_COUNT
 };
 
 inline const char* SectionName( int s )
 {
-    static const char* names[SEC_COUNT] = { "NONE", "FORMAT_LINE", "GET_LOCAL_TIME", "FILE_LOCK", "FPRINTF", "FFLUSH" };
+    static const char* names[SEC_COUNT] = { "NONE", "FORMAT_LINE", "GET_LOCAL_TIME", "FILE_LOCK", "FPRINTF", "FFLUSH", "TO_STRING", "IS_BANNED" };
     return s >= 0 && s < SEC_COUNT ? names[s] : "?";
 }
+
+// Set on the watched peer's network thread only; sections time that thread alone.
+inline thread_local bool onWatchedThread = false;
 
 inline std::atomic<int> currentSection{ SEC_NONE };
 inline std::atomic<uint64_t> currentSectionStartUs{ 0 };
@@ -158,7 +163,7 @@ struct SectionTimer
     , outer( SEC_NONE )
     , outerStartUs( 0 )
     , startUs( 0 )
-    , active( watchedPeer.load( std::memory_order_relaxed ) != nullptr )
+    , active( onWatchedThread )
     {
         if( !active )
             return;

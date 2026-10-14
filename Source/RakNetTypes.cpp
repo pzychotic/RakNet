@@ -42,6 +42,7 @@
 #include <charconv>
 #include <cinttypes>
 #include <stdlib.h>
+#include "DiagStall.h" // [DEBUG-stall]
 
 namespace RakNet {
 
@@ -338,6 +339,7 @@ void SystemAddress::ToString_New( bool writePort, char* dest, char portDelineato
 #endif // #if RAKNET_SUPPORT_IPV6!=1
 void SystemAddress::ToString( bool writePort, char* dest, char portDelineator ) const
 {
+    RAKNET_DIAG_SECTION( diagToString, SEC_TO_STRING ); // [DEBUG-stall]
 
 #if RAKNET_SUPPORT_IPV6 != 1
     ToString_Old( writePort, dest, portDelineator );

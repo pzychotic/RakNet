@@ -28,8 +28,8 @@ jobs:
     timeout-minutes: 90
     env:
       CXXFLAGS: -DRAKNET_SUPPORT_IPV6=${{ matrix.ipv6 }} -DRAKNET_DIAG_STALL=1
-      RUNS: ${{ inputs.runs || '300' }}
-      SUITES: ${{ inputs.suites || '1' }}
+      RUNS: ${{ inputs.runs || '3000' }}
+      SUITES: ${{ inputs.suites || '5' }}
     steps:
       - uses: actions/checkout@v7
       - name: Runner
@@ -53,6 +53,7 @@ jobs:
           $pass = 0; $fail = 0
           for ($i = 1; $i -le [int]$env:RUNS; $i++) {
             $out = & $exe $name 2>&1 | Out-String
+            $out -split "`n" | Select-String -SimpleMatch "stage=1 " | ForEach-Object { Write-Host "R$i $($_.Line.Trim())" }
             if ($LASTEXITCODE -eq 0) { $pass++ } else {
               $fail++
               Write-Host "===== run $i failed"
