@@ -124,14 +124,27 @@ TCPInterface::~TCPInterface()
     StringCompressor::RemoveReference();
 }
 
+// A restarted server listens again while connections on its port are still closing, in
+// TIME_WAIT or LAST_ACK. POSIX refuses that bind without SO_REUSEADDR. Windows binds anyway,
+// and there SO_REUSEADDR would let a second socket bind the same port.
+static void AllowListenPortReuse( __TCPSOCKET__ listenSocket )
+{
+#if defined( _WIN32 )
+    (void)listenSocket;
+#else
+    int reuse = 1;
+    setsockopt__( listenSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse, sizeof( reuse ) );
+#endif
+}
+
 bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIncomingConnections, unsigned short socketFamily, const char* bindAddress )
 {
-    (void)maxIncomingConnections;
     (void)socketFamily;
 #if RAKNET_SUPPORT_IPV6 != 1
     listenSocket = socket__( AF_INET, SOCK_STREAM, 0 );
     if( listenSocket == INVALID_SOCKET )
         return false;
+    AllowListenPortReuse( listenSocket );
 
     struct sockaddr_in serverAddress;
     memset( &serverAddress, 0, sizeof( sockaddr_in ) );
@@ -148,9 +161,11 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
     SocketLayer::SetSocketOptions( listenSocket, false, false );
 
     if( bind__( listenSocket, (struct sockaddr*)&serverAddress, sizeof( serverAddress ) ) < 0 )
+    {
+        closesocket__( listenSocket );
+        listenSocket = INVALID_SOCKET;
         return false;
-
-    listen__( listenSocket, maxIncomingConnections );
+    }
 #else
     struct addrinfo hints;
     memset( &hints, 0, sizeof( addrinfo ) ); // make sure the struct is empty
@@ -162,14 +177,19 @@ bool TCPInterface::CreateListenSocket( unsigned short port, unsigned short maxIn
     RakAssert( res.ec == std::errc() );
     *res.ptr = '\0';
 
-    listenSocket = BindFirstAddress( ResolveAddrInfo( 0, portStr, hints ).get() );
+    listenSocket = BindFirstAddress( ResolveAddrInfo( 0, portStr, hints ).get(), &AllowListenPortReuse );
     if( listenSocket == INVALID_SOCKET )
         return false;
 
     SocketLayer::SetSocketOptions( listenSocket, false, false );
-
-    listen__( listenSocket, maxIncomingConnections );
 #endif // #if RAKNET_SUPPORT_IPV6!=1
+
+    if( listen__( listenSocket, maxIncomingConnections ) != 0 )
+    {
+        closesocket__( listenSocket );
+        listenSocket = INVALID_SOCKET;
+        return false;
+    }
 
     return true;
 }
@@ -198,16 +218,26 @@ bool TCPInterface::Start( unsigned short port, unsigned short maxIncomingConnect
     remoteClients = std::vector<RemoteClient>( maxConnections );
 
     listenSocket = INVALID_SOCKET;
-    if( maxIncomingConnections > 0 )
+    if( maxIncomingConnections > 0 && CreateListenSocket( port, maxIncomingConnections, socketFamily, bindAddress ) == false )
     {
-        CreateListenSocket( port, maxIncomingConnections, socketFamily, bindAddress );
+        // Left stopped, so Start can be called again.
+        std::vector<RemoteClient>().swap( remoteClients );
+        isStarted--;
+        return false;
     }
 
     // Start the update thread
     int errorCode = RakThread::Create( UpdateTCPInterfaceLoop, this, threadPriority );
 
     if( errorCode != 0 )
+    {
+        if( listenSocket != INVALID_SOCKET )
+            closesocket__( listenSocket );
+        listenSocket = INVALID_SOCKET;
+        std::vector<RemoteClient>().swap( remoteClients );
+        isStarted--;
         return false;
+    }
 
     while( threadRunning == 0 )
     {

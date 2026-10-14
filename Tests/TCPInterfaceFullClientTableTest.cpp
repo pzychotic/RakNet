@@ -42,10 +42,7 @@ namespace {
 
 // TCP, so these share no space with the UDP ports the rest of the suite hardcodes; distinct
 // from the other TCPInterface test's port so a stray listener is never ambiguous about which
-// test left it. One per case rather than one for the file: every case here completes real
-// connections, and CreateListenSocket does not set SO_REUSEADDR before it binds, so a
-// TIME_WAIT left by the previous case could fail the next one's Start for no reason of its
-// own.
+// test left it. One per case.
 constexpr unsigned short kBlockingListenPort = 31011;
 constexpr unsigned short kNonBlockingListenPort = 31012;
 constexpr unsigned short kAcceptListenPort = 31013;

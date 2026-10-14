@@ -26,14 +26,17 @@ inline AddrInfoPtr ResolveAddrInfo( const char* node, const char* service, const
 }
 
 /// Walks list and returns the first socket that socket__ creates and bind__ accepts, or
-/// INVALID_SOCKET if none does. Every socket it rejects is closed.
-inline __UDPSOCKET__ BindFirstAddress( const addrinfo* list )
+/// INVALID_SOCKET if none does. Every socket it rejects is closed. prepare, if given, is
+/// called on each socket before it is bound.
+inline __UDPSOCKET__ BindFirstAddress( const addrinfo* list, void ( *prepare )( __UDPSOCKET__ ) = nullptr )
 {
     for( const addrinfo* aip = list; aip != nullptr; aip = aip->ai_next )
     {
         __UDPSOCKET__ s = socket__( aip->ai_family, aip->ai_socktype, aip->ai_protocol );
         if( s == INVALID_SOCKET )
             continue;
+        if( prepare != nullptr )
+            prepare( s );
         if( bind__( s, aip->ai_addr, (int)aip->ai_addrlen ) >= 0 )
             return s;
         closesocket__( s );

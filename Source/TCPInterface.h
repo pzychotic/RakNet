@@ -71,6 +71,8 @@ public:
     /// \param[in] maxConnections Max total connections, which should be >= maxIncomingConnections
     /// \param[in] threadPriority Passed to the thread creation routine. Use THREAD_PRIORITY_NORMAL for Windows. For Linux based systems, you MUST pass something reasonable based on the thread priorities for your application.
     /// \param[in] socketFamily IP version: For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
+    /// \return false if already started, or if it could not listen on port or start its
+    /// thread. In the last two cases it stays stopped, and Start may be called again.
     bool Start( unsigned short port, unsigned short maxIncomingConnections, unsigned short maxConnections = 0, int _threadPriority = -99999, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
 
     /// Stops the TCP server. Waits for every connect attempt to end, and ends each one still

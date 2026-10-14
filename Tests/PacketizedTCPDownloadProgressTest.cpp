@@ -30,8 +30,7 @@ using namespace RakNet;
 
 namespace {
 
-// TCP, past every port another TCPInterface test takes. CreateListenSocket does not set
-// SO_REUSEADDR before it binds, so no port is shared between cases.
+// TCP, past every port another TCPInterface test takes.
 constexpr unsigned short kShortFirstChunkListenPort = 31056;
 
 // Every rakMalloc_Ex block starts as this, so a byte never written shows up as it.

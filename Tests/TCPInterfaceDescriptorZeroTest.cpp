@@ -32,7 +32,7 @@ namespace {
 
 // TCP, so these share no space with the UDP ports the rest of the suite hardcodes, and
 // distinct from the other TCPInterface tests' ports so a stray listener is never ambiguous
-// about which test left it. One per case, since the listen socket gets no SO_REUSEADDR.
+// about which test left it. One per case.
 constexpr unsigned short kListenOnZeroPort = 31015;
 constexpr unsigned short kConnectOnZeroPort = 31016;
 

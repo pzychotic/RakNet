@@ -34,8 +34,7 @@ using namespace RakNet;
 
 namespace {
 
-// TCP, and distinct from every other test's ports; CreateListenSocket does not set
-// SO_REUSEADDR before it binds, so no port is shared between cases.
+// TCP, distinct from every other test's ports, and one per case.
 constexpr unsigned short kUserCloseListenPort = 31037;
 constexpr unsigned short kUserCloseClientPort = 31038;
 constexpr unsigned short kLostQueuedListenPort = 31039;

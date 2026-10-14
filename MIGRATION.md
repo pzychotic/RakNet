@@ -27,6 +27,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [Timestamped Messages arrive shifted](#timestamped-messages-arrive-shifted)
 - [Router2 and UDPForwarder do what they promised](#router2-and-udpforwarder-do-what-they-promised)
 - [`ConnectWithSocket` refuses a host it can't resolve](#connectwithsocket-refuses-a-host-it-cant-resolve)
+- [`TCPInterface::Start` fails when it can't listen](#tcpinterfacestart-fails-when-it-cant-listen)
 
 ## What did *not* change: the core protocol
 
@@ -1035,3 +1036,14 @@ unassigned address, which could never connect. `Connect` already returned
 `CANNOT_RESOLVE_DOMAIN_NAME`. If you treat anything but `CONNECTION_ATTEMPT_STARTED` as
 failure, nothing to do. If you wait for a Message to learn that a `ConnectWithSocket`
 failed, check its return value too.
+
+## `TCPInterface::Start` fails when it can't listen
+
+**`Start` returns false when its listen socket can't bind or listen.** Stock ignored the
+failure and returned true with nothing listening, so every connection to the port was
+refused. A failed `Start` leaves the interface stopped, and `Start` may be called again.
+
+**On POSIX the listen socket sets `SO_REUSEADDR`.** A server restarted on its port while
+connections there are still closing, in `TIME_WAIT` or `LAST_ACK`, now listens instead of
+failing. A port another socket is listening on still fails. Windows is unchanged: it binds
+there anyway, and its `SO_REUSEADDR` would let a second socket take the port.

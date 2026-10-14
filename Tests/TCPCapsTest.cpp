@@ -43,8 +43,7 @@ using namespace RakNet;
 
 namespace {
 
-// TCP, past every port another TCPInterface test takes. CreateListenSocket does not set
-// SO_REUSEADDR before it binds, so no port is shared between cases.
+// TCP, past every port another TCPInterface test takes, and one per case.
 constexpr unsigned short kOverlongListenPort = 31050;
 constexpr unsigned short kExactMaximumListenPort = 31051;
 constexpr unsigned short kBackpressureListenPort = 31052;

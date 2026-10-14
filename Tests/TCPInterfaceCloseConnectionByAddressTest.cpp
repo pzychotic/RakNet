@@ -41,9 +41,7 @@ namespace {
 // TCP, so these share no space with the UDP ports the rest of the suite hardcodes, and
 // distinct from the other TCPInterface tests' ports so a stray listener is never ambiguous
 // about which test left it. Two listeners for the first case, because a connection is only
-// distinguishable from another by the address it was made to; one for the second. CreateListenSocket
-// does not set SO_REUSEADDR before it binds, so no port is shared between cases: a TIME_WAIT
-// left by one could fail the next one's Start for no reason of its own.
+// distinguishable from another by the address it was made to; one for the second.
 constexpr unsigned short kStaleIndexPortA = 31021;
 constexpr unsigned short kStaleIndexPortB = 31022;
 constexpr unsigned short kUnsetIndexPort = 31023;
