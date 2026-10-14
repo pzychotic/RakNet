@@ -616,16 +616,20 @@ TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread lo
         RakPeerInterface* pinger = peers.Client();
         const unsigned short loggedPort = logged->GetMyBoundAddress().GetPort();
 
-        // Pings until the network thread has logged count more lines.
+        // Pings until the network thread has logged count more lines. The wait is on the
+        // clock, not on a ping count: WriteLog flushes a file on the network thread, and a
+        // flush can block for hundreds of milliseconds, which no count of pings outlasts.
+        RakPeerInterface* const drained[] = { pinger, logged };
         const auto pingUntilLogged = [&]( size_t count ) {
             const size_t target = logger.linesLogged + count;
-            for( int i = 0; i < 10000 && logger.linesLogged < target; ++i )
-            {
-                pinger->Ping( "127.0.0.1", loggedPort, false );
-                ConnectionWaits::Drain( pinger );
-                std::this_thread::yield();
-            }
-            REQUIRE( logger.linesLogged >= target );
+            REQUIRE( ConnectionWaits::DrainUntil(
+                drained, 2,
+                [&] {
+                    for( size_t i = 0; i < count; ++i )
+                        pinger->Ping( "127.0.0.1", loggedPort, false );
+                    return logger.linesLogged >= target;
+                },
+                ConnectionWaits::kSettleBudget ) );
         };
 
         pingUntilLogged( 20 );
