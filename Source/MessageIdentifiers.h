@@ -379,10 +379,13 @@ enum DefaultMessageIDTypes
     /// XBOX integration
     ID_XBOX_LOBBY,
 
-    /// The password we used to challenge the other system passed, meaning the other system has called TwoWayAuthentication::AddPassword() with the same password we passed to TwoWayAuthentication::Challenge()
+    /// A remote system sent us a challenge using TwoWayAuthentication::Challenge(), and proved it knows the password we added with TwoWayAuthentication::AddPassword() for that identifier.
     /// You can read the identifier used to challenge as follows:
     /// BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(RakNet::MessageID)); std::string password; bs.Read(password);
     ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_SUCCESS,
+    /// The other system accepted our response to the challenge we sent with TwoWayAuthentication::Challenge(). This doesn't authenticate the other system: an impostor without the password can send it.
+    /// You can read the identifier used to challenge as follows:
+    /// BitStream bs(packet->data, packet->length, false); bs.IgnoreBytes(sizeof(RakNet::MessageID)); std::string password; bs.Read(password);
     ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS,
     /// A remote system sent us a challenge using TwoWayAuthentication::Challenge(), and the challenge failed.
     /// If the other system must pass the challenge to stay connected, you should call RakPeer::CloseConnection() to terminate the connection to the other system.

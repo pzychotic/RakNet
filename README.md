@@ -30,6 +30,31 @@ affected and what an attacker could do.
   4.081, and this fork until the nonces were drawn from the platform CSPRNG. The wire is
   unchanged, and nothing changes for an integrator.
 
+Known weaknesses
+------------------------------------------
+
+Defects present in stock RakNet that this fork deliberately does not fix. Each entry names what
+is affected, what an attacker can do, and why it stays.
+
+- **TwoWayAuthentication leaks the password to offline guessing and authenticates only one
+  way.** The response to a challenge is `SHA1( nonce || password )`, with no salt and no work
+  factor, and the remote System picks the nonce. Any System a Peer challenges, and any
+  eavesdropper on an exchange, can test password guesses offline at hash speed; a remote that
+  always sends the same nonce can build one precomputed table and use it against every Peer.
+  `ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS` proves nothing about the remote
+  System, because the reply echoes the challenger's own hash and an impostor without the
+  password can produce it. Only `ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_SUCCESS` means
+  the other side proved it knows the password, so for mutual authentication both sides call
+  `Challenge()`, and each trusts only its own incoming result. A pass authenticates an address
+  or GUID at one moment, not the traffic that follows, which RakNet does not protect
+  (ADR-0010). Affected: every version through stock RakNet 4.081, and this fork. Fixing either
+  defect changes the wire. Offline guessing needs a salted, slow KDF or a PAKE, and the
+  one-way success needs a new message that carries the remote System's own proof. No user of
+  this fork has a use case for the plugin that would justify that. Use high-entropy secrets,
+  not human passwords, and run the plugin inside an encrypted, authenticated transport (DTLS,
+  an encrypted tunnel) if any of this matters. The class documentation in
+  `TwoWayAuthentication.h` carries the same warning.
+
 Continuous integration
 ------------------------------------------
 

@@ -10,7 +10,9 @@
 
 /// \file TwoWayAuthentication.h
 /// \brief Implements two way authentication
-/// \details Given two systems, each of whom known a common password, verify the password without transmitting it
+/// \details Given two systems, each of whom knows a common password, one checks that the other knows it
+/// by challenge and response. The password is not sent in plaintext, but the response lets the
+/// remote System and any eavesdropper guess it offline; see the warning on TwoWayAuthentication.
 /// This can be used to determine what permissions are should be allowed to the other system
 ///
 
@@ -41,10 +43,26 @@
 namespace RakNet {
 
 /// \brief Implements two way authentication
-/// \details Given two systems, each of whom known a common password / identifier pair, verify the password without transmitting it
+/// \details Given two systems, each of whom knows a common password / identifier pair, one checks that
+/// the other knows the password by challenge and response, without sending it in plaintext.
 /// This can be used to determine what permissions are should be allowed to the other system
 /// If the other system should not send any data until authentication passes, you can use the MessageFilter plugin for this. Call MessageFilter::SetAllowMessageID() including ID_TWO_WAY_AUTHENTICATION_NEGOTIATION when doing so. Also attach MessageFilter first in the list of plugins
-/// \note If other systems challenges us, and fails, you will get ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_FAILED.
+/// \note If another system challenges us and fails, you will get ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_FAILURE.
+/// \warning The plugin has three limits:
+/// - The password can be guessed offline. The response is SHA1( nonce || password ), with no salt
+///   and no work factor, and the remote System picks the nonce. Any System this Peer challenges,
+///   and any eavesdropper on an exchange, can test guesses at hash speed. A remote that always
+///   sends the same nonce can use one precomputed table against every Peer it is challenged by.
+/// - ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS proves nothing about the remote System. The
+///   reply echoes this Peer's own hash, so an impostor without the password can produce it. Only
+///   ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_SUCCESS means the other side proved it knows the
+///   password. For mutual authentication, both sides call Challenge(), and each trusts only its own
+///   incoming result.
+/// - A pass authenticates an address or GUID at one moment, not the traffic that follows. RakNet
+///   has no transport security (ADR-0010).
+/// Use high-entropy secrets, not human passwords. If any of these limits matters, run the plugin
+/// inside a transport that is already encrypted and authenticated, such as DTLS or an encrypted
+/// tunnel.
 /// \ingroup PLUGINS_GROUP
 class RAK_DLL_EXPORT TwoWayAuthentication : public PluginInterface2
 {
@@ -56,7 +74,7 @@ public:
     virtual ~TwoWayAuthentication();
 
     /// \brief Adds a password to the list of passwords the system will accept
-    /// \details Each password, which is secret and not transmitted, is identified by \a identifier.
+    /// \details Each password, which is never sent in plaintext, is identified by \a identifier.
     /// \a identifier is transmitted in plaintext with the request. It is only needed because the system supports multiple password.
     /// It is used to only hash against once password on the remote system, rather than having to hash against every known password.
     /// \param[in] identifier A unique identifier representing this password. This is transmitted in plaintext and should be considered insecure
@@ -65,8 +83,11 @@ public:
     bool AddPassword( const std::string& identifier, const std::string& password );
 
     /// \brief Challenge another system for the specified identifier
-    /// \details After calling Challenge, you will get back ID_TWO_WAY_AUTHENTICATION_SUCCESS, ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, or ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_FAILED
-    /// ID_TWO_WAY_AUTHENTICATION_SUCCESS will be returned if and only if the other system has called AddPassword() with the same identifier\password pair as this system.
+    /// \details After calling Challenge, you will get back ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS, ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, or ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_FAILURE
+    /// The remote System sends ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS when it accepts this Peer's response.
+    /// \warning ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS doesn't authenticate the remote System:
+    /// an impostor without the password can produce it. To authenticate the remote System, it must call
+    /// Challenge() in turn, and only this Peer's ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_SUCCESS counts.
     /// \param[in] identifier A unique identifier representing this password. This is transmitted in plaintext and should be considered insecure
     /// \return True on success, false on remote system not connected, or identifier not previously added with AddPassword()
     bool Challenge( const std::string& identifier, AddressOrGUID remoteSystem );
