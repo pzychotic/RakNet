@@ -13,6 +13,9 @@ This fork modernized the core to C++17, which breaks the public API. See
 changes are visible on the wire. The core wire protocol is unchanged, and this fork still
 interoperates with a stock 4.081 peer.
 
+`Help/` is the upstream documentation, kept unchanged as history. Some of what it describes,
+SWIG/C# included, isn't in this fork, and [MIGRATION.md](MIGRATION.md) lists what changed.
+
 Security fixes
 ------------------------------------------
 

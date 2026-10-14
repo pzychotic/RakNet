@@ -439,6 +439,10 @@ user left, and `_DISABLE_MEMORY_POOL` is no longer read.
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
 
+**Bindings:** the SWIG C# bindings (`Swig/`) are gone. They were never regenerated against
+this fork's API and would not have compiled against it. If you need C#, generate your own
+bindings against the DLL. Stock 4.081's `Swig/` is the place to start.
+
 **Security:** `LIBCAT_SECURITY` and `SecureHandshake.h`, which never compiled in this
 fork; `InitializeSecurity`, `DisableSecurity`, `AddToSecurityExceptionList`,
 `RemoveFromSecurityExceptionList`, `IsInSecurityExceptionList` and

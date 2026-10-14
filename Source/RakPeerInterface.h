@@ -414,7 +414,7 @@ public:
     /// Get a random 64-bit number from the operating system's random number source.
     /// See GLOSSARY.md for what a RakNetGUID promises.
     ///
-    /// This exists for the exported and SWIG-bound API. New code inside the library
+    /// This exists for the exported API. New code inside the library
     /// should call RakNet::FillRandomBytes, which reports failure separately from its
     /// output, or RakPeer::DrawGuidValue when the value is to be a RakNetGUID - the
     /// single return value here cannot tell a failed draw from a drawn zero, and it
