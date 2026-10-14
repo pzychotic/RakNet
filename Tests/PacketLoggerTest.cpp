@@ -11,6 +11,16 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "DiagStall.h" // [DEBUG-stall]
+#if defined( _WIN32 )
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+#include <cstdio>
+#include <cstdlib>
+
 #include <atomic>
 #include <filesystem>
 #include <fstream>
@@ -612,19 +622,70 @@ TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread lo
         RakPeerInterface* logged = peers.Create();
         logged->AttachPlugin( &logger );
         SocketDescriptor socketDescriptor( 0, nullptr );
+#if defined( RAKNET_DIAG_STALL )
+        DiagStall::Reset( logged ); // [DEBUG-stall]
+        const uint64_t diagStartupUs = RakNet::GetTimeUS();
+#endif
         REQUIRE( logged->Startup( 1, &socketDescriptor, 1 ) == RAKNET_STARTED );
         RakPeerInterface* pinger = peers.Client();
         const unsigned short loggedPort = logged->GetMyBoundAddress().GetPort();
+        int diagStage = 0; // [DEBUG-stall]
 
         // Pings until the network thread has logged count more lines.
         const auto pingUntilLogged = [&]( size_t count ) {
             const size_t target = logger.linesLogged + count;
-            for( int i = 0; i < 10000 && logger.linesLogged < target; ++i )
+            ++diagStage;
+            const uint64_t diagStageStartUs = RakNet::GetTimeUS(); // [DEBUG-stall]
+            int i = 0;
+            // RN_DIAG_FORCE_STALL exercises the dump path locally.
+            const int diagCap = std::getenv( "RN_DIAG_FORCE_STALL" ) ? 0 : 10000;
+            for( ; i < diagCap && logger.linesLogged < target; ++i )
             {
                 pinger->Ping( "127.0.0.1", loggedPort, false );
                 ConnectionWaits::Drain( pinger );
                 std::this_thread::yield();
             }
+#if defined( RAKNET_DIAG_STALL )
+            {
+                using namespace DiagStall;
+                const uint64_t now = RakNet::GetTimeUS();
+                const bool met = logger.linesLogged >= target;
+                printf( "[DEBUG-stall] stage=%d %s iters=%d stageUs=%llu lines=%zu cycles=%llu processed=%llu recvPushed=%llu maxCycleUs=%llu maxWaitUs=%llu\n", diagStage, met ? "OK" : "STALL", i,
+                        (unsigned long long)( now - diagStageStartUs ), (size_t)logger.linesLogged, (unsigned long long)cycles.load(), (unsigned long long)datagramsProcessed.load(),
+                        (unsigned long long)recvPushed.load(), (unsigned long long)maxCycleUs.load(), (unsigned long long)maxWaitUs.load() );
+                if( !met )
+                {
+                    printf( "[DEBUG-stall] now=+%lluus since Startup; last=%s at +%lluus\n", (unsigned long long)( now - diagStartupUs ), Name( lastCheckpoint.load() ),
+                            lastCheckpointUs.load() ? (unsigned long long)( lastCheckpointUs.load() - diagStartupUs ) : 0ull );
+                    for( int cp = 1; cp < DS_COUNT; ++cp )
+                        printf( "[DEBUG-stall]   %-22s first=+%lluus hits=%llu\n", Name( cp ), firstUs[cp].load() ? (unsigned long long)( firstUs[cp].load() - diagStartupUs ) : 0ull, (unsigned long long)hits[cp].load() );
+                    printf( "[DEBUG-stall] recv first=+%lluus last=+%lluus\n", recvFirstUs.load() ? (unsigned long long)( recvFirstUs.load() - diagStartupUs ) : 0ull,
+                            recvLastUs.load() ? (unsigned long long)( recvLastUs.load() - diagStartupUs ) : 0ull );
+#if defined( _WIN32 )
+                    // Does the stuck thread get CPU? Sample its cycles and checkpoint before and
+                    // after 200 ms in which this thread stops flooding.
+                    HANDLE th = updateThreadId.load() ? OpenThread( THREAD_QUERY_LIMITED_INFORMATION, FALSE, updateThreadId.load() ) : NULL;
+                    ULONG64 c0 = 0, c1 = 0;
+                    if( th )
+                        QueryThreadCycleTime( th, &c0 );
+                    const int cpBefore = lastCheckpoint.load();
+                    const uint64_t hitsBefore = hits[DS_AFTER_WAIT].load();
+                    Sleep( 200 );
+                    if( th )
+                        QueryThreadCycleTime( th, &c1 );
+                    printf( "[DEBUG-stall] threadId=%lu cycles %llu -> %llu (+%llu) over 200ms quiet; checkpoint %s -> %s; AFTER_WAIT hits %llu -> %llu; lines=%zu\n", updateThreadId.load(),
+                            (unsigned long long)c0, (unsigned long long)c1, (unsigned long long)( c1 - c0 ), Name( cpBefore ), Name( lastCheckpoint.load() ), (unsigned long long)hitsBefore,
+                            (unsigned long long)hits[DS_AFTER_WAIT].load(), (size_t)logger.linesLogged );
+                    SYSTEM_INFO si;
+                    GetSystemInfo( &si );
+                    printf( "[DEBUG-stall] processors=%lu\n", si.dwNumberOfProcessors );
+                    if( th )
+                        CloseHandle( th );
+#endif
+                    fflush( stdout );
+                }
+            }
+#endif
             REQUIRE( logger.linesLogged >= target );
         };
 

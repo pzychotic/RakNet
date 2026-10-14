@@ -1,0 +1,75 @@
+# [DEBUG-stall] Throwaway: loops the PacketLogger test whose network thread stalled on CI,
+# with the RAKNET_DIAG_STALL checkpoint probes compiled in. Not for master.
+name: diag-stall
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs of the single test per cell
+        default: "300"
+      suites:
+        description: Full ctest passes per cell
+        default: "3"
+  push:
+    branches: [ "diag/**" ]
+
+permissions:
+  contents: read
+
+jobs:
+  loop:
+    name: loop (windows-msvc, IPv6=${{ matrix.ipv6 }})
+    strategy:
+      fail-fast: false
+      matrix:
+        ipv6: [0, 1]
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CXXFLAGS: -DRAKNET_SUPPORT_IPV6=${{ matrix.ipv6 }} -DRAKNET_DIAG_STALL=1
+      RUNS: ${{ inputs.runs || '300' }}
+      SUITES: ${{ inputs.suites || '3' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Runner
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version | Format-List
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
+          Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl | Select-Object Win32PrioritySeparation | Format-List
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build --config Debug --parallel
+      - name: Loop the test
+        shell: pwsh
+        run: |
+          $exe = "build\Tests\Debug\RakNetTests.exe"
+          $name = "PacketFileLogger::StartLog may be called while the network thread logs"
+          $pass = 0; $fail = 0
+          for ($i = 1; $i -le [int]$env:RUNS; $i++) {
+            $out = & $exe $name 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0) { $pass++ } else {
+              $fail++
+              Write-Host "===== run $i failed"
+              Write-Host $out
+            }
+          }
+          Write-Host "single test: pass=$pass fail=$fail"
+          "single test: pass=$pass fail=$fail" >> $env:GITHUB_STEP_SUMMARY
+          exit 0
+      - name: Loop the suite
+        if: always()
+        shell: pwsh
+        run: |
+          for ($i = 1; $i -le [int]$env:SUITES; $i++) {
+            $out = ctest --test-dir build -C Debug --output-on-failure --no-tests=error 2>&1 | Out-String
+            $summary = ($out -split "`n" | Select-String -Pattern "tests passed|tests failed").Line
+            Write-Host "suite $i : $summary"
+            "suite $i : $summary" >> $env:GITHUB_STEP_SUMMARY
+            if ($LASTEXITCODE -ne 0) {
+              $out -split "`n" | Select-String -Pattern "DEBUG-stall|\*\*\*Failed|FAILED:|REQUIRE|CHECK|with expansion|>=|==" | ForEach-Object { Write-Host $_.Line }
+            }
+          }
+          exit 0

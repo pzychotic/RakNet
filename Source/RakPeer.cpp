@@ -14,6 +14,7 @@
 #include "RakNetDefines.h"
 #include "RakPeer.h"
 #include "RakNetTypes.h"
+#include "DiagStall.h" // [DEBUG-stall]
 
 #ifdef _WIN32
 
@@ -418,7 +419,9 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
             // Active before the thread exists, so a Shutdown that gets in before it first runs
             // still waits for it.
             isMainLoopThreadActive = true;
+            RAKNET_DIAG_MARK( this, DS_THREAD_CREATE_CALLED ); // [DEBUG-stall]
             int errorCode = RakThread::Create( UpdateNetworkLoop, this, threadPriority );
+            RAKNET_DIAG_MARK( this, DS_THREAD_CREATE_RETURNED ); // [DEBUG-stall]
 
             if( errorCode != 0 )
             {
@@ -3294,6 +3297,9 @@ bool RakPeer::PushBufferedPacket( RNS2RecvStruct* p )
         return false;
     }
     bufferedPacketsQueue.push_back( p );
+#if defined( RAKNET_DIAG_STALL )
+    ::RakNet::DiagStall::RecvPushed( this ); // [DEBUG-stall]
+#endif
     return true;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3312,11 +3318,20 @@ RNS2RecvStruct* RakPeer::PopBufferedPacket( void )
 void RakPeer::HandleBufferedPackets( BitStream& updateBitStream )
 {
     RNS2RecvStruct* recvFromStruct;
+    RAKNET_DIAG_MARK( this, DS_BEFORE_POP ); // [DEBUG-stall]
     while( ( recvFromStruct = PopBufferedPacket() ) != 0 )
     {
+        RAKNET_DIAG_MARK( this, DS_BEFORE_PROCESS ); // [DEBUG-stall]
         ProcessNetworkPacket( recvFromStruct->systemAddress, recvFromStruct->data, recvFromStruct->bytesRead, this, recvFromStruct->socket, recvFromStruct->timeRead, updateBitStream );
         DeallocRNS2RecvStruct( recvFromStruct, _FILE_AND_LINE_ );
+        RAKNET_DIAG_MARK( this, DS_AFTER_PROCESS ); // [DEBUG-stall]
+#if defined( RAKNET_DIAG_STALL )
+        if( this == ::RakNet::DiagStall::watchedPeer.load() )
+            ::RakNet::DiagStall::datagramsProcessed.fetch_add( 1 ); // [DEBUG-stall]
+#endif
+        RAKNET_DIAG_MARK( this, DS_BEFORE_POP ); // [DEBUG-stall]
     }
+    RAKNET_DIAG_MARK( this, DS_AFTER_POP ); // [DEBUG-stall]
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::PingInternal( const SystemAddress target, bool performImmediate, PacketReliability reliability )
@@ -4452,6 +4467,7 @@ bool RakPeer::RunUpdateCycle( BitStream& updateBitStream )
 {
     insideUpdateCycle = true;
     const bool result = RunUpdateCycleBody( updateBitStream );
+    RAKNET_DIAG_MARK( this, DS_BEFORE_PUBLISH ); // [DEBUG-stall]
     PublishView();
     AnswerPendingQueries();
     insideUpdateCycle = false;
@@ -4493,6 +4509,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
 
     HandleBufferedPackets( updateBitStream );
 
+    RAKNET_DIAG_MARK( this, DS_BEFORE_COMMANDS ); // [DEBUG-stall]
     while( std::optional<BufferedCommandStruct> bcs = bufferedCommands.Pop() )
     {
         if( bcs->command == BufferedCommandStruct::BCS_SEND )
@@ -5188,6 +5205,15 @@ void UpdateNetworkLoop( void* arg )
     RakPeer* rakPeer = (RakPeer*)arg;
 
     networkThreadOf = rakPeer;
+#if defined( RAKNET_DIAG_STALL )
+    if( rakPeer == ::RakNet::DiagStall::watchedPeer.load() )
+    {
+#if defined( _WIN32 )
+        ::RakNet::DiagStall::updateThreadId = GetCurrentThreadId(); // [DEBUG-stall]
+#endif
+    }
+#endif
+    RAKNET_DIAG_MARK( rakPeer, DS_LOOP_ENTERED ); // [DEBUG-stall]
 
     // The bitstream is freed when this block ends, before the exit signal below. Once
     // Shutdown returns, the caller may replace the allocator hooks (SetFree_Ex).
@@ -5202,6 +5228,7 @@ void UpdateNetworkLoop( void* arg )
             //      RakAssert(thisCall-lastCall<250);
             //      lastCall=thisCall;
             // #endif
+            RAKNET_DIAG_MARK( rakPeer, DS_BEFORE_USER_MUTEX ); // [DEBUG-stall]
             {
                 std::lock_guard<std::mutex> guard( rakPeer->userUpdateThreadMutex );
                 if( rakPeer->userUpdateThreadPtr )
@@ -5212,11 +5239,33 @@ void UpdateNetworkLoop( void* arg )
                 }
             }
 
+            RAKNET_DIAG_MARK( rakPeer, DS_BEFORE_CYCLE ); // [DEBUG-stall]
+#if defined( RAKNET_DIAG_STALL )
+            const bool diagWatched = rakPeer == ::RakNet::DiagStall::watchedPeer.load(); // [DEBUG-stall]
+            const RakNet::TimeUS diagCycleStart = RakNet::GetTimeUS();
+#endif
             rakPeer->RunUpdateCycle( updateBitStream );
+#if defined( RAKNET_DIAG_STALL )
+            if( diagWatched ) // [DEBUG-stall]
+            {
+                ::RakNet::DiagStall::cycles.fetch_add( 1 );
+                ::RakNet::DiagStall::Max( ::RakNet::DiagStall::maxCycleUs, RakNet::GetTimeUS() - diagCycleStart );
+            }
+#endif
+            RAKNET_DIAG_MARK( rakPeer, DS_AFTER_CYCLE ); // [DEBUG-stall]
 
             // Pending sends go out this often, unless quitAndDataEvents is set. Acks held back so
             // they share a datagram fall due a millisecond after the last ack datagram.
+            RAKNET_DIAG_MARK( rakPeer, DS_BEFORE_WAIT ); // [DEBUG-stall]
+#if defined( RAKNET_DIAG_STALL )
+            const RakNet::TimeUS diagWaitStart = RakNet::GetTimeUS(); // [DEBUG-stall]
+#endif
             rakPeer->quitAndDataEvents.WaitOnEvent( rakPeer->acksWaitingAfterCycle ? 1 : 10 );
+#if defined( RAKNET_DIAG_STALL )
+            if( diagWatched ) // [DEBUG-stall]
+                ::RakNet::DiagStall::Max( ::RakNet::DiagStall::maxWaitUs, RakNet::GetTimeUS() - diagWaitStart );
+#endif
+            RAKNET_DIAG_MARK( rakPeer, DS_AFTER_WAIT ); // [DEBUG-stall]
         }
     }
 
