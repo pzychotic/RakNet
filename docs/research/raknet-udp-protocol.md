@@ -1157,8 +1157,7 @@ not big-endian ([ReliabilityLayer.cpp:2084](Source/ReliabilityLayer.cpp:2084),
 
 * **Encryption.** With `LIBCAT_SECURITY == 0` (default) nothing is encrypted: the datagram is written
   to the socket exactly as serialised ([ReliabilityLayer.cpp:1962](Source/ReliabilityLayer.cpp:1962)).
-  There is no checksum or MAC; the `GetSHA1`/`CheckSHA1` helpers
-  ([ReliabilityLayer.cpp:2394](Source/ReliabilityLayer.cpp:2394)) exist but are never called.
+  There is no checksum or MAC.
 * **No sequence-number randomisation.** Datagram numbers, reliable message numbers, ordering and
   sequencing indices all start at 0 for every connection
   ([ReliabilityLayer.cpp:305](Source/ReliabilityLayer.cpp:305),
