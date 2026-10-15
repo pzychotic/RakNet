@@ -738,9 +738,8 @@ protected:
     /// \param[in] connectionMode   connection mode of the RemoteSystem.
     /// \param[in] rakNetSocket
     /// \param[in] thisIPConnectedRecently  Is this IP connected recently? set to False;
-    /// \param[in] bindingAddress   Address to be binded with the remote system
     /// \param[in] incomingMTU  MTU for the remote system
-    RemoteSystemStruct* AssignSystemAddressToRemoteSystemList( const SystemAddress systemAddress, RemoteSystemStruct::ConnectMode connectionMode, RakNetSocket2* incomingRakNetSocket, bool* thisIPConnectedRecently, SystemAddress bindingAddress, int incomingMTU, RakNetGUID guid );
+    RemoteSystemStruct* AssignSystemAddressToRemoteSystemList( const SystemAddress systemAddress, RemoteSystemStruct::ConnectMode connectionMode, RakNetSocket2* incomingRakNetSocket, bool* thisIPConnectedRecently, int incomingMTU, RakNetGUID guid );
     /// \brief Adjust the timestamp of the incoming packet to be relative to this system.
     /// \param[in] data Data in the incoming packet.
     /// \param[in] systemAddress Sender of the incoming packet.

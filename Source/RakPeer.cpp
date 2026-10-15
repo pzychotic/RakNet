@@ -1137,19 +1137,6 @@ unsigned int RakPeer::GetMaximumNumberOfPeers( void ) const
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::CloseConnection( const AddressOrGUID target, bool sendDisconnectionNotification, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )
 {
-    /*
-    // This only be called from the user thread, for the user shutting down.
-    // From the network thread, this should occur because of ID_DISCONNECTION_NOTIFICATION and ID_CONNECTION_LOST
-    unsigned j;
-    for (j=0; j < messageHandlerList.Size(); j++)
-    {
-        messageHandlerList[j]->OnClosedConnection(
-            target.systemAddress==UNASSIGNED_SYSTEM_ADDRESS ? GetSystemAddressFromGuid(target.rakNetGuid) : target.systemAddress,
-            target.rakNetGuid==UNASSIGNED_RAKNET_GUID ? GetGuidFromSystemAddress(target.systemAddress) : target.rakNetGuid,
-            LCR_CLOSED_BY_USER);
-    }
-    */
-
     CloseConnectionInternal( target, sendDisconnectionNotification, false, orderingChannel, disconnectionNotificationPriority );
 }
 
@@ -2684,7 +2671,7 @@ unsigned int RakPeer::GetNumberOfRemoteInitiatedConnections( void ) const
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( const SystemAddress systemAddress, RemoteSystemStruct::ConnectMode connectionMode, RakNetSocket2* incomingRakNetSocket, bool* thisIPConnectedRecently, SystemAddress bindingAddress, int incomingMTU, RakNetGUID guid )
+RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( const SystemAddress systemAddress, RemoteSystemStruct::ConnectMode connectionMode, RakNetSocket2* incomingRakNetSocket, bool* thisIPConnectedRecently, int incomingMTU, RakNetGUID guid )
 {
     RemoteSystemStruct* remoteSystem;
     unsigned i, j, assignedIndex;
@@ -2711,9 +2698,6 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
         }
     }
 
-    // Don't use a different port than what we received on
-    bindingAddress.CopyPort( incomingRakNetSocket->GetBoundAddress() );
-
     *thisIPConnectedRecently = false;
     for( assignedIndex = 0; assignedIndex < remoteSystemList.size(); assignedIndex++ )
     {
@@ -2735,57 +2719,8 @@ RakPeer::RemoteSystemStruct* RakPeer::AssignSystemAddressToRemoteSystemList( con
             remoteSystem->reliabilityLayer.SetUnreliableTimeout( unreliableTimeout );
             remoteSystem->reliabilityLayer.SetTimeoutTime( defaultTimeoutTime );
             AddToActiveSystemList( assignedIndex );
-            if( incomingRakNetSocket->GetBoundAddress() == bindingAddress )
-            {
-                remoteSystem->rakNetSocket = incomingRakNetSocket;
-            }
-            else
-            {
-                char str[256];
-                bindingAddress.ToString( true, str );
-                // See if this is an internal IP address.
-                // If so, force binding on it so we reply on the same IP address as they sent to.
-                unsigned int ipListIndex, foundIndex = (unsigned int)-1;
-                const auto internalIDs = CopyIPList();
-
-                for( ipListIndex = 0; ipListIndex < MAXIMUM_NUMBER_OF_INTERNAL_IDS; ipListIndex++ )
-                {
-                    if( internalIDs[ipListIndex] == UNASSIGNED_SYSTEM_ADDRESS )
-                        break;
-
-                    if( bindingAddress.EqualsExcludingPort( internalIDs[ipListIndex] ) )
-                    {
-                        foundIndex = ipListIndex;
-                        break;
-                    }
-                }
-
-                // 06/26/09 Unconfirmed report that Vista firewall blocks the reply if we force a binding
-                // For now use the incoming socket only
-                // Originally this code was to force a machine with multiple IP addresses to reply back on the IP
-                // that the datagram came in on
-                if( 1 || foundIndex == (unsigned int)-1 )
-                {
-                    // Must not be an internal LAN address. Just use whatever socket it came in on
-                    remoteSystem->rakNetSocket = incomingRakNetSocket;
-                }
-                else
-                {
-                    /*
-                    // Force binding
-                    unsigned int socketListIndex;
-                    for (socketListIndex=0; socketListIndex < socketList.Size(); socketListIndex++)
-                    {
-                        if (socketList[socketListIndex]->GetBoundAddress()==bindingAddress)
-                        {
-                            // Force binding with existing socket
-                            remoteSystem->rakNetSocket=socketList[socketListIndex];
-                            break;
-                        }
-                    }
-                    */
-                }
-            }
+            // Replies go out on the socket the request came in on.
+            remoteSystem->rakNetSocket = incomingRakNetSocket;
 
             for( j = 0; j < (unsigned)PING_TIMES_ARRAY_SIZE; j++ )
             {
@@ -4042,11 +3977,11 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                     {
                         if( rcs->socket == 0 )
                         {
-                            remoteSystem = rakPeer->AssignSystemAddressToRemoteSystemList( systemAddress, RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER, rakNetSocket, &thisIPConnectedRecently, bindingAddress, mtu, guid );
+                            remoteSystem = rakPeer->AssignSystemAddressToRemoteSystemList( systemAddress, RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER, rakNetSocket, &thisIPConnectedRecently, mtu, guid );
                         }
                         else
                         {
-                            remoteSystem = rakPeer->AssignSystemAddressToRemoteSystemList( systemAddress, RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER, rcs->socket, &thisIPConnectedRecently, bindingAddress, mtu, guid );
+                            remoteSystem = rakPeer->AssignSystemAddressToRemoteSystemList( systemAddress, RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER, rcs->socket, &thisIPConnectedRecently, mtu, guid );
                         }
                     }
 
@@ -4351,7 +4286,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             }
 
             bool thisIPConnectedRecently = false;
-            rssFromSA = rakPeer->AssignSystemAddressToRemoteSystemList( systemAddress, RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER, rakNetSocket, &thisIPConnectedRecently, bindingAddress, mtu, guid );
+            rssFromSA = rakPeer->AssignSystemAddressToRemoteSystemList( systemAddress, RakPeer::RemoteSystemStruct::UNVERIFIED_SENDER, rakNetSocket, &thisIPConnectedRecently, mtu, guid );
 
             if( thisIPConnectedRecently == true )
             {
