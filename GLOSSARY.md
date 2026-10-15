@@ -141,7 +141,7 @@ it. While datagrams keep arriving, their acknowledgements share one ack datagram
 every millisecond, whatever the Message's size. The sender cannot see it on its own: what
 the sender measures is the **Round trip**, from a datagram leaving to its acknowledgement
 arriving, which includes the Ack delay.
-_Avoid_: SYN (the 10 ms ack timer only `CCRakNetUDT` still uses), ack gap (the millisecond
+_Avoid_: SYN (the 10 ms ack timer of upstream's removed `CCRakNetUDT`), ack gap (the millisecond
 between two ack datagrams, not the concept), round trip, ping
 
 **Offline datagram**:

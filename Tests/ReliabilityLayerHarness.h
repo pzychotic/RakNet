@@ -79,9 +79,6 @@ inline void WriteDatagramHeader( BitStream& out, DatagramSequenceNumberType data
     out.Write( false ); // isContinuousSend
     out.Write( false ); // needsBAndAs
     out.AlignWriteToByteBoundary();
-#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
-    out.Write( (RakNet::TimeMS)0 );
-#endif
     out.Write( datagramNumber );
 }
 

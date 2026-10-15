@@ -38,8 +38,6 @@ else use congestion avoidance
 #pragma once
 
 #include "RakNetDefines.h"
-#if USE_SLIDING_WINDOW_CONGESTION_CONTROL == 1
-
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
 
@@ -202,5 +200,3 @@ protected:
 };
 
 } // namespace RakNet
-
-#endif

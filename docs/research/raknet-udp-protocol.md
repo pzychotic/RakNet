@@ -475,8 +475,7 @@ Defined by `struct DatagramHeaderFormat` ([ReliabilityLayer.cpp:84](Source/Relia
 serialised at [ReliabilityLayer.cpp:117](Source/ReliabilityLayer.cpp:117) and parsed at
 [ReliabilityLayer.cpp:159](Source/ReliabilityLayer.cpp:159).
 
-In this build `INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 0`
-([ReliabilityLayer.h:33](Source/ReliabilityLayer.h:33)–39), so **there is no timestamp field**.
+**There is no timestamp field.** Only the removed `CCRakNetUDT` controller sent one.
 
 ### 4.1 Data datagram
 
@@ -519,10 +518,10 @@ byte1.. : [float AS, 4 bytes big-endian]  -- only if BAS == 1
         : range list (see 4.4)
 ```
 
-`BAS` = `hasBAndAS`. With the default sliding-window controller
+`BAS` = `hasBAndAS`. The sliding-window controller's
 `OnSendAckGetBAndAS` always reports `false` ([CCRakNetSlidingWindow.cpp:262](Source/CCRakNetSlidingWindow.cpp:262)),
-so **`AS` is never present in a default build**. (With `CCRakNetUDT` it is the receiver's measured data
-arrival rate in bytes/µs, sent at most once per SYN, [CCRakNetUDT.cpp:546](Source/CCRakNetUDT.cpp:546).)
+so **`AS` is never present**. (The removed `CCRakNetUDT` sent the receiver's measured data
+arrival rate in bytes/µs there, at most once per SYN.)
 `hasBAndAS` is also gated on the peer having asked for it via the `needsBAndAs` bit
 (`remoteSystemNeedsBAndAS`, [ReliabilityLayer.cpp:735](Source/ReliabilityLayer.cpp:735),
 [ReliabilityLayer.cpp:3095](Source/ReliabilityLayer.cpp:3095)).
@@ -1008,10 +1007,8 @@ is periodically true.
 
 ## 10. Congestion control
 
-`USE_SLIDING_WINDOW_CONGESTION_CONTROL` defaults to **1**
-([RakNetDefines.h:98](Source/RakNetDefines.h:98)), selecting `CCRakNetSlidingWindow`
-([ReliabilityLayer.h:515](Source/ReliabilityLayer.h:515)) and setting
-`INCLUDE_TIMESTAMP_WITH_DATAGRAMS 0` ([ReliabilityLayer.h:38](Source/ReliabilityLayer.h:38)).
+`CCRakNetSlidingWindow` is the only congestion controller. Upstream also shipped `CCRakNetUDT`,
+selected by `USE_SLIDING_WINDOW_CONGESTION_CONTROL 0`; both are removed.
 
 `CCRakNetSlidingWindow` is a plain TCP-Reno-style AIMD controller
 ([CCRakNetSlidingWindow.cpp](Source/CCRakNetSlidingWindow.cpp)):
@@ -1032,18 +1029,18 @@ is periodically true.
 * Rate limiting only kicks in when `isContinuousSend` is true — a peer that sends sporadically is
   effectively unthrottled.
 
-**Wire-visible consequences of this choice:**
+**Wire-visible consequences:**
 
-| Field | Sliding window (default) | `CCRakNetUDT` |
+| Field | Sliding window | Upstream `CCRakNetUDT` (removed) |
 |---|---|---|
 | 4-byte `sourceSystemTime` in data and ACK headers | absent | present |
 | `hasBAndAS` bit in ACKs | always 0 | set at most once per SYN |
 | `AS` float in ACKs | never | present when `hasBAndAS` |
 | `needsBAndAs` bit in data headers | usually 1 (slow start) | reflects UDT slow start |
-| `isPacketPair` | always 0 (pairing code commented out) | also 0 in this tree |
+| `isPacketPair` | always 0 (pairing code commented out) | also 0 |
 
-Switching congestion controllers therefore changes the byte layout of the datagram header and is not
-interoperable.
+A peer built with upstream's `USE_SLIDING_WINDOW_CONGESTION_CONTROL 0` therefore lays out the datagram
+header differently and does not interoperate.
 
 ---
 
@@ -1144,7 +1141,6 @@ not big-endian ([ReliabilityLayer.cpp:2084](Source/ReliabilityLayer.cpp:2084),
 
 | Macro | Default | Effect if changed |
 |---|---|---|
-| `USE_SLIDING_WINDOW_CONGESTION_CONTROL` | 1 ([RakNetDefines.h:103](Source/RakNetDefines.h:103)) | 0 selects `CCRakNetUDT` and sets `INCLUDE_TIMESTAMP_WITH_DATAGRAMS 1`, adding a 4-byte `TimeMS` to data and ACK headers |
 | `__GET_TIME_64BIT` | 1 ([RakNetDefines.h:22](Source/RakNetDefines.h:22)) | 0 makes `RakNet::Time` 4 bytes, halving every timestamp field in the handshake and ping messages |
 | `__BITSTREAM_NATIVE_END` | undefined ([RakNetDefines.h:33](Source/RakNetDefines.h:33)) | defining it removes all byte swapping, making multi-byte fields host-endian (little-endian on x86) and breaking interop with default builds on LE hosts |
 | `LIBCAT_SECURITY` | 0 ([NativeFeatureIncludes.h:42](Source/NativeFeatureIncludes.h:42)) | 1 adds cookies, public keys, challenge/answer and per-datagram authenticated encryption ([SecureHandshake.cpp:17](Source/SecureHandshake.cpp:17), [ReliabilityLayer.cpp:533](Source/ReliabilityLayer.cpp:533), [ReliabilityLayer.cpp:1930](Source/ReliabilityLayer.cpp:1930)) |
@@ -1280,4 +1276,4 @@ pinned down from the source alone.
     flush ([ReliabilityLayer.cpp:1507](Source/ReliabilityLayer.cpp:1507)) and is then force-set for all
     but the first datagram of a burst ([ReliabilityLayer.cpp:1789](Source/ReliabilityLayer.cpp:1789)).
     Its only effect on the receiver is being handed to `OnGotPacket`, which the sliding-window
-    controller ignores; it matters to `CCRakNetUDT`.
+    controller ignores; it mattered only to the removed `CCRakNetUDT`.

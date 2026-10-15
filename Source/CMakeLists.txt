@@ -5,7 +5,6 @@ endif()
 set( CURRENT_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStream.h
     ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetSlidingWindow.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetUDT.h
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandParserInterface.h
     ${CMAKE_CURRENT_SOURCE_DIR}/ConsoleServer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/DR_SHA1.h
@@ -57,7 +56,6 @@ set( CURRENT_HEADER
 set( CURRENT_SOURCE
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStream.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetSlidingWindow.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/CCRakNetUDT.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandParserInterface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ConsoleServer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/DR_SHA1.cpp

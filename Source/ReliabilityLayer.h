@@ -26,14 +26,7 @@
 #include "NativeFeatureIncludes.h"
 #include "PluginInterface2.h"
 #include "RakNetSocket2.h"
-
-#if USE_SLIDING_WINDOW_CONGESTION_CONTROL != 1
-#include "CCRakNetUDT.h"
-#define INCLUDE_TIMESTAMP_WITH_DATAGRAMS 1
-#else
 #include "CCRakNetSlidingWindow.h"
-#define INCLUDE_TIMESTAMP_WITH_DATAGRAMS 0
-#endif
 
 #include <atomic>
 #include <deque>
@@ -397,9 +390,6 @@ public:
     bool AckTimeout( RakNet::Time curTime );
     CCTimeType GetNextSendTime( void ) const;
     CCTimeType GetTimeBetweenPackets( void ) const;
-#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
-    CCTimeType GetAckPing( void ) const;
-#endif
     RakNet::TimeMS GetTimeLastDatagramArrived( void ) const
     {
         return timeLastDatagramArrived;
@@ -474,7 +464,7 @@ private:
     unsigned RemovePacketFromResendListAndDeleteOlderReliableSequenced( const MessageNumberType messageNumber, CCTimeType time, std::vector<PluginInterface2*>& messageHandlerList, const SystemAddress& systemAddress );
 
     /// Acknowledge receipt of the packet with the specified messageNumber
-    void SendAcknowledgementPacket( const DatagramSequenceNumberType messageNumber, CCTimeType time );
+    void SendAcknowledgementPacket( const DatagramSequenceNumberType messageNumber );
 
     /// This will return true if we should not send at this time
     bool IsSendThrottled( int MTUSize );
@@ -669,9 +659,6 @@ private:
 
     CCTimeType lastUpdateTime;
     CCTimeType timeBetweenPackets, nextSendTime;
-#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
-    CCTimeType ackPing;
-#endif
     CCTimeType ackPingSum;
     unsigned char ackPingIndex;
     RemoteSystemTimeType remoteSystemTime;
@@ -706,14 +693,8 @@ private:
 
     CCTimeType elapsedTimeSinceLastUpdate;
 
-    CCTimeType nextAckTimeToSend;
 
-
-#if USE_SLIDING_WINDOW_CONGESTION_CONTROL == 1
     CCRakNetSlidingWindow congestionManager;
-#else
-    CCRakNetUDT congestionManager;
-#endif
 
 
     uint32_t unacknowledgedBytes;

@@ -24,12 +24,6 @@
 #include <netdb.h>
 #endif
 
-#if USE_SLIDING_WINDOW_CONGESTION_CONTROL != 1
-#include "CCRakNetUDT.h"
-#else
-#include "CCRakNetSlidingWindow.h"
-#endif
-
 #ifdef _WIN32
 #else
 #include <string.h> // memcpy

@@ -10,8 +10,6 @@
 
 #include "CCRakNetSlidingWindow.h"
 
-#if USE_SLIDING_WINDOW_CONGESTION_CONTROL == 1
-
 #include "MTUSize.h"
 #include <stdio.h>
 #include <climits>
@@ -367,6 +365,3 @@ bool CCRakNetSlidingWindow::IsInSlowStart( void ) const
 }
 
 } // namespace RakNet
-
-// ----------------------------------------------------------------------------------------------------------------------------
-#endif

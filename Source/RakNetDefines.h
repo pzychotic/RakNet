@@ -143,11 +143,6 @@
 /// Uncomment if you want to link in the DLMalloc library to use with RakMemoryOverride
 // #define _LINK_DL_MALLOC
 
-// Use sliding window congestion control instead of ping based congestion control
-#ifndef USE_SLIDING_WINDOW_CONGESTION_CONTROL
-#define USE_SLIDING_WINDOW_CONGESTION_CONTROL 1
-#endif
-
 #ifndef RAKNET_SUPPORT_IPV6
 #define RAKNET_SUPPORT_IPV6 0
 #endif

@@ -97,11 +97,6 @@ inline bool ReadDataDatagramHeader( BitStream& in, DatagramSequenceNumberType& d
     if( in.Read( isPacketPair ) == false || in.Read( isContinuousSend ) == false || in.Read( needsBAndAs ) == false )
         return false;
     in.AlignReadToByteBoundary();
-#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
-    RakNet::TimeMS sourceSystemTime = 0;
-    if( in.Read( sourceSystemTime ) == false )
-        return false;
-#endif
     return in.Read( datagramNumber );
 }
 
@@ -117,11 +112,6 @@ inline bool AckCovers( const char* data, int length, DatagramSequenceNumberType 
     if( in.Read( hasBAndAS ) == false )
         return false;
     in.AlignReadToByteBoundary();
-#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
-    RakNet::TimeMS sourceSystemTime = 0;
-    if( in.Read( sourceSystemTime ) == false )
-        return false;
-#endif
     if( hasBAndAS )
     {
         float AS = 0;
@@ -286,9 +276,6 @@ public:
         datagram.Write( true );  // isACK
         datagram.Write( false ); // hasBAndAS
         datagram.AlignWriteToByteBoundary();
-#if INCLUDE_TIMESTAMP_WITH_DATAGRAMS == 1
-        datagram.Write( (RakNet::TimeMS)0 );
-#endif
         SequenceRanges<DatagramSequenceNumberType> acked;
         acked.Insert( datagramNumber );
         acked.Serialize( &datagram, BytesToBits( MAXIMUM_MTU_SIZE ), false );

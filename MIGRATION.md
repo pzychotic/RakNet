@@ -466,6 +466,12 @@ compiles in 4.081, so nothing you were doing stops working.
   with it. Its code stopped compiling when stock moved sends onto `RakNetSocket2`. A build
   that still defines it now compiles and sends inline from the update cycle.
 
+**Congestion control:** `USE_SLIDING_WINDOW_CONGESTION_CONTROL` and `CCRakNetUDT` (with
+`CCRakNetUDT.h`). Sliding window is the only algorithm. Stock defaulted the switch to 1, so
+the wire format is unchanged for anyone on the default. The switch is no longer read: a
+build that sets it to 0 compiles and uses sliding window, and so cannot talk to a stock Peer
+built with 0, whose datagram headers carry a timestamp.
+
 **`_USE_RAK_MEMORY_OVERRIDE`.** Source-only. Replace the global `operator new`/`delete`
 instead. A build that still defines it compiles, and the `OP_NEW` templates are plain
 `new`/`delete` either way.
