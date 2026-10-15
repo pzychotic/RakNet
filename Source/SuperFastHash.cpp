@@ -27,28 +27,6 @@
 
 namespace RakNet {
 
-static const int INCREMENTAL_READ_BLOCK = 65536;
-
-uint32_t SuperFastHash( const char* data, int length )
-{
-    // All this is necessary or the hash does not match SuperFastHashIncremental
-    int bytesRemaining = length;
-    unsigned int lastHash = length;
-    int offset = 0;
-    while( bytesRemaining >= INCREMENTAL_READ_BLOCK )
-    {
-        lastHash = SuperFastHashIncremental( data + offset, INCREMENTAL_READ_BLOCK, lastHash );
-        bytesRemaining -= INCREMENTAL_READ_BLOCK;
-        offset += INCREMENTAL_READ_BLOCK;
-    }
-    if( bytesRemaining > 0 )
-    {
-        lastHash = SuperFastHashIncremental( data + offset, bytesRemaining, lastHash );
-    }
-    return lastHash;
-
-    //  return SuperFastHashIncremental(data,len,len);
-}
 uint32_t SuperFastHashIncremental( const char* data, int len, unsigned int lastHash )
 {
     uint32_t hash = (uint32_t)lastHash;
@@ -100,38 +78,6 @@ uint32_t SuperFastHashIncremental( const char* data, int len, unsigned int lastH
     hash += hash >> 6;
 
     return (uint32_t)hash;
-}
-
-uint32_t SuperFastHashFile( const char* filename )
-{
-    FILE* fp = fopen( filename, "rb" );
-    if( fp == 0 )
-        return 0;
-    uint32_t hash = SuperFastHashFilePtr( fp );
-    fclose( fp );
-    return hash;
-}
-
-uint32_t SuperFastHashFilePtr( FILE* fp )
-{
-    fseek( fp, 0, SEEK_END );
-    int length = ftell( fp );
-    fseek( fp, 0, SEEK_SET );
-    int bytesRemaining = length;
-    unsigned int lastHash = length;
-    char readBlock[INCREMENTAL_READ_BLOCK];
-    // Stops at the first short read and hashes only the bytes that read returned.
-    while( bytesRemaining > 0 )
-    {
-        const size_t wanted = bytesRemaining < (int)sizeof( readBlock ) ? (size_t)bytesRemaining : sizeof( readBlock );
-        const size_t got = fread( readBlock, 1, wanted, fp );
-        if( got > 0 )
-            lastHash = SuperFastHashIncremental( readBlock, (int)got, lastHash );
-        if( got < wanted )
-            break;
-        bytesRemaining -= (int)got;
-    }
-    return lastHash;
 }
 
 } // namespace RakNet

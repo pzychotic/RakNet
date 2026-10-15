@@ -381,6 +381,8 @@ you will need to keep the stock implementation or do without.
 `seedMT`/`randomMT`/`frandomMT`/`fillBufferMT` functions), and the
 `Gets`/`Getche`/`Kbhit`/`_FindFirst` platform shims. `<mutex>`, `<thread>`, `<atomic>` and
 `<chrono>` replace the threading and timing ones, and `<random>` replaces `Rand.h`.
+`SuperFastHash`, `SuperFastHashFile` and `SuperFastHashFilePtr` are gone from
+`SuperFastHash.h`; `SuperFastHashIncremental` stays.
 
 **`SingleProducerConsumer.h`.** Gone, with no replacement. Use a `std::mutex` and a
 `std::deque`. `ThreadsafePacketLogger`, its only user, now keeps its lines in private
