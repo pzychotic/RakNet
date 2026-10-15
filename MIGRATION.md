@@ -187,10 +187,6 @@ void EncodeString( const char* input, int maxCharsToWrite, BitStream* output );
 bool DecodeString( char* output, int maxCharsToWrite, BitStream* input );
 void EncodeString( const std::string& input, int maxCharsToWrite, BitStream* output );
 bool DecodeString( std::string& output, int maxCharsToWrite, BitStream* input );
-
-// SocketLayer
-static std::string GetSubNetForSocketAndIp( __UDPSOCKET__ inSock,
-                                            const std::string& inIpString );
 ```
 
 The `RAKSTRING_TYPE` macro in `RakNetDefines.h`, which selected `RakString` or `RakWString`
@@ -436,6 +432,10 @@ the queue first, and there is no `Allocate`, `Deallocate` or `SetPageSize`.
 `TCPInterface::incomingMessages` holds `std::unique_ptr<Packet>`, and the unused
 `requestedCloseConnections` and `newRemoteClients` are gone. `MemoryPool` had no other
 user left, and `_DISABLE_MEMORY_POOL` is no longer read.
+
+**`SocketLayer`:** `GetSubNetForSocketAndIp`, `GetMyIP`, `GetFirstBindableIP` and
+`GetSystemAddress_Old`. Use `RakNetSocket2::GetMyIP` in place of `GetMyIP`. Use
+`GetSystemAddress` in place of `GetSystemAddress_Old`.
 
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
