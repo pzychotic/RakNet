@@ -474,6 +474,11 @@ the wire format is unchanged for anyone on the default. The switch is no longer 
 build that sets it to 0 compiles and uses sliding window, and so cannot talk to a stock Peer
 built with 0, whose datagram headers carry a timestamp.
 
+**Configuration macros:** `RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS` and
+`RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH`. Unlike most entries here, a build that
+still defines them compiles; they are no longer read. `RPC4GlobalRegistration` has no cap on
+the number of global registrations or on the length of a name.
+
 **`_USE_RAK_MEMORY_OVERRIDE`.** Source-only. Replace the global `operator new`/`delete`
 instead. A build that still defines it compiles, and the `OP_NEW` templates are plain
 `new`/`delete` either way.

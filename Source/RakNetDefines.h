@@ -147,14 +147,6 @@
 #define RAKNET_SUPPORT_IPV6 0
 #endif
 
-#ifndef RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS
-#define RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS 48
-#endif
-
-#ifndef RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH
-#define RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH 48
-#endif
-
 // If defined to 1, the user is responsible for calling RakPeer::RunUpdateCycle and RakPeer::RunRecvfrom
 #ifndef RAKPEER_USER_THREADED
 #define RAKPEER_USER_THREADED 0

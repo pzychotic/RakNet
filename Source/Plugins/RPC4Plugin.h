@@ -48,6 +48,7 @@ enum RPCErrorCodes
 };
 
 /// \brief Instantiate this class globally if you want to register a function with RPC4 at the global space
+/// \details Construct registrations during static initialisation or on the application thread, never while an RPC4 is being attached (ADR-0011).
 class RAK_DLL_EXPORT RPC4GlobalRegistration
 {
 public:

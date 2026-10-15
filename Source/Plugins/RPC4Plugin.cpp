@@ -23,6 +23,7 @@
 #include <memory>
 #include <string.h>
 #include <thread>
+#include <vector>
 
 namespace RakNet {
 
@@ -32,68 +33,35 @@ struct GlobalRegistration
 {
     void ( *registerFunctionPointer )( BitStream* userData, Packet* packet );
     void ( *registerBlockingFunctionPointer )( BitStream* userData, BitStream* returnData, Packet* packet );
-    char functionName[RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH];
+    std::string functionName;
     MessageID messageId;
     int callPriority;
 };
-static GlobalRegistration globalRegistrationBuffer[RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS];
-static unsigned int globalRegistrationIndex = 0;
+
+// Built on first use, so a registration from another translation unit during static
+// initialisation finds it constructed whatever the initialisation order.
+static std::vector<GlobalRegistration>& GlobalRegistrations()
+{
+    static std::vector<GlobalRegistration> registrations;
+    return registrations;
+}
 
 RPC4GlobalRegistration::RPC4GlobalRegistration( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ) )
 {
-    RakAssert( globalRegistrationIndex != RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS );
-    unsigned int i;
-    for( i = 0; uniqueID[i]; i++ )
-    {
-        RakAssert( i <= RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH - 1 );
-        globalRegistrationBuffer[globalRegistrationIndex].functionName[i] = uniqueID[i];
-    }
-    globalRegistrationBuffer[globalRegistrationIndex].registerFunctionPointer = functionPointer;
-    globalRegistrationBuffer[globalRegistrationIndex].registerBlockingFunctionPointer = 0;
-    globalRegistrationBuffer[globalRegistrationIndex].callPriority = 0xFFFFFFFF;
-    globalRegistrationIndex++;
+    GlobalRegistrations().push_back( { functionPointer, nullptr, uniqueID, 0, (int)0xFFFFFFFF } );
 }
 RPC4GlobalRegistration::RPC4GlobalRegistration( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ), int callPriority )
 {
-    RakAssert( globalRegistrationIndex != RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS );
-    unsigned int i;
-    for( i = 0; uniqueID[i]; i++ )
-    {
-        RakAssert( i <= RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH - 1 );
-        globalRegistrationBuffer[globalRegistrationIndex].functionName[i] = uniqueID[i];
-    }
-    globalRegistrationBuffer[globalRegistrationIndex].registerFunctionPointer = functionPointer;
-    globalRegistrationBuffer[globalRegistrationIndex].registerBlockingFunctionPointer = 0;
     RakAssert( callPriority != (int)0xFFFFFFFF );
-    globalRegistrationBuffer[globalRegistrationIndex].callPriority = callPriority;
-    globalRegistrationIndex++;
+    GlobalRegistrations().push_back( { functionPointer, nullptr, uniqueID, 0, callPriority } );
 }
 RPC4GlobalRegistration::RPC4GlobalRegistration( const char* uniqueID, void ( *functionPointer )( BitStream* userData, BitStream* returnData, Packet* packet ) )
 {
-    RakAssert( globalRegistrationIndex != RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS );
-    unsigned int i;
-    for( i = 0; uniqueID[i]; i++ )
-    {
-        RakAssert( i <= RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH - 1 );
-        globalRegistrationBuffer[globalRegistrationIndex].functionName[i] = uniqueID[i];
-    }
-    globalRegistrationBuffer[globalRegistrationIndex].registerFunctionPointer = 0;
-    globalRegistrationBuffer[globalRegistrationIndex].registerBlockingFunctionPointer = functionPointer;
-    globalRegistrationIndex++;
+    GlobalRegistrations().push_back( { nullptr, functionPointer, uniqueID, 0, 0 } );
 }
 RPC4GlobalRegistration::RPC4GlobalRegistration( const char* uniqueID, MessageID messageId )
 {
-    RakAssert( globalRegistrationIndex != RPC4_GLOBAL_REGISTRATION_MAX_FUNCTIONS );
-    unsigned int i;
-    for( i = 0; uniqueID[i]; i++ )
-    {
-        RakAssert( i <= RPC4_GLOBAL_REGISTRATION_MAX_FUNCTION_NAME_LENGTH - 1 );
-        globalRegistrationBuffer[globalRegistrationIndex].functionName[i] = uniqueID[i];
-    }
-    globalRegistrationBuffer[globalRegistrationIndex].registerFunctionPointer = 0;
-    globalRegistrationBuffer[globalRegistrationIndex].registerBlockingFunctionPointer = 0;
-    globalRegistrationBuffer[globalRegistrationIndex].messageId = messageId;
-    globalRegistrationIndex++;
+    GlobalRegistrations().push_back( { nullptr, nullptr, uniqueID, messageId, 0 } );
 }
 
 enum RPC4Identifiers
@@ -433,20 +401,20 @@ void RPC4::InterruptSignal( void )
 
 void RPC4::OnAttach( void )
 {
-    unsigned int i;
-    for( i = 0; i < globalRegistrationIndex; i++ )
+    for( const GlobalRegistration& registration : GlobalRegistrations() )
     {
-        if( globalRegistrationBuffer[i].registerFunctionPointer )
+        const char* functionName = registration.functionName.c_str();
+        if( registration.registerFunctionPointer )
         {
-            if( globalRegistrationBuffer[i].callPriority == (int)0xFFFFFFFF )
-                RegisterFunction( globalRegistrationBuffer[i].functionName, globalRegistrationBuffer[i].registerFunctionPointer );
+            if( registration.callPriority == (int)0xFFFFFFFF )
+                RegisterFunction( functionName, registration.registerFunctionPointer );
             else
-                RegisterSlot( globalRegistrationBuffer[i].functionName, globalRegistrationBuffer[i].registerFunctionPointer, globalRegistrationBuffer[i].callPriority );
+                RegisterSlot( functionName, registration.registerFunctionPointer, registration.callPriority );
         }
-        else if( globalRegistrationBuffer[i].registerBlockingFunctionPointer )
-            RegisterBlockingFunction( globalRegistrationBuffer[i].functionName, globalRegistrationBuffer[i].registerBlockingFunctionPointer );
+        else if( registration.registerBlockingFunctionPointer )
+            RegisterBlockingFunction( functionName, registration.registerBlockingFunctionPointer );
         else
-            RegisterLocalCallback( globalRegistrationBuffer[i].functionName, globalRegistrationBuffer[i].messageId );
+            RegisterLocalCallback( functionName, registration.messageId );
     }
 }
 
