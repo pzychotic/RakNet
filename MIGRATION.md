@@ -1085,3 +1085,8 @@ resolution like any other host name, instead of being read as `127.0.0.1`.
 read `"abc"` as 0, `"-1"` as 2^64-1 and `"123abc"` as 123. It also reads
 `"UNASSIGNED_RAKNET_GUID"`, which `ToString` writes for `UNASSIGNED_RAKNET_GUID`, back as
 that GUID. Stock read it as 0.
+
+**`RakNetCommandParser` reads a numeric argument as 0 unless it is a whole number in the
+range of the parameter it is passed to.** Stock read `"7x"` as 7, `"-1"` as the largest
+value of an unsigned parameter, and truncated `"70000"` for an `unsigned short` to 4464. A
+console command with a well-formed number does what it did.

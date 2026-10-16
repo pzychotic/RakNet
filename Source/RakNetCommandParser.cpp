@@ -17,11 +17,28 @@
 #include "RakAssert.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
+#include <charconv>
 
 namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS( RakNetCommandParser, RakNetCommandParser );
+
+namespace {
+
+// Reads the whole of text as a T. Anything else, including a value outside T's range,
+// reads as 0.
+template<typename T>
+T ParseArgument( const char* text )
+{
+    const char* const end = text + strlen( text );
+    T value;
+    auto res = std::from_chars( text, end, value );
+    if( res.ec != std::errc() || res.ptr != end )
+        return 0;
+    return value;
+}
+
+} // namespace
 
 RakNetCommandParser::RakNetCommandParser()
 {
@@ -76,12 +93,12 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
 
     if( strcmp( command, "Startup" ) == 0 )
     {
-        SocketDescriptor socketDescriptor( (unsigned short)atoi( parameterList[1] ), parameterList[2] );
-        ReturnResult( peer->Startup( (unsigned short)atoi( parameterList[0] ), &socketDescriptor, 1 ), command, transport, systemAddress );
+        SocketDescriptor socketDescriptor( ParseArgument<unsigned short>( parameterList[1] ), parameterList[2] );
+        ReturnResult( peer->Startup( ParseArgument<unsigned int>( parameterList[0] ), &socketDescriptor, 1 ), command, transport, systemAddress );
     }
     else if( strcmp( command, "SetMaximumIncomingConnections" ) == 0 )
     {
-        peer->SetMaximumIncomingConnections( (unsigned short)atoi( parameterList[0] ) );
+        peer->SetMaximumIncomingConnections( ParseArgument<unsigned short>( parameterList[0] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "GetMaximumIncomingConnections" ) == 0 )
@@ -90,11 +107,11 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "Connect" ) == 0 )
     {
-        ReturnResult( peer->Connect( parameterList[0], (unsigned short)atoi( parameterList[1] ), parameterList[2], atoi( parameterList[3] ) ) == CONNECTION_ATTEMPT_STARTED, command, transport, systemAddress );
+        ReturnResult( peer->Connect( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), parameterList[2], ParseArgument<int>( parameterList[3] ) ) == CONNECTION_ATTEMPT_STARTED, command, transport, systemAddress );
     }
     else if( strcmp( command, "Disconnect" ) == 0 )
     {
-        peer->Shutdown( atoi( parameterList[0] ), (unsigned char)atoi( parameterList[1] ) );
+        peer->Shutdown( ParseArgument<unsigned int>( parameterList[0] ), ParseArgument<unsigned char>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "IsActive" ) == 0 )
@@ -128,7 +145,7 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "CloseConnection" ) == 0 )
     {
-        peer->CloseConnection( SystemAddress( parameterList[0] ), atoi( parameterList[1] ) != 0, (unsigned char)atoi( parameterList[2] ) );
+        peer->CloseConnection( SystemAddress( parameterList[0] ), ParseArgument<int>( parameterList[1] ) != 0, ParseArgument<unsigned char>( parameterList[2] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "GetConnectionState" ) == 0 )
@@ -141,11 +158,11 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "GetSystemAddressFromIndex" ) == 0 )
     {
-        ReturnResult( peer->GetSystemAddressFromIndex( atoi( parameterList[0] ) ), command, transport, systemAddress );
+        ReturnResult( peer->GetSystemAddressFromIndex( ParseArgument<unsigned int>( parameterList[0] ) ), command, transport, systemAddress );
     }
     else if( strcmp( command, "AddToBanList" ) == 0 )
     {
-        peer->AddToBanList( parameterList[0], atoi( parameterList[1] ) );
+        peer->AddToBanList( parameterList[0], ParseArgument<TimeMS>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "RemoveFromBanList" ) == 0 )
@@ -169,7 +186,7 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "Ping2" ) == 0 )
     {
-        peer->Ping( parameterList[0], (unsigned short)atoi( parameterList[1] ), atoi( parameterList[2] ) != 0 );
+        peer->Ping( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), ParseArgument<int>( parameterList[2] ) != 0 );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "GetAveragePing" ) == 0 )
@@ -186,12 +203,12 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "SetOccasionalPing" ) == 0 )
     {
-        peer->SetOccasionalPing( atoi( parameterList[0] ) != 0 );
+        peer->SetOccasionalPing( ParseArgument<int>( parameterList[0] ) != 0 );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "SetOfflinePingResponse" ) == 0 )
     {
-        peer->SetOfflinePingResponse( parameterList[0], atoi( parameterList[1] ) );
+        peer->SetOfflinePingResponse( parameterList[0], ParseArgument<unsigned int>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "GetInternalID" ) == 0 )
@@ -204,7 +221,7 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "SetTimeoutTime" ) == 0 )
     {
-        peer->SetTimeoutTime( atoi( parameterList[0] ), SystemAddress( parameterList[1] ) );
+        peer->SetTimeoutTime( ParseArgument<TimeMS>( parameterList[0] ), SystemAddress( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "GetMTUSize" ) == 0 )
@@ -217,21 +234,21 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "GetLocalIP" ) == 0 )
     {
-        ReturnResult( (char*)peer->GetLocalIP( atoi( parameterList[0] ) ), command, transport, systemAddress );
+        ReturnResult( (char*)peer->GetLocalIP( ParseArgument<unsigned int>( parameterList[0] ) ), command, transport, systemAddress );
     }
     else if( strcmp( command, "AllowConnectionResponseIPMigration" ) == 0 )
     {
-        peer->AllowConnectionResponseIPMigration( atoi( parameterList[0] ) != 0 );
+        peer->AllowConnectionResponseIPMigration( ParseArgument<int>( parameterList[0] ) != 0 );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "AdvertiseSystem" ) == 0 )
     {
-        peer->AdvertiseSystem( parameterList[0], (unsigned short)atoi( parameterList[1] ), parameterList[2], atoi( parameterList[3] ) );
+        peer->AdvertiseSystem( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), parameterList[2], ParseArgument<int>( parameterList[3] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "SetIncomingPassword" ) == 0 )
     {
-        peer->SetIncomingPassword( parameterList[0], atoi( parameterList[1] ) );
+        peer->SetIncomingPassword( parameterList[0], ParseArgument<int>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
     else if( strcmp( command, "GetIncomingPassword" ) == 0 )

@@ -90,6 +90,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PingTestsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PluginCapsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PublishedViewTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakNetCommandParserTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakThreadTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReceiveAfterPublishTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReceiveQueueCapTest.cpp
