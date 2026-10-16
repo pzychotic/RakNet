@@ -1060,3 +1060,21 @@ refused. A failed `Start` leaves the interface stopped, and `Start` may be calle
 connections there are still closing, in `TIME_WAIT` or `LAST_ACK`, now listens instead of
 failing. A port another socket is listening on still fails. Windows is unchanged: it binds
 there anyway, and its `SO_REUSEADDR` would let a second socket take the port.
+
+## Numbers in strings are read whole
+
+Every number RakNet reads from a string is now read with `std::from_chars`, which takes
+decimal digits only and reports a value out of range. Stock used `atoi` and `strtoull`,
+which skip leading whitespace, accept a sign, stop at the first character that isn't a
+digit and truncate or saturate a value out of range. Valid input reads as before.
+
+**`SystemAddress::FromString` returns false for a port that isn't a whole number from 0 to
+65535**, and leaves the address unchanged. Stock truncated `"1.2.3.4|70000"` to port 4464,
+read `"1.2.3.4|80x"` as port 80 and, depending on `RAKNET_SUPPORT_IPV6`, ignored or read
+a port after a space. `SetBinaryAddress` does the same. If you build address strings from
+user input, check the return value.
+
+**`SetBinaryAddress` reads the port after `localhost`.** Stock passed the delineator to
+`atoi`, so `"localhost:1234"` came out as `127.0.0.1` port 0. It now reads port 1234. A
+name that only starts with `localhost`, such as `localhost.localdomain`, now goes to name
+resolution like any other host name, instead of being read as `127.0.0.1`.

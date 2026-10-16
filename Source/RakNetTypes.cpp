@@ -49,6 +49,22 @@ namespace RakNet {
 const char* IPV6_LOOPBACK = "::1";
 const char* IPV4_LOOPBACK = "127.0.0.1";
 
+namespace {
+
+// Reads the whole of text as a port: decimal digits only, 0 to 65535.
+bool ParsePort( const char* text, unsigned short& port )
+{
+    const char* const end = text + strlen( text );
+    unsigned short value;
+    auto res = std::from_chars( text, end, value );
+    if( res.ec != std::errc() || res.ptr != end )
+        return false;
+    port = value;
+    return true;
+}
+
+} // namespace
+
 AddressOrGUID::AddressOrGUID( Packet* packet )
 {
     rakNetGuid = packet->guid;
@@ -402,14 +418,16 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
 {
     if( NonNumericHostString( str ) )
     {
-        if( _strnicmp( str, "localhost", 9 ) == 0 )
+        if( _strnicmp( str, "localhost", 9 ) == 0 && ( str[9] == 0 || str[9] == portDelineator ) )
         {
-            address.addr4.sin_addr.s_addr = inet_addr__( "127.0.0.1" );
+            const char* const portText = str[9] ? str + 10 : "";
+            unsigned short port = 0;
+            if( portText[0] && ParsePort( portText, port ) == false )
+                return false;
 
-            if( str[9] )
-            {
-                SetPortHostOrder( (unsigned short)atoi( str + 9 ) );
-            }
+            address.addr4.sin_addr.s_addr = inet_addr__( "127.0.0.1" );
+            if( portText[0] )
+                SetPortHostOrder( port );
             return true;
         }
 
@@ -429,9 +447,8 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
     else
     {
         // Split the string into the first part, and the : part
-        int index, portIndex;
+        int index;
         char IPPart[22];
-        char portPart[10];
         // Only write the valid parts, don't change existing if invalid
         //  binaryAddress=UNASSIGNED_SYSTEM_ADDRESS.binaryAddress;
         //  port=UNASSIGNED_SYSTEM_ADDRESS.port;
@@ -442,29 +459,22 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
             IPPart[index] = str[index];
         }
         IPPart[index] = 0;
-        portPart[0] = 0;
-        if( str[index] && str[index + 1] )
-        {
-            index++;
-            for( portIndex = 0; portIndex < 10 && str[index] && index < 22 + 10; index++, portIndex++ )
-            {
-                if( str[index] < '0' || str[index] > '9' )
-                    break;
 
-                portPart[portIndex] = str[index];
-            }
-            portPart[portIndex] = 0;
-        }
+        // The port is everything after the character that ended the IP.
+        const char* const portText = str[index] ? str + index + 1 : "";
+        unsigned short port = 0;
+        if( portText[0] && ParsePort( portText, port ) == false )
+            return false;
 
         if( IPPart[0] )
         {
             address.addr4.sin_addr.s_addr = inet_addr__( IPPart );
         }
 
-        if( portPart[0] )
+        if( portText[0] )
         {
-            address.addr4.sin_port = htons( (unsigned short)atoi( portPart ) );
-            debugPort = ntohs( address.addr4.sin_port );
+            address.addr4.sin_port = htons( port );
+            debugPort = port;
         }
     }
     return true;
@@ -487,8 +497,7 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
 #else
     char ipPart[INET_ADDRSTRLEN];
 #endif
-    char portPart[32];
-    int i = 0, j;
+    int i = 0;
 
     // TODO - what about 255.255.255.255?
     if( ipVersion == 4 && strcmp( str, IPV6_LOOPBACK ) == 0 )
@@ -517,16 +526,10 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
         ipPart[sizeof( ipPart ) - 1] = 0;
     }
 
-    j = 0;
-    if( str[i] == portDelineator && portDelineator != 0 )
-    {
-        i++;
-        for( ; j < sizeof( portPart ) && str[i] != 0; i++, j++ )
-        {
-            portPart[j] = str[i];
-        }
-    }
-    portPart[j] = 0;
+    const char* const portText = ( str[i] == portDelineator && portDelineator != 0 ) ? str + i + 1 : "";
+    unsigned short port = 0;
+    if( portText[0] && ParsePort( portText, port ) == false )
+        return false;
 
 
     // needed for getaddrinfo
@@ -598,10 +601,10 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     WSAStartupSingleton::Deref();
 
     // PORT
-    if( portPart[0] )
+    if( portText[0] )
     {
-        address.addr4.sin_port = htons( (unsigned short)atoi( portPart ) );
-        debugPort = ntohs( address.addr4.sin_port );
+        address.addr4.sin_port = htons( port );
+        debugPort = port;
     }
     else
     {

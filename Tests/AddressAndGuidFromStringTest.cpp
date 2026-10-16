@@ -78,6 +78,52 @@ TEST_CASE( "The SystemAddress string constructor reads the port", "[address]" )
     CHECK( address.GetPort() == 4321 );
 }
 
+TEST_CASE( "SystemAddress::FromString rejects a port that is not a whole number up to 65535", "[address]" )
+{
+    WinsockScope winsock;
+
+    const char* const rejected[] = {
+        "10.0.0.1|65536",
+        "10.0.0.1|99999",
+        "10.0.0.1|4294967376",
+        "10.0.0.1| 80",
+        "10.0.0.1|+80",
+        "10.0.0.1|-1",
+        "10.0.0.1|8.0",
+    };
+    for( const char* text : rejected )
+    {
+        CAPTURE( text );
+        SystemAddress address( "192.168.1.5", 1234 );
+        CHECK_FALSE( address.FromString( text ) );
+        CHECK( IpOf( address ) == "192.168.1.5" );
+        CHECK( address.GetPort() == 1234 );
+    }
+
+    // A letter anywhere makes the string a host name, which then fails to resolve.
+    SystemAddress address;
+    CHECK_FALSE( address.FromString( "10.0.0.1|80x" ) );
+}
+
+TEST_CASE( "SystemAddress::SetBinaryAddress reads the port after localhost", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    REQUIRE( address.SetBinaryAddress( "localhost:4321" ) );
+    CHECK( IpOf( address ) == "127.0.0.1" );
+    CHECK( address.GetPort() == 4321 );
+
+    REQUIRE( address.SetBinaryAddress( "LOCALHOST" ) );
+    CHECK( IpOf( address ) == "127.0.0.1" );
+    CHECK( address.GetPort() == 4321 );
+
+    SystemAddress rejected( "192.168.1.5", 1234 );
+    CHECK_FALSE( rejected.SetBinaryAddress( "localhost:70000" ) );
+    CHECK( IpOf( rejected ) == "192.168.1.5" );
+    CHECK( rejected.GetPort() == 1234 );
+}
+
 TEST_CASE( "RakNetGUID::FromString reads a decimal GUID", "[guid]" )
 {
     RakNetGUID guid;
