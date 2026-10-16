@@ -15,6 +15,7 @@
 
 #include "AddrInfo.h"
 
+#include <algorithm>
 #include <charconv>
 
 #ifndef _WIN32
@@ -60,11 +61,7 @@ void GetMyIP_Windows_Linux_IPV4And6( SystemAddress addresses[MAXIMUM_NUMBER_OF_I
         }
     }
 
-    while( idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS )
-    {
-        addresses[idx] = UNASSIGNED_SYSTEM_ADDRESS;
-        idx++;
-    }
+    std::fill( addresses + idx, addresses + MAXIMUM_NUMBER_OF_INTERNAL_IDS, UNASSIGNED_SYSTEM_ADDRESS );
 }
 
 #else
@@ -92,11 +89,7 @@ void GetMyIP_Windows_Linux_IPV4( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTER
         memcpy( &addresses[idx].address.addr4.sin_addr, phe->h_addr_list[idx], sizeof( struct in_addr ) );
     }
 
-    while( idx < MAXIMUM_NUMBER_OF_INTERNAL_IDS )
-    {
-        addresses[idx] = UNASSIGNED_SYSTEM_ADDRESS;
-        idx++;
-    }
+    std::fill( addresses + idx, addresses + MAXIMUM_NUMBER_OF_INTERNAL_IDS, UNASSIGNED_SYSTEM_ADDRESS );
 }
 
 #endif // RAKNET_SUPPORT_IPV6==1

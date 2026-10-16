@@ -18,6 +18,10 @@
 #include "Export.h"
 #include "RakNetTypes.h"
 
+#include <algorithm>
+#include <functional>
+#include <iterator>
+
 namespace RakNet {
 
 enum RNSPerSecondMetrics
@@ -127,18 +131,10 @@ struct RAK_DLL_EXPORT RakNetStatistics
         bytesHeldForReassemblyAndOrdering += other.bytesHeldForReassemblyAndOrdering;
         messagesDroppedOverConnectionBudget += other.messagesDroppedOverConnectionBudget;
 
-        unsigned i;
-        for( i = 0; i < NUMBER_OF_PRIORITIES; i++ )
-        {
-            messageInSendBuffer[i] += other.messageInSendBuffer[i];
-            bytesInSendBuffer[i] += other.bytesInSendBuffer[i];
-        }
-
-        for( i = 0; i < RNS_PER_SECOND_METRICS_COUNT; i++ )
-        {
-            valueOverLastSecond[i] += other.valueOverLastSecond[i];
-            runningTotal[i] += other.runningTotal[i];
-        }
+        std::transform( std::begin( messageInSendBuffer ), std::end( messageInSendBuffer ), std::begin( other.messageInSendBuffer ), std::begin( messageInSendBuffer ), std::plus<>() );
+        std::transform( std::begin( bytesInSendBuffer ), std::end( bytesInSendBuffer ), std::begin( other.bytesInSendBuffer ), std::begin( bytesInSendBuffer ), std::plus<>() );
+        std::transform( std::begin( valueOverLastSecond ), std::end( valueOverLastSecond ), std::begin( other.valueOverLastSecond ), std::begin( valueOverLastSecond ), std::plus<>() );
+        std::transform( std::begin( runningTotal ), std::end( runningTotal ), std::begin( other.runningTotal ), std::begin( runningTotal ), std::plus<>() );
 
         return *this;
     }

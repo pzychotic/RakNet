@@ -39,6 +39,7 @@
 
 #include "SuperFastHash.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cinttypes>
 #include <stdlib.h>
@@ -75,17 +76,9 @@ void AddressOrGUID::ToString( bool writePort, char* dest ) const
 bool NonNumericHostString( const char* host )
 {
     // Return false if IP address. Return true if domain
-    unsigned int i = 0;
-    while( host[i] )
-    {
-        // IPV4: natpunch.jenkinssoftware.com
-        // IPV6: fe80::7c:31f7:fec4:27de%14
-        if( ( host[i] >= 'g' && host[i] <= 'z' ) ||
-            ( host[i] >= 'G' && host[i] <= 'Z' ) )
-            return true;
-        ++i;
-    }
-    return false;
+    // IPV4: natpunch.jenkinssoftware.com
+    // IPV6: fe80::7c:31f7:fec4:27de%14
+    return std::any_of( host, host + strlen( host ), []( char c ) { return ( c >= 'g' && c <= 'z' ) || ( c >= 'G' && c <= 'Z' ); } );
 }
 
 SocketDescriptor::SocketDescriptor()
