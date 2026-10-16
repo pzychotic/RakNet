@@ -25,7 +25,6 @@
 
 
 #if defined( _WIN32 )
-// extern __int64 _strtoui64(const char*, char**, int); // needed for Code::Blocks. Does not compile on Visual Studio 2010
 // IP_DONTFRAGMENT is different between winsock 1 and winsock 2.  Therefore, Winsock2.h must be linked againt Ws2_32.lib
 // winsock.h must be linked against WSock32.lib.  If these two are mixed up the flag won't work correctly
 #include "WindowsIncludes.h"
@@ -679,15 +678,18 @@ bool RakNetGUID::FromString( const char* source )
     if( source == 0 )
         return false;
 
+    if( strcmp( source, "UNASSIGNED_RAKNET_GUID" ) == 0 )
+    {
+        g = UNASSIGNED_RAKNET_GUID.g;
+        return true;
+    }
 
-#if defined( WIN32 )
-    g = _strtoui64( source, NULL, 10 );
-
-
-#else
-    // Changed from g=strtoull(source,0,10); for android
-    g = strtoull( source, (char**)NULL, 10 );
-#endif
+    const char* const end = source + strlen( source );
+    uint64_t value;
+    auto res = std::from_chars( source, end, value );
+    if( res.ec != std::errc() || res.ptr != end )
+        return false;
+    g = value;
     return true;
 }
 unsigned long RakNetGUID::ToUint32( const RakNetGUID& g )

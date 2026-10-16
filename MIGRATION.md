@@ -28,6 +28,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [Router2 and UDPForwarder do what they promised](#router2-and-udpforwarder-do-what-they-promised)
 - [`ConnectWithSocket` refuses a host it can't resolve](#connectwithsocket-refuses-a-host-it-cant-resolve)
 - [`TCPInterface::Start` fails when it can't listen](#tcpinterfacestart-fails-when-it-cant-listen)
+- [Numbers in strings are read whole](#numbers-in-strings-are-read-whole)
 
 ## What did *not* change: the core protocol
 
@@ -1078,3 +1079,9 @@ user input, check the return value.
 `atoi`, so `"localhost:1234"` came out as `127.0.0.1` port 0. It now reads port 1234. A
 name that only starts with `localhost`, such as `localhost.localdomain`, now goes to name
 resolution like any other host name, instead of being read as `127.0.0.1`.
+
+**`RakNetGUID::FromString` returns false unless the whole string is a decimal number below
+2^64**, and leaves the GUID unchanged. Stock always returned true for a non-null string, and
+read `"abc"` as 0, `"-1"` as 2^64-1 and `"123abc"` as 123. It also reads
+`"UNASSIGNED_RAKNET_GUID"`, which `ToString` writes for `UNASSIGNED_RAKNET_GUID`, back as
+that GUID. Stock read it as 0.

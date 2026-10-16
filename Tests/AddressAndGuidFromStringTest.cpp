@@ -144,6 +144,34 @@ TEST_CASE( "RakNetGUID::FromString rejects a null string", "[guid]" )
     CHECK( guid.g == 5 );
 }
 
+TEST_CASE( "RakNetGUID::FromString rejects anything but a whole decimal number below 2^64", "[guid]" )
+{
+    const char* const rejected[] = {
+        "",
+        " 123",
+        "+123",
+        "-1",
+        "123abc",
+        "0x10",
+        "18446744073709551616",
+        "abc",
+    };
+    for( const char* text : rejected )
+    {
+        CAPTURE( text );
+        RakNetGUID guid( 5 );
+        CHECK_FALSE( guid.FromString( text ) );
+        CHECK( guid.g == 5 );
+    }
+}
+
+TEST_CASE( "RakNetGUID::FromString reads the name ToString gives the unassigned GUID", "[guid]" )
+{
+    RakNetGUID guid( 5 );
+    REQUIRE( guid.FromString( UNASSIGNED_RAKNET_GUID.ToString() ) );
+    CHECK( guid == UNASSIGNED_RAKNET_GUID );
+}
+
 TEST_CASE( "RakNetGUID::ToString writes the GUID in decimal", "[guid]" )
 {
     char dest[64] = {};
