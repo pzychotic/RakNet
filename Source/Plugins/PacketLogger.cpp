@@ -42,6 +42,25 @@ PacketLogger::PacketLogger()
 PacketLogger::~PacketLogger()
 {
 }
+
+namespace {
+
+// Writes value right-aligned in five columns, or in full when wider, and terminates it.
+// dest holds at least 11 characters.
+void FormatFiveColumns( char* dest, unsigned int value )
+{
+    char digits[10];
+    auto res = std::to_chars( digits, digits + sizeof( digits ), value );
+    RakAssert( res.ec == std::errc() );
+    const size_t length = res.ptr - digits;
+    const size_t padding = length < 5 ? 5 - length : 0;
+    memset( dest, ' ', padding );
+    memcpy( dest + padding, digits, length );
+    dest[padding + length] = 0;
+}
+
+} // namespace
+
 void PacketLogger::FormatLine(
     char* into, const char* dir, const char* type, unsigned int reliableMessageNumber, unsigned int frame, unsigned char id, const BitSize_t bitLen, unsigned long long time, const SystemAddress& local, const SystemAddress& remote,
     unsigned int splitPacketId, unsigned int splitPacketIndex, unsigned int splitPacketCount, unsigned int orderingIndex )
@@ -60,7 +79,7 @@ void PacketLogger::FormatLine(
     // would just be redundant.
     if( idToPrint == NULL )
     {
-        sprintf( numericID, "%5u", id );
+        FormatFiveColumns( numericID, id );
         idToPrint = numericID;
     }
 
@@ -86,7 +105,7 @@ void PacketLogger::FormatLine(
     }
     else
     {
-        sprintf( str3, "%5u", reliableMessageNumber );
+        FormatFiveColumns( str3, reliableMessageNumber );
     }
 
     std::lock_guard<std::mutex> lock( affixMutex );

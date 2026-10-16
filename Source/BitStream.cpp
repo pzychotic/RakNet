@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <charconv>
 
 #if defined( _WIN32 )
 #include "WindowsIncludes.h"
@@ -917,7 +918,13 @@ void BitStream::PrintHex( char* out ) const
     BitSize_t i;
     for( i = 0; i < GetNumberOfBytesUsed(); i++ )
     {
-        sprintf( out + i * 3, "%02x ", data[i] );
+        // Two lowercase digits, the first a '0' that a byte below 0x10 leaves in place.
+        char* const digits = out + i * 3;
+        digits[0] = '0';
+        auto res = std::to_chars( digits + ( data[i] < 0x10 ? 1 : 0 ), digits + 2, data[i], 16 );
+        RakAssert( res.ec == std::errc() );
+        digits[2] = ' ';
+        digits[3] = 0;
     }
 }
 void BitStream::PrintHex( void ) const

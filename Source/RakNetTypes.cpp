@@ -664,9 +664,12 @@ void RakNetGUID::ToString( char* dest ) const
     if( *this == UNASSIGNED_RAKNET_GUID )
         strcpy( dest, "UNASSIGNED_RAKNET_GUID" );
     else
-        //sprintf(dest, "%u.%u.%u.%u.%u.%u", g[0], g[1], g[2], g[3], g[4], g[5]);
-        sprintf( dest, "%" PRIu64, g );
-    // sprintf(dest, "%u.%u.%u.%u.%u.%u", g[0], g[1], g[2], g[3], g[4], g[5]);
+    {
+        // At most 20 digits.
+        auto res = std::to_chars( dest, dest + 20, g );
+        RakAssert( res.ec == std::errc() );
+        *res.ptr = '\0';
+    }
 }
 bool RakNetGUID::FromString( const char* source )
 {
