@@ -1910,9 +1910,7 @@ void ReliabilityLayer::SendBitStream( RakNetSocket2* s, SystemAddress& systemAdd
             dat->s = s;
             dat->length = length;
             dat->sendTime = RakNet::GetTimeMS() + delay;
-            auto it = delayList.begin();
-            while( it != delayList.end() && ( *it )->sendTime <= dat->sendTime )
-                ++it;
+            auto it = std::upper_bound( delayList.begin(), delayList.end(), dat->sendTime, []( RakNet::TimeMS time, const std::unique_ptr<DataAndTime>& queued ) { return time < queued->sendTime; } );
             delayList.insert( it, std::move( dat ) );
             return;
         }
