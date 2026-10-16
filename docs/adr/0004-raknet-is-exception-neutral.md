@@ -71,7 +71,10 @@ differently in the two modes. CI enforces this list, and the `throw`/`try`/`catc
 with `tools/lint-banned-apis.pl`. Change the two together.
 A safe call is marked on its line with `// ADR-0004-allow(<rule>): <reason>`.
 
-- `std::stoi` and relatives. Use `std::from_chars`.
+- `std::stoi` and relatives. Use `std::from_chars`. The lint also rejects the C parsers
+  `std::from_chars` replaced (rule `c-parse`): `atoi`, `atol`, `atof`, `strtoul`,
+  `strtoull` and `_strtoui64`. They don't throw, but they can't report bad input or
+  overflow either.
 - `std::filesystem`'s throwing overloads. Use the `std::error_code` ones.
 - `std::random_device`. ADR-0001's reasoning is unchanged.
 - `std::regex`, and `.at()` on any container.

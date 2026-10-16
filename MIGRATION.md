@@ -1090,3 +1090,6 @@ that GUID. Stock read it as 0.
 range of the parameter it is passed to.** Stock read `"7x"` as 7, `"-1"` as the largest
 value of an unsigned parameter, and truncated `"70000"` for an `unsigned short` to 4464. A
 console command with a well-formed number does what it did.
+
+**`ConsoleServer` answers "Invalid index." to a parser number that isn't a whole number.**
+Stock read `"1x Command"` as parser 1.

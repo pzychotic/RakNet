@@ -65,6 +65,17 @@ flags( "double d = stod( s );\n",         'stox', 'unqualified stod' );
 passes( "int n = 0; std::from_chars( b, e, n );\n", 'std::from_chars' );
 passes( "int stoiCount = 0;\n",           'identifier starting with stoi' );
 
+# --- c-parse ----------------------------------------------------------------
+flags( "int n = atoi( s );\n",                    'c-parse', 'atoi' );
+flags( "long n = ::atol(s);\n",                   'c-parse', 'globally qualified atol' );
+flags( "double d = std::atof( s );\n",            'c-parse', 'std::atof' );
+flags( "unsigned long n = strtoul( s, 0, 10 );\n", 'c-parse', 'strtoul' );
+flags( "auto n = std::strtoull( s, nullptr, 10 );\n", 'c-parse', 'std::strtoull' );
+flags( "auto n = _strtoui64( s, NULL, 10 );\n",   'c-parse', '_strtoui64' );
+passes( "int n = ParseAtoi( s );\n",              'identifier ending in atoi' );
+passes( "int n = parser.atoi( s );\n",            'an atoi member' );
+passes( "int n = foo::strtoul( s );\n",           'a strtoul in another namespace' );
+
 # --- regex, random-device, thread -------------------------------------------
 flags( "#include <regex>\n",                  'regex', '#include <regex>' );
 flags( "std::regex r( \"a\" );\n",            'regex', 'std::regex' );

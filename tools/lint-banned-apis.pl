@@ -51,6 +51,11 @@ my @RULES = (
         message => 'std::stoi and relatives throw on bad input. Use std::from_chars',
     },
     {
+        id      => 'c-parse',
+        re      => qr/(?<![\w.>:])(?:::)?(?:std::)?(?:atoi|atol|atof|strtoul|strtoull|_strtoui64)\s*\(/,
+        message => 'atoi and relatives cannot report bad input or overflow. Use std::from_chars',
+    },
+    {
         id      => 'filesystem',
         check   => \&check_filesystem,
         message => 'std::filesystem call without a std::error_code as its last argument. '
