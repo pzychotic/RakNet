@@ -115,6 +115,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SocketWildcardAddressTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SplitPacketReassemblyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsHistoryCullOnAddTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsHistoryMergeSetsTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsHistorySortTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StatisticsQueryTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/StringCompressorTest.cpp

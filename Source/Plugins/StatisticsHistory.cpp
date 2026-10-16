@@ -341,14 +341,14 @@ void StatisticsHistory::TimeAndValueQueue::MergeSets( const TimeAndValueQueue* l
             }
             else if( rhs->values[rhsIndex].time > lhs->values[lhsIndex].time )
             {
-                valuesOutput.push_back( lhs->values[rhsIndex] );
+                valuesOutput.push_back( lhs->values[lhsIndex] );
                 lhsIndex++;
             }
             else
             {
                 valuesOutput.push_back( rhs->values[rhsIndex] );
                 rhsIndex++;
-                valuesOutput.push_back( lhs->values[rhsIndex] );
+                valuesOutput.push_back( lhs->values[lhsIndex] );
                 lhsIndex++;
             }
         }
