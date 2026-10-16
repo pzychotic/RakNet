@@ -21,6 +21,7 @@ set( CURRENT_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/NativeFeatureIncludesOverrides.h
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketPriority.h
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketizedTCP.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ParseWholeNumber.h
     ${CMAKE_CURRENT_SOURCE_DIR}/PlatformRandom.h
     ${CMAKE_CURRENT_SOURCE_DIR}/PluginInterface2.h
     ${CMAKE_CURRENT_SOURCE_DIR}/RakAssert.h

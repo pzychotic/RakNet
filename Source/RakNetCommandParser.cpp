@@ -15,9 +15,9 @@
 #include "TransportInterface.h"
 #include "RakPeerInterface.h"
 #include "RakAssert.h"
+#include "ParseWholeNumber.h"
 #include <stdio.h>
 #include <string.h>
-#include <charconv>
 
 namespace RakNet {
 
@@ -30,11 +30,8 @@ namespace {
 template<typename T>
 T ParseArgument( const char* text )
 {
-    const char* const end = text + strlen( text );
-    T value;
-    auto res = std::from_chars( text, end, value );
-    if( res.ec != std::errc() || res.ptr != end )
-        return 0;
+    T value = 0;
+    ParseWholeNumber( text, value );
     return value;
 }
 

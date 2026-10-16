@@ -15,11 +15,11 @@
 #include "TransportInterface.h"
 #include "CommandParserInterface.h"
 #include "RakAssert.h"
+#include "ParseWholeNumber.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <algorithm>
-#include <charconv>
 
 #define COMMAND_DELINATOR ' '
 #define COMMAND_DELINATOR_TOGGLE '"'
@@ -220,11 +220,8 @@ void ConsoleServer::Update( void )
                 if( **parameterList >= '0' && **parameterList <= '9' )
                 {
                     // Parsers are listed from 1, and 0 or anything but a whole number is no parser.
-                    const char* const end = *parameterList + strlen( *parameterList );
                     uint32_t parserNumber = 0;
-                    auto res = std::from_chars( *parameterList, end, parserNumber );
-                    if( res.ec != std::errc() || res.ptr != end )
-                        parserNumber = 0;
+                    ParseWholeNumber( *parameterList, parserNumber );
                     commandParserIndex = parserNumber - 1;
                     if( commandParserIndex >= commandParserList.size() )
                     {

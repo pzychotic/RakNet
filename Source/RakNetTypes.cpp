@@ -36,6 +36,7 @@
 #include <netdb.h>
 #endif
 
+#include "ParseWholeNumber.h"
 #include "SuperFastHash.h"
 
 #include <algorithm>
@@ -47,22 +48,6 @@ namespace RakNet {
 
 const char* IPV6_LOOPBACK = "::1";
 const char* IPV4_LOOPBACK = "127.0.0.1";
-
-namespace {
-
-// Reads the whole of text as a port: decimal digits only, 0 to 65535.
-bool ParsePort( const char* text, unsigned short& port )
-{
-    const char* const end = text + strlen( text );
-    unsigned short value;
-    auto res = std::from_chars( text, end, value );
-    if( res.ec != std::errc() || res.ptr != end )
-        return false;
-    port = value;
-    return true;
-}
-
-} // namespace
 
 AddressOrGUID::AddressOrGUID( Packet* packet )
 {
@@ -421,7 +406,7 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         {
             const char* const portText = str[9] ? str + 10 : "";
             unsigned short port = 0;
-            if( portText[0] && ParsePort( portText, port ) == false )
+            if( portText[0] && ParseWholeNumber( portText, port ) == false )
                 return false;
 
             address.addr4.sin_addr.s_addr = inet_addr__( "127.0.0.1" );
@@ -462,7 +447,7 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         // The port is everything after the character that ended the IP.
         const char* const portText = str[index] ? str + index + 1 : "";
         unsigned short port = 0;
-        if( portText[0] && ParsePort( portText, port ) == false )
+        if( portText[0] && ParseWholeNumber( portText, port ) == false )
             return false;
 
         if( IPPart[0] )
@@ -527,7 +512,7 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
 
     const char* const portText = ( str[i] == portDelineator && portDelineator != 0 ) ? str + i + 1 : "";
     unsigned short port = 0;
-    if( portText[0] && ParsePort( portText, port ) == false )
+    if( portText[0] && ParseWholeNumber( portText, port ) == false )
         return false;
 
 
@@ -684,13 +669,7 @@ bool RakNetGUID::FromString( const char* source )
         return true;
     }
 
-    const char* const end = source + strlen( source );
-    uint64_t value;
-    auto res = std::from_chars( source, end, value );
-    if( res.ec != std::errc() || res.ptr != end )
-        return false;
-    g = value;
-    return true;
+    return ParseWholeNumber( source, g );
 }
 unsigned long RakNetGUID::ToUint32( const RakNetGUID& g )
 {
