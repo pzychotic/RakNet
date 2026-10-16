@@ -81,7 +81,7 @@ bool NonNumericHostString( const char* host )
         // IPV4: natpunch.jenkinssoftware.com
         // IPV6: fe80::7c:31f7:fec4:27de%14
         if( ( host[i] >= 'g' && host[i] <= 'z' ) ||
-            ( host[i] >= 'A' && host[i] <= 'Z' ) )
+            ( host[i] >= 'G' && host[i] <= 'Z' ) )
             return true;
         ++i;
     }
