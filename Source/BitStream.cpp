@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <algorithm>
 #include <charconv>
 
 #if defined( _WIN32 )
@@ -992,19 +993,11 @@ bool BitStream::IsNetworkOrderInternal( void )
 }
 void BitStream::ReverseBytes( unsigned char* inByteArray, unsigned char* inOutByteArray, const unsigned int length )
 {
-    for( BitSize_t i = 0; i < length; i++ )
-        inOutByteArray[i] = inByteArray[length - i - 1];
+    std::reverse_copy( inByteArray, inByteArray + length, inOutByteArray );
 }
 void BitStream::ReverseBytesInPlace( unsigned char* inOutData, const unsigned int length )
 {
-    unsigned char temp;
-    BitSize_t i;
-    for( i = 0; i < ( length >> 1 ); i++ )
-    {
-        temp = inOutData[i];
-        inOutData[i] = inOutData[length - i - 1];
-        inOutData[length - i - 1] = temp;
-    }
+    std::reverse( inOutData, inOutData + length );
 }
 
 void BitStream::WriteAlignedVar8( const char* inByteArray )
