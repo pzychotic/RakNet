@@ -40,6 +40,9 @@ password or the wrong one, ID_CONNECTION_BANNED for a ban - and by the client no
 connected after it. So a refusal for the wrong reason fails, and so does a refusal that
 stops sending its Message, even though the client is still kept out.
 
+The second case walks the edges of the password compare: the last byte wrong, a proper
+prefix, one byte too many, and a 255-byte password matched and missed by its last byte.
+
 The four cases after it pin how a refusal ends. A refused attempt leaves a record on
 both sides. The client acks the refusal before it drops its own record, even inside its
 Ack delay, which lets the server drop its record too. If that ack never comes, the
@@ -247,6 +250,52 @@ TEST_CASE( "SetIncomingPassword and the ban list decide which clients a server a
 
     server->ClearBanList();
     CHECK_FALSE( server->IsBanned( "127.0.0.1" ) );
+    CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ) ) );
+}
+
+TEST_CASE( "Only the exact password gets in, however close the miss and at any length up to 255", "[network]" )
+{
+    PeerScope peers;
+
+    const std::string thePassword = "password";
+
+    RakPeerInterface* server = peers.Server( kServerPort );
+    server->SetIncomingPassword( thePassword.c_str(), static_cast<int>( thePassword.size() ) );
+
+    RakPeerInterface* client = peers.Client();
+
+    const SystemAddress serverAddress( "127.0.0.1", kServerPort );
+
+    std::string lastByteWrong = thePassword;
+    lastByteWrong.back() = 'x';
+    CHECK( RefusedWith( client, serverAddress, lastByteWrong.c_str(), static_cast<int>( lastByteWrong.size() ), ID_INVALID_PASSWORD ) );
+
+    const std::string prefix = thePassword.substr( 0, thePassword.size() - 1 );
+    CHECK( RefusedWith( client, serverAddress, prefix.c_str(), static_cast<int>( prefix.size() ), ID_INVALID_PASSWORD ) );
+
+    const std::string oneByteMore = thePassword + "x";
+    CHECK( RefusedWith( client, serverAddress, oneByteMore.c_str(), static_cast<int>( oneByteMore.size() ), ID_INVALID_PASSWORD ) );
+
+    REQUIRE( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ) ) );
+
+    Disconnect( client, serverAddress, "the correct password was accepted" );
+
+    // The longest password Connect and SetIncomingPassword pass through whole.
+    std::string longest( 255, '\0' );
+    for( size_t i = 0; i < longest.size(); ++i )
+        longest[i] = static_cast<char>( 'a' + i % 26 );
+    server->SetIncomingPassword( longest.c_str(), static_cast<int>( longest.size() ) );
+
+    std::string longestLastByteWrong = longest;
+    longestLastByteWrong.back() = '!';
+    CHECK( RefusedWith( client, serverAddress, longestLastByteWrong.c_str(), static_cast<int>( longestLastByteWrong.size() ), ID_INVALID_PASSWORD ) );
+
+    REQUIRE( TryToConnect( client, serverAddress, longest.c_str(), static_cast<int>( longest.size() ) ) );
+
+    Disconnect( client, serverAddress, "the 255-byte password was accepted" );
+
+    // A shorter password set over a longer one leaves nothing of the longer behind.
+    server->SetIncomingPassword( thePassword.c_str(), static_cast<int>( thePassword.size() ) );
     CHECK( TryToConnect( client, serverAddress, thePassword.c_str(), static_cast<int>( thePassword.size() ) ) );
 }
 

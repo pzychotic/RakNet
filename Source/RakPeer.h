@@ -891,8 +891,9 @@ protected:
     ///network thread.
     std::atomic<unsigned int> maximumIncomingConnections;
     BitStream offlinePingResponse;
-    /// What a connection request has to carry. Guarded by incomingPasswordMutex.
-    char incomingPassword[256];
+    /// What a connection request has to carry, zero past incomingPasswordLength. Guarded by
+    /// incomingPasswordMutex.
+    char incomingPassword[256] = {};
     unsigned char incomingPasswordLength;
     std::mutex incomingPasswordMutex;
 

@@ -90,6 +90,22 @@ private:
     bool ownsRecord;
 };
 
+/// True when the incoming password equals the stored one, which is zero past storedLength.
+/// The compare does not exit early, on length or on any byte: the incoming bytes are padded
+/// to the stored buffer's size and every byte of it is compared. An incoming password longer
+/// than that fails on length.
+bool PasswordMatches( const unsigned char* incoming, int incomingLength, const char ( &stored )[256], int storedLength )
+{
+    unsigned char padded[sizeof( stored )] = {};
+    if( incomingLength > 0 && incomingLength <= static_cast<int>( sizeof( padded ) ) )
+        memcpy( padded, incoming, incomingLength );
+
+    unsigned char difference = incomingLength != storedLength;
+    for( size_t i = 0; i < sizeof( padded ); ++i )
+        difference |= padded[i] ^ static_cast<unsigned char>( stored[i] );
+    return difference == 0;
+}
+
 } // namespace
 
 void UpdateNetworkLoop( void* arg );
@@ -507,6 +523,7 @@ void RakPeer::SetIncomingPassword( const char* passwordData, int passwordDataLen
         passwordDataLength = 0;
 
     std::lock_guard<std::mutex> guard( incomingPasswordMutex );
+    memset( incomingPassword, 0, sizeof( incomingPassword ) );
     if( passwordDataLength > 0 )
         memcpy( incomingPassword, passwordData, passwordDataLength );
     incomingPasswordLength = (unsigned char)passwordDataLength;
@@ -2594,7 +2611,7 @@ bool RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct* remoteS
     bool passwordMatches;
     {
         std::lock_guard<std::mutex> guard( incomingPasswordMutex );
-        passwordMatches = incomingPasswordLength == passwordLength && memcmp( password, incomingPassword, incomingPasswordLength ) == 0;
+        passwordMatches = PasswordMatches( password, passwordLength, incomingPassword, incomingPasswordLength );
     }
     if( passwordMatches == false )
     {
