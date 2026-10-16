@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cfloat>
 #include <cstddef>
@@ -1214,11 +1215,7 @@ template<>
 inline void BitStream::WriteCompressed( const float& inTemplateVar )
 {
     RakAssert( inTemplateVar > -1.01f && inTemplateVar < 1.01f );
-    float varCopy = inTemplateVar;
-    if( varCopy < -1.0f )
-        varCopy = -1.0f;
-    if( varCopy > 1.0f )
-        varCopy = 1.0f;
+    const float varCopy = std::clamp( inTemplateVar, -1.0f, 1.0f );
     Write( (unsigned short)( ( varCopy + 1.0f ) * 32767.5f ) );
 }
 
@@ -1227,11 +1224,7 @@ template<>
 inline void BitStream::WriteCompressed( const double& inTemplateVar )
 {
     RakAssert( inTemplateVar > -1.01 && inTemplateVar < 1.01 );
-    double varCopy = inTemplateVar;
-    if( varCopy < -1.0f )
-        varCopy = -1.0f;
-    if( varCopy > 1.0f )
-        varCopy = 1.0f;
+    const double varCopy = std::clamp( inTemplateVar, -1.0, 1.0 );
     Write( (uint32_t)( ( varCopy + 1.0 ) * 2147483648.0 ) );
 }
 
@@ -1641,20 +1634,16 @@ void BitStream::WriteOrthMatrix(
     // http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
     float sum;
     sum = 1 + m00 + m11 + m22;
-    if( sum < 0.0f )
-        sum = 0.0f;
+    sum = std::max<float>( sum, 0.0f );
     qw = sqrt( sum ) / 2;
     sum = 1 + m00 - m11 - m22;
-    if( sum < 0.0f )
-        sum = 0.0f;
+    sum = std::max<float>( sum, 0.0f );
     qx = sqrt( sum ) / 2;
     sum = 1 - m00 + m11 - m22;
-    if( sum < 0.0f )
-        sum = 0.0f;
+    sum = std::max<float>( sum, 0.0f );
     qy = sqrt( sum ) / 2;
     sum = 1 - m00 - m11 + m22;
-    if( sum < 0.0f )
-        sum = 0.0f;
+    sum = std::max<float>( sum, 0.0f );
     qz = sqrt( sum ) / 2;
     if( qw < 0.0 )
         qw = 0.0;

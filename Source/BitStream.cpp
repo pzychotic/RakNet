@@ -326,7 +326,7 @@ void BitStream::WriteAlignedBytesSafe( const char* inByteArray, const unsigned i
         return;
     }
     WriteCompressed( inputLength );
-    WriteAlignedBytes( (const unsigned char*)inByteArray, inputLength < maxBytesToWrite ? inputLength : maxBytesToWrite );
+    WriteAlignedBytes( (const unsigned char*)inByteArray, std::min<unsigned int>( inputLength, maxBytesToWrite ) );
 }
 
 // Read bits, starting at the next aligned bits. Note that the modulus 8 starting offset of the
@@ -360,8 +360,7 @@ bool BitStream::ReadAlignedBytesSafe( char* inOutByteArray, unsigned int& inputL
 {
     if( ReadCompressed( inputLength ) == false )
         return false;
-    if( inputLength > maxBytesToRead )
-        inputLength = maxBytesToRead;
+    inputLength = std::min<unsigned int>( inputLength, maxBytesToRead );
     if( inputLength == 0 )
         return true;
     return ReadAlignedBytes( (unsigned char*)inOutByteArray, inputLength );
@@ -376,8 +375,7 @@ bool BitStream::ReadAlignedBytesSafeAlloc( char** outByteArray, unsigned int& in
     *outByteArray = 0;
     if( ReadCompressed( inputLength ) == false )
         return false;
-    if( inputLength > maxBytesToRead )
-        inputLength = maxBytesToRead;
+    inputLength = std::min<unsigned int>( inputLength, maxBytesToRead );
     if( inputLength == 0 )
         return true;
     *outByteArray = (char*)rakMalloc_Ex( (size_t)inputLength, _FILE_AND_LINE_ );
@@ -1111,11 +1109,7 @@ bool BitStream::ReadFloat16( float& outFloat, float floatMin, float floatMax )
     if( Read( percentile ) )
     {
         RakAssert( floatMax > floatMin );
-        outFloat = floatMin + ( (float)percentile / 65535.0f ) * ( floatMax - floatMin );
-        if( outFloat < floatMin )
-            outFloat = floatMin;
-        else if( outFloat > floatMax )
-            outFloat = floatMax;
+        outFloat = std::clamp( floatMin + ( (float)percentile / 65535.0f ) * ( floatMax - floatMin ), floatMin, floatMax );
         return true;
     }
     return false;
@@ -1139,11 +1133,7 @@ void BitStream::WriteFloat16( float inOutFloat, float floatMin, float floatMax )
     {
         RakAssert( inOutFloat >= floatMin - .001 );
     }
-    float percentile = 65535.0f * ( inOutFloat - floatMin ) / ( floatMax - floatMin );
-    if( percentile < 0.0 )
-        percentile = 0.0;
-    if( percentile > 65535.0f )
-        percentile = 65535.0f;
+    const float percentile = std::clamp( 65535.0f * ( inOutFloat - floatMin ) / ( floatMax - floatMin ), 0.0f, 65535.0f );
     Write( (unsigned short)percentile );
 }
 
