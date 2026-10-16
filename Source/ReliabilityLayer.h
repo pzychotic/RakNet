@@ -187,6 +187,15 @@ public:
         RakAssert( index < allocation_size );
         return data[index];
     }
+    /// The slots in index order, null where no chunk has arrived.
+    InternalPacket* const* begin() const
+    {
+        return data;
+    }
+    InternalPacket* const* end() const
+    {
+        return data + allocation_size;
+    }
     SplitPacketIdType PacketId()
     {
         RakAssert( data != NULL );

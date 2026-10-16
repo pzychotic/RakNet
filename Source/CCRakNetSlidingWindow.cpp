@@ -12,6 +12,7 @@
 
 #include "MTUSize.h"
 #include <stdio.h>
+#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <stdlib.h>
@@ -163,9 +164,7 @@ void CCRakNetSlidingWindow::OnResend( CCTimeType curTime, RakNet::TimeUS nextAct
     {
         // Spec says 1/2 cwnd, but it never recovers because cwnd increases too slowly
         //ssThresh=cwnd-8.0 * (MAXIMUM_MTU_INCLUDING_UDP_HEADER*MAXIMUM_MTU_INCLUDING_UDP_HEADER/cwnd);
-        ssThresh = cwnd / 2;
-        if( ssThresh < MAXIMUM_MTU_INCLUDING_UDP_HEADER )
-            ssThresh = MAXIMUM_MTU_INCLUDING_UDP_HEADER;
+        ssThresh = std::max<double>( cwnd / 2, MAXIMUM_MTU_INCLUDING_UDP_HEADER );
         cwnd = MAXIMUM_MTU_INCLUDING_UDP_HEADER;
 
         // Only backoff once per period
@@ -189,9 +188,7 @@ void CCRakNetSlidingWindow::OnNAK( CCTimeType curTime, DatagramSequenceNumberTyp
     if( _isContinuousSend && backoffThisBlock == false )
     {
         // Start congestion avoidance
-        ssThresh = cwnd / 2;
-        if( ssThresh < MAXIMUM_MTU_INCLUDING_UDP_HEADER )
-            ssThresh = MAXIMUM_MTU_INCLUDING_UDP_HEADER;
+        ssThresh = std::max<double>( cwnd / 2, MAXIMUM_MTU_INCLUDING_UDP_HEADER );
 
         // CC PRINTF
         //printf("- %.0f (NAK) Set congestion avoidance.\n", cwnd);
@@ -254,9 +251,7 @@ void CCRakNetSlidingWindow::OnAck( CCTimeType curTime, CCTimeType rtt, bool hasB
         // printf("+ %.0f Congestion avoidance increase.\n", cwnd);
     }
 
-    const double maxCwnd = (double)RESEND_BUFFER_ARRAY_LENGTH * MAXIMUM_MTU_INCLUDING_UDP_HEADER;
-    if( cwnd > maxCwnd )
-        cwnd = maxCwnd;
+    cwnd = std::min<double>( cwnd, (double)RESEND_BUFFER_ARRAY_LENGTH * MAXIMUM_MTU_INCLUDING_UDP_HEADER );
 }
 // ----------------------------------------------------------------------------------------------------------------------------
 void CCRakNetSlidingWindow::OnDuplicateAck( CCTimeType curTime, DatagramSequenceNumberType sequenceNumber )

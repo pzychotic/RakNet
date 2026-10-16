@@ -17,8 +17,11 @@
 #include "RakAssert.h"
 #include "PlatformRandom.h"
 #include "MessageIdentifiers.h"
+#include <algorithm>
 #include <cinttypes>
+#include <iterator>
 #include <math.h>
+#include <numeric>
 
 namespace RakNet {
 
@@ -378,7 +381,7 @@ void ReliabilityLayer::FreeThreadSafeMemory( void )
     }
     outputQueue.clear();
 
-    memset( resendBuffer, 0, sizeof( resendBuffer ) );
+    std::fill( std::begin( resendBuffer ), std::end( resendBuffer ), nullptr );
     statistics.messagesInResendBuffer = 0;
     statistics.bytesInResendBuffer = 0;
 
@@ -810,9 +813,8 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
                         // Fixed by late assigning message IDs on the sender
 
                         // Add 0 times to the queue until (reliableMessageNumber - baseIndex) < queue size.
-                        while( (unsigned int)( holeCount ) > hasReceivedPacketQueue.size() )
-                            hasReceivedPacketQueue.push_back( true ); // time+(CCTimeType)60 * (CCTimeType)1000 * (CCTimeType)1000); // Didn't get this packet - set the time to give up waiting
-                        hasReceivedPacketQueue.push_back( false );    // Got the packet
+                        hasReceivedPacketQueue.resize( (unsigned int)holeCount, true ); // Didn't get these packets
+                        hasReceivedPacketQueue.push_back( false );                      // Got the packet
                         // If this assert hits then DatagramSequenceNumberType has overflowed
                         RakAssert( hasReceivedPacketQueue.size() < (unsigned int)( (DatagramSequenceNumberType)~0u ) );
                     }
@@ -1370,11 +1372,9 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     CCTimeType timeSinceLastTick = time - lastUpdateTime;
     lastUpdateTime = time;
 #if CC_TIME_TYPE_BYTES == 4
-    if( timeSinceLastTick > 100 )
-        timeSinceLastTick = 100;
+    timeSinceLastTick = std::min<CCTimeType>( timeSinceLastTick, 100 );
 #else
-    if( timeSinceLastTick > 100000 )
-        timeSinceLastTick = 100000;
+    timeSinceLastTick = std::min<CCTimeType>( timeSinceLastTick, 100000 );
 #endif
 
     if( unreliableTimeout > 0 )
@@ -2425,10 +2425,7 @@ void ReliabilityLayer::SplitPacket( InternalPacket* internalPacket )
             internalPacket->messageInternalOrder = internalOrderIndex++;
 
         byteOffset = splitPacketIndex * maximumSendBlockBytes;
-        bytesToSend = dataByteLength - byteOffset;
-
-        if( bytesToSend > maximumSendBlockBytes )
-            bytesToSend = maximumSendBlockBytes;
+        bytesToSend = std::min<unsigned int>( dataByteLength - byteOffset, maximumSendBlockBytes );
 
         // Copy over our chunk of data
         AllocInternalPacketData( chunk, &refCounter, internalPacket->data, internalPacket->data + byteOffset );
@@ -2673,16 +2670,8 @@ uint64_t ReliabilityLayer::EmptySplitPacketChannelCost( SplitPacketIndexType spl
 
 uint64_t ReliabilityLayer::SplitPacketChannelCost( SplitPacketChannel* splitPacketChannel )
 {
-    uint64_t cost = EmptySplitPacketChannelCost( splitPacketChannel->splitPacketList.AllocSize() );
-    for( unsigned int j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
-    {
-        const InternalPacket* chunk = splitPacketChannel->splitPacketList.Get( j );
-        if( chunk != nullptr )
-        {
-            cost += HeldPacketCost( chunk );
-        }
-    }
-    return cost;
+    SortedSplittedPackets& chunks = splitPacketChannel->splitPacketList;
+    return std::accumulate( chunks.begin(), chunks.end(), EmptySplitPacketChannelCost( chunks.AllocSize() ), []( uint64_t cost, const InternalPacket* chunk ) { return chunk != nullptr ? cost + HeldPacketCost( chunk ) : cost; } );
 }
 
 bool ReliabilityLayer::ChargeHeldBytes( uint64_t bytes, PacketReliability reliability )
@@ -2868,9 +2857,8 @@ InternalPacket* ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCha
     // Reconstruct. The chunks stay in the channel; the caller erases it. The reassembled copy is
     // not charged here - it is the caller's, and is charged if it goes into an ordering heap.
     internalPacket = CreateInternalPacketCopy( splitPacketChannel->splitPacketList.Get( 0 ), time );
-    internalPacket->dataBitLength = 0;
-    for( j = 0; j < splitPacketChannel->splitPacketList.AllocSize(); j++ )
-        internalPacket->dataBitLength += splitPacketChannel->splitPacketList.Get( j )->dataBitLength;
+    const SortedSplittedPackets& chunks = splitPacketChannel->splitPacketList;
+    internalPacket->dataBitLength = std::accumulate( chunks.begin(), chunks.end(), BitSize_t( 0 ), []( BitSize_t total, const InternalPacket* chunk ) { return total + chunk->dataBitLength; } );
     // splitPacketPartLength=BitsToBytes(splitPacketChannel->firstPacket->dataBitLength);
 
     internalPacket->data = (unsigned char*)rakMalloc_Ex( BitsToBytes( internalPacket->dataBitLength ), _FILE_AND_LINE_ );
