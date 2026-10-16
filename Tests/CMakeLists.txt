@@ -47,6 +47,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/AddressAndGuidFromStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamPrintHexTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamWireTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BPSTrackerTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BulkSendResendTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CloseClosingConnectionTest.cpp
@@ -64,6 +65,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ExternalAddressViewTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GetTimeTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GuidGenerationTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTreeWireTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/InternalIDTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/InvalidPasswordMessageTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LocalIsConnectedTest.cpp
