@@ -134,9 +134,7 @@ bool Router2::ConnectInternal( RakNetGUID endpointGuid, bool returnConnectionLos
 
     // StoreRequest(endpointGuid, Largest(ping*2), systemsSentTo). Set state REQUEST_STATE_QUERY_FORWARDING
     // A connection with no ping measured yet counts as 0
-    int largestPing = GetLargestPingAmongConnectedSystems();
-    if( largestPing < 0 )
-        largestPing = 0;
+    const int largestPing = std::max<int>( GetLargestPingAmongConnectedSystems(), 0 );
     auto cr = std::make_unique<Router2::ConnnectRequest>();
     cr->requestState = R2RS_REQUEST_STATE_QUERY_FORWARDING;
     cr->pingTimeout = RakNet::GetTimeMS() + largestPing * 2 + 1000;
@@ -1238,22 +1236,18 @@ int Router2::GetLargestPingAmongConnectedSystems( void ) const
 
 unsigned int Router2::GetConnectionRequestIndex( RakNetGUID endpointGuid )
 {
-    for( unsigned int i = 0; i < connectionRequests.size(); i++ )
-    {
-        if( connectionRequests[i]->endpointGuid == endpointGuid )
-            return i;
-    }
-    return ~0u;
+    auto match = std::find_if( connectionRequests.begin(), connectionRequests.end(), [&]( const std::unique_ptr<ConnnectRequest>& connectionRequest ) { return connectionRequest->endpointGuid == endpointGuid; } );
+    if( match == connectionRequests.end() )
+        return ~0u;
+    return (unsigned int)( match - connectionRequests.begin() );
 }
 
 unsigned int Router2::ConnnectRequest::GetGuidIndex( RakNetGUID guid )
 {
-    for( unsigned int i = 0; i < connectionRequestSystems.size(); i++ )
-    {
-        if( connectionRequestSystems[i].guid == guid )
-            return i;
-    }
-    return ~0u;
+    auto match = std::find_if( connectionRequestSystems.begin(), connectionRequestSystems.end(), [&]( const ConnectionRequestSystem& system ) { return system.guid == guid; } );
+    if( match == connectionRequestSystems.end() )
+        return ~0u;
+    return (unsigned int)( match - connectionRequestSystems.begin() );
 }
 
 void Router2::ReturnToUser( MessageID messageId, RakNetGUID endpointGuid, const SystemAddress& systemAddress, bool wasGeneratedLocally )

@@ -419,14 +419,7 @@ void UDPProxyClient::OnPingServers( Packet* packet )
 
 bool UDPProxyClient::PingServerGroup::AreAllServersPinged( void ) const
 {
-    for( const ServerWithPing& rServer : serversToPing )
-    {
-        if( rServer.ping == DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR )
-        {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of( serversToPing.begin(), serversToPing.end(), []( const ServerWithPing& rServer ) { return rServer.ping != DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR; } );
 }
 
 void UDPProxyClient::PingServerGroup::SendPingedServersToCoordinator( RakPeerInterface* rakPeerInterface )

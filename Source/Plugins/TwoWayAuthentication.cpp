@@ -18,6 +18,7 @@
 #include "PlatformRandom.h"
 #include "RakPeerInterface.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -128,9 +129,7 @@ void TwoWayAuthentication::NonceGenerator::ClearByAddress( AddressOrGUID remoteS
 void TwoWayAuthentication::NonceGenerator::Update( RakNet::Time curTime )
 {
     // Nonces are in the order they were made, so the stale ones are a prefix
-    auto firstFresh = generatedNonces.begin();
-    while( firstFresh != generatedNonces.end() && (RakNet::Time)( curTime - ( *firstFresh )->whenGenerated ) > NONCE_TIMEOUT_MS )
-        ++firstFresh;
+    auto firstFresh = std::find_if( generatedNonces.begin(), generatedNonces.end(), [&]( const std::unique_ptr<NonceAndRemoteSystemRequest>& nonce ) { return (RakNet::Time)( curTime - nonce->whenGenerated ) <= NONCE_TIMEOUT_MS; } );
     generatedNonces.erase( generatedNonces.begin(), firstFresh );
 }
 TwoWayAuthentication::TwoWayAuthentication()

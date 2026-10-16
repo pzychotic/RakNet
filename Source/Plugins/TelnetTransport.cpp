@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include "LinuxStrings.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -287,9 +288,7 @@ SystemAddress TelnetTransport::HasLostConnection( void )
 }
 TelnetTransport::TelnetClient* TelnetTransport::CountConnection( const SystemAddress& systemAddress, int delta )
 {
-    auto it = remoteClients.begin();
-    while( it != remoteClients.end() && ( *it )->systemAddress != systemAddress )
-        ++it;
+    auto it = std::find_if( remoteClients.begin(), remoteClients.end(), [&]( const std::unique_ptr<TelnetClient>& remoteClient ) { return remoteClient->systemAddress == systemAddress; } );
 
     if( it == remoteClients.end() )
     {

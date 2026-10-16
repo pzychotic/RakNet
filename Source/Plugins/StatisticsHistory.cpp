@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <numeric>
 #include <utility>
 
 namespace RakNet {
@@ -118,10 +119,8 @@ void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& 
     queue->recentSumOfSquares += tav.val * tav.val;
     queue->longTermSum += tav.val;
     queue->longTermCount = queue->longTermCount + 1;
-    if( queue->longTermLowest > tav.val )
-        queue->longTermLowest = tav.val;
-    if( queue->longTermHighest < tav.val )
-        queue->longTermHighest = tav.val;
+    queue->longTermLowest = std::min<SHValueType>( queue->longTermLowest, tav.val );
+    queue->longTermHighest = std::max<SHValueType>( queue->longTermHighest, tav.val );
 
     // Without this, a queue nobody reads holds every sample it was ever given.
     queue->CullExpiredValues( curTime );
@@ -293,13 +292,8 @@ Time StatisticsHistory::TimeAndValueQueue::GetTimeRange( void ) const
 }
 SHValueType StatisticsHistory::TimeAndValueQueue::GetSumSinceTime( Time t ) const
 {
-    SHValueType sum = 0;
-    for( int i = (int)values.size(); i > 0; --i )
-    {
-        if( values[i - 1].time >= t )
-            sum += values[i - 1].val;
-    }
-    return sum;
+    // Summed newest first.
+    return std::accumulate( values.rbegin(), values.rend(), SHValueType( 0 ), [&]( SHValueType sum, const TimeAndValue& value ) { return value.time >= t ? sum + value.val : sum; } );
 }
 void StatisticsHistory::TimeAndValueQueue::MergeSets( const TimeAndValueQueue* lhs, SHDataCategory lhsDataCategory, const TimeAndValueQueue* rhs, SHDataCategory rhsDataCategory, TimeAndValueQueue* output )
 {
@@ -446,13 +440,8 @@ void StatisticsHistory::TimeAndValueQueue::MergeSets( const TimeAndValueQueue* l
             lhsIndex++;
         }
 
-        output->recentSum = 0;
-        output->recentSumOfSquares = 0;
-        for( const TimeAndValue& rVal : valuesOutput )
-        {
-            output->recentSum += rVal.val;
-            output->recentSumOfSquares += rVal.val * rVal.val;
-        }
+        output->recentSum = std::accumulate( valuesOutput.begin(), valuesOutput.end(), SHValueType( 0 ), []( SHValueType sum, const TimeAndValue& value ) { return sum + value.val; } );
+        output->recentSumOfSquares = std::accumulate( valuesOutput.begin(), valuesOutput.end(), SHValueType( 0 ), []( SHValueType sum, const TimeAndValue& value ) { return sum + value.val * value.val; } );
     }
 
     output->values = valuesOutput;

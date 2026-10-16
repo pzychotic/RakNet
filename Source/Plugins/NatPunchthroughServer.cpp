@@ -113,8 +113,7 @@ NatPunchthroughServer::NatPunchthroughServer()
     lastUpdate = 0;
     sessionId = 0;
     natPunchthroughServerDebugInterface = 0;
-    for( int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-        boundAddresses[i] = UNASSIGNED_SYSTEM_ADDRESS;
+    std::fill( std::begin( boundAddresses ), std::end( boundAddresses ), UNASSIGNED_SYSTEM_ADDRESS );
     boundAddressCount = 0;
 }
 
@@ -433,8 +432,7 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
                 }
                 else
                 {
-                    int largerPing = targetPing > senderPing ? targetPing : senderPing;
-                    simultaneousAttemptTime = time + ( ( largerPing * 4 < 100 ) ? 100 : ( largerPing * 4 ) );
+                    simultaneousAttemptTime = time + std::max<int>( std::max<int>( targetPing, senderPing ) * 4, 100 );
                 }
 
                 if( natPunchthroughServerDebugInterface )

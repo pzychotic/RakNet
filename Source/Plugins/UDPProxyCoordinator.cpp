@@ -84,13 +84,7 @@ uint64_t UDPProxyCoordinator::GetServerSelectionBitstreamsRefused( void ) const
 }
 unsigned int UDPProxyCoordinator::CountRequestsFrom( const SystemAddress& requestingAddress ) const
 {
-    unsigned int count = 0;
-    for( const auto& [sata, fw] : forwardingRequestList )
-    {
-        if( fw->requestingAddress == requestingAddress )
-            count++;
-    }
-    return count;
+    return (unsigned int)std::count_if( forwardingRequestList.begin(), forwardingRequestList.end(), [&]( const auto& entry ) { return entry.second->requestingAddress == requestingAddress; } );
 }
 void UDPProxyCoordinator::Update( void )
 {
@@ -550,7 +544,7 @@ void UDPProxyCoordinator::ForwardingRequest::OrderRemainingServersToTry( void )
     {
         swp.serverAddress = serverAddress;
         unsigned int ping = ReportedPingOrUnresponsive( sourceServerPings, serverAddress ) + ReportedPingOrUnresponsive( targetServerPings, serverAddress );
-        swp.ping = ping > 0xFFFF ? (unsigned short)0xFFFF : (unsigned short)ping;
+        swp.ping = (unsigned short)std::min<unsigned int>( ping, 0xFFFFu );
         swpList.push_back( swp );
     }
     // Servers with the same ping keep the order they were listed in.

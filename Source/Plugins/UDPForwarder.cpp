@@ -26,6 +26,7 @@
 #include <netdb.h>
 #endif
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -142,21 +143,19 @@ UDPForwarderResult UDPForwarder::StartForwarding( SystemAddress source, SystemAd
     {
         std::this_thread::sleep_for( std::chrono::milliseconds( 0 ) );
         std::lock_guard<std::mutex> guard( startForwardingOutputMutex );
-        for( auto it = startForwardingOutput.begin(); it != startForwardingOutput.end(); ++it )
+        auto it = std::find_if( startForwardingOutput.begin(), startForwardingOutput.end(), [&]( const StartForwardingOutputStruct& output ) { return output.inputId == inputId; } );
+        if( it != startForwardingOutput.end() )
         {
-            if( (*it).inputId == inputId )
+            if( it->result == UDPFORWARDER_SUCCESS || it->result == UDPFORWARDER_FORWARDING_ALREADY_EXISTS )
             {
-                if( ( *it ).result == UDPFORWARDER_SUCCESS || ( *it ).result == UDPFORWARDER_FORWARDING_ALREADY_EXISTS )
-                {
-                    if( forwardingPort )
-                        *forwardingPort = (*it).forwardingPort;
-                    if( forwardingSocket )
-                        *forwardingSocket = (*it).forwardingSocket;
-                }
-                UDPForwarderResult res = (*it).result;
-                startForwardingOutput.erase( it );
-                return res;
+                if( forwardingPort )
+                    *forwardingPort = it->forwardingPort;
+                if( forwardingSocket )
+                    *forwardingSocket = it->forwardingSocket;
             }
+            UDPForwarderResult res = it->result;
+            startForwardingOutput.erase( it );
+            return res;
         }
     }
 
