@@ -5158,25 +5158,15 @@ void RakPeer::FillIPList( void )
 
 void SortInternalIDs( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
 {
-    int startingIdx = 0;
-    while( startingIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && addresses[startingIdx] != UNASSIGNED_SYSTEM_ADDRESS )
-    {
-        int lowestIdx = startingIdx;
-        for( int curIdx = startingIdx + 1; curIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS && addresses[curIdx] != UNASSIGNED_SYSTEM_ADDRESS; curIdx++ )
-        {
-            if( addresses[curIdx] < addresses[lowestIdx] )
-            {
-                lowestIdx = curIdx;
-            }
-        }
-        if( startingIdx != lowestIdx )
-        {
-            SystemAddress temp = addresses[startingIdx];
-            addresses[startingIdx] = addresses[lowestIdx];
-            addresses[lowestIdx] = temp;
-        }
-        ++startingIdx;
-    }
+    // operator< compares the address in the left operand's family, so it is not a strict weak
+    // ordering across families. The order is by port, then IPv6 before IPv4, then operator<.
+    auto sortsBefore = []( const SystemAddress& lhs, const SystemAddress& rhs ) {
+        if( lhs.GetPort() != rhs.GetPort() || lhs.GetIPVersion() == rhs.GetIPVersion() )
+            return lhs < rhs;
+        return lhs.GetIPVersion() > rhs.GetIPVersion();
+    };
+    SystemAddress* const end = addresses + MAXIMUM_NUMBER_OF_INTERNAL_IDS;
+    std::sort( addresses, std::find( addresses, end, UNASSIGNED_SYSTEM_ADDRESS ), sortsBefore );
 }
 
 } // namespace RakNet

@@ -47,7 +47,8 @@ class PluginInterface2;
 
 /// \internal
 /// Sorts the addresses before the first UNASSIGNED_SYSTEM_ADDRESS from lowest to highest,
-/// as RakPeer orders the internal IDs it reads from the machine.
+/// as RakPeer orders the internal IDs it reads from the machine. On the same port, IPv6
+/// addresses come before IPv4 ones.
 void SortInternalIDs( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
 
 ///\brief Main interface for network communications.
