@@ -46,6 +46,7 @@ typedef int socklen_t;
 #include <cerrno>
 #include <charconv>
 #include <chrono>
+#include <numeric>
 #include <thread>
 
 namespace RakNet {
@@ -676,13 +677,7 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
         return false;
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS && broadcast == false )
         return false;
-    unsigned int totalLength = 0;
-    int i;
-    for( i = 0; i < numParameters; i++ )
-    {
-        if( lengths[i] > 0 )
-            totalLength += lengths[i];
-    }
+    const unsigned int totalLength = std::accumulate( lengths, lengths + std::max<int>( numParameters, 0 ), 0u );
     if( totalLength == 0 )
         return false;
 
@@ -710,7 +705,7 @@ bool TCPInterface::SendList( const char** data, const unsigned int* lengths, con
     // tried first, and the search is for when it does not name the connection.
     if( broadcast || systemAddress.systemIndex >= (int)remoteClients.size() || bufferFor( remoteClients[systemAddress.systemIndex] ) == false )
     {
-        for( i = 0; i < (int)remoteClients.size(); i++ )
+        for( int i = 0; i < (int)remoteClients.size(); i++ )
             bufferFor( remoteClients[i] );
     }
 
@@ -1513,9 +1508,7 @@ bool RemoteClient::SendOrBuffer( const char** data, const unsigned int* lengths,
     if( state != State::ACTIVE )
         return false;
 
-    uint64_t totalLength = 0;
-    for( int parameterIndex = 0; parameterIndex < numParameters; parameterIndex++ )
-        totalLength += lengths[parameterIndex];
+    const uint64_t totalLength = std::accumulate( lengths, lengths + std::max<int>( numParameters, 0 ), uint64_t( 0 ) );
 
     // All or nothing, under one lock, so the check and the writes agree.
     std::lock_guard<std::mutex> guard( outgoingDataMutex );

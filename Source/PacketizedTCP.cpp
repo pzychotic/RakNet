@@ -17,6 +17,8 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <algorithm>
+#include <numeric>
 
 namespace RakNet {
 
@@ -98,13 +100,7 @@ bool PacketizedTCP::SendList( const char** data, const unsigned int* lengths, co
         return false;
     if( systemAddress == UNASSIGNED_SYSTEM_ADDRESS && broadcast == false )
         return false;
-    PTCPHeader totalLengthOfUserData = 0;
-    int i;
-    for( i = 0; i < numParameters; i++ )
-    {
-        if( lengths[i] > 0 )
-            totalLengthOfUserData += lengths[i];
-    }
+    PTCPHeader totalLengthOfUserData = std::accumulate( lengths, lengths + std::max<int>( numParameters, 0 ), PTCPHeader( 0 ) );
     if( totalLengthOfUserData == 0 )
         return false;
 
@@ -121,11 +117,9 @@ bool PacketizedTCP::SendList( const char** data, const unsigned int* lengths, co
     const char* dataArray[513];
     dataArray[0] = (char*)&dataLength;
     lengthsArray[0] = sizeof( dataLength );
-    for( int i = 0; i < 512 && i < numParameters; i++ )
-    {
-        dataArray[i + 1] = data[i];
-        lengthsArray[i + 1] = lengths[i];
-    }
+    const int copied = std::min<int>( numParameters, 512 );
+    std::copy_n( data, copied, dataArray + 1 );
+    std::copy_n( lengths, copied, lengthsArray + 1 );
     return TCPInterface::SendList( dataArray, lengthsArray, numParameters + 1, systemAddress, broadcast );
 }
 void PacketizedTCP::PushNotificationsToQueues( void )
