@@ -42,6 +42,7 @@
 #include <stdlib.h> // malloc
 #include <algorithm>
 #include <chrono>
+#include <numeric>
 #include <thread>
 
 namespace RakNet {
@@ -192,8 +193,7 @@ RakPeer::RakPeer()
     acceptingQueries = false;
 
     occasionalPing = false;
-    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-        ipList[i] = UNASSIGNED_SYSTEM_ADDRESS;
+    std::fill( std::begin( ipList ), std::end( ipList ), UNASSIGNED_SYSTEM_ADDRESS );
     allowConnectionResponseIPMigration = false;
     //incomingPasswordLength=outgoingPasswordLength=0;
     incomingPasswordLength = 0;
@@ -382,8 +382,7 @@ StartupResult RakPeer::Startup( unsigned int maxConnections, SocketDescriptor* s
     if( maximumNumberOfPeers == 0 )
     {
         // Don't allow more incoming connections than we have peers.
-        if( maximumIncomingConnections > maxConnections )
-            maximumIncomingConnections = maxConnections;
+        maximumIncomingConnections = std::min<unsigned int>( maximumIncomingConnections.load(), maxConnections );
 
         maximumNumberOfPeers = maxConnections;
 
@@ -516,8 +515,7 @@ void RakPeer::SetIncomingPassword( const char* passwordData, int passwordDataLen
     //if (passwordDataLength > MAX_OFFLINE_DATA_LENGTH)
     //  passwordDataLength=MAX_OFFLINE_DATA_LENGTH;
 
-    if( passwordDataLength > 255 )
-        passwordDataLength = 255;
+    passwordDataLength = std::min<int>( passwordDataLength, 255 );
 
     if( passwordData == 0 )
         passwordDataLength = 0;
@@ -576,8 +574,7 @@ ConnectionAttemptResult RakPeer::Connect( const char* host, unsigned short remot
 
     connectionSocketIndex = GetRakNetSocketFromUserConnectionSocketIndex( connectionSocketIndex );
 
-    if( passwordDataLength > 255 )
-        passwordDataLength = 255;
+    passwordDataLength = std::min<int>( passwordDataLength, 255 );
 
     if( passwordData == 0 )
         passwordDataLength = 0;
@@ -602,8 +599,7 @@ ConnectionAttemptResult RakPeer::ConnectWithSocket( const char* host, unsigned s
     if( host == 0 || endThreads || socket == 0 )
         return INVALID_PARAMETER;
 
-    if( passwordDataLength > 255 )
-        passwordDataLength = 255;
+    passwordDataLength = std::min<int>( passwordDataLength, 255 );
 
     if( passwordData == 0 )
         passwordDataLength = 0;
@@ -777,10 +773,9 @@ bool RakPeer::GetConnectionList( SystemAddress* remoteSystems, unsigned short* n
     GetSystemList( addresses, guids );
     if( remoteSystems )
     {
-        unsigned short i;
-        for( i = 0; i < *numberOfSystems && i < addresses.size(); i++ )
-            remoteSystems[i] = addresses[i];
-        *numberOfSystems = i;
+        const unsigned short count = (unsigned short)std::min<size_t>( *numberOfSystems, addresses.size() );
+        std::copy_n( addresses.begin(), count, remoteSystems );
+        *numberOfSystems = count;
     }
     else
     {
@@ -944,6 +939,13 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
     return usedSendReceipt;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// The length of SendList's concatenation, which skips blocks with a non-positive length.
+// Summed in uint64_t, so no total of int lengths wraps to one under MAXIMUM_MESSAGE_SIZE.
+static uint64_t TotalListLength( const int* lengths, int numParameters )
+{
+    return std::accumulate( lengths, lengths + std::max<int>( numParameters, 0 ), uint64_t( 0 ), []( uint64_t total, int length ) { return length > 0 ? total + (uint64_t)length : total; } );
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Sends multiple blocks of data, concatenating them automatically.
 //
 // This is equivalent to:
@@ -981,18 +983,8 @@ uint32_t RakPeer::SendList( const char** data, const int* lengths, const int num
         return 0;
 
     // The limit is on the concatenation, since that is the message the far end reassembles.
-    // Summed in uint64_t: SendBufferedList accumulates the same lengths into an unsigned int,
-    // which wraps, and a wrapped total would slip past this check and then under-allocate.
-    // Blocks with a non-positive length are skipped there, so they are skipped here too.
     // Rejected by return value with no RakAssert.
-    uint64_t totalLength = 0;
-    for( int i = 0; i < numParameters; i++ )
-    {
-        if( lengths[i] > 0 )
-            totalLength += (uint64_t)lengths[i];
-    }
-
-    if( totalLength > MAXIMUM_MESSAGE_SIZE )
+    if( TotalListLength( lengths, numParameters ) > MAXIMUM_MESSAGE_SIZE )
         return 0;
 
     if( broadcast == false && systemIdentifier.IsUndefined() )
@@ -1200,18 +1192,10 @@ ConnectionState RakPeer::GetConnectionState( const AddressOrGUID systemIdentifie
     if( systemIdentifier.systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
     {
         std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-        for( const std::unique_ptr<RequestedConnectionStruct>& pConnection : requestedConnectionQueue )
-        {
-            if( pConnection->systemAddress == systemIdentifier.systemAddress )
-            {
-                return IS_PENDING;
-            }
-        }
-        for( const SystemAddress& address : requestsHandedToRecords )
-        {
-            if( address == systemIdentifier.systemAddress )
-                return IS_PENDING;
-        }
+        if( std::any_of( requestedConnectionQueue.begin(), requestedConnectionQueue.end(), [&]( const std::unique_ptr<RequestedConnectionStruct>& pConnection ) { return pConnection->systemAddress == systemIdentifier.systemAddress; } ) )
+            return IS_PENDING;
+        if( std::find( requestsHandedToRecords.begin(), requestsHandedToRecords.end(), systemIdentifier.systemAddress ) != requestsHandedToRecords.end() )
+            return IS_PENDING;
     }
 
     // The view holds open connection records only, so nothing here answers IS_DISCONNECTED.
@@ -1348,18 +1332,16 @@ void RakPeer::AddToBanList( const char* IP, RakNet::TimeMS milliseconds )
     // If this guy is already in the ban list, do nothing
     banListMutex.lock();
 
-    for( const std::unique_ptr<BanStruct>& pBanStruct : banList )
+    auto banned = std::find_if( banList.begin(), banList.end(), [&]( const std::unique_ptr<BanStruct>& pBanStruct ) { return pBanStruct->IP == IP; } );
+    if( banned != banList.end() )
     {
-        if( pBanStruct->IP == IP )
-        {
-            // Already in the ban list.  Just update the time
-            if( milliseconds == 0 )
-                pBanStruct->timeout = 0; // Infinite
-            else
-                pBanStruct->timeout = time + milliseconds;
-            banListMutex.unlock();
-            return;
-        }
+        // Already in the ban list.  Just update the time
+        if( milliseconds == 0 )
+            ( *banned )->timeout = 0; // Infinite
+        else
+            ( *banned )->timeout = time + milliseconds;
+        banListMutex.unlock();
+        return;
     }
 
     banListMutex.unlock();
@@ -1390,14 +1372,9 @@ void RakPeer::RemoveFromBanList( const char* IP )
 
     std::lock_guard<std::mutex> guard( banListMutex );
 
-    for( auto it = banList.begin(); it != banList.end(); ++it )
-    {
-        if( ( *it )->IP == IP )
-        {
-            banList.erase( it );
-            break;
-        }
-    }
+    auto banned = std::find_if( banList.begin(), banList.end(), [&]( const std::unique_ptr<BanStruct>& pBanStruct ) { return pBanStruct->IP == IP; } );
+    if( banned != banList.end() )
+        banList.erase( banned );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1565,22 +1542,22 @@ bool RakPeer::Ping( const char* host, unsigned short remotePort, bool onlyReplyO
 // Parameters:
 // target - whose time to read
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// The end of the pings recorded so far: the first unused slot, whose pingTime is 65535.
+static const RakPeer::PingAndClockDifferential* RecordedPingsEnd( const RakPeer::RemoteSystemStruct& remoteSystem )
+{
+    return std::find_if( std::begin( remoteSystem.pingAndClockDifferential ), std::end( remoteSystem.pingAndClockDifferential ), []( const RakPeer::PingAndClockDifferential& ping ) { return ping.pingTime == 65535; } );
+}
+
 // The ping summary GetAveragePing and GetLastPing report. PublishView computes it into the
 // published view.
 static int AveragePingOf( const RakPeer::RemoteSystemStruct& remoteSystem )
 {
-    int sum = 0;
-    int quantity;
-    for( quantity = 0; quantity < PING_TIMES_ARRAY_SIZE; quantity++ )
-    {
-        if( remoteSystem.pingAndClockDifferential[quantity].pingTime == 65535 )
-            break;
-        sum += remoteSystem.pingAndClockDifferential[quantity].pingTime;
-    }
-
-    if( quantity > 0 )
-        return sum / quantity;
-    return -1;
+    const RakPeer::PingAndClockDifferential* pings = remoteSystem.pingAndClockDifferential;
+    const RakPeer::PingAndClockDifferential* pingsEnd = RecordedPingsEnd( remoteSystem );
+    const int quantity = (int)( pingsEnd - pings );
+    if( quantity == 0 )
+        return -1;
+    return std::accumulate( pings, pingsEnd, 0, []( int sum, const RakPeer::PingAndClockDifferential& ping ) { return sum + ping.pingTime; } ) / quantity;
 }
 
 static int LastPingOf( const RakPeer::RemoteSystemStruct& remoteSystem )
@@ -1658,26 +1635,13 @@ RakNet::Time RakPeer::GetClockDifferential( const AddressOrGUID systemIdentifier
 
 RakNet::Time RakPeer::GetClockDifferentialInt( RemoteSystemStruct* remoteSystem ) const
 {
-    int counter, lowestPingSoFar;
-    RakNet::Time clockDifferential;
-
-    lowestPingSoFar = 65535;
-
-    clockDifferential = 0;
-
-    for( counter = 0; counter < PING_TIMES_ARRAY_SIZE; counter++ )
-    {
-        if( remoteSystem->pingAndClockDifferential[counter].pingTime == 65535 )
-            break;
-
-        if( remoteSystem->pingAndClockDifferential[counter].pingTime < lowestPingSoFar )
-        {
-            clockDifferential = remoteSystem->pingAndClockDifferential[counter].clockDifferential;
-            lowestPingSoFar = remoteSystem->pingAndClockDifferential[counter].pingTime;
-        }
-    }
-
-    return clockDifferential;
+    // The differential measured with the lowest ping, the earliest of any tied.
+    const PingAndClockDifferential* pings = remoteSystem->pingAndClockDifferential;
+    const PingAndClockDifferential* pingsEnd = RecordedPingsEnd( *remoteSystem );
+    const PingAndClockDifferential* lowest = std::min_element( pings, pingsEnd, []( const PingAndClockDifferential& lhs, const PingAndClockDifferential& rhs ) { return lhs.pingTime < rhs.pingTime; } );
+    if( lowest == pingsEnd )
+        return 0;
+    return lowest->clockDifferential;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Description:
@@ -1903,11 +1867,7 @@ unsigned int RakPeer::GetNumberOfAddresses( void )
     }
 
     std::lock_guard<std::mutex> guard( ipListMutex );
-    unsigned int i = 0;
-    while( i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && ipList[i] != UNASSIGNED_SYSTEM_ADDRESS )
-        i++;
-
-    return i;
+    return (unsigned int)( std::find( std::begin( ipList ), std::end( ipList ), UNASSIGNED_SYSTEM_ADDRESS ) - std::begin( ipList ) );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1956,15 +1916,12 @@ bool RakPeer::IsLocalIP( const char* ip )
         FillIPList();
 
     const auto internalIDs = CopyIPList();
-    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && internalIDs[i] != UNASSIGNED_SYSTEM_ADDRESS; i++ )
-    {
+    const auto assignedEnd = std::find( internalIDs.begin(), internalIDs.end(), UNASSIGNED_SYSTEM_ADDRESS );
+    return std::any_of( internalIDs.begin(), assignedEnd, [&]( const SystemAddress& internalID ) {
         char str[128];
-        internalIDs[i].ToString( false, str );
-        if( strcmp( ip, str ) == 0 )
-            return true;
-    }
-
-    return false;
+        internalID.ToString( false, str );
+        return strcmp( ip, str ) == 0;
+    } );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2487,13 +2444,8 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const SystemAddress& sys
 
     // Return false if already pending, else push on queue
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-    for( const std::unique_ptr<RequestedConnectionStruct>& pConnection : requestedConnectionQueue )
-    {
-        if( pConnection->systemAddress == systemAddress )
-        {
-            return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
-        }
-    }
+    if( std::any_of( requestedConnectionQueue.begin(), requestedConnectionQueue.end(), [&]( const std::unique_ptr<RequestedConnectionStruct>& pConnection ) { return pConnection->systemAddress == systemAddress; } ) )
+        return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
     requestedConnectionQueue.push_back( std::move( rcs ) );
 
     return CONNECTION_ATTEMPT_STARTED;
@@ -2534,15 +2486,10 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystemFromGUID( const RakNetGUID 
     if( guid == UNASSIGNED_RAKNET_GUID )
         return 0;
 
-    unsigned i;
-    for( i = 0; i < remoteSystemList.size(); i++ )
-    {
-        if( remoteSystemList[i].guid == guid && ( onlyActive == false || remoteSystemList[i].isActive ) )
-        {
-            return &remoteSystemList[i];
-        }
-    }
-    return 0;
+    auto match = std::find_if( remoteSystemList.begin(), remoteSystemList.end(), [&]( const RemoteSystemStruct& remoteSystem ) { return remoteSystem.guid == guid && ( onlyActive == false || remoteSystem.isActive ); } );
+    if( match == remoteSystemList.end() )
+        return 0;
+    return &*match;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The ID_CONNECTION_REQUEST header, exactly as ProcessOfflineNetworkPacket writes it:
@@ -2850,15 +2797,11 @@ RakPeer::RemoteSystemStruct* RakPeer::GetRemoteSystem( const SystemAddress& sa )
 template<class Entry, class Matches>
 static bool CopyFirstMatch( const std::vector<Entry>& view, Matches matches, Entry& out )
 {
-    for( const Entry& entry : view )
-    {
-        if( matches( entry ) )
-        {
-            out = entry;
-            return true;
-        }
-    }
-    return false;
+    auto match = std::find_if( view.begin(), view.end(), matches );
+    if( match == view.end() )
+        return false;
+    out = *match;
+    return true;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::GetPublishedByAddress( const SystemAddress& systemAddress, PublishedRemoteSystem& out ) const
@@ -2913,8 +2856,7 @@ void RakPeer::PublishView( void )
         entry.guid.systemIndex = (SystemIndex)i;
         entry.connectMode = remoteSystem.connectMode;
         entry.rakNetSocket = remoteSystem.rakNetSocket;
-        for( int j = 0; j < MAXIMUM_NUMBER_OF_INTERNAL_IDS; j++ )
-            entry.theirInternalSystemAddress[j] = remoteSystem.theirInternalSystemAddress[j];
+        std::copy( std::begin( remoteSystem.theirInternalSystemAddress ), std::end( remoteSystem.theirInternalSystemAddress ), entry.theirInternalSystemAddress );
         entry.myExternalSystemAddress = remoteSystem.myExternalSystemAddress;
         entry.MTUSize = remoteSystem.MTUSize;
         entry.timeoutTime = remoteSystem.reliabilityLayer.GetTimeoutTime();
@@ -3114,16 +3056,13 @@ void RakPeer::AddToActiveSystemList( unsigned int remoteSystemListIndex )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::RemoveFromActiveSystemList( const SystemAddress& sa )
 {
-    unsigned int i;
-    for( i = 0; i < activeSystemListSize; i++ )
+    const auto activeEnd = activeSystemList.begin() + activeSystemListSize;
+    auto match = std::find_if( activeSystemList.begin(), activeEnd, [&]( const RemoteSystemStruct* rss ) { return rss->systemAddress == sa; } );
+    if( match != activeEnd )
     {
-        RemoteSystemStruct* rss = activeSystemList[i];
-        if( rss->systemAddress == sa )
-        {
-            activeSystemList[i] = activeSystemList[activeSystemListSize - 1];
-            activeSystemListSize--;
-            return;
-        }
+        *match = *( activeEnd - 1 );
+        activeSystemListSize--;
+        return;
     }
     RakAssert( "activeSystemList invalid, entry not found in RemoveFromActiveSystemList. Ensure that AddToActiveSystemList and RemoveFromActiveSystemList are called by the same thread." && 0 );
 }
@@ -3146,19 +3085,12 @@ bool RakPeer::MatchesThisPeer( const AddressOrGUID& systemIdentifier, bool match
         return systemIdentifier.rakNetGuid == myGuid;
 
     const auto internalIDs = CopyIPList();
-    for( int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS && internalIDs[i] != UNASSIGNED_SYSTEM_ADDRESS; i++ )
-    {
-        if( matchPort )
-        {
-            if( internalIDs[i] == systemIdentifier.systemAddress )
-                return true;
-        }
-        else
-        {
-            if( internalIDs[i].EqualsExcludingPort( systemIdentifier.systemAddress ) )
-                return true;
-        }
-    }
+    const auto assignedEnd = std::find( internalIDs.begin(), internalIDs.end(), UNASSIGNED_SYSTEM_ADDRESS );
+    const bool isInternalID = std::any_of( internalIDs.begin(), assignedEnd, [&]( const SystemAddress& internalID ) {
+        return matchPort ? internalID == systemIdentifier.systemAddress : internalID.EqualsExcludingPort( systemIdentifier.systemAddress );
+    } );
+    if( isInternalID )
+        return true;
 
     return ( matchPort == true && systemIdentifier.systemAddress == externalAddress ) ||
            ( matchPort == false && systemIdentifier.systemAddress.EqualsExcludingPort( externalAddress ) );
@@ -3174,8 +3106,7 @@ std::array<SystemAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS> RakPeer::CopyIPList( v
 {
     std::array<SystemAddress, MAXIMUM_NUMBER_OF_INTERNAL_IDS> copy;
     std::lock_guard<std::mutex> guard( ipListMutex );
-    for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-        copy[i] = ipList[i];
+    std::copy( std::begin( ipList ), std::end( ipList ), copy.begin() );
     return copy;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3426,20 +3357,13 @@ void RakPeer::SendBuffered( const char* data, BitSize_t numberOfBitsToSend, Pack
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SendBufferedList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, RemoteSystemStruct::ConnectMode connectionMode, uint32_t receipt )
 {
-    uint64_t totalLength = 0;
+    const uint64_t totalLength = TotalListLength( lengths, numParameters );
     unsigned int lengthOffset;
     int i;
-    for( i = 0; i < numParameters; i++ )
-    {
-        if( lengths[i] > 0 )
-            totalLength += (uint64_t)lengths[i];
-    }
     if( totalLength == 0 )
         return;
 
-    // SendList has already rejected anything larger. Summing in uint64_t rather than the
-    // unsigned int this used means an oversized total arrives here as itself instead of
-    // wrapping to a small one, so this guard can see it.
+    // SendList has already rejected anything larger.
     if( totalLength > MAXIMUM_MESSAGE_SIZE )
     {
         RakAssert( "SendBufferedList: total length exceeds MAXIMUM_MESSAGE_SIZE" && 0 );
@@ -4147,7 +4071,7 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bsOut.Write( (unsigned char)0 ); // HasCookie: this Peer never asks for security
 
             // MTU. Lower MTU if it exceeds our own limit.
-            uint16_t mtu = ( length + UDP_HEADER_SIZE > MAXIMUM_MTU_SIZE ) ? MAXIMUM_MTU_SIZE : length + UDP_HEADER_SIZE;
+            uint16_t mtu = (uint16_t)std::min<int>( length + UDP_HEADER_SIZE, MAXIMUM_MTU_SIZE );
             bsOut.WriteCasted<uint16_t>( mtu );
             // Pad response with zeros to MTU size so the connection's MTU will be tested in both directions
             bsOut.PadWithZeroToByteLength( mtu - bsOut.GetNumberOfBytesUsed() );
@@ -4388,13 +4312,9 @@ void RakPeer::DerefAllSockets( void )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 unsigned int RakPeer::GetRakNetSocketFromUserConnectionSocketIndex( unsigned int userIndex ) const
 {
-    for( unsigned int i = 0; i < socketList.size(); i++ )
-    {
-        if( socketList[i]->GetUserConnectionSocketIndex() == userIndex )
-        {
-            return i;
-        }
-    }
+    auto match = std::find_if( socketList.begin(), socketList.end(), [&]( const RakNetSocket2* socket ) { return socket->GetUserConnectionSocketIndex() == userIndex; } );
+    if( match != socketList.end() )
+        return (unsigned int)( match - socketList.begin() );
     RakAssert( "GetRakNetSocketFromUserConnectionSocketIndex failed" && 0 );
     return ~0u;
 }
@@ -4565,9 +4485,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                 }
                 else
                 {
-                    int MTUSizeIndex = rcs->requestsMade / ( rcs->sendConnectionAttemptCount / NUM_MTU_SIZES );
-                    if( MTUSizeIndex >= NUM_MTU_SIZES )
-                        MTUSizeIndex = NUM_MTU_SIZES - 1;
+                    const int MTUSizeIndex = std::min<int>( rcs->requestsMade / ( rcs->sendConnectionAttemptCount / NUM_MTU_SIZES ), NUM_MTU_SIZES - 1 );
                     rcs->requestsMade++;
                     rcs->nextRequestTime = timeMS + rcs->timeBetweenSendConnectionAttemptsMS;
 

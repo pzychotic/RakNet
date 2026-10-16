@@ -151,6 +151,18 @@ TEST_CASE( "SendList applies the limit to the concatenation", "[send]" )
                              UNASSIGNED_SYSTEM_ADDRESS, true ) == 0 );
 }
 
+TEST_CASE( "SendList rejects lengths whose 32-bit total wraps to a small one", "[send]" )
+{
+    PeerScope peers;
+    RakPeerInterface* peer = StartedPeer( peers );
+
+    // Summed in 32 bits, signed or unsigned, these come to 1, which is under the limit.
+    const char* blocks[3] = { g_oneByte, g_oneByte, g_oneByte };
+    int wrapping[3] = { INT32_MAX, INT32_MAX, 3 };
+    REQUIRE( peer->SendList( blocks, wrapping, 3, HIGH_PRIORITY, RELIABLE_ORDERED, 0,
+                             UNASSIGNED_SYSTEM_ADDRESS, true ) == 0 );
+}
+
 TEST_CASE( "Send( BitStream* ) shares the limit", "[send]" )
 {
     PeerScope peers;
