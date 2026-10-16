@@ -79,6 +79,33 @@ TEST_CASE( "SortInternalIDs sorts the addresses before the first unassigned one,
     CHECK( Sorted( AddressList( {} ) ) == AddressList( {} ) );
 }
 
+#if RAKNET_SUPPORT_IPV6 == 1
+TEST_CASE( "SortInternalIDs puts IPv6 addresses before IPv4 ones on the same port", "[address]" )
+{
+    WinsockScope winsock;
+    const SystemAddress ipv4Low( "10.0.0.1", 1000 );
+    const SystemAddress ipv4High( "10.0.0.2", 1000 );
+    const SystemAddress ipv6First( "fe80::2", 1000 );
+    const SystemAddress ipv6Second( "fe80::1", 1000 );
+    REQUIRE( ipv6First.GetIPVersion() == 6 );
+    REQUIRE( ipv6First < ipv6Second );
+
+    std::vector<SystemAddress> list( MAXIMUM_NUMBER_OF_INTERNAL_IDS, UNASSIGNED_SYSTEM_ADDRESS );
+    list[0] = ipv4High;
+    list[1] = ipv6Second;
+    list[2] = ipv4Low;
+    list[3] = ipv6First;
+
+    std::vector<SystemAddress> expected( MAXIMUM_NUMBER_OF_INTERNAL_IDS, UNASSIGNED_SYSTEM_ADDRESS );
+    expected[0] = ipv6First;
+    expected[1] = ipv6Second;
+    expected[2] = ipv4Low;
+    expected[3] = ipv4High;
+
+    CHECK( Sorted( list ) == expected );
+}
+#endif
+
 TEST_CASE( "GetLocalIP called on two threads at once gives each thread its own string", "[network]" )
 {
     PeerScope peers;
