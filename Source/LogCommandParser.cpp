@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <algorithm>
+#include <iterator>
 
 #include "LinuxStrings.h"
 
@@ -110,14 +112,12 @@ void LogCommandParser::AddChannel( const char* channelName )
     // Each channel can only be added once.
     RakAssert( channelIndex == ~0u );
 
-    for( unsigned i = 0; i < 32; i++ )
+    const char** freeChannel = std::find( std::begin( channelNames ), std::end( channelNames ), nullptr );
+    if( freeChannel != std::end( channelNames ) )
     {
-        if( channelNames[i] == 0 )
-        {
-            // Assuming a persistent static string.
-            channelNames[i] = channelName;
-            return;
-        }
+        // Assuming a persistent static string.
+        *freeChannel = channelName;
+        return;
     }
 
     // No more available channels - max 32 with this implementation where I save subscribed channels with bit operations
@@ -250,15 +250,11 @@ unsigned LogCommandParser::Subscribe( const SystemAddress& systemAddress, const 
 }
 unsigned LogCommandParser::GetChannelIndexFromName( const char* channelName )
 {
-    for( unsigned i = 0; i < 32; i++ )
-    {
-        if( channelNames[i] == 0 )
-            return ~0u;
-
-        if( _stricmp( channelNames[i], channelName ) == 0 )
-            return i;
-    }
-    return ~0u;
+    const char** addedEnd = std::find( std::begin( channelNames ), std::end( channelNames ), nullptr );
+    const char** match = std::find_if( std::begin( channelNames ), addedEnd, [&]( const char* name ) { return _stricmp( name, channelName ) == 0; } );
+    if( match == addedEnd )
+        return ~0u;
+    return (unsigned)( match - std::begin( channelNames ) );
 }
 
 void LogCommandParser::OnTransportChange( TransportInterface* transport )

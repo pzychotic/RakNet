@@ -18,6 +18,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <algorithm>
 
 #define COMMAND_DELINATOR ' '
 #define COMMAND_DELINATOR_TOGGLE '"'
@@ -67,17 +68,14 @@ void ConsoleServer::AddCommandParser( CommandParserInterface* commandParserInter
         return;
 
     // Non-duplicate insertion
-    for( CommandParserInterface* pCommandParser : commandParserList )
+    auto match = std::find_if( commandParserList.begin(), commandParserList.end(), [&]( CommandParserInterface* pCommandParser ) {
+        return pCommandParser == commandParserInterface || _stricmp( pCommandParser->GetName(), commandParserInterface->GetName() ) == 0;
+    } );
+    if( match != commandParserList.end() )
     {
-        if( pCommandParser == commandParserInterface )
-            return;
-
-        if( _stricmp( pCommandParser->GetName(), commandParserInterface->GetName() ) == 0 )
-        {
-            // Naming conflict between two command parsers
-            RakAssert( 0 );
-            return;
-        }
+        // Either already added, or a naming conflict between two command parsers
+        RakAssert( *match == commandParserInterface );
+        return;
     }
 
     commandParserList.push_back( commandParserInterface );
@@ -93,14 +91,11 @@ void ConsoleServer::RemoveCommandParser( CommandParserInterface* commandParserIn
         return;
 
     // Overwrite the element we are removing from the back of the list and delete the back of the list
-    for( size_t i = 0; i < commandParserList.size(); ++i )
+    auto match = std::find( commandParserList.begin(), commandParserList.end(), commandParserInterface );
+    if( match != commandParserList.end() )
     {
-        if( commandParserList[i] == commandParserInterface )
-        {
-            commandParserList[i] = commandParserList.back();
-            commandParserList.pop_back();
-            return;
-        }
+        *match = commandParserList.back();
+        commandParserList.pop_back();
     }
 }
 void ConsoleServer::Update( void )

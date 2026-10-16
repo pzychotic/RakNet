@@ -64,6 +64,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/InternalIDTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/InvalidPasswordMessageTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LocalIsConnectedTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LogCommandParserTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerDeallocateBlockingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ManyClientsOneServerNonBlockingTest.cpp
