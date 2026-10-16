@@ -5251,9 +5251,9 @@ void SortInternalIDs( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
     while( startingIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && addresses[startingIdx] != UNASSIGNED_SYSTEM_ADDRESS )
     {
         int lowestIdx = startingIdx;
-        for( int curIdx = startingIdx + 1; curIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && addresses[curIdx] != UNASSIGNED_SYSTEM_ADDRESS; curIdx++ )
+        for( int curIdx = startingIdx + 1; curIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS && addresses[curIdx] != UNASSIGNED_SYSTEM_ADDRESS; curIdx++ )
         {
-            if( addresses[curIdx] < addresses[startingIdx] )
+            if( addresses[curIdx] < addresses[lowestIdx] )
             {
                 lowestIdx = curIdx;
             }

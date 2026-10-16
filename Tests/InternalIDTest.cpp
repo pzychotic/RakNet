@@ -5,19 +5,24 @@
 #include "RakNetDefines.h"
 #include "RakNetStringMakers.h"
 #include "RakNetTypes.h"
+#include "RakPeer.h"
 #include "RakPeerInterface.h"
+#include "WinsockScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <initializer_list>
 #include <string>
 #include <thread>
+#include <vector>
 
 /*
 Pins a Peer's list of internal addresses: what SetInternalID, GetInternalID and GetLocalIP do
-with an index, and that the list can change while the network thread uses it.
+with an index, that the list can change while the network thread uses it, and the order
+SortInternalIDs puts the machine's addresses in before the Peer lists them.
 
 RakPeerInterface functions explicitly tested:
 
@@ -39,7 +44,40 @@ constexpr int kWaitBudgetMs = 5000;
 const SystemAddress kFirstAddress( "10.0.0.1", 1001 );
 const SystemAddress kSecondAddress( "10.0.0.2", 1002 );
 
+// An address per slot of an internal ID list, 10.0.0.<octet> for each octet in turn, then
+// UNASSIGNED_SYSTEM_ADDRESS to the end. Only the last octet differs, so SystemAddress's
+// operator< orders them by it on either byte order.
+std::vector<SystemAddress> AddressList( std::initializer_list<int> octets )
+{
+    std::vector<SystemAddress> list( MAXIMUM_NUMBER_OF_INTERNAL_IDS, UNASSIGNED_SYSTEM_ADDRESS );
+    size_t index = 0;
+    for( int octet : octets )
+        list[index++] = SystemAddress( ( "10.0.0." + std::to_string( octet ) ).c_str(), 1000 );
+    return list;
+}
+
+std::vector<SystemAddress> Sorted( std::vector<SystemAddress> list )
+{
+    SortInternalIDs( list.data() );
+    return list;
+}
+
 } // namespace
+
+TEST_CASE( "SortInternalIDs sorts the addresses before the first unassigned one, lowest first", "[address]" )
+{
+    WinsockScope winsock;
+    static_assert( MAXIMUM_NUMBER_OF_INTERNAL_IDS == 10, "The full list below has one address per slot." );
+
+    // The lowest address is not the last one below the first.
+    CHECK( Sorted( AddressList( { 3, 1, 2 } ) ) == AddressList( { 1, 2, 3 } ) );
+
+    // The lowest address is in the last slot.
+    CHECK( Sorted( AddressList( { 10, 9, 8, 7, 6, 5, 4, 3, 2, 1 } ) ) == AddressList( { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } ) );
+    CHECK( Sorted( AddressList( { 2, 3, 4, 5, 6, 7, 8, 9, 10, 1 } ) ) == AddressList( { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } ) );
+
+    CHECK( Sorted( AddressList( {} ) ) == AddressList( {} ) );
+}
 
 TEST_CASE( "GetLocalIP called on two threads at once gives each thread its own string", "[network]" )
 {
