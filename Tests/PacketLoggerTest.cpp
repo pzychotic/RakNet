@@ -164,6 +164,46 @@ TEST_CASE( "PacketLogger logs a Timestamped Message by the ID after its time", "
 }
 
 /*
+With SetPrintID off, the ID is logged as a number. It and the reliable message number
+are right-aligned in five columns, and a wider number is written in full.
+*/
+
+TEST_CASE( "PacketLogger right-aligns the reliable message number and a numeric ID in five columns", "[packetlogger]" )
+{
+    auto logReceive = []( unsigned int reliableMessageNumber, unsigned char id ) {
+        unsigned char buffer[1] = { id };
+        InternalPacket packet{};
+        packet.data = buffer;
+        packet.dataBitLength = BytesToBits( 1 );
+        packet.reliability = RELIABLE;
+        packet.reliableMessageNumber = reliableMessageNumber;
+        packet.allocationScheme = InternalPacket::STACK;
+
+        CapturingPacketLogger logger;
+        logger.SetPrintID( false );
+        PeerScope peers;
+        RakPeerInterface* peer = peers.Create();
+        peer->AttachPlugin( &logger );
+
+        logger.OnInternalPacket( &packet, 0, UNASSIGNED_SYSTEM_ADDRESS, 0, 0 );
+        peer->DetachPlugin( &logger );
+
+        REQUIRE( logger.lines.size() == 1 );
+        return FieldsOfReceiveLine( logger.lines[0] );
+    };
+
+    const std::vector<std::string> narrow = logReceive( 42, 7 );
+    REQUIRE( narrow.size() == 5 );
+    CHECK( narrow[2] == "   42" );
+    CHECK( narrow[4] == "    7" );
+
+    const std::vector<std::string> wide = logReceive( 1234567, 255 );
+    REQUIRE( wide.size() == 5 );
+    CHECK( wide[2] == "1234567" );
+    CHECK( wide[4] == "  255" );
+}
+
+/*
 A 255-byte prefix and suffix, the most SetPrefix and SetSuffix keep, logged through
 OnInternalPacket. The whole line, from the clock to the suffix, must reach WriteLog.
 */
