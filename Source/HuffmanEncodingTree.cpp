@@ -12,6 +12,7 @@
 #include "BitStream.h"
 #include "RakAssert.h"
 
+#include <algorithm>
 #include <array>
 #include <deque>
 #include <list>
@@ -60,14 +61,9 @@ void HuffmanEncodingTree::FreeMemory( void )
 
 void InsertNode( HuffmanEncodingTreeNode* pNode, std::list<HuffmanEncodingTreeNode*>& aList )
 {
-    auto it = aList.begin();
-    for( /**/; it != aList.end(); ++it )
-    {
-        if( ( *it )->weight >= pNode->weight )
-        {
-            break;
-        }
-    }
+    // Before the nodes of equal weight: that tie order decides every code.
+    auto it = std::lower_bound( aList.begin(), aList.end(), pNode->weight,
+                                []( const HuffmanEncodingTreeNode* node, unsigned weight ) { return node->weight < weight; } );
     aList.insert( it, pNode );
 }
 
