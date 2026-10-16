@@ -99,6 +99,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/RerouteTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2EntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2ForwardingFlowTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Router2PunchListTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2RequestForwardingTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Router2UnrequestedForwardingSuccessTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RPC4GlobalRegistrationTest.cpp
