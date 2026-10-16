@@ -45,6 +45,11 @@ namespace RakNet {
 /// Forward declarations
 class PluginInterface2;
 
+/// \internal
+/// Sorts the addresses before the first UNASSIGNED_SYSTEM_ADDRESS from lowest to highest,
+/// as RakPeer orders the internal IDs it reads from the machine.
+void SortInternalIDs( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
+
 ///\brief Main interface for network communications.
 /// \details It implements most of RakNet's functionality and is the primary interface for RakNet.
 ///

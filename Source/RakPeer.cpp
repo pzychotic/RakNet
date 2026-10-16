@@ -5242,23 +5242,27 @@ void RakPeer::FillIPList( void )
     // Fill out ipList structure
     RakNetSocket2::GetMyIP( ipList );
 
-    // Sort the addresses from lowest to highest
+    SortInternalIDs( ipList );
+}
+
+void SortInternalIDs( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
+{
     int startingIdx = 0;
-    while( startingIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && ipList[startingIdx] != UNASSIGNED_SYSTEM_ADDRESS )
+    while( startingIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && addresses[startingIdx] != UNASSIGNED_SYSTEM_ADDRESS )
     {
         int lowestIdx = startingIdx;
-        for( int curIdx = startingIdx + 1; curIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && ipList[curIdx] != UNASSIGNED_SYSTEM_ADDRESS; curIdx++ )
+        for( int curIdx = startingIdx + 1; curIdx < MAXIMUM_NUMBER_OF_INTERNAL_IDS - 1 && addresses[curIdx] != UNASSIGNED_SYSTEM_ADDRESS; curIdx++ )
         {
-            if( ipList[curIdx] < ipList[startingIdx] )
+            if( addresses[curIdx] < addresses[startingIdx] )
             {
                 lowestIdx = curIdx;
             }
         }
         if( startingIdx != lowestIdx )
         {
-            SystemAddress temp = ipList[startingIdx];
-            ipList[startingIdx] = ipList[lowestIdx];
-            ipList[lowestIdx] = temp;
+            SystemAddress temp = addresses[startingIdx];
+            addresses[startingIdx] = addresses[lowestIdx];
+            addresses[lowestIdx] = temp;
         }
         ++startingIdx;
     }
