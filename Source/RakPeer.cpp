@@ -1167,18 +1167,11 @@ void RakPeer::HandleConnectionCancelQueue()
     {
         // Cancel pending connection attempt, if there is one
         requestedConnectionQueueMutex.lock();
-        for( auto it = requestedConnectionQueue.begin(); it != requestedConnectionQueue.end(); )
-        {
-            if( (*it)->systemAddress == requestedConnectionCancelQueue.front() )
-            {
-                it = requestedConnectionQueue.erase( it );
-                break;
-            }
-            else
-            {
-                ++it;
-            }
-        }
+        const SystemAddress& target = requestedConnectionCancelQueue.front();
+        auto it = std::find_if( requestedConnectionQueue.begin(), requestedConnectionQueue.end(),
+                                [&target]( const std::unique_ptr<RequestedConnectionStruct>& pConnection ) { return pConnection->systemAddress == target; } );
+        if( it != requestedConnectionQueue.end() )
+            requestedConnectionQueue.erase( it );
         requestedConnectionQueueMutex.unlock();
 
         requestedConnectionCancelQueue.pop_front();

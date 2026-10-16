@@ -113,18 +113,9 @@ void TwoWayAuthentication::NonceGenerator::Clear( void )
 }
 void TwoWayAuthentication::NonceGenerator::ClearByAddress( AddressOrGUID remoteSystem )
 {
-    for( auto it = generatedNonces.begin(); it != generatedNonces.end(); /**/ )
-    {
-        TwoWayAuthentication::NonceAndRemoteSystemRequest* pNonce = it->get();
-        if( pNonce->remoteSystem == remoteSystem )
-        {
-            it = generatedNonces.erase( it );
-        }
-        else
-        {
-            ++it;
-        }
-    }
+    generatedNonces.erase( std::remove_if( generatedNonces.begin(), generatedNonces.end(),
+                                           [&remoteSystem]( const std::unique_ptr<TwoWayAuthentication::NonceAndRemoteSystemRequest>& pNonce ) { return pNonce->remoteSystem == remoteSystem; } ),
+                           generatedNonces.end() );
 }
 void TwoWayAuthentication::NonceGenerator::Update( RakNet::Time curTime )
 {
@@ -261,18 +252,11 @@ void TwoWayAuthentication::OnClosedConnection( const SystemAddress& systemAddres
     (void)lostConnectionReason;
 
     // Remove from pending challenges
-    for( auto it = outgoingChallenges.begin(); it != outgoingChallenges.end(); )
-    {
-        if( ( rakNetGUID != UNASSIGNED_RAKNET_GUID && (*it).remoteSystem.rakNetGuid == rakNetGUID ) ||
-            ( systemAddress != UNASSIGNED_SYSTEM_ADDRESS && (*it).remoteSystem.systemAddress == systemAddress ) )
-        {
-            it = outgoingChallenges.erase( it );
-        }
-        else
-        {
-            ++it;
-        }
-    }
+    outgoingChallenges.erase( std::remove_if( outgoingChallenges.begin(), outgoingChallenges.end(), [&]( const PendingChallenge& rChallenge ) {
+                                  return ( rakNetGUID != UNASSIGNED_RAKNET_GUID && rChallenge.remoteSystem.rakNetGuid == rakNetGUID ) ||
+                                         ( systemAddress != UNASSIGNED_SYSTEM_ADDRESS && rChallenge.remoteSystem.systemAddress == systemAddress );
+                              } ),
+                              outgoingChallenges.end() );
 
     if( rakNetGUID != UNASSIGNED_RAKNET_GUID )
         nonceGenerator.ClearByAddress( rakNetGUID );

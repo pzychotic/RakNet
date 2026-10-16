@@ -352,20 +352,11 @@ void Router2::Update( void )
         if( connectionRequest->requestState == R2RS_REQUEST_STATE_QUERY_FORWARDING &&
             connectionRequest->pingTimeout < curTime )
         {
-            bool anyRemoved = false;
-            unsigned int connectionRequestGuidIndex = 0;
-            while( connectionRequestGuidIndex < connectionRequest->connectionRequestSystems.size() )
-            {
-                if( connectionRequest->connectionRequestSystems[connectionRequestGuidIndex].pingToEndpoint < 0 )
-                {
-                    anyRemoved = true;
-                    connectionRequest->connectionRequestSystems.erase( connectionRequest->connectionRequestSystems.begin() + connectionRequestGuidIndex ); // ??? perf
-                }
-                else
-                {
-                    connectionRequestGuidIndex++;
-                }
-            }
+            // The systems that have not answered by the timeout are dropped
+            std::vector<ConnectionRequestSystem>& systems = connectionRequest->connectionRequestSystems;
+            const auto unanswered = std::remove_if( systems.begin(), systems.end(), []( const ConnectionRequestSystem& rSystem ) { return rSystem.pingToEndpoint < 0; } );
+            const bool anyRemoved = unanswered != systems.end();
+            systems.erase( unanswered, systems.end() );
 
             if( anyRemoved )
             {
@@ -505,49 +496,41 @@ void Router2::OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID
         }
     }
 
-    unsigned int i = 0;
-    while( i < miniPunchesInProgress.size() )
+    // The punches through the closed System are abandoned, in list order
+    const auto abandoned = std::stable_partition( miniPunchesInProgress.begin(), miniPunchesInProgress.end(), [rakNetGUID]( const MiniPunchRequest& rPunch ) {
+        return rPunch.sourceGuid != rakNetGUID && rPunch.endpointGuid != rakNetGUID;
+    } );
+    for( auto it = abandoned; it != miniPunchesInProgress.end(); ++it )
     {
-        if( miniPunchesInProgress[i].sourceGuid == rakNetGUID || miniPunchesInProgress[i].endpointGuid == rakNetGUID )
+        ReleaseForwarding( *it );
+        if( it->sourceGuid != rakNetGUID )
         {
-            ReleaseForwarding( miniPunchesInProgress[i] );
-            if( miniPunchesInProgress[i].sourceGuid != rakNetGUID )
-            {
-                SendFailureOnCannotForward( miniPunchesInProgress[i].sourceGuid, miniPunchesInProgress[i].endpointGuid );
-            }
-            miniPunchesInProgress.erase( miniPunchesInProgress.begin() + i ); // ??? perf
-        }
-        else
-        {
-            i++;
+            SendFailureOnCannotForward( it->sourceGuid, it->endpointGuid );
         }
     }
+    miniPunchesInProgress.erase( abandoned, miniPunchesInProgress.end() );
 }
 
 void Router2::OnFailedConnectionAttempt( Packet* packet, PI2_FailedConnectionAttemptReason failedConnectionAttemptReason )
 {
     (void)failedConnectionAttemptReason;
 
-    unsigned int forwardedConnectionIndex = 0;
-    while( forwardedConnectionIndex < forwardedConnectionList.size() )
+    // The connections forwarded through the unreachable intermediary are dropped, in list order
+    const auto dropped = std::stable_partition( forwardedConnectionList.begin(), forwardedConnectionList.end(), [packet]( const ForwardedConnection& rConnection ) {
+        return rConnection.intermediaryAddress != packet->systemAddress;
+    } );
+    for( auto it = dropped; it != forwardedConnectionList.end(); ++it )
     {
-        if( forwardedConnectionList[forwardedConnectionIndex].intermediaryAddress == packet->systemAddress )
+        if( debugInterface )
         {
-            if( debugInterface )
-            {
-                debugInterface->ShowDiagnostic( RakNet::format( "Failed connection attempt to forwarded system (%" PRIu64 " : %s) at %s:%i\n",
-                                                                forwardedConnectionList[forwardedConnectionIndex].endpointGuid.g, packet->systemAddress.ToString( true ), __FILE__, __LINE__ )
-                                                    .c_str() );
-            }
+            debugInterface->ShowDiagnostic( RakNet::format( "Failed connection attempt to forwarded system (%" PRIu64 " : %s) at %s:%i\n",
+                                                            it->endpointGuid.g, packet->systemAddress.ToString( true ), __FILE__, __LINE__ )
+                                                .c_str() );
+        }
 
-            packet->guid = forwardedConnectionList[forwardedConnectionIndex].endpointGuid;
-            forwardedConnectionList.erase( forwardedConnectionList.begin() + forwardedConnectionIndex );
-        }
-        else
-        {
-            forwardedConnectionIndex++;
-        }
+        packet->guid = it->endpointGuid;
     }
+    forwardedConnectionList.erase( dropped, forwardedConnectionList.end() );
 }
 
 void Router2::OnRakPeerShutdown( void )
@@ -992,9 +975,6 @@ void Router2::OnRequestForwarding( Packet* packet )
 
 void Router2::OnMiniPunchReplyBounce( Packet* packet )
 {
-    // Find stored punch request
-    unsigned int i = 0;
-
     if( debugInterface )
     {
         debugInterface->ShowDiagnostic( RakNet::format( "Got ID_ROUTER_2_MINI_PUNCH_REPLY_BOUNCE from guid=%" PRIu64 " (miniPunchesInProgress.Size() = %d)",
@@ -1002,37 +982,33 @@ void Router2::OnMiniPunchReplyBounce( Packet* packet )
                                             .c_str() );
     }
 
-    while( i < miniPunchesInProgress.size() )
+    // A punch is done once both its ends have answered, the last of them through this bounce
+    const auto done = [packet]( const MiniPunchRequest& rPunch ) {
+        return ( rPunch.sourceGuid == packet->guid || rPunch.endpointGuid == packet->guid ) &&
+               rPunch.gotReplyFromEndpoint && rPunch.gotReplyFromSource;
+    };
+    for( MiniPunchRequest& punch : miniPunchesInProgress )
     {
-        if( miniPunchesInProgress[i].sourceGuid == packet->guid || miniPunchesInProgress[i].endpointGuid == packet->guid )
+        if( punch.sourceGuid != packet->guid && punch.endpointGuid != packet->guid )
+            continue;
+
+        if( punch.sourceGuid == packet->guid )
+            punch.gotReplyFromSource = true;
+        if( punch.endpointGuid == packet->guid )
+            punch.gotReplyFromEndpoint = true;
+
+        if( debugInterface )
         {
-            if( miniPunchesInProgress[i].sourceGuid == packet->guid )
-                miniPunchesInProgress[i].gotReplyFromSource = true;
-            if( miniPunchesInProgress[i].endpointGuid == packet->guid )
-                miniPunchesInProgress[i].gotReplyFromEndpoint = true;
-
-            if( debugInterface )
-            {
-                debugInterface->ShowDiagnostic( RakNet::format( "Processing ID_ROUTER_2_MINI_PUNCH_REPLY_BOUNCE, gotReplyFromSource=%i gotReplyFromEndpoint=%i at %s:%i\n", miniPunchesInProgress[i].gotReplyFromSource, miniPunchesInProgress[i].gotReplyFromEndpoint, __FILE__, __LINE__ ).c_str() );
-            }
-
-            if( miniPunchesInProgress[i].gotReplyFromEndpoint == true &&
-                miniPunchesInProgress[i].gotReplyFromSource == true )
-            {
-                SendForwardingSuccess( ID_ROUTER_2_REROUTED, miniPunchesInProgress[i].endpointGuid, miniPunchesInProgress[i].sourceGuid, miniPunchesInProgress[i].forwardingPort );
-                SendForwardingSuccess( ID_ROUTER_2_FORWARDING_ESTABLISHED, miniPunchesInProgress[i].sourceGuid, miniPunchesInProgress[i].endpointGuid, miniPunchesInProgress[i].forwardingPort );
-                miniPunchesInProgress.erase( miniPunchesInProgress.begin() + i ); // ??? perf
-            }
-            else
-            {
-                i++;
-            }
+            debugInterface->ShowDiagnostic( RakNet::format( "Processing ID_ROUTER_2_MINI_PUNCH_REPLY_BOUNCE, gotReplyFromSource=%i gotReplyFromEndpoint=%i at %s:%i\n", punch.gotReplyFromSource, punch.gotReplyFromEndpoint, __FILE__, __LINE__ ).c_str() );
         }
-        else
+
+        if( done( punch ) )
         {
-            i++;
+            SendForwardingSuccess( ID_ROUTER_2_REROUTED, punch.endpointGuid, punch.sourceGuid, punch.forwardingPort );
+            SendForwardingSuccess( ID_ROUTER_2_FORWARDING_ESTABLISHED, punch.sourceGuid, punch.endpointGuid, punch.forwardingPort );
         }
     }
+    miniPunchesInProgress.erase( std::remove_if( miniPunchesInProgress.begin(), miniPunchesInProgress.end(), done ), miniPunchesInProgress.end() );
 }
 
 void Router2::OnMiniPunchReply( Packet* packet )

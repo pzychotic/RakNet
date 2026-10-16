@@ -342,22 +342,16 @@ void RelayPlugin::LeaveGroup( StrAndGuidAndRoom* strAndGuidSender )
         strAndGuidSender->currentRoom.clear();
 
         RP_Group* room = itRoom->get();
-        for( auto itUser = room->usersInRoom.begin(); itUser != room->usersInRoom.end(); /**/ )
-        {
-            if( itUser->guid == strAndGuidSender->guid )
-            {
-                itUser = room->usersInRoom.erase( itUser );
+        std::vector<StrAndGuid>& users = room->usersInRoom;
+        const auto leaving = std::remove_if( users.begin(), users.end(), [strAndGuidSender]( const StrAndGuid& rUser ) { return rUser.guid == strAndGuidSender->guid; } );
+        const bool wasInRoom = leaving != users.end();
+        users.erase( leaving, users.end() );
 
-                if( room->usersInRoom.empty() )
-                {
-                    chatRooms.erase( itRoom );
-                    return;
-                }
-            }
-            else
-            {
-                ++itUser;
-            }
+        // A room its last user leaves is gone
+        if( wasInRoom && users.empty() )
+        {
+            chatRooms.erase( itRoom );
+            return;
         }
 
         NotifyUsersInRoom( room, RPE_USER_LEFT_ROOM, userName );

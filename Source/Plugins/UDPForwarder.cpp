@@ -449,34 +449,27 @@ void UDPForwarder::UpdateUDPForwarder( void )
 
     while( std::optional<StopForwardingStruct> sfs = stopForwardingCommands.Pop() )
     {
-        for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); ++it )
+        auto it = std::find_if( forwardListNotUpdated.begin(), forwardListNotUpdated.end(), [&sfs]( const std::unique_ptr<ForwardEntry>& pEntry ) {
+            return ( pEntry->addr1Unconfirmed == sfs->source &&
+                     pEntry->addr2Unconfirmed == sfs->destination ) ||
+                   ( pEntry->addr1Unconfirmed == sfs->destination &&
+                     pEntry->addr2Unconfirmed == sfs->source );
+        } );
+        if( it != forwardListNotUpdated.end() )
         {
-            ForwardEntry* pEntry = it->get();
-            if( ( pEntry->addr1Unconfirmed == sfs->source &&
-                  pEntry->addr2Unconfirmed == sfs->destination ) ||
-                ( pEntry->addr1Unconfirmed == sfs->destination &&
-                  pEntry->addr2Unconfirmed == sfs->source ) )
-            {
-                forwardListNotUpdated.erase( it );
-                usedForwardEntries = (int)forwardListNotUpdated.size();
-                break;
-            }
+            forwardListNotUpdated.erase( it );
+            usedForwardEntries = (int)forwardListNotUpdated.size();
         }
     }
 
-    for( auto it = forwardListNotUpdated.begin(); it != forwardListNotUpdated.end(); /**/ )
+    const auto idle = std::remove_if( forwardListNotUpdated.begin(), forwardListNotUpdated.end(), [curTime]( const std::unique_ptr<ForwardEntry>& pEntry ) {
+        return curTime > pEntry->timeLastDatagramForwarded && // Account for timestamp wrap
+               curTime > pEntry->timeLastDatagramForwarded + pEntry->timeoutOnNoDataMS;
+    } );
+    if( idle != forwardListNotUpdated.end() )
     {
-        ForwardEntry* pEntry = it->get();
-        if( curTime > pEntry->timeLastDatagramForwarded && // Account for timestamp wrap
-            curTime > pEntry->timeLastDatagramForwarded + pEntry->timeoutOnNoDataMS )
-        {
-            it = forwardListNotUpdated.erase( it );
-            usedForwardEntries = (int)forwardListNotUpdated.size();
-        }
-        else
-        {
-            ++it;
-        }
+        forwardListNotUpdated.erase( idle, forwardListNotUpdated.end() );
+        usedForwardEntries = (int)forwardListNotUpdated.size();
     }
 
     for( const auto& pEntry : forwardListNotUpdated )
