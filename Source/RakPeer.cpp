@@ -37,6 +37,7 @@
 #include "RakThread.h"
 #include "RakAssert.h"
 #include "RakNetVersion.h"
+#include "TotalListLength.h"
 #include "WSAStartupSingleton.h"
 
 #include <stdlib.h> // malloc
@@ -937,13 +938,6 @@ uint32_t RakPeer::Send( const BitStream* bitStream, PacketPriority priority, Pac
 
 
     return usedSendReceipt;
-}
-// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// The length of SendList's concatenation, which skips blocks with a non-positive length.
-// Summed in uint64_t, so no total of int lengths wraps to one under MAXIMUM_MESSAGE_SIZE.
-static uint64_t TotalListLength( const int* lengths, int numParameters )
-{
-    return std::accumulate( lengths, lengths + std::max<int>( numParameters, 0 ), uint64_t( 0 ), []( uint64_t total, int length ) { return length > 0 ? total + (uint64_t)length : total; } );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Sends multiple blocks of data, concatenating them automatically.
