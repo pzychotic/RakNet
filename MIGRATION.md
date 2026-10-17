@@ -1147,6 +1147,17 @@ and returned true. Surrounding whitespace is not trimmed:
 name that only starts with `localhost`, such as `localhost.localdomain`, now goes to name
 resolution like any other host name, instead of being read as `127.0.0.1`.
 
+**`SetBinaryAddress` resolves a host name to its IPv4 address**, the first one
+`getaddrinfo` lists, in both builds, and returns false for a name with none. Stock's IPv6
+build took the first address of either family, and often failed for a name whose first
+address is IPv6, such as `localhost.`. Its IPv4 build used `gethostbyname`, which isn't
+thread-safe. **`SetBinaryAddress` sets the IPv4 family whenever it sets the address**, so
+`SetBinaryAddress( "1.2.3.4" )` on an IPv6 address gives the IPv4 address 1.2.3.4. Stock
+left the family IPv6 and overwrote part of the IPv6 address. An empty host still sets only
+the port and keeps an IPv6 address. `SetBinaryAddress` starts Winsock for the lookup itself,
+so it resolves a name before any `RakPeer` exists. **`RakNetSocket2::DomainNameToIP` is
+removed.** Call `SystemAddress::SetBinaryAddress` or `FromString` instead.
+
 **`RakNetGUID::FromString` returns false unless the whole string is a decimal number below
 2^64**, and leaves the GUID unchanged. Stock always returned true for a non-null string, and
 read `"abc"` as 0, `"-1"` as 2^64-1 and `"123abc"` as 123. It also reads

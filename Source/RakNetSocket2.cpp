@@ -66,11 +66,6 @@ unsigned int RakNetSocket2::GetUserConnectionSocketIndex( void ) const { return 
 void RakNetSocket2::SetUserConnectionSocketIndex( unsigned int i ) { userConnectionSocketIndex = i; }
 RNS2EventHandler* RakNetSocket2::GetEventHandler( void ) const { return eventHandler; }
 
-void RakNetSocket2::DomainNameToIP( const char* domainName, char ip[65] )
-{
-    return DomainNameToIP_Berkley( domainName, ip );
-}
-
 bool RNS2_Berkley::IsPortInUse( unsigned short port, const char* hostAddress, unsigned short addressFamily, int type )
 {
     RNS2_BerkleyBindParameters bbp;

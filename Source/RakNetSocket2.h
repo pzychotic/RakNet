@@ -116,7 +116,6 @@ public:
 
     // ----------- STATICS ------------
     static void GetMyIP( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] );
-    static void DomainNameToIP( const char* domainName, char ip[65] );
 
 protected:
     RNS2EventHandler* eventHandler;

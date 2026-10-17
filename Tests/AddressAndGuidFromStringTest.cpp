@@ -176,6 +176,58 @@ TEST_CASE( "SystemAddress::FromString reads the port after a host name", "[addre
     CHECK( address.GetPort() == 80 );
 }
 
+TEST_CASE( "SystemAddress::SetBinaryAddress resolves a host name to its IPv4 address", "[address]" )
+{
+    WinsockScope winsock;
+
+    // getaddrinfo lists ::1 before 127.0.0.1 for this name on Windows and Linux.
+    SystemAddress address( "192.168.1.5", 1234 );
+    REQUIRE( address.SetBinaryAddress( "localhost.|80", '|' ) );
+    CHECK( address.GetIPVersion() == 4 );
+    CHECK( address.IsLoopback() );
+    CHECK( address.GetPort() == 80 );
+}
+
+#if defined( _WIN32 )
+TEST_CASE( "SystemAddress::SetBinaryAddress resolves a host name before Winsock is started", "[address]" )
+{
+    // No WinsockScope: SetBinaryAddress starts Winsock for the lookup itself.
+    SystemAddress address;
+    address.SetPortHostOrder( 1234 );
+    REQUIRE( address.SetBinaryAddress( "localhost.|80", '|' ) );
+    CHECK( address.IsLoopback() );
+    CHECK( address.GetPort() == 80 );
+}
+#endif
+
+#if RAKNET_SUPPORT_IPV6 == 1
+TEST_CASE( "SystemAddress::SetBinaryAddress makes an IPv6 address an IPv4 one", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address;
+    REQUIRE( address.FromString( "::1|1234" ) );
+    REQUIRE( address.GetIPVersion() == 6 );
+    REQUIRE( address.SetBinaryAddress( "1.2.3.4|80", '|' ) );
+    CHECK( address.GetIPVersion() == 4 );
+    CHECK( IpOf( address ) == "1.2.3.4" );
+    CHECK( address.GetPort() == 80 );
+    CHECK( address == SystemAddress( "1.2.3.4", 80 ) );
+}
+
+TEST_CASE( "SystemAddress::SetBinaryAddress keeps an IPv6 address for an empty host", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address;
+    REQUIRE( address.FromString( "::1|1234" ) );
+    REQUIRE( address.SetBinaryAddress( "|80", '|' ) );
+    CHECK( address.GetIPVersion() == 6 );
+    CHECK( IpOf( address ) == "::1" );
+    CHECK( address.GetPort() == 80 );
+}
+#endif
+
 TEST_CASE( "SystemAddress::FromString rejects a host name longer than 254 characters", "[address]" )
 {
     WinsockScope winsock;

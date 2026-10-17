@@ -20,7 +20,6 @@
 #include "WSAStartupSingleton.h"
 #include "SocketDefines.h"
 #include "AddrInfo.h"
-#include "RakNetSocket2.h"
 #include "LinuxStrings.h"
 
 
@@ -74,6 +73,25 @@ size_t HostLength( const char* str, char portDelineator )
     while( str[length] != 0 && str[length] != portDelineator )
         length++;
     return length;
+}
+
+// The first IPv4 address getaddrinfo lists for name, or none when the name has none.
+std::optional<in_addr> ResolveIPv4( const char* name )
+{
+    WSAStartupSingleton::AddRef();
+    addrinfo hints;
+    memset( &hints, 0, sizeof hints );
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    std::optional<in_addr> ip;
+    {
+        // Freed before the Deref, which can be the WSACleanup.
+        const AddrInfoPtr servinfo = ResolveAddrInfo( name, nullptr, hints );
+        if( servinfo )
+            ip = reinterpret_cast<const sockaddr_in*>( servinfo->ai_addr )->sin_addr;
+    }
+    WSAStartupSingleton::Deref();
+    return ip;
 }
 
 } // namespace
@@ -432,33 +450,33 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
     if( ReadPort( str[hostLength] ? str + hostLength + 1 : "", port ) == false )
         return false;
 
+    std::optional<in_addr> ip;
     switch( ClassifyHost( str, hostLength ) )
     {
     case HostKind::Empty:
         break;
     case HostKind::IPv4: {
-        char ip[MaxNumericHostLength + 1];
-        memcpy( ip, str, hostLength );
-        ip[hostLength] = 0;
-        address.addr4.sin_addr.s_addr = inet_addr__( ip );
+        char text[MaxNumericHostLength + 1];
+        memcpy( text, str, hostLength );
+        text[hostLength] = 0;
+        ip.emplace();
+        ip->s_addr = inet_addr__( text );
         break;
     }
     case HostKind::HostName: {
         if( hostLength == 9 && _strnicmp( str, "localhost", 9 ) == 0 )
         {
-            address.addr4.sin_addr.s_addr = inet_addr__( "127.0.0.1" );
+            ip.emplace();
+            ip->s_addr = inet_addr__( "127.0.0.1" );
             break;
         }
 
         char name[MaxHostNameLength + 1];
         memcpy( name, str, hostLength );
         name[hostLength] = 0;
-        char ip[65];
-        ip[0] = 0;
-        RakNetSocket2::DomainNameToIP( name, ip );
-        if( ip[0] == 0 )
+        ip = ResolveIPv4( name );
+        if( !ip )
             return false;
-        address.addr4.sin_addr.s_addr = inet_addr__( ip );
         break;
     }
     case HostKind::IPv6:
@@ -466,6 +484,14 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         return false;
     }
 
+    if( ip )
+    {
+        const unsigned short networkOrderPort = address.addr4.sin_port;
+        memset( &address, 0, sizeof( address ) );
+        address.addr4.sin_family = AF_INET;
+        address.addr4.sin_port = networkOrderPort;
+        address.addr4.sin_addr = *ip;
+    }
     if( port )
         SetPortHostOrder( *port );
     return true;
