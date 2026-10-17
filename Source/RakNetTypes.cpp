@@ -42,9 +42,27 @@
 #include <algorithm>
 #include <charconv>
 #include <cinttypes>
+#include <optional>
 #include <stdlib.h>
 
 namespace RakNet {
+
+namespace {
+
+// Reads portText, the text after a port delineator, as a port. Empty text is no port and
+// leaves port empty. Returns false for text that isn't a whole number from 0 to 65535.
+bool ReadPort( const char* portText, std::optional<unsigned short>& port )
+{
+    if( portText[0] == 0 )
+        return true;
+    unsigned short value = 0;
+    if( ParseWholeNumber( portText, value ) == false )
+        return false;
+    port = value;
+    return true;
+}
+
+} // namespace
 
 const char* IPV6_LOOPBACK = "::1";
 const char* IPV4_LOOPBACK = "127.0.0.1";
@@ -404,14 +422,13 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
     {
         if( _strnicmp( str, "localhost", 9 ) == 0 && ( str[9] == 0 || str[9] == portDelineator ) )
         {
-            const char* const portText = str[9] ? str + 10 : "";
-            unsigned short port = 0;
-            if( portText[0] && ParseWholeNumber( portText, port ) == false )
+            std::optional<unsigned short> port;
+            if( ReadPort( str[9] ? str + 10 : "", port ) == false )
                 return false;
 
             address.addr4.sin_addr.s_addr = inet_addr__( "127.0.0.1" );
-            if( portText[0] )
-                SetPortHostOrder( port );
+            if( port )
+                SetPortHostOrder( *port );
             return true;
         }
 
@@ -445,9 +462,8 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         IPPart[index] = 0;
 
         // The port is everything after the character that ended the IP.
-        const char* const portText = str[index] ? str + index + 1 : "";
-        unsigned short port = 0;
-        if( portText[0] && ParseWholeNumber( portText, port ) == false )
+        std::optional<unsigned short> port;
+        if( ReadPort( str[index] ? str + index + 1 : "", port ) == false )
             return false;
 
         if( IPPart[0] )
@@ -455,11 +471,8 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
             address.addr4.sin_addr.s_addr = inet_addr__( IPPart );
         }
 
-        if( portText[0] )
-        {
-            address.addr4.sin_port = htons( port );
-            debugPort = port;
-        }
+        if( port )
+            SetPortHostOrder( *port );
     }
     return true;
 }
@@ -510,9 +523,8 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
         ipPart[sizeof( ipPart ) - 1] = 0;
     }
 
-    const char* const portText = ( str[i] == portDelineator && portDelineator != 0 ) ? str + i + 1 : "";
-    unsigned short port = 0;
-    if( portText[0] && ParseWholeNumber( portText, port ) == false )
+    std::optional<unsigned short> port;
+    if( ReadPort( ( str[i] == portDelineator && portDelineator != 0 ) ? str + i + 1 : "", port ) == false )
         return false;
 
 
@@ -585,11 +597,8 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     WSAStartupSingleton::Deref();
 
     // PORT
-    if( portText[0] )
-    {
-        address.addr4.sin_port = htons( port );
-        debugPort = port;
-    }
+    if( port )
+        SetPortHostOrder( *port );
     else
     {
         address.addr4.sin_port = oldPort;
