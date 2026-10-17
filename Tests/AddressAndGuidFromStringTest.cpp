@@ -124,6 +124,44 @@ TEST_CASE( "SystemAddress::SetBinaryAddress reads the port after localhost", "[a
     CHECK( rejected.GetPort() == 1234 );
 }
 
+TEST_CASE( "SystemAddress::SetBinaryAddress rejects a numeric host longer than 21 characters", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.SetBinaryAddress( "1111111111111111111111|80" ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+
+#if RAKNET_SUPPORT_IPV6 == 1
+TEST_CASE( "SystemAddress::FromString rejects a numeric host longer than 56 characters", "[address]" )
+{
+    WinsockScope winsock;
+
+    // A zone padded with zeros resolves at any length, so only the length rejects it.
+    const std::string text = "2001:db8::1%" + std::string( 64, '0' ) + "1|80";
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.FromString( text.c_str() ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+
+TEST_CASE( "SystemAddress::FromString reads a zoned IPv6 literal whole", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address;
+    REQUIRE( address.FromString( "ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%1|80" ) );
+    REQUIRE( address.GetIPVersion() == 6 );
+    const unsigned char allOnes[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+    CHECK( std::memcmp( &address.address.addr6.sin6_addr, allOnes, sizeof( allOnes ) ) == 0 );
+    CHECK( address.address.addr6.sin6_scope_id == 1 );
+    CHECK( address.GetPort() == 80 );
+}
+#endif
+
 TEST_CASE( "RakNetGUID::FromString reads a decimal GUID", "[guid]" )
 {
     RakNetGUID guid;

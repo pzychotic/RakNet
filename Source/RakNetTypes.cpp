@@ -62,6 +62,24 @@ bool ReadPort( const char* portText, std::optional<unsigned short>& port )
     return true;
 }
 
+// Whether c can be part of a numeric host, as SetBinaryAddress reads one.
+bool IsDottedDecimalCharacter( char c )
+{
+    return ( c >= '0' && c <= '9' ) || c == '.';
+}
+
+#if RAKNET_SUPPORT_IPV6 == 1
+// The longest numeric host FromString reads: an IPv6 address of 45 characters, '%' and a
+// zone index of up to 10 digits.
+constexpr size_t MaxNumericHostLength = 45 + 1 + 10;
+
+// Whether c can be part of a numeric host, as FromString reads one.
+bool IsNumericHostCharacter( char c )
+{
+    return ( c >= '0' && c <= '9' ) || ( c >= 'a' && c <= 'f' ) || ( c >= 'A' && c <= 'F' ) || c == '.' || c == ':' || c == '%' || c == '-' || c == '/';
+}
+#endif
+
 } // namespace
 
 const char* IPV6_LOOPBACK = "::1";
@@ -453,12 +471,15 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         // Only write the valid parts, don't change existing if invalid
         //  binaryAddress=UNASSIGNED_SYSTEM_ADDRESS.binaryAddress;
         //  port=UNASSIGNED_SYSTEM_ADDRESS.port;
-        for( index = 0; str[index] && str[index] != portDelineator && index < 22; index++ )
+        for( index = 0; str[index] && str[index] != portDelineator && index < (int)sizeof( IPPart ) - 1; index++ )
         {
-            if( str[index] != '.' && ( str[index] < '0' || str[index] > '9' ) )
+            if( IsDottedDecimalCharacter( str[index] ) == false )
                 break;
             IPPart[index] = str[index];
         }
+        // Still in the host at the end of the buffer: too long for any address.
+        if( str[index] != portDelineator && IsDottedDecimalCharacter( str[index] ) )
+            return false;
         IPPart[index] = 0;
 
         // The port is everything after the character that ended the IP.
@@ -489,11 +510,7 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
         address.addr4.sin_family = AF_INET;
         return true;
     }
-#if RAKNET_SUPPORT_IPV6 == 1
-    char ipPart[INET6_ADDRSTRLEN];
-#else
-    char ipPart[INET_ADDRSTRLEN];
-#endif
+    char ipPart[MaxNumericHostLength + 1];
     int i = 0;
 
     // TODO - what about 255.255.255.255?
@@ -508,13 +525,16 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     }
     else if( NonNumericHostString( str ) == false )
     {
-        for( ; i < sizeof( ipPart ) && str[i] != 0 && str[i] != portDelineator; i++ )
+        for( ; i < (int)MaxNumericHostLength && str[i] != 0 && str[i] != portDelineator; i++ )
         {
-            if( ( str[i] < '0' || str[i] > '9' ) && ( str[i] < 'a' || str[i] > 'f' ) && ( str[i] < 'A' || str[i] > 'F' ) && str[i] != '.' && str[i] != ':' && str[i] != '%' && str[i] != '-' && str[i] != '/' )
+            if( IsNumericHostCharacter( str[i] ) == false )
                 break;
 
             ipPart[i] = str[i];
         }
+        // Still in the host at the end of the buffer: too long for any address.
+        if( str[i] != portDelineator && IsNumericHostCharacter( str[i] ) )
+            return false;
         ipPart[i] = 0;
     }
     else

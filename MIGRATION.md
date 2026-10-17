@@ -1075,6 +1075,15 @@ read `"1.2.3.4|80x"` as port 80 and, depending on `RAKNET_SUPPORT_IPV6`, ignored
 a port after a space. `SetBinaryAddress` does the same. If you build address strings from
 user input, check the return value.
 
+**A numeric host longer than the longest address returns false**, and leaves the address
+unchanged. The limit is 21 characters for `SetBinaryAddress`, which is also `FromString`
+when `RAKNET_SUPPORT_IPV6` is 0, and 56 for `FromString` when it is 1: an IPv6 address,
+`%` and a zone index of up to 10 digits. Stock wrote one byte past a stack buffer. In the
+IPv6 build, a numeric zoned literal longer than 45 characters, such as
+`ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%1`, now parses on Linux. Stock cut it short
+and returned false. The same buffer holds a host name, which the IPv6 build now cuts at 56
+characters on every platform, where stock cut it at 45 on Linux and 64 on Windows.
+
 **`SetBinaryAddress` reads the port after `localhost`.** Stock passed the delineator to
 `atoi`, so `"localhost:1234"` came out as `127.0.0.1` port 0. It now reads port 1234. A
 name that only starts with `localhost`, such as `localhost.localdomain`, now goes to name
