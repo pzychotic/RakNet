@@ -831,6 +831,19 @@ logged in to always passed. Any System could have a proxy server forward between
 addresses of its choosing. A proxy server now opens forwarding only for a coordinator that
 answered its `LoginToCoordinator` with success. Nothing to do.
 
+**`NatTypeDetectionClient`.** Stock took `ID_NAT_TYPE_DETECTION_REQUEST` and
+`ID_NAT_TYPE_DETECTION_RESULT` from any connected System while a detection ran. A request
+made the Peer send a datagram carrying its GUID to an address and port of the sender's
+choosing, and a result ended detection with whatever type the sender claimed. Both are now
+taken only from the server passed to `DetectNATType`, while that detection runs. From any
+other System, or with no detection running, both are consumed and no longer reach
+`Receive`. The `ID_NAT_TYPE_DETECTION_RESULT` the plugin generates when detection ends
+still does. Nothing to do.
+
+The tests the server runs out of band, from other addresses and ports, can't be tied to
+it. While a detection runs, a System that knows the Peer's address can still forge a
+`NAT_TYPE_NONE`, `NAT_TYPE_FULL_CONE` or `NAT_TYPE_ADDRESS_RESTRICTED` result that way.
+
 ## `Receive` and plugin calls must not overlap
 
 Stock never said which threads may be inside `Receive`, or call a plugin, at the same time.

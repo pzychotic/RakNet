@@ -84,6 +84,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughServerSelfRequestTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionBindTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionClientUnparseableHostTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionClientUnsolicitedTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionRecvLoopTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OfflineMessagesConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketAllocationFailureTest.cpp

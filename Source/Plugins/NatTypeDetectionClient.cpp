@@ -130,30 +130,29 @@ void NatTypeDetectionClient::Update( void )
 }
 PluginReceiveResult NatTypeDetectionClient::OnReceive( Packet* packet )
 {
-    if( IsInProgress() )
+    // A request or remote result is Solicited only from the server the outstanding
+    // DetectNATType asked. From anyone else, or with no detection running, it is consumed.
+    const bool fromServer = IsInProgress() && packet->systemAddress == serverAddress;
+
+    switch( packet->data[0] )
     {
-        switch( packet->data[0] )
+    case ID_OUT_OF_BAND_INTERNAL:
+        if( IsInProgress() && packet->length >= 3 && packet->data[1] == ID_NAT_TYPE_DETECT )
         {
-        case ID_OUT_OF_BAND_INTERNAL: {
-            if( packet->length >= 3 && packet->data[1] == ID_NAT_TYPE_DETECT )
-            {
-                OnCompletion( (NATTypeDetectionResult)packet->data[2] );
-                return RR_STOP_PROCESSING_AND_DEALLOCATE;
-            }
-        }
-        break;
-        case ID_NAT_TYPE_DETECTION_RESULT:
-            if( packet->wasGeneratedLocally == false )
-            {
-                OnCompletion( (NATTypeDetectionResult)packet->data[1] );
-                return RR_STOP_PROCESSING_AND_DEALLOCATE;
-            }
-            else
-                break;
-        case ID_NAT_TYPE_DETECTION_REQUEST:
-            OnTestPortRestricted( packet );
+            OnCompletion( (NATTypeDetectionResult)packet->data[2] );
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
         }
+        break;
+    case ID_NAT_TYPE_DETECTION_RESULT:
+        if( packet->wasGeneratedLocally )
+            break;
+        if( fromServer && packet->length >= 2 )
+            OnCompletion( (NATTypeDetectionResult)packet->data[1] );
+        return RR_STOP_PROCESSING_AND_DEALLOCATE;
+    case ID_NAT_TYPE_DETECTION_REQUEST:
+        if( fromServer )
+            OnTestPortRestricted( packet );
+        return RR_STOP_PROCESSING_AND_DEALLOCATE;
     }
 
     return RR_CONTINUE_PROCESSING;
