@@ -45,6 +45,7 @@ include( Catch )
 set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/AckDelayTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AddressAndGuidFromStringTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/AddressStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamPrintHexTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamWireTest.cpp
@@ -84,7 +85,6 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionBindTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionClientUnparseableHostTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionRecvLoopTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/NumericHostStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OfflineMessagesConvertTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketAllocationFailureTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketAndLowLevelTestsTest.cpp

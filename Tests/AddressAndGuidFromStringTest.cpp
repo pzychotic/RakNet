@@ -124,7 +124,7 @@ TEST_CASE( "SystemAddress::SetBinaryAddress reads the port after localhost", "[a
     CHECK( rejected.GetPort() == 1234 );
 }
 
-TEST_CASE( "SystemAddress::SetBinaryAddress rejects a numeric host longer than 21 characters", "[address]" )
+TEST_CASE( "SystemAddress::SetBinaryAddress rejects a host of digits alone", "[address]" )
 {
     WinsockScope winsock;
 
@@ -231,12 +231,12 @@ TEST_CASE( "SystemAddress::FromString does not read host:port with the default d
 #endif
 
 #if RAKNET_SUPPORT_IPV6 == 1
-TEST_CASE( "SystemAddress::FromString rejects a numeric host longer than 56 characters", "[address]" )
+TEST_CASE( "SystemAddress::FromString rejects a zone longer than 15 characters", "[address]" )
 {
     WinsockScope winsock;
 
     // A zone padded with zeros resolves at any length, so only the length rejects it.
-    const std::string text = "2001:db8::1%" + std::string( 64, '0' ) + "1|80";
+    const std::string text = "2001:db8::1%" + std::string( 15, '0' ) + "1|80";
     SystemAddress address( "192.168.1.5", 1234 );
     CHECK_FALSE( address.FromString( text.c_str() ) );
     CHECK( IpOf( address ) == "192.168.1.5" );
@@ -256,7 +256,81 @@ TEST_CASE( "SystemAddress::FromString reads a zoned IPv6 literal whole", "[addre
     CHECK( address.address.addr6.sin6_scope_id == 1 );
     CHECK( address.GetPort() == 80 );
 }
+
+TEST_CASE( "SystemAddress::FromString reads a zone index after the loopback address", "[address]" )
+{
+    WinsockScope winsock;
+
+    // Interface 1 is the loopback interface on Windows and Linux.
+    SystemAddress address;
+    REQUIRE( address.FromString( "::1%1|80" ) );
+    REQUIRE( address.GetIPVersion() == 6 );
+    CHECK( address.address.addr6.sin6_scope_id == 1 );
+    CHECK( address.GetPort() == 80 );
+}
+
+TEST_CASE( "SystemAddress::FromString splits the port off an IPv6 address in either case", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress upper;
+    REQUIRE( upper.FromString( "FE80::1|1234", '|', 6 ) );
+    SystemAddress lower;
+    REQUIRE( lower.FromString( "fe80::1|1234", '|', 6 ) );
+
+    CHECK( lower.GetPort() == 1234 );
+    CHECK( upper == lower );
+}
 #endif
+
+TEST_CASE( "SystemAddress::SetBinaryAddress does not read a malformed host as the broadcast address", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.SetBinaryAddress( "1.2.3.4.5", '|' ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+
+TEST_CASE( "SystemAddress::FromString rejects a malformed host", "[address]" )
+{
+    WinsockScope winsock;
+
+    for( const char* text : { "1.2.3.4.5", "1.2.3.999|80", "127.1", "0177.0.0.1", "::zz", "[::1]|80" } )
+    {
+        CAPTURE( text );
+        SystemAddress address( "192.168.1.5", 1234 );
+        CHECK_FALSE( address.FromString( text ) );
+        CHECK( IpOf( address ) == "192.168.1.5" );
+        CHECK( address.GetPort() == 1234 );
+    }
+}
+
+TEST_CASE( "SystemAddress::SetBinaryAddress rejects an IPv6 address", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.SetBinaryAddress( "::1|80", '|' ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+
+TEST_CASE( "SystemAddress::SetBinaryAddress and FromString read the broadcast address", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress viaSetBinary;
+    REQUIRE( viaSetBinary.SetBinaryAddress( "255.255.255.255|80", '|' ) );
+    CHECK( IpOf( viaSetBinary ) == "255.255.255.255" );
+    CHECK( viaSetBinary.GetPort() == 80 );
+
+    SystemAddress viaFromString;
+    REQUIRE( viaFromString.FromString( "255.255.255.255|80" ) );
+    CHECK( IpOf( viaFromString ) == "255.255.255.255" );
+    CHECK( viaFromString.GetPort() == 80 );
+}
 
 TEST_CASE( "RakNetGUID::FromString reads a decimal GUID", "[guid]" )
 {

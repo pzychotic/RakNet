@@ -88,6 +88,7 @@ set( CURRENT_SOURCE
 # Internal headers build with the library but are not installed.
 set( INTERNAL_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/AddrInfo.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/AddressString.h
     ${CMAKE_CURRENT_SOURCE_DIR}/ParseWholeNumber.h
     ${CMAKE_CURRENT_SOURCE_DIR}/TotalListLength.h
 )

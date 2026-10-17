@@ -36,6 +36,7 @@
 #include <netdb.h>
 #endif
 
+#include "AddressString.h"
 #include "ParseWholeNumber.h"
 #include "SuperFastHash.h"
 
@@ -62,41 +63,18 @@ bool ReadPort( const char* portText, std::optional<unsigned short>& port )
     return true;
 }
 
-// Whether c can be part of a numeric host, as SetBinaryAddress reads one.
-bool IsDottedDecimalCharacter( char c )
-{
-    return ( c >= '0' && c <= '9' ) || c == '.';
-}
-
 // The longest host name read: a DNS name of 253 characters and a trailing dot.
 constexpr size_t MaxHostNameLength = 253 + 1;
 
-// Copies the host name at the start of str, up to the delineator or the end of the string,
-// into name, and sets length to its length. Returns false when the name is longer than
-// MaxHostNameLength.
-bool ReadHostName( const char* str, char portDelineator, char ( &name )[MaxHostNameLength + 1], size_t& length )
+// The length of the host at the start of str: everything before the delineator, or all of
+// str when the delineator is 0 or absent.
+size_t HostLength( const char* str, char portDelineator )
 {
-    for( length = 0; str[length] != 0 && str[length] != portDelineator; length++ )
-    {
-        if( length == MaxHostNameLength )
-            return false;
-        name[length] = str[length];
-    }
-    name[length] = 0;
-    return true;
+    size_t length = 0;
+    while( str[length] != 0 && str[length] != portDelineator )
+        length++;
+    return length;
 }
-
-#if RAKNET_SUPPORT_IPV6 == 1
-// The longest numeric host FromString reads: an IPv6 address of 45 characters, '%' and a
-// zone index of up to 10 digits.
-constexpr size_t MaxNumericHostLength = 45 + 1 + 10;
-
-// Whether c can be part of a numeric host, as FromString reads one.
-bool IsNumericHostCharacter( char c )
-{
-    return ( c >= '0' && c <= '9' ) || ( c >= 'a' && c <= 'f' ) || ( c >= 'A' && c <= 'F' ) || c == '.' || c == ':' || c == '%' || c == '-' || c == '/';
-}
-#endif
 
 } // namespace
 
@@ -127,14 +105,6 @@ void AddressOrGUID::ToString( bool writePort, char* dest ) const
         return rakNetGuid.ToString( dest );
     return systemAddress.ToString( writePort, dest );
 }
-bool NonNumericHostString( const char* host )
-{
-    // Return false if IP address. Return true if domain
-    // IPV4: natpunch.jenkinssoftware.com
-    // IPV6: fe80::7c:31f7:fec4:27de%14
-    return std::any_of( host, host + strlen( host ), []( char c ) { return ( c >= 'g' && c <= 'z' ) || ( c >= 'G' && c <= 'Z' ); } );
-}
-
 SocketDescriptor::SocketDescriptor()
 {
     port = 0;
@@ -454,72 +424,50 @@ bool SystemAddress::IsLANAddress( void )
 }
 bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
 {
-    if( NonNumericHostString( str ) )
-    {
-        if( _strnicmp( str, "localhost", 9 ) == 0 && ( str[9] == 0 || str[9] == portDelineator ) )
-        {
-            std::optional<unsigned short> port;
-            if( ReadPort( str[9] ? str + 10 : "", port ) == false )
-                return false;
+    const size_t hostLength = HostLength( str, portDelineator );
+    if( hostLength > MaxHostNameLength )
+        return false;
 
+    std::optional<unsigned short> port;
+    if( ReadPort( str[hostLength] ? str + hostLength + 1 : "", port ) == false )
+        return false;
+
+    switch( ClassifyHost( str, hostLength ) )
+    {
+    case HostKind::Empty:
+        break;
+    case HostKind::IPv4: {
+        char ip[MaxNumericHostLength + 1];
+        memcpy( ip, str, hostLength );
+        ip[hostLength] = 0;
+        address.addr4.sin_addr.s_addr = inet_addr__( ip );
+        break;
+    }
+    case HostKind::HostName: {
+        if( hostLength == 9 && _strnicmp( str, "localhost", 9 ) == 0 )
+        {
             address.addr4.sin_addr.s_addr = inet_addr__( "127.0.0.1" );
-            if( port )
-                SetPortHostOrder( *port );
-            return true;
+            break;
         }
 
         char name[MaxHostNameLength + 1];
-        size_t length;
-        if( ReadHostName( str, portDelineator, name, length ) == false )
-            return false;
-
-        std::optional<unsigned short> port;
-        if( ReadPort( str[length] ? str + length + 1 : "", port ) == false )
-            return false;
-
+        memcpy( name, str, hostLength );
+        name[hostLength] = 0;
         char ip[65];
         ip[0] = 0;
         RakNetSocket2::DomainNameToIP( name, ip );
         if( ip[0] == 0 )
             return false;
-
         address.addr4.sin_addr.s_addr = inet_addr__( ip );
-        if( port )
-            SetPortHostOrder( *port );
+        break;
     }
-    else
-    {
-        // Split the string into the first part, and the : part
-        int index;
-        char IPPart[22];
-        // Only write the valid parts, don't change existing if invalid
-        //  binaryAddress=UNASSIGNED_SYSTEM_ADDRESS.binaryAddress;
-        //  port=UNASSIGNED_SYSTEM_ADDRESS.port;
-        for( index = 0; str[index] && str[index] != portDelineator && index < (int)sizeof( IPPart ) - 1; index++ )
-        {
-            if( IsDottedDecimalCharacter( str[index] ) == false )
-                break;
-            IPPart[index] = str[index];
-        }
-        // The host ends only at the end of the string or at the delineator. Anything else,
-        // including a host too long for the buffer, is not an address.
-        if( str[index] != 0 && str[index] != portDelineator )
-            return false;
-        IPPart[index] = 0;
-
-        // The port is everything after the delineator.
-        std::optional<unsigned short> port;
-        if( ReadPort( str[index] ? str + index + 1 : "", port ) == false )
-            return false;
-
-        if( IPPart[0] )
-        {
-            address.addr4.sin_addr.s_addr = inet_addr__( IPPart );
-        }
-
-        if( port )
-            SetPortHostOrder( *port );
+    case HostKind::IPv6:
+    case HostKind::Malformed:
+        return false;
     }
+
+    if( port )
+        SetPortHostOrder( *port );
     return true;
 }
 
@@ -538,7 +486,8 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     // Holds a numeric host or a host name.
     static_assert( MaxHostNameLength >= MaxNumericHostLength );
     char ipPart[MaxHostNameLength + 1];
-    int i = 0;
+    size_t hostLength = 0;
+    bool numericHost = true;
 
     // TODO - what about 255.255.255.255?
     if( ipVersion == 4 && strcmp( str, IPV6_LOOPBACK ) == 0 )
@@ -550,31 +499,29 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
         address.addr4.sin_family = AF_INET6;
         strcpy( ipPart, IPV6_LOOPBACK );
     }
-    else if( NonNumericHostString( str ) == false )
-    {
-        for( ; i < (int)MaxNumericHostLength && str[i] != 0 && str[i] != portDelineator; i++ )
-        {
-            if( IsNumericHostCharacter( str[i] ) == false )
-                break;
-
-            ipPart[i] = str[i];
-        }
-        // The host ends only at the end of the string or at the delineator. Anything else,
-        // including a host too long for the buffer, is not an address.
-        if( str[i] != 0 && str[i] != portDelineator )
-            return false;
-        ipPart[i] = 0;
-    }
     else
     {
-        size_t length;
-        if( ReadHostName( str, portDelineator, ipPart, length ) == false )
+        hostLength = HostLength( str, portDelineator );
+        if( hostLength > MaxHostNameLength )
             return false;
-        i = (int)length;
+        switch( ClassifyHost( str, hostLength ) )
+        {
+        case HostKind::Malformed:
+            return false;
+        case HostKind::Empty:
+        case HostKind::HostName:
+            numericHost = false;
+            break;
+        case HostKind::IPv4:
+        case HostKind::IPv6:
+            break;
+        }
+        memcpy( ipPart, str, hostLength );
+        ipPart[hostLength] = 0;
     }
 
     std::optional<unsigned short> port;
-    if( ReadPort( ( str[i] == portDelineator && portDelineator != 0 ) ? str + i + 1 : "", port ) == false )
+    if( ReadPort( ( str[hostLength] == portDelineator && portDelineator != 0 ) ? str + hostLength + 1 : "", port ) == false )
         return false;
 
 
@@ -586,6 +533,8 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     addrinfo hints;
     memset( &hints, 0, sizeof hints );
     hints.ai_socktype = SOCK_DGRAM;
+    if( numericHost )
+        hints.ai_flags = AI_NUMERICHOST;
     if( ipVersion == 6 )
         hints.ai_family = AF_INET6;
     else if( ipVersion == 4 )

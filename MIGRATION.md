@@ -506,6 +506,11 @@ standard specifiers. Replace `"%" PRINTF_64_BIT_MODIFIER "u"` with `"%" PRIu64` 
 and return `BitSize_t` (`uint32_t`). The macros computed in the argument's type, so a call
 on an `int` now converts it to `uint32_t` and returns `uint32_t`.
 
+**`NonNumericHostString`.** The `RakNetTypes.h` function that guessed from a string's
+letters whether it was a host name is gone. Check the return value of
+`SystemAddress::FromString` instead. See [Numbers in strings are read
+whole](#numbers-in-strings-are-read-whole) for how a host is now classified.
+
 `INTERNAL_PACKET_PAGE_SIZE` is no longer read. It sized the memory pool `ReliabilityLayer`
 kept its per-message objects in, and those are now made with `new`. A build that defines
 it still compiles.
@@ -1097,12 +1102,26 @@ and read `"1.2.3.4|80x"` as port 80. `SetBinaryAddress` does the same. If you bu
 address strings from user input, check the return value.
 
 **A numeric host longer than the longest address returns false**, and leaves the address
-unchanged. The limit is 21 characters for `SetBinaryAddress`, which is also `FromString`
-when `RAKNET_SUPPORT_IPV6` is 0, and 56 for `FromString` when it is 1: an IPv6 address,
-`%` and a zone index of up to 10 digits. Stock wrote one byte past a stack buffer. In the
+unchanged. The limit is 15 characters for an IPv4 numeric host and 61 for an IPv6 one: an
+address, `%` and a zone of up to 15 characters. Stock wrote one byte past a stack buffer. In the
 IPv6 build, a numeric zoned literal longer than 45 characters, such as
 `ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%1`, now parses on Linux. Stock cut it short
 and returned false.
+
+**A host is numeric only if it is an address.** The host, everything before the port
+delineator, is an IPv4 numeric host if it is a dotted quad of four decimal octets from 0 to
+255 without leading zeros, and an IPv6 one if the platform's `inet_pton` accepts it, with an
+optional `%` and a zone of up to 15 letters, digits, `.`, `_` and `-`. A zone can name an
+interface, `fe80::1%eth0`, where the platform supports it. A numeric host is never looked up
+by a resolver. A name whose letters are all a–f, such as `cafe.de`, is now resolved as a
+host name. Stock read it as a numeric host, so it failed in the IPv4 build and was held to
+the numeric limit in the IPv6 build. A host that contains `:` or whose last label is all
+digits, once one trailing dot is dropped, but isn't an address returns false without a
+lookup and leaves the address unchanged: `"1.2.3.4.5"`, `"1.2.3.999"`, `"1.2.3.4."`, and
+the shorthand, hex and octal forms `127.1`, `0x7f.0.0.1`, `0177.0.0.1`, `010.0.0.1`. Stock's
+IPv4 build read `"1.2.3.4.5"` as 255.255.255.255 and returned true, and read the other forms
+through `inet_addr`. Its IPv6 build looked them up as names. `255.255.255.255` itself still
+parses. `SetBinaryAddress` returns false for an IPv6 address.
 
 **A host name is read up to the port delineator, and the port after it**, in
 `SetBinaryAddress` and `FromString` in both builds, so `FromString( "example.com|80" )` sets

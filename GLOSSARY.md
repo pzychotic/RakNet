@@ -181,3 +181,20 @@ Moving an open connection record to a new address while the connection itself ca
 same System, same RakNetGUID, same connection record. A reroute never leaves two open
 connection records for one address.
 _Avoid_: Change system address, re-address
+
+**Address string**:
+Text naming an address: a host, optionally followed by the port delineator and a port. The
+host is everything before the delineator. An empty host names no address and changes only
+the port.
+_Avoid_: IP string, host string
+
+**Numeric host**:
+A host written as an address itself, an IPv4 dotted quad or an IPv6 address, read without
+asking a resolver. A host that looks like one, because it contains a colon or its last
+label is all digits, but isn't one is malformed: it is never a host name.
+_Avoid_: IP address string, numeric string, IP literal
+
+**Host name**:
+Any other non-empty host, handed to the resolver to turn into an address. Its letters
+alone never make it numeric: `cafe.de` is a host name.
+_Avoid_: Domain, non-numeric host

@@ -121,8 +121,6 @@ struct RAK_DLL_EXPORT SocketDescriptor
     unsigned int extraSocketOptions;
 };
 
-extern bool NonNumericHostString( const char* host );
-
 /// \brief Network address for a system
 /// \details Corresponds to a network address<BR>
 /// This is not necessarily a unique identifier. For example, if a system has both LAN and internet connections, the system may be identified by either one, depending on who is communicating<BR>
@@ -189,6 +187,8 @@ struct RAK_DLL_EXPORT SystemAddress
     /// Set the system address from a printable IP string, for example "192.0.2.1" or "2001:db8:63b3:1::3490"
     /// You can write the port as well, using the portDelineator, for example "192.0.2.1|1234"
     /// \param[in] str A printable IP string, for example "192.0.2.1" or "2001:db8:63b3:1::3490". Pass 0 for \a str to set to UNASSIGNED_SYSTEM_ADDRESS
+    /// The host before the delineator is a strict IPv4 dotted quad, an IPv6 address with an optional "%zone" of up to 15 characters, or a host name to resolve.
+    /// A host that contains ':' or ends in an all-digit label but is not an address returns false without a lookup.
     /// \param[in] portDelineator if \a str contains a port, delineate the port with this character. portDelineator should not be '.', ':', '%', '-', '/', a number, or a-f
     /// \param[in] ipVersion Only used if str is a pre-defined address in the wrong format, such as 127.0.0.1 but you want ip version 6, so you can pass 6 here to do the conversion
     /// \note The current port is unchanged if a port is not specified in \a str
@@ -218,6 +218,7 @@ struct RAK_DLL_EXPORT SystemAddress
     void SetPortNetworkOrder( unsigned short s );
 
     /// Old version, for crap platforms that don't support newer socket functions
+    /// Reads the host as FromString() does, but returns false for an IPv6 address.
     bool SetBinaryAddress( const char* str, char portDelineator = ':' );
     /// Old version, for crap platforms that don't support newer socket functions
     void ToString_Old( bool writePort, char* dest, char portDelineator = ':' ) const;
