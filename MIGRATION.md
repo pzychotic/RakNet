@@ -1080,8 +1080,16 @@ when `RAKNET_SUPPORT_IPV6` is 0, and 56 for `FromString` when it is 1: an IPv6 a
 `%` and a zone index of up to 10 digits. Stock wrote one byte past a stack buffer. In the
 IPv6 build, a numeric zoned literal longer than 45 characters, such as
 `ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%1`, now parses on Linux. Stock cut it short
-and returned false. The same buffer holds a host name, which the IPv6 build now cuts at 56
-characters on every platform, where stock cut it at 45 on Linux and 64 on Windows.
+and returned false.
+
+**A host name is read up to the port delineator, and the port after it**, in
+`SetBinaryAddress` and `FromString` in both builds, so `FromString( "example.com|80" )` sets
+port 80. A name of up to 254 characters is resolved whole, and a longer one returns false
+and leaves the address unchanged. Stock passed `"name|80"` to the resolver whole, so it
+failed, and the IPv6 build cut a name at 45 characters on Linux or 64 on Windows, sometimes
+resolving a different name. Any other character stays in the name, so `"example.com 80"`
+still fails to resolve. **`SetBinaryAddress` leaves the address unchanged when a name fails
+to resolve.** Stock set `UNASSIGNED_SYSTEM_ADDRESS`.
 
 **A numeric host followed by anything but the end of the string or the port delineator
 returns false**, and leaves the address unchanged, in `SetBinaryAddress` and `FromString`

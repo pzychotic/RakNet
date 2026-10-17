@@ -164,7 +164,47 @@ TEST_CASE( "SystemAddress::SetBinaryAddress sets only the port for an empty host
     CHECK( address.GetPort() == 80 );
 }
 
+TEST_CASE( "SystemAddress::FromString reads the port after a host name", "[address]" )
+{
+    WinsockScope winsock;
+
+    // The trailing dot resolves from the hosts file and skips SetBinaryAddress's localhost
+    // shortcut.
+    SystemAddress address( "192.168.1.5", 1234 );
+    REQUIRE( address.FromString( "localhost.|80" ) );
+    CHECK( address.IsLoopback() );
+    CHECK( address.GetPort() == 80 );
+}
+
+TEST_CASE( "SystemAddress::FromString rejects a host name longer than 254 characters", "[address]" )
+{
+    WinsockScope winsock;
+
+    std::string text;
+    for( int label = 0; label < 4; label++ )
+        text += std::string( 62, 'g' ) + ".";
+    text += "ggg";
+    REQUIRE( text.size() == 255 );
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.FromString( text.c_str() ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+
 #if RAKNET_SUPPORT_IPV6 == 1
+TEST_CASE( "SystemAddress::FromString does not cut a host name short", "[address]" )
+{
+    WinsockScope winsock;
+
+    // Cut at 56 characters, this would be the octal literal for 127.0.0.1.
+    const std::string text = std::string( 46, '0' ) + "0177.0.0.1" + ".g";
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.FromString( text.c_str() ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+
 TEST_CASE( "SystemAddress::FromString rejects a numeric host ended by anything but the delineator", "[address]" )
 {
     WinsockScope winsock;

@@ -68,6 +68,24 @@ bool IsDottedDecimalCharacter( char c )
     return ( c >= '0' && c <= '9' ) || c == '.';
 }
 
+// The longest host name read: a DNS name of 253 characters and a trailing dot.
+constexpr size_t MaxHostNameLength = 253 + 1;
+
+// Copies the host name at the start of str, up to the delineator or the end of the string,
+// into name, and sets length to its length. Returns false when the name is longer than
+// MaxHostNameLength.
+bool ReadHostName( const char* str, char portDelineator, char ( &name )[MaxHostNameLength + 1], size_t& length )
+{
+    for( length = 0; str[length] != 0 && str[length] != portDelineator; length++ )
+    {
+        if( length == MaxHostNameLength )
+            return false;
+        name[length] = str[length];
+    }
+    name[length] = 0;
+    return true;
+}
+
 #if RAKNET_SUPPORT_IPV6 == 1
 // The longest numeric host FromString reads: an IPv6 address of 45 characters, '%' and a
 // zone index of up to 10 digits.
@@ -450,18 +468,24 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
             return true;
         }
 
+        char name[MaxHostNameLength + 1];
+        size_t length;
+        if( ReadHostName( str, portDelineator, name, length ) == false )
+            return false;
+
+        std::optional<unsigned short> port;
+        if( ReadPort( str[length] ? str + length + 1 : "", port ) == false )
+            return false;
+
         char ip[65];
         ip[0] = 0;
-        RakNetSocket2::DomainNameToIP( str, ip );
-        if( ip[0] )
-        {
-            address.addr4.sin_addr.s_addr = inet_addr__( ip );
-        }
-        else
-        {
-            *this = UNASSIGNED_SYSTEM_ADDRESS;
+        RakNetSocket2::DomainNameToIP( name, ip );
+        if( ip[0] == 0 )
             return false;
-        }
+
+        address.addr4.sin_addr.s_addr = inet_addr__( ip );
+        if( port )
+            SetPortHostOrder( *port );
     }
     else
     {
@@ -511,7 +535,9 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
         address.addr4.sin_family = AF_INET;
         return true;
     }
-    char ipPart[MaxNumericHostLength + 1];
+    // Holds a numeric host or a host name.
+    static_assert( MaxHostNameLength >= MaxNumericHostLength );
+    char ipPart[MaxHostNameLength + 1];
     int i = 0;
 
     // TODO - what about 255.255.255.255?
@@ -541,8 +567,10 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
     }
     else
     {
-        strncpy( ipPart, str, sizeof( ipPart ) );
-        ipPart[sizeof( ipPart ) - 1] = 0;
+        size_t length;
+        if( ReadHostName( str, portDelineator, ipPart, length ) == false )
+            return false;
+        i = (int)length;
     }
 
     std::optional<unsigned short> port;
