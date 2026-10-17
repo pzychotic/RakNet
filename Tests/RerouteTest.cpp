@@ -29,10 +29,10 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kFreeServerPort = 33010;
-constexpr unsigned short kFreeTargetPort = 33011;
-constexpr unsigned short kHeldServerPort = 33020;
-constexpr unsigned short kHeldOtherServerPort = 33021;
+constexpr unsigned short kFreeServerPort = 31710;
+constexpr unsigned short kFreeTargetPort = 31711;
+constexpr unsigned short kHeldServerPort = 31720;
+constexpr unsigned short kHeldOtherServerPort = 31721;
 
 // Hang guard for the wait below, not a settle time: it normally ends within an update
 // cycle or two.

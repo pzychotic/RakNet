@@ -39,7 +39,7 @@ using namespace RakNet;
 namespace {
 
 // Ports no other test uses.
-constexpr unsigned short kServerPort = 32900;
+constexpr unsigned short kServerPort = 31900;
 
 constexpr int kRepeats = 8;
 

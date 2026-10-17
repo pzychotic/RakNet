@@ -24,10 +24,10 @@ using namespace RakNet;
 
 namespace {
 
-constexpr unsigned short kLoopbackServerPort = 32800;
-constexpr unsigned short kLoopbackClientPort = 32801;
-constexpr unsigned short kShutdownServerPort = 32810;
-constexpr unsigned short kShutdownClientPort = 32811;
+constexpr unsigned short kLoopbackServerPort = 31800;
+constexpr unsigned short kLoopbackClientPort = 31801;
+constexpr unsigned short kShutdownServerPort = 31810;
+constexpr unsigned short kShutdownClientPort = 31811;
 
 // Hang guard for each wait, not a settle time: each normally ends within a second.
 constexpr TimeMS kWaitBudgetMs = 10000;
