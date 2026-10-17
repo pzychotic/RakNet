@@ -13,6 +13,7 @@
 #include "TCPInterface.h"
 #include "RakPeerInterface.h"
 #include "BitStream.h"
+#include "MTUSize.h"
 #include <string.h>
 
 namespace RakNet {
@@ -176,15 +177,16 @@ bool PluginInterface2::SendListUnified( const char** data, const int* lengths, c
     if( broadcast == false && systemIdentifier.rakNetGuid == GetMyGUIDUnified() )
     {
 
-        unsigned int totalLength = 0;
+        // Summed in uint64_t so no total wraps, and limited like RakPeer::SendList.
+        uint64_t totalLength = 0;
         unsigned int lengthOffset;
         int i;
         for( i = 0; i < numParameters; i++ )
         {
             if( lengths[i] > 0 )
-                totalLength += lengths[i];
+                totalLength += (uint64_t)lengths[i];
         }
-        if( totalLength == 0 )
+        if( totalLength == 0 || totalLength > MAXIMUM_MESSAGE_SIZE )
             return false;
 
         char* dataAggregate;
@@ -203,7 +205,7 @@ bool PluginInterface2::SendListUnified( const char** data, const int* lengths, c
             }
         }
 
-        SendUnified( dataAggregate, totalLength, priority, reliability, orderingChannel, systemIdentifier, broadcast );
+        SendUnified( dataAggregate, (int)totalLength, priority, reliability, orderingChannel, systemIdentifier, broadcast );
         rakFree_Ex( dataAggregate, _FILE_AND_LINE_ );
         return true;
     }
