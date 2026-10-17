@@ -108,6 +108,28 @@ bool PasswordMatches( const unsigned char* incoming, int incomingLength, const c
     return difference == 0;
 }
 
+/// The end of the assigned addresses in an internal-ID list: its first
+/// UNASSIGNED_SYSTEM_ADDRESS, or last.
+template<class Iterator>
+Iterator AssignedEnd( Iterator first, Iterator last )
+{
+    return std::find( first, last, UNASSIGNED_SYSTEM_ADDRESS );
+}
+
+/// The queued connection request to target, or the queue's end.
+template<class RequestQueue>
+auto FindRequestTo( RequestQueue& queue, const SystemAddress& target )
+{
+    return std::find_if( queue.begin(), queue.end(), [&]( const auto& request ) { return request->systemAddress == target; } );
+}
+
+/// The ban list entry for IP, or the list's end.
+template<class BanList>
+auto FindBan( BanList& banList, const char* IP )
+{
+    return std::find_if( banList.begin(), banList.end(), [&]( const auto& ban ) { return ban->IP == IP; } );
+}
+
 } // namespace
 
 void UpdateNetworkLoop( void* arg );
@@ -1162,8 +1184,7 @@ void RakPeer::HandleConnectionCancelQueue()
         // Cancel pending connection attempt, if there is one
         requestedConnectionQueueMutex.lock();
         const SystemAddress& target = requestedConnectionCancelQueue.front();
-        auto it = std::find_if( requestedConnectionQueue.begin(), requestedConnectionQueue.end(),
-                                [&target]( const std::unique_ptr<RequestedConnectionStruct>& pConnection ) { return pConnection->systemAddress == target; } );
+        auto it = FindRequestTo( requestedConnectionQueue, target );
         if( it != requestedConnectionQueue.end() )
             requestedConnectionQueue.erase( it );
         requestedConnectionQueueMutex.unlock();
@@ -1179,7 +1200,7 @@ ConnectionState RakPeer::GetConnectionState( const AddressOrGUID systemIdentifie
     if( systemIdentifier.systemAddress != UNASSIGNED_SYSTEM_ADDRESS )
     {
         std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-        if( std::any_of( requestedConnectionQueue.begin(), requestedConnectionQueue.end(), [&]( const std::unique_ptr<RequestedConnectionStruct>& pConnection ) { return pConnection->systemAddress == systemIdentifier.systemAddress; } ) )
+        if( FindRequestTo( requestedConnectionQueue, systemIdentifier.systemAddress ) != requestedConnectionQueue.end() )
             return IS_PENDING;
         if( std::find( requestsHandedToRecords.begin(), requestsHandedToRecords.end(), systemIdentifier.systemAddress ) != requestsHandedToRecords.end() )
             return IS_PENDING;
@@ -1319,7 +1340,7 @@ void RakPeer::AddToBanList( const char* IP, RakNet::TimeMS milliseconds )
     // If this guy is already in the ban list, do nothing
     banListMutex.lock();
 
-    auto banned = std::find_if( banList.begin(), banList.end(), [&]( const std::unique_ptr<BanStruct>& pBanStruct ) { return pBanStruct->IP == IP; } );
+    auto banned = FindBan( banList, IP );
     if( banned != banList.end() )
     {
         // Already in the ban list.  Just update the time
@@ -1359,7 +1380,7 @@ void RakPeer::RemoveFromBanList( const char* IP )
 
     std::lock_guard<std::mutex> guard( banListMutex );
 
-    auto banned = std::find_if( banList.begin(), banList.end(), [&]( const std::unique_ptr<BanStruct>& pBanStruct ) { return pBanStruct->IP == IP; } );
+    auto banned = FindBan( banList, IP );
     if( banned != banList.end() )
         banList.erase( banned );
 }
@@ -1854,7 +1875,7 @@ unsigned int RakPeer::GetNumberOfAddresses( void )
     }
 
     std::lock_guard<std::mutex> guard( ipListMutex );
-    return (unsigned int)( std::find( std::begin( ipList ), std::end( ipList ), UNASSIGNED_SYSTEM_ADDRESS ) - std::begin( ipList ) );
+    return (unsigned int)( AssignedEnd( std::begin( ipList ), std::end( ipList ) ) - std::begin( ipList ) );
 }
 
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1903,7 +1924,7 @@ bool RakPeer::IsLocalIP( const char* ip )
         FillIPList();
 
     const auto internalIDs = CopyIPList();
-    const auto assignedEnd = std::find( internalIDs.begin(), internalIDs.end(), UNASSIGNED_SYSTEM_ADDRESS );
+    const auto assignedEnd = AssignedEnd( internalIDs.begin(), internalIDs.end() );
     return std::any_of( internalIDs.begin(), assignedEnd, [&]( const SystemAddress& internalID ) {
         char str[128];
         internalID.ToString( false, str );
@@ -2431,7 +2452,7 @@ ConnectionAttemptResult RakPeer::SendConnectionRequest( const SystemAddress& sys
 
     // Return false if already pending, else push on queue
     std::lock_guard<std::mutex> guard( requestedConnectionQueueMutex );
-    if( std::any_of( requestedConnectionQueue.begin(), requestedConnectionQueue.end(), [&]( const std::unique_ptr<RequestedConnectionStruct>& pConnection ) { return pConnection->systemAddress == systemAddress; } ) )
+    if( FindRequestTo( requestedConnectionQueue, systemAddress ) != requestedConnectionQueue.end() )
         return CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS;
     requestedConnectionQueue.push_back( std::move( rcs ) );
 
@@ -3072,7 +3093,7 @@ bool RakPeer::MatchesThisPeer( const AddressOrGUID& systemIdentifier, bool match
         return systemIdentifier.rakNetGuid == myGuid;
 
     const auto internalIDs = CopyIPList();
-    const auto assignedEnd = std::find( internalIDs.begin(), internalIDs.end(), UNASSIGNED_SYSTEM_ADDRESS );
+    const auto assignedEnd = AssignedEnd( internalIDs.begin(), internalIDs.end() );
     const bool isInternalID = std::any_of( internalIDs.begin(), assignedEnd, [&]( const SystemAddress& internalID ) {
         return matchPort ? internalID == systemIdentifier.systemAddress : internalID.EqualsExcludingPort( systemIdentifier.systemAddress );
     } );
@@ -5160,7 +5181,7 @@ void SortInternalIDs( SystemAddress addresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS] )
         return lhs.GetIPVersion() > rhs.GetIPVersion();
     };
     SystemAddress* const end = addresses + MAXIMUM_NUMBER_OF_INTERNAL_IDS;
-    std::sort( addresses, std::find( addresses, end, UNASSIGNED_SYSTEM_ADDRESS ), sortsBefore );
+    std::sort( addresses, AssignedEnd( addresses, end ), sortsBefore );
 }
 
 } // namespace RakNet
