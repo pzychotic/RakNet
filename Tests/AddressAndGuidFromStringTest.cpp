@@ -134,6 +134,62 @@ TEST_CASE( "SystemAddress::SetBinaryAddress rejects a numeric host longer than 2
     CHECK( address.GetPort() == 1234 );
 }
 
+TEST_CASE( "SystemAddress::SetBinaryAddress rejects a numeric host ended by anything but the delineator", "[address]" )
+{
+    WinsockScope winsock;
+
+    const char* const rejected[] = {
+        "1.2.3.4 80",
+        "1.2.3.4/24",
+        "1.2.3.4 ",
+        " 80",
+    };
+    for( const char* text : rejected )
+    {
+        CAPTURE( text );
+        SystemAddress address( "192.168.1.5", 1234 );
+        CHECK_FALSE( address.SetBinaryAddress( text, '|' ) );
+        CHECK( IpOf( address ) == "192.168.1.5" );
+        CHECK( address.GetPort() == 1234 );
+    }
+}
+
+TEST_CASE( "SystemAddress::SetBinaryAddress sets only the port for an empty host", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    REQUIRE( address.SetBinaryAddress( "|80", '|' ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 80 );
+}
+
+#if RAKNET_SUPPORT_IPV6 == 1
+TEST_CASE( "SystemAddress::FromString rejects a numeric host ended by anything but the delineator", "[address]" )
+{
+    WinsockScope winsock;
+
+    for( const char* text : { "1.2.3.4 80", "1.2.3.4 " } )
+    {
+        CAPTURE( text );
+        SystemAddress address( "192.168.1.5", 1234 );
+        CHECK_FALSE( address.FromString( text ) );
+        CHECK( IpOf( address ) == "192.168.1.5" );
+        CHECK( address.GetPort() == 1234 );
+    }
+}
+#else
+TEST_CASE( "SystemAddress::FromString does not read host:port with the default delineator", "[address]" )
+{
+    WinsockScope winsock;
+
+    SystemAddress address( "192.168.1.5", 1234 );
+    CHECK_FALSE( address.FromString( "1.2.3.4:80" ) );
+    CHECK( IpOf( address ) == "192.168.1.5" );
+    CHECK( address.GetPort() == 1234 );
+}
+#endif
+
 #if RAKNET_SUPPORT_IPV6 == 1
 TEST_CASE( "SystemAddress::FromString rejects a numeric host longer than 56 characters", "[address]" )
 {

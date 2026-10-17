@@ -1070,10 +1070,9 @@ which skip leading whitespace, accept a sign, stop at the first character that i
 digit and truncate or saturate a value out of range. Valid input reads as before.
 
 **`SystemAddress::FromString` returns false for a port that isn't a whole number from 0 to
-65535**, and leaves the address unchanged. Stock truncated `"1.2.3.4|70000"` to port 4464,
-read `"1.2.3.4|80x"` as port 80 and, depending on `RAKNET_SUPPORT_IPV6`, ignored or read
-a port after a space. `SetBinaryAddress` does the same. If you build address strings from
-user input, check the return value.
+65535**, and leaves the address unchanged. Stock truncated `"1.2.3.4|70000"` to port 4464
+and read `"1.2.3.4|80x"` as port 80. `SetBinaryAddress` does the same. If you build
+address strings from user input, check the return value.
 
 **A numeric host longer than the longest address returns false**, and leaves the address
 unchanged. The limit is 21 characters for `SetBinaryAddress`, which is also `FromString`
@@ -1083,6 +1082,16 @@ IPv6 build, a numeric zoned literal longer than 45 characters, such as
 `ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%1`, now parses on Linux. Stock cut it short
 and returned false. The same buffer holds a host name, which the IPv6 build now cuts at 56
 characters on every platform, where stock cut it at 45 on Linux and 64 on Windows.
+
+**A numeric host followed by anything but the end of the string or the port delineator
+returns false**, and leaves the address unchanged, in `SetBinaryAddress` and `FromString`
+in both builds. Stock read a port after a space or any other character when
+`RAKNET_SUPPORT_IPV6` is 0, so `"1.2.3.4 80"` and `"1.2.3.4/24"` set ports 80 and 24 and
+`FromString( "1.2.3.4:80" )` read port 80 with the default `'|'`. When it is 1, stock
+ignored the text after a space or other character that can't be part of an IPv6 address,
+and returned true. Surrounding whitespace is not trimmed:
+`"1.2.3.4 "`, and so `Connect( "1.2.3.4 ", ... )`, now fails. Pass `':'` to read
+`host:port`. An empty host before the delineator, `"|80"`, still sets only the port.
 
 **`SetBinaryAddress` reads the port after `localhost`.** Stock passed the delineator to
 `atoi`, so `"localhost:1234"` came out as `127.0.0.1` port 0. It now reads port 1234. A

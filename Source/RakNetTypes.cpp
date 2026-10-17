@@ -477,12 +477,13 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
                 break;
             IPPart[index] = str[index];
         }
-        // Still in the host at the end of the buffer: too long for any address.
-        if( str[index] != portDelineator && IsDottedDecimalCharacter( str[index] ) )
+        // The host ends only at the end of the string or at the delineator. Anything else,
+        // including a host too long for the buffer, is not an address.
+        if( str[index] != 0 && str[index] != portDelineator )
             return false;
         IPPart[index] = 0;
 
-        // The port is everything after the character that ended the IP.
+        // The port is everything after the delineator.
         std::optional<unsigned short> port;
         if( ReadPort( str[index] ? str + index + 1 : "", port ) == false )
             return false;
@@ -532,8 +533,9 @@ bool SystemAddress::FromString( const char* str, char portDelineator, int ipVers
 
             ipPart[i] = str[i];
         }
-        // Still in the host at the end of the buffer: too long for any address.
-        if( str[i] != portDelineator && IsNumericHostCharacter( str[i] ) )
+        // The host ends only at the end of the string or at the delineator. Anything else,
+        // including a host too long for the buffer, is not an address.
+        if( str[i] != 0 && str[i] != portDelineator )
             return false;
         ipPart[i] = 0;
     }
