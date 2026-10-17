@@ -1,6 +1,7 @@
 #include "PeerScope.h"
 
 #include "RakNetCommandParser.h"
+#include "RakPeer.h"
 #include "RakPeerInterface.h"
 #include "TransportInterface.h"
 
@@ -16,7 +17,8 @@
 RakNetCommandParser reads a numeric argument whole, as a number in the range of the
 parameter it is passed to. Anything else reads as 0, as atoi read text with no leading
 digits. Driven through SetMaximumIncomingConnections, whose unsigned short argument
-reads straight back, on a peer that was never started.
+reads straight back, on a peer that was never started. Startup's unsigned int argument
+is read by a peer that records it instead of starting.
 */
 
 using namespace RakNet;
@@ -54,6 +56,35 @@ unsigned short SetMaximumIncomingConnectionsTo( const char* argument )
     return peer->GetMaximumIncomingConnections();
 }
 
+/// Records the maxConnections Startup is called with, and starts nothing.
+class StartupRecordingPeer : public RakPeer
+{
+public:
+    StartupResult Startup( unsigned int maxConnections, SocketDescriptor*, unsigned, int ) override
+    {
+        startedWith = maxConnections;
+        return RAKNET_STARTED;
+    }
+
+    unsigned int startedWith = 0;
+};
+
+unsigned int StartupMaxConnections( const char* argument )
+{
+    StartupRecordingPeer peer;
+    RakNetCommandParser parser;
+    parser.SetRakPeerInterface( &peer );
+    NullTransport transport;
+
+    char maxConnections[32];
+    snprintf( maxConnections, sizeof( maxConnections ), "%s", argument );
+    char localPort[] = "0";
+    char forceHostAddress[] = "127.0.0.1";
+    char* parameterList[] = { maxConnections, localPort, forceHostAddress };
+    parser.OnCommand( "Startup", 3, parameterList, &transport, UNASSIGNED_SYSTEM_ADDRESS, "" );
+    return peer.startedWith;
+}
+
 } // namespace
 
 TEST_CASE( "RakNetCommandParser reads a numeric argument", "[commandparser]" )
@@ -70,4 +101,10 @@ TEST_CASE( "RakNetCommandParser reads an argument that is not a whole number in 
         CAPTURE( argument );
         CHECK( SetMaximumIncomingConnectionsTo( argument ) == 0 );
     }
+}
+
+TEST_CASE( "RakNetCommandParser passes Startup a maxConnections above 65535 whole", "[commandparser]" )
+{
+    CHECK( StartupMaxConnections( "8" ) == 8 );
+    CHECK( StartupMaxConnections( "65537" ) == 65537 );
 }

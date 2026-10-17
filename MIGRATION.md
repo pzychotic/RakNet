@@ -1091,5 +1091,9 @@ range of the parameter it is passed to.** Stock read `"7x"` as 7, `"-1"` as the 
 value of an unsigned parameter, and truncated `"70000"` for an `unsigned short` to 4464. A
 console command with a well-formed number does what it did.
 
+**`RakNetCommandParser`'s `Startup` passes `maxConnections` whole.** Stock cut it to an
+`unsigned short` before calling `Startup`, which takes an `unsigned int`, so `"65537"`
+started a peer with 1 connection. It now starts one with 65537.
+
 **`ConsoleServer` answers "Invalid index." to a parser number that isn't a whole number.**
 Stock read `"1x Command"` as parser 1.
