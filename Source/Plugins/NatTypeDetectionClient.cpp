@@ -187,7 +187,10 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
     rakPeerInterface->GetSockets( sockets );
     RakAssert( !sockets.empty() );
     SystemAddress s3p4Addr = sockets.front()->GetBoundAddress();
-    s3p4Addr.FromStringExplicitPort( s3p4StrAddress.c_str(), s3p4Port );
+    // Dropped without ending detection: the server sends the request twice and decides from
+    // what comes back, and ending it here would let any System cancel one in progress.
+    if( s3p4Addr.FromStringExplicitPort( s3p4StrAddress.c_str(), s3p4Port ) == false )
+        return;
 
     // Send off the RakNet socket to the specified address, message is unformatted
     // Server does this twice, so don't have to unduly worry about packetloss

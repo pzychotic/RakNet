@@ -402,6 +402,10 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
         for( int i = 0; i < boundAddressCount && i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
         {
             bs.Read( boundAddresses[i] );
+            // ToString writes this one as a name rather than a number, which SendOutOfBand
+            // would look up.
+            if( boundAddresses[i] == UNASSIGNED_SYSTEM_ADDRESS )
+                continue;
             if( boundAddresses[i] != packet->systemAddress )
             {
                 BitStream outgoingBs;

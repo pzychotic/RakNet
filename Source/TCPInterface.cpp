@@ -533,6 +533,12 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     if( bindAddress != 0 && strlen( bindAddress ) > MAXIMUM_BIND_ADDRESS_LENGTH )
         return UNASSIGNED_SYSTEM_ADDRESS;
 
+    // A host that doesn't parse is the caller's error rather than a failed attempt, so it is
+    // refused before an attempt is counted in or a slot reserved.
+    SystemAddress systemAddress;
+    if( systemAddress.FromStringExplicitPort( host, remotePort ) == false )
+        return UNASSIGNED_SYSTEM_ADDRESS;
+
     // "Table is full" is the handle's answer rather than a loop counter left one past the
     // end of the array, so there is no out-of-range index here to guard against indexing
     // with. What fills the entry in is a connect that can block, and holding the entry's
@@ -552,9 +558,6 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
 
     if( block )
     {
-        SystemAddress systemAddress;
-        systemAddress.FromString( host );
-        systemAddress.SetPortHostOrder( remotePort );
         systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
         char buffout[128];
         systemAddress.ToString( false, buffout );
@@ -597,7 +600,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     else
     {
         std::unique_ptr<ThisPtrPlusSysAddr> s = std::make_unique<ThisPtrPlusSysAddr>();
-        s->systemAddress.FromStringExplicitPort( host, remotePort );
+        s->systemAddress = systemAddress;
         s->systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
         // Bounded by the length check at the top of Connect.
         if( bindAddress )

@@ -77,10 +77,12 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/MaximumMessageSizeTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MessageFilterTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MiscellaneousTestsTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughClientBoundAddressTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughClientQueuedOpenNatTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughServerDisconnectTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatPunchthroughServerSelfRequestTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionBindTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionClientUnparseableHostTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NatTypeDetectionRecvLoopTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/NumericHostStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OfflineMessagesConvertTest.cpp
@@ -96,6 +98,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PluginInterface2SendListTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PublishedViewTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakNetCommandParserTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RakPeerUnparseableHostTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RakThreadTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReceiveAfterPublishTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ReceiveQueueCapTest.cpp
@@ -141,6 +144,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceStartTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceStopConnectAttemptTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceStopTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TCPInterfaceUnparseableHostTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TelnetTransportCloseConnectionTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TelnetTransportLineBufferTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TelnetTransportReconnectTest.cpp

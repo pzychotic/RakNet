@@ -497,7 +497,9 @@ public:
     /// \param[in] ttl Max hops of datagram, set to 3
     /// \param[in] connectionSocketIndex userConnectionSocketIndex.
     /// \remarks Used for NAT-Punchthrough
-    void SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex = 0 );
+    /// \return false, sending nothing, if host doesn't parse as an address. A socket that isn't
+    /// a Berkeley socket sends nothing and returns true without parsing host.
+    bool SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex = 0 );
 
     // -------------------------------------------------------------------------------------------- Plugin Functions--------------------------------------------------------------------------------------------
     /// \brief Attaches a Plugin interface to an instance of the base class (RakPeer or PacketizedTCP) to run code automatically on message receipt in the Receive call.

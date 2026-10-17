@@ -508,7 +508,9 @@ public:
     /// Send a message to host, with the IP socket option TTL set to 3
     /// This message will not reach the host, but will open the router.
     /// Used for NAT-Punchthrough
-    virtual void SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex = 0 ) = 0;
+    /// \return false, sending nothing, if host doesn't parse as an address. A socket that isn't
+    /// a Berkeley socket sends nothing and returns true without parsing host.
+    virtual bool SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex = 0 ) = 0;
 
     // -------------------------------------------------------------------------------------------- Plugin Functions--------------------------------------------------------------------------------------------
     /// \brief Attaches a Plugin interface to an instance of the base class (RakPeer or PacketizedTCP) to run code automatically on message receipt in the Receive call.

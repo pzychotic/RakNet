@@ -83,7 +83,7 @@ public:
 
     /// Connect to the specified host on the specified port. Refused, with
     /// UNASSIGNED_SYSTEM_ADDRESS and no failed connection attempt reported, if the interface
-    /// is not started or Stop is running.
+    /// is not started or Stop is running, or if host doesn't parse as an address.
     /// \param[in] bindAddress Local address to bind to, or 0 for none. At most
     /// MAXIMUM_BIND_ADDRESS_LENGTH characters: a longer one is rejected with
     /// UNASSIGNED_SYSTEM_ADDRESS rather than truncated.

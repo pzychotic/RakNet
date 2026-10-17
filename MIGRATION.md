@@ -27,6 +27,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [Timestamped Messages arrive shifted](#timestamped-messages-arrive-shifted)
 - [Router2 and UDPForwarder do what they promised](#router2-and-udpforwarder-do-what-they-promised)
 - [`ConnectWithSocket` refuses a host it can't resolve](#connectwithsocket-refuses-a-host-it-cant-resolve)
+- [Calls given a host that doesn't parse send nothing](#calls-given-a-host-that-doesnt-parse-send-nothing)
 - [`TCPInterface::Start` fails when it can't listen](#tcpinterfacestart-fails-when-it-cant-listen)
 - [Numbers in strings are read whole](#numbers-in-strings-are-read-whole)
 
@@ -1050,6 +1051,27 @@ unassigned address, which could never connect. `Connect` already returned
 `CANNOT_RESOLVE_DOMAIN_NAME`. If you treat anything but `CONNECTION_ATTEMPT_STARTED` as
 failure, nothing to do. If you wait for a Message to learn that a `ConnectWithSocket`
 failed, check its return value too.
+
+## Calls given a host that doesn't parse send nothing
+
+**`TCPInterface::Connect` returns `UNASSIGNED_SYSTEM_ADDRESS` for a host that doesn't
+parse**, in both the blocking and the non-blocking branch, and queues no failed connection
+attempt. Stock connected to whatever address the failed parse left: `0.0.0.0` when
+blocking, which on Linux reaches the local machine, and `UNASSIGNED_SYSTEM_ADDRESS` when
+not, reported later through `HasFailedConnectionAttempt`. Treat `UNASSIGNED_SYSTEM_ADDRESS`
+from a blocking `Connect` as failure, as before. From a non-blocking one it still means
+"started" too, so check the host string before calling if you need to tell the two apart.
+The blocking branch now refuses `"1.2.3.4|80"`, as the non-blocking one did. Stock took it
+there and ignored the port, using `remotePort`.
+
+**`RakPeerInterface::SendTTL` returns `bool`.** It returns false and sends nothing when
+`host` doesn't parse, and true otherwise. Stock returned `void` and sent the datagram to
+`UNASSIGNED_SYSTEM_ADDRESS`. A class that implements `RakPeerInterface` must change its
+override. **`SendOutOfBand` returns false and sends nothing when `host` doesn't parse.**
+Stock sent it to `UNASSIGNED_SYSTEM_ADDRESS` and returned true.
+
+**`Ping( "0.0.0.0", 0, ... )` sends the ping.** Stock compared the parsed address to
+`UNASSIGNED_SYSTEM_ADDRESS`, which `0.0.0.0` with port 0 equals, and returned false.
 
 ## `TCPInterface::Start` fails when it can't listen
 

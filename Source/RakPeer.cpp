@@ -1530,8 +1530,7 @@ bool RakPeer::Ping( const char* host, unsigned short remotePort, bool onlyReplyO
     RNS2_SendParameters bsp;
     bsp.data = (char*)bitStream.GetData();
     bsp.length = bitStream.GetNumberOfBytesUsed();
-    bsp.systemAddress.FromStringExplicitPort( host, remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion() );
-    if( bsp.systemAddress == UNASSIGNED_SYSTEM_ADDRESS )
+    if( bsp.systemAddress.FromStringExplicitPort( host, remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion() ) == false )
         return false;
     bsp.systemAddress.FixForIPVersion( socketList[realIndex]->GetBoundAddress() );
     for( PluginInterface2* pPlugin : pluginListNTS )
@@ -2015,8 +2014,10 @@ void RakPeer::SetUnreliableTimeout( RakNet::TimeMS timeoutMS )
 // Send a message to host, with the IP socket option TTL set to 3
 // This message will not reach the host, but will open the router.
 // Used for NAT-Punchthrough
+// Returns false, sending nothing, if host doesn't parse as an address. A socket that isn't
+// a Berkeley socket sends nothing and returns true without parsing host.
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex )
+bool RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex )
 {
     char fakeData[2];
     fakeData[0] = 0;
@@ -2027,7 +2028,8 @@ void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, uns
         RNS2_SendParameters bsp;
         bsp.data = (char*)fakeData;
         bsp.length = 2;
-        bsp.systemAddress.FromStringExplicitPort( host, remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion() );
+        if( bsp.systemAddress.FromStringExplicitPort( host, remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion() ) == false )
+            return false;
         bsp.systemAddress.FixForIPVersion( socketList[realIndex]->GetBoundAddress() );
         bsp.ttl = ttl;
         for( PluginInterface2* pPlugin : pluginListNTS )
@@ -2036,6 +2038,7 @@ void RakPeer::SendTTL( const char* host, unsigned short remotePort, int ttl, uns
         }
         socketList[realIndex]->Send( &bsp, _FILE_AND_LINE_ );
     }
+    return true;
 }
 
 
@@ -2328,7 +2331,8 @@ bool RakPeer::SendOutOfBand( const char* host, unsigned short remotePort, const 
     RNS2_SendParameters bsp;
     bsp.data = (char*)bitStream.GetData();
     bsp.length = bitStream.GetNumberOfBytesUsed();
-    bsp.systemAddress.FromStringExplicitPort( host, remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion() );
+    if( bsp.systemAddress.FromStringExplicitPort( host, remotePort, socketList[realIndex]->GetBoundAddress().GetIPVersion() ) == false )
+        return false;
     bsp.systemAddress.FixForIPVersion( socketList[realIndex]->GetBoundAddress() );
     for( PluginInterface2* pPlugin : pluginListNTS )
     {
