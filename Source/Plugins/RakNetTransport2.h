@@ -42,16 +42,16 @@ public:
     STATIC_FACTORY_DECLARATIONS( RakNetTransport2 )
 
     RakNetTransport2();
-    virtual ~RakNetTransport2();
+    ~RakNetTransport2() override;
 
     /// Start the transport provider on the indicated port.
     /// \param[in] port The port to start the transport provider on
     /// \param[in] serverMode If true, you should allow incoming connections (I don't actually use this anywhere)
     /// \return Return true on success, false on failure.
-    bool Start( unsigned short port, bool serverMode );
+    bool Start( unsigned short port, bool serverMode ) override;
 
     /// Stop the transport provider.  You can clear memory and shutdown threads here.
-    void Stop( void );
+    void Stop( void ) override;
 
     /// Send a null-terminated string to \a systemAddress
     /// If your transport method requires particular formatting of the outgoing data (e.g. you don't just send strings) you can do it here
@@ -59,39 +59,39 @@ public:
     /// \param[in] systemAddress The player to send the string to
     /// \param[in] data format specifier - same as RAKNET_DEBUG_PRINTF
     /// \param[in] ... format specification arguments - same as RAKNET_DEBUG_PRINTF
-    void Send( SystemAddress systemAddress, const char* data, ... );
+    void Send( SystemAddress systemAddress, const char* data, ... ) override;
 
     /// Disconnect \a systemAddress .  The binary address and port defines the SystemAddress structure.
     /// \param[in] systemAddress The player/address to disconnect
-    void CloseConnection( SystemAddress systemAddress );
+    void CloseConnection( SystemAddress systemAddress ) override;
 
     /// Return a string. The string should be allocated and written to Packet::data .
     /// The byte length should be written to Packet::length .  The player/address should be written to Packet::systemAddress
     /// If your transport protocol adds special formatting to the data stream you should parse it out before returning it in the packet
     /// and thus only return a string in Packet::data
     /// \return The packet structure containing the result of Receive, or 0 if no data is available
-    Packet* Receive( void );
+    Packet* Receive( void ) override;
 
     /// Deallocate the Packet structure returned by Receive
     /// \param[in] The packet to deallocate
-    void DeallocatePacket( Packet* packet );
+    void DeallocatePacket( Packet* packet ) override;
 
     /// If a new system connects to you, you should queue that event and return the systemAddress/address of that player in this function.
     /// \return The SystemAddress/address of the system
-    SystemAddress HasNewIncomingConnection( void );
+    SystemAddress HasNewIncomingConnection( void ) override;
 
     /// If a system loses the connection, you should queue that event and return the systemAddress/address of that player in this function.
     /// \return The SystemAddress/address of the system
-    SystemAddress HasLostConnection( void );
+    SystemAddress HasLostConnection( void ) override;
 
-    virtual CommandParserInterface* GetCommandParser( void ) { return 0; }
+    CommandParserInterface* GetCommandParser( void ) override { return 0; }
 
     /// \internal
-    virtual PluginReceiveResult OnReceive( Packet* packet );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
     /// \internal
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
     /// \internal
-    virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
+    void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming ) override;
 
 protected:
 

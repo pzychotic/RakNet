@@ -81,7 +81,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( MessageFilter )
 
     MessageFilter();
-    virtual ~MessageFilter();
+    ~MessageFilter() override;
 
     MessageFilter( const MessageFilter& ) = delete;
     MessageFilter& operator=( const MessageFilter& ) = delete;
@@ -170,10 +170,10 @@ public:
     // --------------------------------------------------------------------------------------------
     // Packet handling functions
     // --------------------------------------------------------------------------------------------
-    virtual void Update( void );
-    virtual PluginReceiveResult OnReceive( Packet* packet );
-    virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    void Update( void ) override;
+    PluginReceiveResult OnReceive( Packet* packet ) override;
+    void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
 
 protected:
     void Clear( void );

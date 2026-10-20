@@ -47,7 +47,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( UDPProxyCoordinator )
 
     UDPProxyCoordinator();
-    virtual ~UDPProxyCoordinator();
+    ~UDPProxyCoordinator() override;
 
     UDPProxyCoordinator( const UDPProxyCoordinator& ) = delete;
     UDPProxyCoordinator& operator=( const UDPProxyCoordinator& ) = delete;
@@ -84,9 +84,9 @@ public:
     uint64_t GetServerSelectionBitstreamsRefused( void ) const;
 
     /// \internal
-    virtual void Update( void );
-    virtual PluginReceiveResult OnReceive( Packet* packet );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    void Update( void ) override;
+    PluginReceiveResult OnReceive( Packet* packet ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
 
     struct SenderAndTargetAddress
     {

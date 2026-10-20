@@ -35,7 +35,7 @@ public:
     // Writes to the command parser used for logging, which is accessed through a secondary communication layer (such as Telnet or RakNet) - See ConsoleServer.h
     // Call on the application thread.
     virtual void SetLogCommandParser( LogCommandParser* lcp );
-    virtual void WriteLog( const char* str );
+    void WriteLog( const char* str ) override;
 
 protected:
     LogCommandParser* logCommandParser;

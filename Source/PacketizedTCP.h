@@ -35,19 +35,19 @@ public:
     STATIC_FACTORY_DECLARATIONS( PacketizedTCP )
 
     PacketizedTCP();
-    virtual ~PacketizedTCP();
+    ~PacketizedTCP() override;
 
     /// Stops the TCP server
     void Stop( void );
 
     /// Sends a byte stream
-    void Send( const char* data, unsigned length, const SystemAddress& systemAddress, bool broadcast );
+    void Send( const char* data, unsigned length, const SystemAddress& systemAddress, bool broadcast ) override;
 
     // Sends a concatenated list of byte streams
-    bool SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast );
+    bool SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast ) override;
 
     /// Returns data received
-    Packet* Receive( void );
+    Packet* Receive( void ) override;
 
     /// Disconnects a player/address
     /// \return As TCPInterface::CloseConnection.

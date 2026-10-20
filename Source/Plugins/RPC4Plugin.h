@@ -80,7 +80,7 @@ public:
     RPC4();
 
     // Destructor
-    virtual ~RPC4();
+    ~RPC4() override;
 
     RPC4( const RPC4& ) = delete;
     RPC4& operator=( const RPC4& ) = delete;
@@ -219,8 +219,8 @@ protected:
     // --------------------------------------------------------------------------------------------
     // Packet handling functions
     // --------------------------------------------------------------------------------------------
-    virtual void OnAttach( void );
-    virtual PluginReceiveResult OnReceive( Packet* packet );
+    void OnAttach( void ) override;
+    PluginReceiveResult OnReceive( Packet* packet ) override;
 
     std::unordered_map<std::string, void ( * )( BitStream*, Packet* )> registeredNonblockingFunctions;
     std::unordered_map<std::string, void ( * )( BitStream*, BitStream*, Packet* )> registeredBlockingFunctions;

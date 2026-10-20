@@ -207,7 +207,7 @@ public:
     StatisticsHistory statistics;
 
     StatisticsHistoryPlugin();
-    virtual ~StatisticsHistoryPlugin();
+    ~StatisticsHistoryPlugin() override;
 
     /// \brief Whether each connection gets a tracked object in \a statistics, keyed by its RakNetGUID.
     /// \param[in] _addNewConnections Add an object of type \a newConnectionsObjectType for each new connection. Defaults to true.
@@ -218,9 +218,9 @@ public:
     void SetTrackConnections( bool _addNewConnections, int newConnectionsObjectType, bool _removeLostConnections );
 
 protected:
-    virtual void Update( void );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
-    virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
+    void Update( void ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
+    void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming ) override;
 
     bool addNewConnections;
     bool removeLostConnections;

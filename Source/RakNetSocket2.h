@@ -162,7 +162,7 @@ class RNS2_Berkley : public RakNetSocket2
 {
 public:
     RNS2_Berkley();
-    virtual ~RNS2_Berkley();
+    ~RNS2_Berkley() override;
 
     int CreateRecvPollingThread( int threadPriority );
     void SignalStopRecvPollingThread( void );
@@ -172,7 +172,7 @@ public:
     void SetDoNotFragment( int opt );
 
     RNS2BindResult Bind( RNS2_BerkleyBindParameters* bindParameters, const char* file, unsigned int line );
-    RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line );
+    RNS2SendResult Send( RNS2_SendParameters* sendParameters, const char* file, unsigned int line ) override;
 
     void SetSocketLayerOverride( SocketLayerOverride* _slo );
     SocketLayerOverride* GetSocketLayerOverride( void );

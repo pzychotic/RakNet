@@ -71,7 +71,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( TwoWayAuthentication )
 
     TwoWayAuthentication();
-    virtual ~TwoWayAuthentication();
+    ~TwoWayAuthentication() override;
 
     /// \brief Adds a password to the list of passwords the system will accept
     /// \details Each password, which is never sent in plaintext, is identified by \a identifier.
@@ -110,13 +110,13 @@ public:
     void Clear( void );
 
     /// \internal
-    virtual void Update( void );
+    void Update( void ) override;
     /// \internal
-    virtual PluginReceiveResult OnReceive( Packet* packet );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
     /// \internal
-    virtual void OnRakPeerShutdown( void );
+    void OnRakPeerShutdown( void ) override;
     /// \internal
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
 
     /// \internal
     struct PendingChallenge

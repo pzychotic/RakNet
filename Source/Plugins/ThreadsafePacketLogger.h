@@ -32,11 +32,11 @@ class RAK_DLL_EXPORT ThreadsafePacketLogger : public PacketLogger
 {
 public:
     ThreadsafePacketLogger();
-    virtual ~ThreadsafePacketLogger();
+    ~ThreadsafePacketLogger() override;
 
     /// Writes the queued lines. If any were refused since the last call, ends with one
     /// line giving how many.
-    virtual void Update( void );
+    void Update( void ) override;
 
     /// \brief Caps how many lines wait in the queue for Update().
     /// \details At the cap a new line is refused and counted in GetLinesRefused(). Lowering
@@ -52,7 +52,7 @@ public:
 
 protected:
     /// Thread-safe. Called from the network thread and from any thread that logs.
-    virtual void AddToLog( const char* str );
+    void AddToLog( const char* str ) override;
 
 private:
     mutable std::mutex logMessagesMutex;

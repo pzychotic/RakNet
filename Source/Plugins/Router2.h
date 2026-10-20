@@ -59,7 +59,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( Router2 )
 
     Router2();
-    virtual ~Router2();
+    ~Router2() override;
 
     /// Sets the socket family to use, either IPV4 or IPV6
     /// \param[in] socketFamily For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
@@ -131,11 +131,11 @@ public:
     // --------------------------------------------------------------------------------------------
     // Packet handling functions
     // --------------------------------------------------------------------------------------------
-    virtual PluginReceiveResult OnReceive( Packet* packet );
-    virtual void Update( void );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
-    virtual void OnFailedConnectionAttempt( Packet* packet, PI2_FailedConnectionAttemptReason failedConnectionAttemptReason );
-    virtual void OnRakPeerShutdown( void );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
+    void Update( void ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
+    void OnFailedConnectionAttempt( Packet* packet, PI2_FailedConnectionAttemptReason failedConnectionAttemptReason ) override;
+    void OnRakPeerShutdown( void ) override;
 
 
     enum Router2RequestStates

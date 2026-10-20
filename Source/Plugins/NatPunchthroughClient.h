@@ -106,7 +106,7 @@ struct RAK_DLL_EXPORT NatPunchthroughDebugInterface
 /// \ingroup NAT_PUNCHTHROUGH_GROUP
 struct RAK_DLL_EXPORT NatPunchthroughDebugInterface_Printf : public NatPunchthroughDebugInterface
 {
-    virtual void OnClientMessage( const char* msg );
+    void OnClientMessage( const char* msg ) override;
 };
 
 #if _RAKNET_SUPPORT_PacketLogger == 1
@@ -117,8 +117,8 @@ struct RAK_DLL_EXPORT NatPunchthroughDebugInterface_PacketLogger : public NatPun
     PacketLogger* pl;
 
     NatPunchthroughDebugInterface_PacketLogger() { pl = 0; }
-    ~NatPunchthroughDebugInterface_PacketLogger() {}
-    virtual void OnClientMessage( const char* msg );
+    ~NatPunchthroughDebugInterface_PacketLogger() override {}
+    void OnClientMessage( const char* msg ) override;
 };
 #endif
 
@@ -136,7 +136,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( NatPunchthroughClient )
 
     NatPunchthroughClient();
-    ~NatPunchthroughClient();
+    ~NatPunchthroughClient() override;
 
     /// If the instance of RakPeer running NATPunchthroughServer was bound to two IP addresses, then you can call FindRouterPortStride()
     /// This will determine the stride that your router uses when assigning ports, if your router is full-cone
@@ -161,20 +161,20 @@ public:
     void SetDebugInterface( NatPunchthroughDebugInterface* i );
 
     /// \internal For plugin handling
-    virtual void Update( void );
+    void Update( void ) override;
 
     /// \internal For plugin handling
-    virtual PluginReceiveResult OnReceive( Packet* packet );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
 
     /// \internal For plugin handling
-    virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
+    void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming ) override;
 
     /// \internal For plugin handling
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
 
-    virtual void OnAttach( void );
-    virtual void OnDetach( void );
-    virtual void OnRakPeerShutdown( void );
+    void OnAttach( void ) override;
+    void OnDetach( void ) override;
+    void OnRakPeerShutdown( void ) override;
     void Clear( void );
 
     struct SendPing

@@ -51,7 +51,7 @@ struct RAK_DLL_EXPORT NatPunchthroughServerDebugInterface
 /// \ingroup NAT_PUNCHTHROUGH_GROUP
 struct RAK_DLL_EXPORT NatPunchthroughServerDebugInterface_Printf : public NatPunchthroughServerDebugInterface
 {
-    virtual void OnServerMessage( const char* msg );
+    void OnServerMessage( const char* msg ) override;
 };
 
 #if _RAKNET_SUPPORT_PacketLogger == 1
@@ -62,8 +62,8 @@ struct RAK_DLL_EXPORT NatPunchthroughServerDebugInterface_PacketLogger : public 
     PacketLogger* pl;
 
     NatPunchthroughServerDebugInterface_PacketLogger() { pl = 0; }
-    ~NatPunchthroughServerDebugInterface_PacketLogger() {}
-    virtual void OnServerMessage( const char* msg );
+    ~NatPunchthroughServerDebugInterface_PacketLogger() override {}
+    void OnServerMessage( const char* msg ) override;
 };
 #endif
 
@@ -83,7 +83,7 @@ public:
     NatPunchthroughServer();
 
     // Destructor
-    virtual ~NatPunchthroughServer();
+    ~NatPunchthroughServer() override;
 
     NatPunchthroughServer( const NatPunchthroughServer& ) = delete;
     NatPunchthroughServer& operator=( const NatPunchthroughServer& ) = delete;
@@ -93,14 +93,14 @@ public:
     void SetDebugInterface( NatPunchthroughServerDebugInterface* i );
 
     /// \internal For plugin handling
-    virtual void Update( void );
+    void Update( void ) override;
 
     /// \internal For plugin handling
-    virtual PluginReceiveResult OnReceive( Packet* packet );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
 
     /// \internal For plugin handling
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
-    virtual void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming );
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
+    void OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming ) override;
 
     // Each connected user has a ready state. Ready means ready for nat punchthrough.
     struct User;

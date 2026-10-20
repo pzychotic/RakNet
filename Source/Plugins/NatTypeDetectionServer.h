@@ -62,7 +62,7 @@ public:
     NatTypeDetectionServer();
 
     // Destructor
-    virtual ~NatTypeDetectionServer();
+    ~NatTypeDetectionServer() override;
 
     /// Start the system, binding to 3 external IPs not already in use
     /// nonRakNetIP2 to nonRakNetIP4 must be IPv4 addresses on this host. If any of the sockets
@@ -77,13 +77,13 @@ public:
     void Shutdown( void );
 
     /// \internal For plugin handling
-    virtual void Update( void );
-    virtual void OnRakPeerShutdown( void );
-    virtual void OnDetach( void );
+    void Update( void ) override;
+    void OnRakPeerShutdown( void ) override;
+    void OnDetach( void ) override;
 
     /// \internal For plugin handling
-    virtual PluginReceiveResult OnReceive( Packet* packet );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
 
     enum NATDetectionState
     {
@@ -109,9 +109,9 @@ public:
         RakNetGUID guid;
     };
 
-    virtual void OnRNS2Recv( RNS2RecvStruct* recvStruct );
-    virtual void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line );
-    virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line );
+    void OnRNS2Recv( RNS2RecvStruct* recvStruct ) override;
+    void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line ) override;
+    RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line ) override;
 
     /// \brief How many datagrams to the plugin's own sockets were dropped because MAX_BUFFERED_RECEIVED_DATAGRAMS already waited for Update.
     /// \details Any sender can reach those sockets. The cap is the core's, overridable per build in RakNetDefines.h; it defaults to 8192.

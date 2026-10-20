@@ -34,8 +34,10 @@ jobs:
   # the network simulator among it, that compiles only under _DEBUG. GCC builds Release, so
   # the suite also runs optimized. no-exceptions-msvc compiles Source/ in MSVC Release.
   #
-  # GCC also turns its printf-format, buffer-overflow and unused-result warnings into errors
-  # for Source/. MSVC reports none of these at its default level. Tests/ is not covered.
+  # GCC also turns its printf-format, buffer-overflow, unused-result and suggest-override
+  # warnings into errors for Source/. MSVC reports none of these at its default level.
+  # Without override, an override silently becomes a new function when its base signature
+  # changes. Tests/ and user subclasses are not covered.
   test:
     name: test (${{ matrix.platform }}, IPv6=${{ matrix.ipv6 }})
     strategy:
@@ -51,7 +53,7 @@ jobs:
             os: ubuntu-latest
             cxx: g++
             config: Release
-            source-options: -Werror=format;-Werror=format-overflow;-Werror=format-truncation;-Werror=unused-result
+            source-options: -Werror=format;-Werror=format-overflow;-Werror=format-truncation;-Werror=unused-result;-Werror=suggest-override
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:

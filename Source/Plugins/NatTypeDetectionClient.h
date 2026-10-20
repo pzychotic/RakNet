@@ -51,7 +51,7 @@ public:
     NatTypeDetectionClient();
 
     // Destructor
-    virtual ~NatTypeDetectionClient();
+    ~NatTypeDetectionClient() override;
 
     /// Send the message to the server to detect the nat type
     /// Server must be running NatTypeDetectionServer
@@ -62,18 +62,18 @@ public:
     void DetectNATType( SystemAddress _serverAddress );
 
     /// \internal For plugin handling
-    virtual void Update( void );
+    void Update( void ) override;
 
     /// \internal For plugin handling
-    virtual PluginReceiveResult OnReceive( Packet* packet );
+    PluginReceiveResult OnReceive( Packet* packet ) override;
 
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
-    virtual void OnRakPeerShutdown( void );
-    virtual void OnDetach( void );
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
+    void OnRakPeerShutdown( void ) override;
+    void OnDetach( void ) override;
 
-    virtual void OnRNS2Recv( RNS2RecvStruct* recvStruct );
-    virtual void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line );
-    virtual RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line );
+    void OnRNS2Recv( RNS2RecvStruct* recvStruct ) override;
+    void DeallocRNS2RecvStruct( RNS2RecvStruct* s, const char* file, unsigned int line ) override;
+    RNS2RecvStruct* AllocRNS2RecvStruct( const char* file, unsigned int line ) override;
 
     /// \brief How many datagrams to the plugin's own socket were dropped because MAX_BUFFERED_RECEIVED_DATAGRAMS already waited for Update.
     /// \details Any sender can reach that socket. The cap is the core's, overridable per build in RakNetDefines.h; it defaults to 8192.

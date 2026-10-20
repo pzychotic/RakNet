@@ -70,7 +70,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( UDPProxyServer )
 
     UDPProxyServer();
-    ~UDPProxyServer();
+    ~UDPProxyServer() override;
 
     /// Sets the socket family to use, either IPV4 or IPV6
     /// \param[in] socketFamily For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
@@ -97,15 +97,15 @@ public:
     /// UDPForwarder::Startup(), UDPForwarder::Shutdown(), and UDPForwarder::Update() are called automatically by the plugin
     UDPForwarder udpForwarder;
 
-    virtual void OnAttach( void );
-    virtual void OnDetach( void );
+    void OnAttach( void ) override;
+    void OnDetach( void ) override;
 
     /// \internal
-    virtual void Update( void );
-    virtual PluginReceiveResult OnReceive( Packet* packet );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
-    virtual void OnRakPeerStartup( void );
-    virtual void OnRakPeerShutdown( void );
+    void Update( void ) override;
+    PluginReceiveResult OnReceive( Packet* packet ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
+    void OnRakPeerStartup( void ) override;
+    void OnRakPeerShutdown( void ) override;
 
 protected:
     void OnForwardingRequestFromCoordinatorToServer( Packet* packet );

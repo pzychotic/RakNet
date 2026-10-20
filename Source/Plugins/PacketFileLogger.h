@@ -30,12 +30,12 @@ class RAK_DLL_EXPORT PacketFileLogger : public PacketLogger
 {
 public:
     PacketFileLogger();
-    virtual ~PacketFileLogger();
+    ~PacketFileLogger() override;
     /// Opens filenamePrefix_<time>.csv, or PacketLog_<time>.csv if filenamePrefix is null,
     /// writes the header to it, and logs to it from then on. Closes the file already open.
     /// \note May be called while the Peer runs.
     void StartLog( const char* filenamePrefix );
-    virtual void WriteLog( const char* str );
+    void WriteLog( const char* str ) override;
 
 protected:
     // Guards packetLogFile.

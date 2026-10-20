@@ -32,7 +32,7 @@ public:
     STATIC_FACTORY_DECLARATIONS( LogCommandParser )
 
     LogCommandParser();
-    ~LogCommandParser();
+    ~LogCommandParser() override;
 
     /// Given \a command with parameters \a parameterList , do whatever processing you wish.
     /// \param[in] command The command to process
@@ -41,17 +41,17 @@ public:
     /// \param[in] transport The transport interface we can use to write to
     /// \param[in] systemAddress The player that sent this command.
     /// \param[in] originalString The string that was actually sent over the network, in case you want to do your own parsing
-    bool OnCommand( const char* command, unsigned numParameters, char** parameterList, TransportInterface* transport, const SystemAddress& systemAddress, const char* originalString );
+    bool OnCommand( const char* command, unsigned numParameters, char** parameterList, TransportInterface* transport, const SystemAddress& systemAddress, const char* originalString ) override;
 
     /// You are responsible for overriding this function and returning a static string, which will identifier your parser.
     /// This should return a static string
     /// \return The name that you return.
-    const char* GetName( void ) const;
+    const char* GetName( void ) const override;
 
     /// A callback for when you are expected to send a brief description of your parser to \a systemAddress
     /// \param[in] transport The transport interface we can use to write to
     /// \param[in] systemAddress The player that requested help.
-    void SendHelp( TransportInterface* transport, const SystemAddress& systemAddress );
+    void SendHelp( TransportInterface* transport, const SystemAddress& systemAddress ) override;
 
     /// All logs must be associated with a channel.  This is a filter so that remote clients only get logs for a system they care about.
     // If you call Log with a channel that is unknown, that channel will automatically be added
@@ -67,17 +67,17 @@ public:
     /// A callback for when \a systemAddress has connected to us.
     /// \param[in] systemAddress The player that has connected.
     /// \param[in] transport The transport interface that sent us this information.  Can be used to send messages to this or other players.
-    void OnNewIncomingConnection( const SystemAddress& systemAddress, TransportInterface* transport );
+    void OnNewIncomingConnection( const SystemAddress& systemAddress, TransportInterface* transport ) override;
 
     /// A callback for when \a systemAddress has disconnected, either gracefully or forcefully
     /// \param[in] systemAddress The player that has disconnected.
     /// \param[in] transport The transport interface that sent us this information.
-    void OnConnectionLost( const SystemAddress& systemAddress, TransportInterface* transport );
+    void OnConnectionLost( const SystemAddress& systemAddress, TransportInterface* transport ) override;
 
     /// This is called every time transport interface is registered.  If you want to save a copy of the TransportInterface pointer
     /// This is the place to do it
     /// \param[in] transport The new TransportInterface
-    void OnTransportChange( TransportInterface* transport );
+    void OnTransportChange( TransportInterface* transport ) override;
 
 protected:
     /// Sends the currently active channels to the user

@@ -41,20 +41,20 @@ public:
     STATIC_FACTORY_DECLARATIONS( TelnetTransport )
 
     TelnetTransport();
-    virtual ~TelnetTransport();
+    ~TelnetTransport() override;
 
     TelnetTransport( const TelnetTransport& ) = delete;
     TelnetTransport& operator=( const TelnetTransport& ) = delete;
 
-    bool Start( unsigned short port, bool serverMode );
-    void Stop( void );
-    void Send( SystemAddress systemAddress, const char* data, ... );
-    void CloseConnection( SystemAddress systemAddress );
-    Packet* Receive( void );
-    void DeallocatePacket( Packet* packet );
-    SystemAddress HasNewIncomingConnection( void );
-    SystemAddress HasLostConnection( void );
-    CommandParserInterface* GetCommandParser( void );
+    bool Start( unsigned short port, bool serverMode ) override;
+    void Stop( void ) override;
+    void Send( SystemAddress systemAddress, const char* data, ... ) override;
+    void CloseConnection( SystemAddress systemAddress ) override;
+    Packet* Receive( void ) override;
+    void DeallocatePacket( Packet* packet ) override;
+    SystemAddress HasNewIncomingConnection( void ) override;
+    SystemAddress HasLostConnection( void ) override;
+    CommandParserInterface* GetCommandParser( void ) override;
     void SetSendSuffix( const char* suffix );
     void SetSendPrefix( const char* prefix );
 

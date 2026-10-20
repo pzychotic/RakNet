@@ -127,7 +127,7 @@ public:
     static constexpr unsigned int MAX_OUTSTANDING_REQUESTS = 64;
 
     UDPProxyClient();
-    ~UDPProxyClient();
+    ~UDPProxyClient() override;
 
     UDPProxyClient( const UDPProxyClient& ) = delete;
     UDPProxyClient& operator=( const UDPProxyClient& ) = delete;
@@ -195,10 +195,10 @@ public:
     uint64_t GetPingServerGroupsReplaced( void ) const;
 
     /// \internal
-    virtual void Update( void );
-    virtual PluginReceiveResult OnReceive( Packet* packet );
-    virtual void OnRakPeerShutdown( void );
-    virtual void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason );
+    void Update( void ) override;
+    PluginReceiveResult OnReceive( Packet* packet ) override;
+    void OnRakPeerShutdown( void ) override;
+    void OnClosedConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, PI2_LostConnectionReason lostConnectionReason ) override;
 
     struct ServerWithPing
     {
