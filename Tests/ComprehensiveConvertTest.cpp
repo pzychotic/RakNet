@@ -174,10 +174,6 @@ constexpr int kMinSendBytes = 3;
 constexpr int kSendBytesSpread = 8000;
 constexpr int kMaxPayloadBytes = kMinSendBytes + kSendBytesSpread - 1;
 
-// StatisticsToString at verbosity 0 writes three lines; this is an order of
-// magnitude more than it needs.
-constexpr int kStatisticsBufferBytes = 512;
-
 // Connection ends: one connection contributes two, one to each peer holding it.
 //
 // The setup draws its targets from the seed, which describes six connections -
@@ -227,7 +223,6 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
     std::vector<RakNetGUID> guidList;
 
     std::vector<char> payload( kMaxPayloadBytes, 0 );
-    char statisticsBuffer[kStatisticsBufferBytes];
 
     auto connectIfIdle = [&]( int from, int to ) {
         const SystemAddress target( "127.0.0.1", static_cast<unsigned short>( kBasePort + to ) );
@@ -451,7 +446,7 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
             // under churn at all.
             if( statistics != 0 )
             {
-                StatisticsToString( statistics, statisticsBuffer, 0 );
+                StatisticsToString( *statistics, 0 );
             }
         }
     };

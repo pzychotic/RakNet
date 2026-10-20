@@ -609,7 +609,7 @@ public:
     // --------------------------------------------------------------------------------------------Statistical Functions - Functions dealing with API performance--------------------------------------------------------------------------------------------
 
     /// Returns a structure containing a large set of network statistics for the specified system.
-    /// You can map this data to a string using the C style StatisticsToString() function
+    /// You can map this data to a string using StatisticsToString( const RakNetStatistics&, int ).
     /// \param[in] systemAddress: Which connected system to get statistics for
     /// \param[in] rns If you supply this structure, it will be written to it.  Otherwise it will use a static struct, which is not threadsafe
     /// \return 0 on can't find the specified system.  A pointer to a set of data otherwise.

@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <string>
 
 namespace RakNet {
 
@@ -140,14 +141,13 @@ struct RAK_DLL_EXPORT RakNetStatistics
     }
 };
 
-/// Verbosity level currently supports 0 (low), 1 (medium), 2 (high)
+/// Formats \a s as a report of one labelled line per statistic.
 /// \param[in] s The Statistical information to format out
-/// \param[in] buffer The buffer containing a formated report
 /// \param[in] verbosityLevel
 /// 0 low
 /// 1 medium
-/// 2 high
-/// 3 debugging congestion control
-void RAK_DLL_EXPORT StatisticsToString( RakNetStatistics* s, char* buffer, int verbosityLevel );
+/// 2 or more high
+/// \return The report.
+RAK_DLL_EXPORT std::string StatisticsToString( const RakNetStatistics& s, int verbosityLevel );
 
 } // namespace RakNet

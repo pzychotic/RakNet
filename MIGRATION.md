@@ -91,6 +91,7 @@ These change the API that ordinary RakNet code calls. Every one but break 5 is s
 | 4 | `BitStream` rejects raw character buffers | Source only |
 | 5 | `ID_RPC_REMOTE_ERROR`'s payload is length-prefixed | **Wire-visible** |
 | 6 | `Connect` and `ConnectWithSocket` lost their `PublicKey*` | Source only |
+| 7 | `StatisticsToString` returns a `std::string` | Source only |
 
 ### 1. Everything moved into `namespace RakNet`
 
@@ -359,6 +360,46 @@ through a `RakPeer` too.
 The same overloads catch a new-order call that passes an `int` literal in that slot, such
 as `Connect( host, port, 0, 0, 0, 12, 500 )`. Write that argument unsigned (`0u`), or
 leave it out if it is the default.
+
+### 7. `StatisticsToString` returns a `std::string`
+
+**Source break, not a wire break.** The report's text is byte-for-byte what stock wrote.
+
+#### Before (stock 4.081)
+
+```cpp
+char buffer[2048];
+StatisticsToString( peer->GetStatistics( address ), buffer, 2 );
+```
+
+The function wrote into `buffer` without knowing its size. How large the buffer had to be
+was stated nowhere, so the only way to size it was to read the implementation. A null
+statistics pointer wrote `"stats is a NULL pointer in statsToString\n"` in place of a
+report.
+
+#### After
+
+```cpp
+RakNetStatistics* statistics = peer->GetStatistics( address );
+if( statistics != nullptr )
+{
+    const std::string report = StatisticsToString( *statistics, 2 );
+}
+```
+
+The function takes a `const RakNetStatistics&` and returns the whole report. The `char*`
+form is gone, with no overload left to keep old calls compiling.
+
+#### What to do
+
+Drop the buffer and take the return value. **Check the result of `GetStatistics` before
+dereferencing it.** It returns null when the system isn't connected, when the Peer is shut
+down, or when the network thread doesn't answer within `BLOCKING_QUERY_TIMEOUT_MS`, and a
+reference can't carry that case the way the old pointer did.
+
+Verbosity 0 is low, 1 is medium, and 2 or more is high. Stock's header also documented a
+level 3 for "debugging congestion control". There never was one: 3 has always printed the
+same report as 2.
 
 ## Also removed
 
