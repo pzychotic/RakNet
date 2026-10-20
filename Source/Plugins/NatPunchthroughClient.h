@@ -211,7 +211,6 @@ public:
 
 protected:
     unsigned short mostRecentExternalPort;
-    void OnFailureNotification( Packet* packet );
     void OnGetMostRecentPort( Packet* packet );
     void OnConnectAtTime( Packet* packet );
     void SendPunchthrough( RakNetGUID destination, const SystemAddress& facilitator );

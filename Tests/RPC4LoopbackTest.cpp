@@ -56,11 +56,11 @@ TEST_CASE( "RPC4 CallLoopback error packet is readable by the RPC4 reader", "[rp
     CHECK( packet->data[0] == ID_RPC_REMOTE_ERROR );
     CHECK( packet->data[1] == RPC_ERROR_FUNCTION_NOT_REGISTERED );
 
-    // Verbatim from CallBlocking's ID_RPC_REMOTE_ERROR branch.
+    // The reads of CallBlocking's ID_RPC_REMOTE_ERROR branch.
     std::string functionName;
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( 2 );
-    bsIn.Read( functionName );
+    REQUIRE( bsIn.Read( functionName ) );
 
     CHECK( functionName == uniqueID );
 

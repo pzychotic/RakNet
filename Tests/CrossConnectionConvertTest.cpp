@@ -117,7 +117,7 @@ TEST_CASE( "Two peers connecting to each other at the same instant both get a co
             TimeMS sendPingTime = 0;
             BitStream bs( packet->data, packet->length, false );
             bs.IgnoreBytes( 1 );
-            bs.Read( sendPingTime );
+            REQUIRE( bs.Read( sendPingTime ) );
 
             // Pull this side forward by the one-way trip so both Connect() calls
             // land together. A half-trip over half the delay means the estimate is

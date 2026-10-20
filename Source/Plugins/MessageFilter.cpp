@@ -363,8 +363,7 @@ PluginReceiveResult MessageFilter::OnReceive( Packet* packet )
             BitStream bsIn( packet->data, packet->length, false );
             bsIn.IgnoreBytes( 2 );
             std::string functionName;
-            bsIn.ReadCompressed( functionName );
-            if( value.filter->allowedRPC4.count( functionName ) == 0 )
+            if( !bsIn.ReadCompressed( functionName ) || value.filter->allowedRPC4.count( functionName ) == 0 )
             {
                 OnInvalidMessage( value.filter, packet, packet->data[0] );
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;

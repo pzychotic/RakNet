@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <tuple>
 #include <utility>
 
 namespace RakNet {
@@ -199,9 +200,11 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             if( !ReadSendParameters( bsIn, priority, reliability, orderingChannel ) )
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
             std::string key;
-            bsIn.ReadCompressed( key );
+            if( !bsIn.ReadCompressed( key ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             BitStream bsData;
-            bsIn.Read( &bsData );
+            // Copies whatever is left, so it cannot fail.
+            std::ignore = bsIn.Read( &bsData );
             auto itStrAndGuid = strToGuidHash.find( key );
             auto itStrAndGuidSender = guidToStrHash.find( packet->guid );
             if( itStrAndGuid != strToGuidHash.end() && itStrAndGuidSender != guidToStrHash.end() )
@@ -222,7 +225,8 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             BitStream bsIn( packet->data, packet->length, false );
             bsIn.IgnoreBytes( sizeof( MessageID ) * 2 );
             std::string key;
-            bsIn.ReadCompressed( key );
+            if( !bsIn.ReadCompressed( key ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             BitStream bsOut;
             bsOut.WriteCasted<MessageID>( ID_RELAY_PLUGIN );
             if( !acceptAddParticipantRequests )
@@ -429,7 +433,8 @@ void RelayPlugin::OnGroupMessageFromClient( Packet* packet )
     if( !ReadSendParameters( bsIn, priority, reliability, orderingChannel ) )
         return;
     BitStream bsData;
-    bsIn.Read( &bsData );
+    // Copies whatever is left, so it cannot fail.
+    std::ignore = bsIn.Read( &bsData );
 
     if( auto it = guidToStrHash.find( packet->guid ); it != guidToStrHash.end() )
     {
@@ -442,7 +447,8 @@ void RelayPlugin::OnJoinGroupRequestFromClient( Packet* packet )
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( sizeof( MessageID ) * 2 );
     std::string groupName;
-    bsIn.ReadCompressed( groupName );
+    if( !bsIn.ReadCompressed( groupName ) )
+        return;
     RelayPlugin::RP_Group* groupJoined = 0;
     if( groupName.size() > maxNameLength )
         CountNameRefused( groupName.size() );

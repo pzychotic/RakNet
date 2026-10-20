@@ -124,9 +124,9 @@ TEST_CASE( "Multi-byte values written after a partial byte keep network order", 
 
     BitStream reader( bs.GetData(), bs.GetNumberOfBytesUsed(), false );
     bool pad = false;
-    reader.Read( pad );
-    reader.Read( pad );
-    reader.Read( pad );
+    REQUIRE( reader.Read( pad ) );
+    REQUIRE( reader.Read( pad ) );
+    REQUIRE( reader.Read( pad ) );
     uint32_t read = 0;
     REQUIRE( reader.Read( read ) );
     CHECK( read == 0x12345678 );

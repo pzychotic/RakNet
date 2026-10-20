@@ -277,7 +277,8 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( 1 );
     bool isRequest = false;
-    bsIn.Read( isRequest );
+    if( !bsIn.Read( isRequest ) )
+        return;
     if( isRequest )
     {
         if( it != natDetectionAttempts.end() )
@@ -293,10 +294,11 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
         }
 
         NATDetectionAttempt nda;
+        if( !bsIn.Read( nda.c2Port ) )
+            return;
         nda.detectionState = STATE_NONE;
         nda.systemAddress = packet->systemAddress;
         nda.guid = packet->guid;
-        bsIn.Read( nda.c2Port );
         nda.nextStateTime = 0;
         nda.timeBetweenAttempts = rakPeerInterface->GetLastPing( nda.systemAddress ) * 3 + 50;
         natDetectionAttempts.emplace_back( nda );

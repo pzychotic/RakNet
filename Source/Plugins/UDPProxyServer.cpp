@@ -17,6 +17,8 @@
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 
+#include <tuple>
+
 namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS( UDPProxyServer, UDPProxyServer );
@@ -80,7 +82,8 @@ PluginReceiveResult UDPProxyServer::OnReceive( Packet* packet )
                 BitStream incomingBs( packet->data, packet->length, false );
                 incomingBs.IgnoreBytes( 2 );
                 std::string password;
-                incomingBs.Read( password );
+                // The message ID is the result. The echoed password is only passed on, and stays empty if it is missing.
+                std::ignore = incomingBs.Read( password );
                 switch( packet->data[1] )
                 {
                 case ID_UDP_PROXY_NO_PASSWORD_SET_FROM_COORDINATOR_TO_SERVER:
@@ -142,10 +145,9 @@ void UDPProxyServer::OnForwardingRequestFromCoordinatorToServer( Packet* packet 
     SystemAddress sourceAddress, targetAddress;
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( 2 );
-    incomingBs.Read( sourceAddress );
-    incomingBs.Read( targetAddress );
     RakNet::TimeMS timeoutOnNoDataMS;
-    incomingBs.Read( timeoutOnNoDataMS );
+    if( !incomingBs.Read( sourceAddress ) || !incomingBs.Read( targetAddress ) || !incomingBs.Read( timeoutOnNoDataMS ) )
+        return;
     RakAssert( timeoutOnNoDataMS > 0 && timeoutOnNoDataMS <= UDP_FORWARDER_MAXIMUM_TIMEOUT );
 
     unsigned short forwardingPort = 0;

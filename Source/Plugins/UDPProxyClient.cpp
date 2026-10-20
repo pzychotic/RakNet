@@ -209,7 +209,9 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
                     BitStream bsIn( packet->data, packet->length, false );
                     bsIn.IgnoreBytes( sizeof( MessageID ) );
                     RakNet::TimeMS sentTime;
-                    bsIn.Read( sentTime );
+                    // Left unpinged, so Update gives up on it after the timeout.
+                    if( !bsIn.Read( sentTime ) )
+                        return RR_STOP_PROCESSING_AND_DEALLOCATE;
                     RakNet::TimeMS curTime = RakNet::GetTimeMS();
                     int ping =  curTime > sentTime ? (int)(curTime - sentTime) : 0;
                     rServer.ping = (unsigned short)ping;
@@ -247,6 +249,13 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
             incomingBs.IgnoreBytes( sizeof( MessageID ) * 2 );
             if( !incomingBs.Read( senderAddress ) || !incomingBs.Read( targetAddress ) || !incomingBs.Read( targetGuid ) )
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
+            unsigned short forwardingPort = 0;
+            std::string serverIP;
+            const bool namesServer = packet->data[1] == ID_UDP_PROXY_FORWARDING_NOTIFICATION ||
+                                     packet->data[1] == ID_UDP_PROXY_FORWARDING_SUCCEEDED ||
+                                     packet->data[1] == ID_UDP_PROXY_IN_PROGRESS;
+            if( namesServer && ( !incomingBs.Read( serverIP ) || !incomingBs.Read( forwardingPort ) ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
 
             if( packet->data[1] == ID_UDP_PROXY_FORWARDING_NOTIFICATION )
             {
@@ -269,10 +278,6 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
             case ID_UDP_PROXY_FORWARDING_NOTIFICATION:
             case ID_UDP_PROXY_FORWARDING_SUCCEEDED:
             case ID_UDP_PROXY_IN_PROGRESS: {
-                unsigned short forwardingPort;
-                std::string serverIP;
-                incomingBs.Read( serverIP );
-                incomingBs.Read( forwardingPort );
                 if( packet->data[1] == ID_UDP_PROXY_FORWARDING_SUCCEEDED )
                 {
                     if( resultHandler )

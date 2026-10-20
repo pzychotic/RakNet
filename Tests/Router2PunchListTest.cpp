@@ -102,22 +102,27 @@ public:
         (void)remoteSystemAddress;
         const unsigned int length = (unsigned int)BitsToBytes( bitsUsed );
         BitStream bs( (unsigned char*)data, length, false );
+        // Recorded rather than REQUIREd: this runs inside RakPeer, which a throw must not cross.
         MessageID id = 0;
-        bs.Read( id );
+        if( !bs.Read( id ) )
+            return;
         if( id == ID_ROUTER_2_INTERNAL && length > 1 && (unsigned char)data[1] == kReplyForwarding )
         {
             bs.IgnoreBytes( 1 );
             RakNetGUID endpointGuid;
-            bs.Read( endpointGuid );
-            Record( "no route to " + std::to_string( endpointGuid.g ) );
+            if( bs.Read( endpointGuid ) )
+                Record( "no route to " + std::to_string( endpointGuid.g ) );
+            else
+                Record( "short no-route" );
         }
         else if( id == ID_ROUTER_2_REROUTED )
         {
             RakNetGUID sourceGuid;
             unsigned short forwardingPort = 0;
-            bs.Read( sourceGuid );
-            bs.Read( forwardingPort );
-            Record( "rerouted through " + std::to_string( forwardingPort ) );
+            if( bs.Read( sourceGuid ) && bs.Read( forwardingPort ) )
+                Record( "rerouted through " + std::to_string( forwardingPort ) );
+            else
+                Record( "short reroute" );
         }
     }
 

@@ -43,8 +43,10 @@
 #include <stdlib.h> // malloc
 #include <algorithm>
 #include <chrono>
+#include <iterator>
 #include <numeric>
 #include <thread>
+#include <tuple>
 
 namespace RakNet {
 
@@ -2544,6 +2546,30 @@ static bool ReadConnectionRequestHeader( BitStream& bs, RakNetGUID& guid, RakNet
     return true;
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// ID_CONNECTION_REQUEST_ACCEPTED and ID_NEW_INCOMING_CONNECTION both end with the sender's
+// internal addresses and a ping and pong time. As in ReadConnectionRequestHeader, the
+// outputs are written only once every field has arrived, and false means none were: the
+// pong time is echoed back as the other side's ping time, and a ping time off the stack
+// would poison that connection's ping table and clock differential.
+static bool ReadInternalIdsAndPingTimes( BitStream& bs, SystemAddress ( &internalIds )[MAXIMUM_NUMBER_OF_INTERNAL_IDS], RakNet::Time& sendPingTime, RakNet::Time& sendPongTime )
+{
+    SystemAddress readIds[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
+    for( SystemAddress& id : readIds )
+    {
+        if( bs.Read( id ) == false )
+            return false;
+    }
+    RakNet::Time readPingTime = 0;
+    RakNet::Time readPongTime = 0;
+    if( bs.Read( readPingTime ) == false || bs.Read( readPongTime ) == false )
+        return false;
+
+    std::copy( std::begin( readIds ), std::end( readIds ), internalIds );
+    sendPingTime = readPingTime;
+    sendPongTime = readPongTime;
+    return true;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // False means only that the header would not parse, and leaves what to do about that to
 // the caller - the two call sites are in different states and answer it differently.
 // Everything that depends on the contents of a header that did parse - a wrong password -
@@ -2738,7 +2764,8 @@ void RakPeer::ShiftIncomingTimestamp( unsigned char* data, const SystemAddress& 
 
     BitStream timeBS( data, sizeof( RakNet::Time ), false );
     RakNet::Time encodedTimestamp;
-    timeBS.Read( encodedTimestamp );
+    // The stream is exactly one RakNet::Time long.
+    std::ignore = timeBS.Read( encodedTimestamp );
 
     encodedTimestamp = encodedTimestamp - GetBestClockDifferential( systemAddress );
     timeBS.SetWriteOffset( 0 );
@@ -3724,10 +3751,12 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                 BitStream inBitStream( (unsigned char*)data, length, false );
                 inBitStream.IgnoreBits( 8 );
                 RakNet::Time sendPingTime;
-                inBitStream.Read( sendPingTime );
+                // The length check above covers the time.
+                std::ignore = inBitStream.Read( sendPingTime );
                 inBitStream.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
+                // A ping without a guid reports UNASSIGNED_RAKNET_GUID.
                 RakNetGUID remoteGuid = UNASSIGNED_RAKNET_GUID;
-                inBitStream.Read( remoteGuid );
+                std::ignore = inBitStream.Read( remoteGuid );
 
                 BitStream outBitStream;
                 outBitStream.Write( (MessageID)ID_UNCONNECTED_PONG ); // Should be named ID_UNCONNECTED_PONG eventually
@@ -3774,8 +3803,9 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             BitStream bsIn( (unsigned char*)data, length, false );
             bsIn.IgnoreBytes( sizeof( unsigned char ) );
             RakNet::Time ping;
-            bsIn.Read( ping );
-            bsIn.Read( packet->guid );
+            // The length check above covers the time and the guid.
+            std::ignore = bsIn.Read( ping );
+            std::ignore = bsIn.Read( packet->guid );
 
             BitStream bsOut( (unsigned char*)packet->data, packet->length, false );
             bsOut.ResetWritePointer();
@@ -3807,7 +3837,8 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
 
             BitStream bs2( (unsigned char*)data, length, false );
             bs2.IgnoreBytes( sizeof( MessageID ) );
-            bs2.Read( packet->guid );
+            // The length check above covers the guid.
+            std::ignore = bs2.Read( packet->guid );
 
             if( data[sizeof( OFFLINE_MESSAGE_DATA_ID ) + sizeof( MessageID ) + RakNetGUID::size()] == ID_ADVERTISE_SYSTEM )
             {
@@ -3838,15 +3869,16 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bsIn.IgnoreBytes( sizeof( MessageID ) );
             bsIn.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
             RakNetGUID serverGuid;
-            bsIn.Read( serverGuid );
             unsigned char serverHasSecurity;
             uint32_t cookie;
             (void)cookie;
-            bsIn.Read( serverHasSecurity );
-            if( serverHasSecurity )
-            {
-                bsIn.Read( cookie );
-            }
+            if( !bsIn.Read( serverGuid ) || !bsIn.Read( serverHasSecurity ) )
+                return true;
+            if( serverHasSecurity && !bsIn.Read( cookie ) )
+                return true;
+            uint16_t mtu;
+            if( !bsIn.Read( mtu ) )
+                return true;
 
             BitStream bsOut;
             bsOut.Write( (MessageID)ID_OPEN_CONNECTION_REQUEST_2 );
@@ -3864,9 +3896,6 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                         // Message does not contain a challenge
                         bsOut.Write( (unsigned char)0 );
                     }
-
-                    uint16_t mtu;
-                    bsIn.Read( mtu );
 
                     // Binding address
                     bsOut.Write( rcs->systemAddress );
@@ -3902,17 +3931,12 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bs.IgnoreBytes( sizeof( MessageID ) );
             bs.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
             RakNetGUID guid;
-            bs.Read( guid );
             SystemAddress bindingAddress;
-            bool b = bs.Read( bindingAddress );
-            RakAssert( b );
             uint16_t mtu;
-            b = bs.Read( mtu );
-            RakAssert( b );
             // Read, but this Peer never asks for security, so it never acts on it.
             bool doSecurity = false;
-            b = bs.Read( doSecurity );
-            RakAssert( b );
+            if( !bs.Read( guid ) || !bs.Read( bindingAddress ) || !bs.Read( mtu ) || !bs.Read( doSecurity ) )
+                return true;
 
             std::unique_lock<std::mutex> queueLock( rakPeer->requestedConnectionQueueMutex );
             for( const std::unique_ptr<RakPeer::RequestedConnectionStruct>& queued : rakPeer->requestedConnectionQueue )
@@ -4015,7 +4039,8 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
                 bs.IgnoreBytes( sizeof( unsigned char ) );
 
             RakNetGUID guid;
-            bs.Read( guid );
+            if( !bs.Read( guid ) )
+                return true;
 
             bool connectionAttemptCancelled = false;
             rakPeer->requestedConnectionQueueMutex.lock();
@@ -4116,10 +4141,9 @@ bool ProcessOfflineNetworkPacket( SystemAddress systemAddress, const char* data,
             bs.IgnoreBytes( sizeof( MessageID ) );
             bs.IgnoreBytes( sizeof( OFFLINE_MESSAGE_DATA_ID ) );
 
-            bs.Read( bindingAddress );
             uint16_t mtu;
-            bs.Read( mtu );
-            bs.Read( guid );
+            if( !bs.Read( bindingAddress ) || !bs.Read( mtu ) || !bs.Read( guid ) )
+                return true;
 
             // A record from this address that is already closing never blocks a new
             // attempt: it is closed here as the update cycle would close it, so a System
@@ -4761,7 +4785,16 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                 }
                 else if( (unsigned char)data[0] == ID_NEW_INCOMING_CONNECTION && byteSize > sizeof( unsigned char ) + sizeof( unsigned int ) + sizeof( unsigned short ) + sizeof( RakNet::Time ) * 2 )
                 {
-                    if( remoteSystem->connectMode == RemoteSystemStruct::HANDLING_CONNECTION_REQUEST )
+                    BitStream inBitStream( (unsigned char*)data, byteSize, false );
+                    SystemAddress bsSystemAddress;
+                    SystemAddress theirInternalIds[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
+                    RakNet::Time sendPingTime = 0;
+                    RakNet::Time sendPongTime = 0;
+                    inBitStream.IgnoreBits( 8 );
+                    const bool complete = inBitStream.Read( bsSystemAddress ) &&
+                                          ReadInternalIdsAndPingTimes( inBitStream, theirInternalIds, sendPingTime, sendPongTime );
+
+                    if( remoteSystem->connectMode == RemoteSystemStruct::HANDLING_CONNECTION_REQUEST && complete )
                     {
                         remoteSystem->connectMode = RemoteSystemStruct::CONNECTED;
                         PingInternal( systemAddress, true, UNRELIABLE );
@@ -4769,17 +4802,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                         // Update again immediately after this tick so the ping goes out right away
                         quitAndDataEvents.SetEvent();
 
-                        BitStream inBitStream( (unsigned char*)data, byteSize, false );
-                        SystemAddress bsSystemAddress;
-
-                        inBitStream.IgnoreBits( 8 );
-                        inBitStream.Read( bsSystemAddress );
-                        for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-                            inBitStream.Read( remoteSystem->theirInternalSystemAddress[i] );
-
-                        RakNet::Time sendPingTime, sendPongTime;
-                        inBitStream.Read( sendPingTime );
-                        inBitStream.Read( sendPongTime );
+                        std::copy( std::begin( theirInternalIds ), std::end( theirInternalIds ), remoteSystem->theirInternalSystemAddress );
                         OnConnectedPong( sendPingTime, sendPongTime, remoteSystem );
 
                         // Overwrite the data in the packet
@@ -4823,7 +4846,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                     else
                     {
                         // A repeat on an open connection is dropped, not delivered: the connection
-                        // opened once.
+                        // opened once. A short one is dropped too, and the request times out.
                         rakFree_Ex( data, _FILE_AND_LINE_ );
                     }
                 }
@@ -4837,8 +4860,9 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                     //PingStruct ps;
                     //ps.Deserialize(psBS);
                     inBitStream.IgnoreBits( 8 );
-                    inBitStream.Read( sendPingTime );
-                    inBitStream.Read( sendPongTime );
+                    // The length check above covers both times.
+                    std::ignore = inBitStream.Read( sendPingTime );
+                    std::ignore = inBitStream.Read( sendPongTime );
 
                     OnConnectedPong( sendPingTime, sendPongTime, remoteSystem );
 
@@ -4849,7 +4873,8 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                     BitStream inBitStream( (unsigned char*)data, byteSize, false );
                     inBitStream.IgnoreBits( 8 );
                     RakNet::Time sendPingTime;
-                    inBitStream.Read( sendPingTime );
+                    // The length check above covers the time.
+                    std::ignore = inBitStream.Read( sendPingTime );
 
                     BitStream outBitStream;
                     outBitStream.Write( (MessageID)ID_CONNECTED_PONG );
@@ -4915,23 +4940,22 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                         else
                             alreadyConnected = false;
 
-                        if( allowConnection )
+                        SystemAddress externalID;
+                        SystemIndex systemIndex;
+                        //                              SystemAddress internalID;
+                        SystemAddress theirInternalIds[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
+                        RakNet::Time sendPingTime = 0;
+                        RakNet::Time sendPongTime = 0;
+
+                        BitStream inBitStream( (unsigned char*)data, byteSize, false );
+                        inBitStream.IgnoreBits( 8 );
+                        //  inBitStream.Read(remotePort);
+                        const bool complete = inBitStream.Read( externalID ) && inBitStream.Read( systemIndex ) &&
+                                              ReadInternalIdsAndPingTimes( inBitStream, theirInternalIds, sendPingTime, sendPongTime );
+
+                        if( allowConnection && complete )
                         {
-                            SystemAddress externalID;
-                            SystemIndex systemIndex;
-                            //                              SystemAddress internalID;
-
-                            BitStream inBitStream( (unsigned char*)data, byteSize, false );
-                            inBitStream.IgnoreBits( 8 );
-                            //  inBitStream.Read(remotePort);
-                            inBitStream.Read( externalID );
-                            inBitStream.Read( systemIndex );
-                            for( unsigned int i = 0; i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
-                                inBitStream.Read( remoteSystem->theirInternalSystemAddress[i] );
-
-                            RakNet::Time sendPingTime, sendPongTime;
-                            inBitStream.Read( sendPingTime );
-                            inBitStream.Read( sendPongTime );
+                            std::copy( std::begin( theirInternalIds ), std::end( theirInternalIds ), remoteSystem->theirInternalSystemAddress );
                             OnConnectedPong( sendPingTime, sendPongTime, remoteSystem );
 
                             // Find a free remote system struct to use
@@ -4987,7 +5011,7 @@ bool RakPeer::RunUpdateCycleBody( BitStream& updateBitStream )
                         }
                         else
                         {
-                            // Ignore, already connected
+                            // Ignore, already connected or short
                             rakFree_Ex( data, _FILE_AND_LINE_ );
                         }
                     }

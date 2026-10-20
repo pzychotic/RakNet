@@ -389,7 +389,8 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
         BitStream bs( packet->data, packet->length, false );
         bs.IgnoreBytes( sizeof( MessageID ) );
         unsigned char boundAddressCount;
-        bs.Read( boundAddressCount );
+        if( !bs.Read( boundAddressCount ) )
+            return RR_STOP_PROCESSING_AND_DEALLOCATE;
         if( boundAddressCount < 2 )
         {
             if( natPunchthroughDebugInterface )
@@ -401,7 +402,8 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
         SystemAddress boundAddresses[MAXIMUM_NUMBER_OF_INTERNAL_IDS];
         for( int i = 0; i < boundAddressCount && i < MAXIMUM_NUMBER_OF_INTERNAL_IDS; i++ )
         {
-            bs.Read( boundAddresses[i] );
+            if( !bs.Read( boundAddresses[i] ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             // ToString writes this one as a name rather than a number, which SendOutOfBand
             // would look up.
             if( boundAddresses[i] == UNASSIGNED_SYSTEM_ADDRESS )
@@ -424,9 +426,9 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
             BitStream bs( packet->data, packet->length, false );
             bs.IgnoreBytes( sizeof( MessageID ) * 2 );
             uint16_t externalPort;
-            bs.Read( externalPort );
             uint16_t externalPort2;
-            bs.Read( externalPort2 );
+            if( !bs.Read( externalPort ) || !bs.Read( externalPort2 ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             portStride = externalPort2 - externalPort;
             mostRecentExternalPort = externalPort2;
             hasPortStride = HAS_PORT_STRIDE;
@@ -444,7 +446,8 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
             BitStream bs( packet->data, packet->length, false );
             bs.IgnoreBytes( 2 );
             uint16_t sessionId;
-            bs.Read( sessionId );
+            if( !bs.Read( sessionId ) )
+                break;
             //          RakAssert(sessionId<100);
             if( sessionId != sp.sessionId )
                 break;
@@ -487,7 +490,8 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
             {
                 // They send back our port
                 unsigned short ourExternalPort;
-                bs.Read( ourExternalPort );
+                if( !bs.Read( ourExternalPort ) )
+                    return RR_STOP_PROCESSING_AND_DEALLOCATE;
                 if( mostRecentExternalPort == 0 )
                 {
                     mostRecentExternalPort = ourExternalPort;
@@ -549,7 +553,8 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
         BitStream incomingBs( packet->data, packet->length, false );
         incomingBs.IgnoreBytes( sizeof( MessageID ) );
         RakNetGUID targetGuid;
-        incomingBs.Read( targetGuid );
+        if( !incomingBs.Read( targetGuid ) )
+            break;
 
         if( natPunchthroughDebugInterface )
         {
@@ -575,14 +580,14 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
         incomingBs.IgnoreBytes( sizeof( MessageID ) );
 
         RakNetGUID targetGuid;
-        incomingBs.Read( targetGuid );
+        if( !incomingBs.Read( targetGuid ) )
+            break;
 
         if( packet->data[0] == ID_NAT_CONNECTION_TO_TARGET_LOST ||
             packet->data[0] == ID_NAT_TARGET_UNRESPONSIVE )
         {
             uint16_t sessionId;
-            incomingBs.Read( sessionId );
-            if( sessionId != sp.sessionId )
+            if( !incomingBs.Read( sessionId ) || sessionId != sp.sessionId )
                 break;
         }
 
@@ -638,17 +643,23 @@ void NatPunchthroughClient::OnConnectAtTime( Packet* packet )
 {
     //  RakAssert(sp.nextActionTime==0);
 
+    // A truncated message leaves sp as it was.
+    SendPing next = sp;
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) );
-    bs.Read( sp.nextActionTime );
+    if( !bs.Read( next.nextActionTime ) )
+        return;
     bs.IgnoreBytes( sizeof( MessageID ) );
-    bs.Read( sp.sessionId );
-    bs.Read( sp.targetAddress );
+    if( !bs.Read( next.sessionId ) || !bs.Read( next.targetAddress ) )
+        return;
     int j;
     //  int k;
     //  k=0;
     for( j = 0; j < MAXIMUM_NUMBER_OF_INTERNAL_IDS; j++ )
-        bs.Read( sp.internalIds[j] );
+    {
+        if( !bs.Read( next.internalIds[j] ) )
+            return;
+    }
 
     // Prevents local testing
     /*
@@ -662,21 +673,22 @@ void NatPunchthroughClient::OnConnectAtTime( Packet* packet )
             sp.internalIds[k++]=id;
     }
     */
-    sp.attemptCount = 0;
-    sp.retryCount = 0;
+    if( !bs.Read( next.targetGuid ) || !bs.Read( next.weAreSender ) )
+        return;
+    next.attemptCount = 0;
+    next.retryCount = 0;
     if( pc.MAXIMUM_NUMBER_OF_INTERNAL_IDS_TO_CHECK > 0 )
     {
-        sp.testMode = SendPing::TESTING_INTERNAL_IPS;
+        next.testMode = SendPing::TESTING_INTERNAL_IPS;
     }
     else
     {
         // TESTING: Try sending to unused ports on the remote system to reserve our own ports while not getting banned
-        sp.testMode = SendPing::TESTING_EXTERNAL_IPS_FACILITATOR_PORT_TO_FACILITATOR_PORT;
-        sp.attemptCount = 0;
-        sp.sentTTL = false;
+        next.testMode = SendPing::TESTING_EXTERNAL_IPS_FACILITATOR_PORT_TO_FACILITATOR_PORT;
+        next.attemptCount = 0;
+        next.sentTTL = false;
     }
-    bs.Read( sp.targetGuid );
-    bs.Read( sp.weAreSender );
+    sp = next;
 }
 void NatPunchthroughClient::SendTTL( const SystemAddress& sa )
 {
@@ -796,19 +808,13 @@ void NatPunchthroughClient::OnClosedConnection( const SystemAddress& systemAddre
         }
     }
 }
-void NatPunchthroughClient::OnFailureNotification( Packet* packet )
-{
-    BitStream incomingBs( packet->data, packet->length, false );
-    incomingBs.IgnoreBytes( sizeof( MessageID ) );
-    RakNetGUID senderGuid;
-    incomingBs.Read( senderGuid );
-}
 void NatPunchthroughClient::OnGetMostRecentPort( Packet* packet )
 {
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( sizeof( MessageID ) );
     uint16_t sessionId;
-    incomingBs.Read( sessionId );
+    if( !incomingBs.Read( sessionId ) )
+        return;
 
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_NAT_GET_MOST_RECENT_PORT );

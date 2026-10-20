@@ -23,6 +23,7 @@
 #include <memory>
 #include <string.h>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 namespace RakNet {
@@ -306,8 +307,7 @@ bool RPC4::CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPrior
                 std::string functionName;
                 BitStream bsIn( packet->data, packet->length, false );
                 bsIn.IgnoreBytes( 2 );
-                bsIn.Read( functionName );
-                if( functionName == uniqueID )
+                if( bsIn.Read( functionName ) && functionName == uniqueID )
                 {
                     // Push back to head in reverse order
                     rakPeerInterface->PushBackPacket( packet, true );
@@ -428,9 +428,9 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
         if( packet->data[1] == ID_RPC4_CALL )
         {
             std::string functionName;
-            bsIn.ReadCompressed( functionName );
             bool isBlocking = false;
-            bsIn.Read( isBlocking );
+            if( !bsIn.ReadCompressed( functionName ) || !bsIn.Read( isBlocking ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             if( isBlocking == false )
             {
                 auto it = registeredNonblockingFunctions.find( functionName );
@@ -478,10 +478,12 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
         else if( packet->data[1] == ID_RPC4_SIGNAL )
         {
             std::string sharedIdentifier;
-            bsIn.ReadCompressed( sharedIdentifier );
+            if( !bsIn.ReadCompressed( sharedIdentifier ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             BitStream serializedParameters;
             bsIn.AlignReadToByteBoundary();
-            bsIn.Read( &serializedParameters );
+            // Copies whatever is left, so it cannot fail.
+            std::ignore = bsIn.Read( &serializedParameters );
             if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
             {
                 InvokeSignal( it->second.get(), &serializedParameters, packet );

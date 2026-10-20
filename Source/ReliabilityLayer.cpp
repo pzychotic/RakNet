@@ -141,41 +141,46 @@ struct DatagramHeaderFormat
             b->Write( datagramNumber );
         }
     }
-    void Deserialize( BitStream* b )
+    /// \return false if the datagram is too short for its header.
+    [[nodiscard]] bool Deserialize( BitStream* b )
     {
         // Not endian safe
         //      b->ReadAlignedBytes((unsigned char*) this, sizeof(DatagramHeaderFormat));
         //      return;
 
-        b->Read( isValid );
-        b->Read( isACK );
+        if( !b->Read( isValid ) || !b->Read( isACK ) )
+            return false;
         if( isACK )
         {
             isNAK = false;
             isPacketPair = false;
-            b->Read( hasBAndAS );
+            if( !b->Read( hasBAndAS ) )
+                return false;
             b->AlignReadToByteBoundary();
             if( hasBAndAS )
             {
-                b->Read( AS );
+                if( !b->Read( AS ) )
+                    return false;
             }
         }
         else
         {
-            b->Read( isNAK );
+            if( !b->Read( isNAK ) )
+                return false;
             if( isNAK )
             {
                 isPacketPair = false;
             }
             else
             {
-                b->Read( isPacketPair );
-                b->Read( isContinuousSend );
-                b->Read( needsBAndAs );
+                if( !b->Read( isPacketPair ) || !b->Read( isContinuousSend ) || !b->Read( needsBAndAs ) )
+                    return false;
                 b->AlignReadToByteBoundary();
-                b->Read( datagramNumber );
+                if( !b->Read( datagramNumber ) )
+                    return false;
             }
         }
+        return true;
     }
 };
 
@@ -493,8 +498,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
     BitStream socketData( (unsigned char*)buffer, length, false ); // Convert the incoming data to a bitstream for easy parsing
 
     DatagramHeaderFormat dhf;
-    dhf.Deserialize( &socketData );
-    if( dhf.isValid == false )
+    if( dhf.Deserialize( &socketData ) == false || dhf.isValid == false )
     {
         for( PluginInterface2* pPlugin : messageHandlerList )
         {
@@ -2251,12 +2255,13 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
 
     // (Incoming data may be all zeros due to padding)
     bitStream->AlignReadToByteBoundary(); // Potentially unaligned
-    bitStream->ReadBits( (unsigned char*)( &( tempChar ) ), 3 );
+    tempChar = 0;
+    readSuccess = bitStream->ReadBits( (unsigned char*)( &( tempChar ) ), 3 );
     internalPacket->reliability = (const PacketReliability)tempChar;
-    readSuccess = bitStream->Read( hasSplitPacket ); // Read 1 bit to indicate if splitPacketCount>0
+    readSuccess = readSuccess && bitStream->Read( hasSplitPacket ); // Read 1 bit to indicate if splitPacketCount>0
     bitStream->AlignReadToByteBoundary();
-    unsigned short s;
-    bitStream->ReadAlignedVar16( (char*)&s );
+    unsigned short s = 0;
+    readSuccess = readSuccess && bitStream->ReadAlignedVar16( (char*)&s );
     internalPacket->dataBitLength = s; // Length of message (2 bytes)
     if( internalPacket->reliability == RELIABLE ||
         internalPacket->reliability == RELIABLE_SEQUENCED ||
@@ -2267,7 +2272,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         //      internalPacket->reliability == RELIABLE_SEQUENCED_WITH_ACK_RECEIPT ||
         //      internalPacket->reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT
     )
-        bitStream->Read( internalPacket->reliableMessageNumber ); // Message sequence number
+        readSuccess = readSuccess && bitStream->Read( internalPacket->reliableMessageNumber ); // Message sequence number
     else
         internalPacket->reliableMessageNumber = (MessageNumberType)(const uint32_t)-1;
     bitStream->AlignReadToByteBoundary(); // Potentially nothing else to Read
@@ -2275,7 +2280,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
     if( internalPacket->reliability == UNRELIABLE_SEQUENCED ||
         internalPacket->reliability == RELIABLE_SEQUENCED )
     {
-        bitStream->Read( internalPacket->sequencingIndex ); // Used for UNRELIABLE_SEQUENCED, RELIABLE_SEQUENCED, RELIABLE_ORDERED.
+        readSuccess = readSuccess && bitStream->Read( internalPacket->sequencingIndex ); // Used for UNRELIABLE_SEQUENCED, RELIABLE_SEQUENCED, RELIABLE_ORDERED.
     }
 
     if( internalPacket->reliability == UNRELIABLE_SEQUENCED ||
@@ -2283,8 +2288,8 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         internalPacket->reliability == RELIABLE_ORDERED ||
         internalPacket->reliability == RELIABLE_ORDERED_WITH_ACK_RECEIPT )
     {
-        bitStream->Read( internalPacket->orderingIndex );                                    // Used for UNRELIABLE_SEQUENCED, RELIABLE_SEQUENCED, RELIABLE_ORDERED. 4 bytes.
-        readSuccess = bitStream->ReadAlignedVar8( (char*)&internalPacket->orderingChannel ); // Used for UNRELIABLE_SEQUENCED, RELIABLE_SEQUENCED, RELIABLE_ORDERED. 5 bits needed, Read one byte
+        readSuccess = readSuccess && bitStream->Read( internalPacket->orderingIndex );                      // Used for UNRELIABLE_SEQUENCED, RELIABLE_SEQUENCED, RELIABLE_ORDERED. 4 bytes.
+        readSuccess = readSuccess && bitStream->ReadAlignedVar8( (char*)&internalPacket->orderingChannel ); // Used for UNRELIABLE_SEQUENCED, RELIABLE_SEQUENCED, RELIABLE_ORDERED. 5 bits needed, Read one byte
     }
     else
         internalPacket->orderingChannel = 0;
@@ -2294,10 +2299,9 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         //      printf("Read before\n");
         //      bitStream->PrintBits();
 
-        bitStream->ReadAlignedVar32( (char*)&internalPacket->splitPacketCount );               // Only needed if splitPacketCount>0. 4 bytes
-        bitStream->ReadAlignedVar16( (char*)&internalPacket->splitPacketId );                  // Only needed if splitPacketCount>0.
-        readSuccess = bitStream->ReadAlignedVar32( (char*)&internalPacket->splitPacketIndex ); // Only needed if splitPacketCount>0. 4 bytes
-        RakAssert( readSuccess );
+        readSuccess = readSuccess && bitStream->ReadAlignedVar32( (char*)&internalPacket->splitPacketCount ); // Only needed if splitPacketCount>0. 4 bytes
+        readSuccess = readSuccess && bitStream->ReadAlignedVar16( (char*)&internalPacket->splitPacketId );    // Only needed if splitPacketCount>0.
+        readSuccess = readSuccess && bitStream->ReadAlignedVar32( (char*)&internalPacket->splitPacketIndex ); // Only needed if splitPacketCount>0. 4 bytes
 
         //      printf("Read after\n");
         //      bitStream->PrintBits();
@@ -2305,6 +2309,13 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
     else
     {
         internalPacket->splitPacketCount = 0;
+    }
+
+    // A header cut short is rejected without an assert, since a System can send one.
+    if( readSuccess == false )
+    {
+        delete internalPacket;
+        return 0;
     }
 
     if( internalPacket->splitPacketCount > MAXIMUM_SPLIT_PACKET_COUNT )
@@ -2318,8 +2329,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( BitStream* 
         return 0;
     }
 
-    if( readSuccess == false ||
-        internalPacket->dataBitLength == 0 ||
+    if( internalPacket->dataBitLength == 0 ||
         internalPacket->reliability >= NUMBER_OF_RELIABILITIES ||
         internalPacket->orderingChannel >= 32 ||
         ( hasSplitPacket && ( internalPacket->splitPacketIndex >= internalPacket->splitPacketCount ) ) )

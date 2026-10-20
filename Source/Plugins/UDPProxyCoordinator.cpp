@@ -178,26 +178,28 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
     // A System may open forwarding only from its own address, so the source is always the requester.
     // The claimed source is still read, since the layout is fixed, and ignored.
     SystemAddress claimedSourceAddress;
-    incomingBs.Read( claimedSourceAddress );
     const SystemAddress sourceAddress = packet->systemAddress;
     SystemAddress targetAddress;
     RakNetGUID targetGuid;
     bool usesAddress = false;
-    incomingBs.Read( usesAddress );
+    if( !incomingBs.Read( claimedSourceAddress ) || !incomingBs.Read( usesAddress ) )
+        return;
     if( usesAddress )
     {
-        incomingBs.Read( targetAddress );
+        if( !incomingBs.Read( targetAddress ) )
+            return;
         targetGuid = rakPeerInterface->GetGuidFromSystemAddress( targetAddress );
     }
     else
     {
-        incomingBs.Read( targetGuid );
+        if( !incomingBs.Read( targetGuid ) )
+            return;
         targetAddress = rakPeerInterface->GetSystemAddressFromGuid( targetGuid );
     }
     RakNet::TimeMS timeoutOnNoDataMS = 0;
-    incomingBs.Read( timeoutOnNoDataMS );
     bool hasServerSelectionBitstream = false;
-    incomingBs.Read( hasServerSelectionBitstream );
+    if( !incomingBs.Read( timeoutOnNoDataMS ) || !incomingBs.Read( hasServerSelectionBitstream ) )
+        return;
     // The selection data is the rest of the Message. Rounded down, since the padding to a whole byte is not the sender's
     const bool serverSelectionTooLong = hasServerSelectionBitstream && incomingBs.GetNumberOfUnreadBits() / 8 > maxServerSelectionBitstreamBytes;
 
@@ -274,7 +276,8 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
     fw->timeoutAfterSuccess = 0;
     fw->timeoutOnNoDataMS = timeoutOnNoDataMS;
     if( hasServerSelectionBitstream )
-        incomingBs.Read( &( fw->serverSelectionBitstream ) );
+        // Copies whatever is left, so it cannot fail.
+        std::ignore = incomingBs.Read( &( fw->serverSelectionBitstream ) );
     fw->sata = sata;
     fw->requestingAddress = packet->systemAddress;
 
@@ -325,7 +328,8 @@ void UDPProxyCoordinator::OnLoginRequestFromServerToCoordinator( Packet* packet 
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( 2 );
     std::string password;
-    incomingBs.Read( password );
+    if( !incomingBs.Read( password ) )
+        return;
     BitStream outgoingBs;
 
     if( remoteLoginPassword.empty() )
@@ -366,8 +370,8 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( 2 );
     SenderAndTargetAddress sata;
-    incomingBs.Read( sata.senderClientAddress );
-    incomingBs.Read( sata.targetClientAddress );
+    if( !incomingBs.Read( sata.senderClientAddress ) || !incomingBs.Read( sata.targetClientAddress ) )
+        return;
     const auto requestIt = forwardingRequestList.find( sata );
     if( requestIt == forwardingRequestList.end() )
     {
@@ -379,7 +383,10 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
     sata.targetClientGuid = fw->sata.targetClientGuid;
 
     std::string serverPublicIp;
-    incomingBs.Read( serverPublicIp );
+    unsigned char c;
+    unsigned short forwardingPort;
+    if( !incomingBs.Read( serverPublicIp ) || !incomingBs.Read( c ) || !incomingBs.Read( forwardingPort ) )
+        return;
 
     if( serverPublicIp.empty() )
     {
@@ -389,12 +396,7 @@ void UDPProxyCoordinator::OnForwardingReplyFromServerToCoordinator( Packet* pack
     }
 
     UDPForwarderResult success;
-    unsigned char c;
-    incomingBs.Read( c );
     success = (UDPForwarderResult)c;
-
-    unsigned short forwardingPort;
-    incomingBs.Read( forwardingPort );
 
     BitStream outgoingBs;
     if( success == UDPFORWARDER_SUCCESS )
@@ -451,8 +453,8 @@ void UDPProxyCoordinator::OnPingServersReplyFromClientToCoordinator( Packet* pac
     unsigned short serversToPingSize;
     SystemAddress serverAddress;
     SenderAndTargetAddress sata;
-    incomingBs.Read( sata.senderClientAddress );
-    incomingBs.Read( sata.targetClientAddress );
+    if( !incomingBs.Read( sata.senderClientAddress ) || !incomingBs.Read( sata.targetClientAddress ) )
+        return;
     const auto requestIt = forwardingRequestList.find( sata );
     if( requestIt == forwardingRequestList.end() )
         return;

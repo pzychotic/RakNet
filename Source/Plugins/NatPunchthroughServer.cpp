@@ -248,7 +248,8 @@ PluginReceiveResult NatPunchthroughServer::OnReceive( Packet* packet )
             BitStream bs( packet->data, packet->length, false );
             bs.IgnoreBytes( sizeof( MessageID ) * 2 );
             uint16_t externalPort;
-            bs.Read( externalPort );
+            if( !bs.Read( externalPort ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
 
             BitStream outgoingBs;
             outgoingBs.Write( (MessageID)ID_NAT_PONG );
@@ -333,7 +334,8 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
     BitStream incomingBs( packet->data, packet->length, false );
     incomingBs.IgnoreBytes( sizeof( MessageID ) );
     RakNetGUID recipientGuid, senderGuid;
-    incomingBs.Read( recipientGuid );
+    if( !incomingBs.Read( recipientGuid ) )
+        return;
     senderGuid = packet->guid;
     const auto senderIt = users.find( senderGuid );
     // A sender that connected before this plugin was attached has no User.
@@ -386,8 +388,8 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
     bsIn.IgnoreBytes( sizeof( MessageID ) );
     uint16_t sessionId;
     unsigned short mostRecentPort;
-    bsIn.Read( sessionId );
-    bsIn.Read( mostRecentPort );
+    if( !bsIn.Read( sessionId ) || !bsIn.Read( mostRecentPort ) )
+        return;
 
     const auto userIt = users.find( packet->guid );
     const bool objectExists = userIt != users.end();

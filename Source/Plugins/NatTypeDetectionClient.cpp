@@ -178,9 +178,9 @@ void NatTypeDetectionClient::OnTestPortRestricted( Packet* packet )
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( sizeof( MessageID ) );
     std::string s3p4StrAddress;
-    bsIn.Read( s3p4StrAddress );
     unsigned short s3p4Port;
-    bsIn.Read( s3p4Port );
+    if( !bsIn.Read( s3p4StrAddress ) || !bsIn.Read( s3p4Port ) )
+        return;
 
     std::vector<RakNetSocket2*> sockets;
     rakPeerInterface->GetSockets( sockets );

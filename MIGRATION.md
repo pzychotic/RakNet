@@ -30,6 +30,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [Calls given a host that doesn't parse send nothing](#calls-given-a-host-that-doesnt-parse-send-nothing)
 - [`TCPInterface::Start` fails when it can't listen](#tcpinterfacestart-fails-when-it-cant-listen)
 - [Numbers in strings are read whole](#numbers-in-strings-are-read-whole)
+- [`BitStream` reads warn when their result is ignored](#bitstream-reads-warn-when-their-result-is-ignored)
 
 ## What did *not* change: the core protocol
 
@@ -1229,3 +1230,25 @@ started a peer with 1 connection. It now starts one with 65537.
 
 **`ConsoleServer` answers "Invalid index." to a parser number that isn't a whole number.**
 Stock read `"1x Command"` as parser 1.
+
+## `BitStream` reads warn when their result is ignored
+
+**Every `BitStream` member that reads and returns `bool` is `[[nodiscard]]`.** That covers
+`Read`, `ReadCompressed`, `ReadDelta`, `ReadCompressedDelta`, `ReadBits`, `ReadBit`,
+`ReadAligned*`, `ReadCasted`, `ReadBitsFromIntegerRange`, `ReadFloat16`, the vector, quaternion
+and matrix reads, and every `Serialize*`, including the shipped specializations for `bool`,
+`SystemAddress`, `uint24_t`, `RakNetGUID`, `std::string`, `float` and `double`. A short or
+malformed stream is reported only by that `false`, and an ignored one leaves the output
+unwritten. Code that drops the result now gets a warning (`-Wunused-result` on GCC and Clang,
+C4834 on MSVC), and a build that makes warnings errors stops. What `BitStream` reads is
+unchanged.
+
+Check the result and give up on the message when it is false. Where the default left in the
+output really is the right answer, write `std::ignore = bs.Read( x );` with a comment saying
+why. `Read( BitStream* )` and `Read( BitStream& )` copy whatever is left and never fail.
+
+**The plugins and `RakPeer` drop a message that is too short for what they read.** Stock
+went on with whatever the unread fields held: an uninitialized hash in
+`TwoWayAuthentication`, a port or session ID in the NAT and proxy plugins, the ping times
+`RakPeer` echoes in the connection handshake. A conforming System never sends one.
+`NatPunchthroughClient::OnFailureNotification`, a protected member nothing called, is gone.

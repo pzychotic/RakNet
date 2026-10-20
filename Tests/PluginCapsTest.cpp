@@ -262,10 +262,10 @@ std::vector<unsigned char> ForwardedTags( RakPeerInterface* server, RakPeerInter
                 BitStream in( packet->data, packet->length, false );
                 in.IgnoreBytes( sizeof( MessageID ) * 2 );
                 std::string sender;
-                in.ReadCompressed( sender );
+                REQUIRE( in.ReadCompressed( sender ) );
                 in.AlignReadToByteBoundary();
                 unsigned char tag = 0;
-                in.Read( tag );
+                REQUIRE( in.Read( tag ) );
                 tags.push_back( tag );
                 if( tag == until && !seen )
                 {

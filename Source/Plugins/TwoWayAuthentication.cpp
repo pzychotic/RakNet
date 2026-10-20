@@ -313,8 +313,8 @@ void TwoWayAuthentication::OnNonceReply( Packet* packet )
 
     char thierNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH];
     unsigned short requestId;
-    bsIn.Read( requestId );
-    bsIn.ReadAlignedBytes( (unsigned char*)thierNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
+    if( !bsIn.Read( requestId ) || !bsIn.ReadAlignedBytes( (unsigned char*)thierNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH ) )
+        return;
 
     // Lookup one of the negotiations for this guid/system address
     AddressOrGUID aog( packet );
@@ -353,10 +353,10 @@ PluginReceiveResult TwoWayAuthentication::OnHashedNonceAndPassword( Packet* pack
 
     char remoteHashedNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
     unsigned short requestId;
-    bsIn.Read( requestId );
     std::string passwordIdentifier;
-    bsIn.Read( passwordIdentifier );
-    bsIn.ReadAlignedBytes( (unsigned char*)remoteHashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH );
+    if( !bsIn.Read( requestId ) || !bsIn.Read( passwordIdentifier ) ||
+        !bsIn.ReadAlignedBytes( (unsigned char*)remoteHashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH ) )
+        return RR_STOP_PROCESSING_AND_DEALLOCATE;
 
     // Look up used nonce from requestId
     char usedNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH];
@@ -402,11 +402,12 @@ void TwoWayAuthentication::OnPasswordResult( Packet* packet )
     BitStream bsIn( packet->data, packet->length, false );
     bsIn.IgnoreBytes( sizeof( MessageID ) * 1 );
     char usedNonce[TWO_WAY_AUTHENTICATION_NONCE_LENGTH];
-    bsIn.ReadAlignedBytes( (unsigned char*)usedNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH );
     char hashedNonceAndPw[HASHED_NONCE_AND_PW_LENGTH];
-    bsIn.ReadAlignedBytes( (unsigned char*)hashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH );
     std::string passwordIdentifier;
-    bsIn.Read( passwordIdentifier );
+    if( !bsIn.ReadAlignedBytes( (unsigned char*)usedNonce, TWO_WAY_AUTHENTICATION_NONCE_LENGTH ) ||
+        !bsIn.ReadAlignedBytes( (unsigned char*)hashedNonceAndPw, HASHED_NONCE_AND_PW_LENGTH ) ||
+        !bsIn.Read( passwordIdentifier ) )
+        return;
 
     if( const auto it = passwords.find( passwordIdentifier ); it != passwords.end() )
     {

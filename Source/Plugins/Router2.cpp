@@ -270,7 +270,8 @@ PluginReceiveResult Router2::OnReceive( Packet* packet )
             bs.IgnoreBytes( 2 );
             sa = packet->systemAddress;
             unsigned short port;
-            bs.Read( port );
+            if( !bs.Read( port ) )
+                return RR_STOP_PROCESSING_AND_DEALLOCATE;
             sa.SetPortHostOrder( port );
             RakAssert( sa.GetPort() != 0 );
             SendOOBFromRakNetPort( ID_ROUTER_2_MINI_PUNCH_REPLY, &bsOut, sa );
@@ -684,8 +685,8 @@ void Router2::OnQueryForwarding( Packet* packet )
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) + sizeof( unsigned char ) );
     RakNetGUID endpointGuid;
-    // Read endpointGuid
-    bs.Read( endpointGuid );
+    if( !bs.Read( endpointGuid ) )
+        return;
 
     int pingToEndpoint = ReturnFailureOnCannotForward( packet->guid, endpointGuid );
     if( pingToEndpoint == -1 )
@@ -716,10 +717,10 @@ void Router2::OnQueryForwardingReply( Packet* packet )
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) + sizeof( unsigned char ) );
     RakNetGUID endpointGuid;
-    bs.Read( endpointGuid );
     // Find endpointGuid among stored requests
     bool canForward = false;
-    bs.Read( canForward );
+    if( !bs.Read( endpointGuid ) || !bs.Read( canForward ) )
+        return;
 
 
     // Whether the pending request asked the sender
@@ -742,12 +743,11 @@ void Router2::OnQueryForwardingReply( Packet* packet )
                                                     .c_str() );
             }
 
-            if( canForward )
+            unsigned short pingToEndpoint;
+            unsigned short usedEntries;
+            // A reply too short to carry the ping and entry count counts as a refusal.
+            if( canForward && bs.Read( pingToEndpoint ) && bs.Read( usedEntries ) )
             {
-                unsigned short pingToEndpoint;
-                unsigned short usedEntries;
-                bs.Read( pingToEndpoint );
-                bs.Read( usedEntries );
                 connectionRequest->connectionRequestSystems[connectionRequestGuidIndex].usedForwardingEntries = usedEntries;
                 connectionRequest->connectionRequestSystems[connectionRequestGuidIndex].pingToEndpoint = rakPeerInterface->GetAveragePing( packet->guid ) + pingToEndpoint;
             }
@@ -867,7 +867,8 @@ void Router2::OnRequestForwarding( Packet* packet )
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) + sizeof( unsigned char ) );
     RakNetGUID endpointGuid;
-    bs.Read( endpointGuid );
+    if( !bs.Read( endpointGuid ) )
+        return;
 
     // One punch per forwarder entry, which serves both directions: the running punch answers a repeat, and a request the other way round is refused
     for( const MiniPunchRequest& mpr : miniPunchesInProgress )
@@ -1016,7 +1017,8 @@ void Router2::OnMiniPunchReply( Packet* packet )
     BitStream bs( packet->data, packet->length, false );
     bs.IgnoreBytes( sizeof( MessageID ) + sizeof( unsigned char ) );
     RakNetGUID routerGuid;
-    bs.Read( routerGuid );
+    if( !bs.Read( routerGuid ) )
+        return;
     SendOOBFromRakNetPort( ID_ROUTER_2_MINI_PUNCH_REPLY_BOUNCE, 0, rakPeerInterface->GetSystemAddressFromGuid( routerGuid ) );
 
     if( debugInterface )
