@@ -19,6 +19,7 @@
 #include <string.h>
 #include <algorithm>
 #include <numeric>
+#include <tuple>
 
 namespace RakNet {
 
@@ -90,7 +91,8 @@ void PacketizedTCP::Send( const char* data, unsigned length, const SystemAddress
     dataArray[1] = data;
     lengthsArray[0] = sizeof( dataLength );
     lengthsArray[1] = length;
-    TCPInterface::SendList( dataArray, lengthsArray, 2, systemAddress, broadcast );
+    // Send has no result. A caller that needs one calls SendList.
+    std::ignore = TCPInterface::SendList( dataArray, lengthsArray, 2, systemAddress, broadcast );
 }
 bool PacketizedTCP::SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast )
 {

@@ -48,6 +48,7 @@ typedef int socklen_t;
 #include <chrono>
 #include <numeric>
 #include <thread>
+#include <tuple>
 
 namespace RakNet {
 
@@ -670,7 +671,8 @@ bool TCPInterface::IsSSLActive( SystemAddress systemAddress )
 #endif
 void TCPInterface::Send( const char* data, unsigned int length, const SystemAddress& systemAddress, bool broadcast )
 {
-    SendList( &data, &length, 1, systemAddress, broadcast );
+    // Send has no result. A caller that needs one calls SendList.
+    std::ignore = SendList( &data, &length, 1, systemAddress, broadcast );
 }
 bool TCPInterface::SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast )
 {

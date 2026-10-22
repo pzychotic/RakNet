@@ -80,7 +80,7 @@ public:
     /// \param[in] identifier A unique identifier representing this password. This is transmitted in plaintext and should be considered insecure
     /// \param[in] password The password to add
     /// \return True on success, false on identifier==password, either identifier or password is blank, or identifier is already in use
-    bool AddPassword( const std::string& identifier, const std::string& password );
+    [[nodiscard]] bool AddPassword( const std::string& identifier, const std::string& password );
 
     /// \brief Challenge another system for the specified identifier
     /// \details After calling Challenge, you will get back ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_SUCCESS, ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, or ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_FAILURE
@@ -90,7 +90,7 @@ public:
     /// Challenge() in turn, and only this Peer's ID_TWO_WAY_AUTHENTICATION_INCOMING_CHALLENGE_SUCCESS counts.
     /// \param[in] identifier A unique identifier representing this password. This is transmitted in plaintext and should be considered insecure
     /// \return True on success, false on remote system not connected, or identifier not previously added with AddPassword()
-    bool Challenge( const std::string& identifier, AddressOrGUID remoteSystem );
+    [[nodiscard]] bool Challenge( const std::string& identifier, AddressOrGUID remoteSystem );
 
     /// \brief Caps the nonces one remote System may hold at once.
     /// \details A System that challenges this Peer is handed a nonce, kept until it answers, it

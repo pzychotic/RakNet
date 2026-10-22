@@ -46,7 +46,7 @@ public:
     TelnetTransport( const TelnetTransport& ) = delete;
     TelnetTransport& operator=( const TelnetTransport& ) = delete;
 
-    bool Start( unsigned short port, bool serverMode ) override;
+    [[nodiscard]] bool Start( unsigned short port, bool serverMode ) override;
     void Stop( void ) override;
     void Send( SystemAddress systemAddress, const char* data, ... ) override;
     void CloseConnection( SystemAddress systemAddress ) override;

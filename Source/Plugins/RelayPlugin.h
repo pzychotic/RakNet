@@ -75,7 +75,7 @@ public:
     /// \param[in] key A string to identify the target's RakNetGUID. This is so the sending system does not need to know the RakNetGUID of the target system. The key should be unique among all guids added. If the key is not unique, only one system will be sent to (at random).
     /// \param[in] guid The RakNetGuid of the system to send to. If this system disconnects, it is removed from the internal hash
     /// \return RPE_ADD_CLIENT_TARGET_NOT_CONNECTED, RPE_ADD_CLIENT_NAME_ALREADY_IN_USE, or RPE_ADD_CLIENT_OK
-    RelayPluginEnums AddParticipantOnServer( const std::string& key, const RakNetGUID& guid );
+    [[nodiscard]] RelayPluginEnums AddParticipantOnServer( const std::string& key, const RakNetGUID& guid );
 
     /// \brief Remove a chat participant
     void RemoveParticipantOnServer( const RakNetGUID& guid );

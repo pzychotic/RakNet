@@ -107,17 +107,17 @@ public:
 
     void SetDefaultTimeToTrack( Time defaultTimeToTrack );
     Time GetDefaultTimeToTrack( void ) const;
-    bool AddObject( TrackedObjectData tod );
-    bool RemoveObject( uint64_t objectId, void** userData );
+    [[nodiscard]] bool AddObject( TrackedObjectData tod );
+    [[nodiscard]] bool RemoveObject( uint64_t objectId, void** userData );
     void RemoveObjectAtIndex( unsigned int index );
     void Clear( void );
     unsigned int GetObjectCount( void ) const;
     StatisticsHistory::TrackedObjectData* GetObjectAtIndex( unsigned int index ) const;
-    unsigned int GetObjectIndex( uint64_t objectId ) const;
-    bool AddValueByObjectID( uint64_t objectId, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
+    [[nodiscard]] unsigned int GetObjectIndex( uint64_t objectId ) const;
+    [[nodiscard]] bool AddValueByObjectID( uint64_t objectId, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
     void AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes );
     SHErrorCode GetHistoryForKey( uint64_t objectId, const std::string& key, TimeAndValueQueue** values, Time curTime ) const;
-    bool GetHistorySorted( uint64_t objectId, SHSortOperation sortType, std::vector<TimeAndValueQueue*>& values ) const;
+    [[nodiscard]] bool GetHistorySorted( uint64_t objectId, SHSortOperation sortType, std::vector<TimeAndValueQueue*>& values ) const;
     void MergeAllObjectsOnKey( const std::string& key, TimeAndValueQueue* tavqOutput, SHDataCategory dataCategory ) const;
 
     struct TimeAndValue

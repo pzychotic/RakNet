@@ -37,7 +37,7 @@ public:
     /// \param[in] port The port to start the transport provider on
     /// \param[in] serverMode If true, you should allow incoming connections (I don't actually use this anywhere)
     /// \return Return true on success, false on failure.
-    virtual bool Start( unsigned short port, bool serverMode ) = 0;
+    [[nodiscard]] virtual bool Start( unsigned short port, bool serverMode ) = 0;
 
     /// Stop the transport provider.  You can clear memory and shutdown threads here.
     virtual void Stop( void ) = 0;

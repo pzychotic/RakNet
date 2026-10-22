@@ -48,7 +48,7 @@ public:
     /// \param[in] port The port to start the transport provider on
     /// \param[in] serverMode If true, you should allow incoming connections (I don't actually use this anywhere)
     /// \return Return true on success, false on failure.
-    bool Start( unsigned short port, bool serverMode ) override;
+    [[nodiscard]] bool Start( unsigned short port, bool serverMode ) override;
 
     /// Stop the transport provider.  You can clear memory and shutdown threads here.
     void Stop( void ) override;

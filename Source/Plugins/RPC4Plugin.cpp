@@ -401,18 +401,20 @@ void RPC4::InterruptSignal( void )
 
 void RPC4::OnAttach( void )
 {
+    // A registration refused because its name is already registered, by an earlier attach or by
+    // the application, leaves the function already registered under it in place.
     for( const GlobalRegistration& registration : GlobalRegistrations() )
     {
         const char* functionName = registration.functionName.c_str();
         if( registration.registerFunctionPointer )
         {
             if( registration.callPriority == (int)0xFFFFFFFF )
-                RegisterFunction( functionName, registration.registerFunctionPointer );
+                std::ignore = RegisterFunction( functionName, registration.registerFunctionPointer );
             else
                 RegisterSlot( functionName, registration.registerFunctionPointer, registration.callPriority );
         }
         else if( registration.registerBlockingFunctionPointer )
-            RegisterBlockingFunction( functionName, registration.registerBlockingFunctionPointer );
+            std::ignore = RegisterBlockingFunction( functionName, registration.registerBlockingFunctionPointer );
         else
             RegisterLocalCallback( functionName, registration.messageId );
     }

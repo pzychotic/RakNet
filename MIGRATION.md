@@ -33,6 +33,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [`BitStream` reads warn when their result is ignored](#bitstream-reads-warn-when-their-result-is-ignored)
 - [`Startup` and `Connect` results warn when ignored](#startup-and-connect-results-warn-when-ignored)
 - [`RakPeerInterface` failure results warn when ignored](#rakpeerinterface-failure-results-warn-when-ignored)
+- [Plugin and TCP failure results warn when ignored](#plugin-and-tcp-failure-results-warn-when-ignored)
 
 ## What did *not* change: the core protocol
 
@@ -1307,3 +1308,43 @@ result, `true` or `false`, as `Startup` and `IsActive` already did.
 
 `Startup` and `Connect` already warned through their result types, and `Receive`,
 `GetConnectionState`, `IsBanned` and the other getters with no failure value are not marked.
+
+## Plugin and TCP failure results warn when ignored
+
+**The plugin, TCP and console calls whose result reports a failure are `[[nodiscard]]`,** as
+the `RakPeerInterface` ones are in the entry above:
+
+- `TCPInterface`: `Start`, `Connect`, `SendList` and `AllocatePacket`. `PacketizedTCP`'s
+  `SendList` repeats it.
+- `TransportInterface::Start`, and its overrides in `TelnetTransport` and `RakNetTransport2`.
+- `CommandParserInterface::GetRegisteredCommand`.
+- `ConsoleServer::SetTransportProvider`, which now returns a result. See below.
+- `MessageFilter::GetSystemFilterSet`.
+- `NatPunchthroughClient::OpenNAT`.
+- `RPC4`: `RegisterFunction`, `RegisterBlockingFunction` and `CallBlocking`.
+- `RelayPlugin::AddParticipantOnServer`.
+- `StatisticsHistory`: `AddObject`, `RemoveObject`, `GetObjectIndex`, `AddValueByObjectID`
+  and `GetHistorySorted`.
+- `TwoWayAuthentication`: `AddPassword` and `Challenge`.
+- `UDPProxyClient::RequestForwarding` (both) and `UDPProxyServer::LoginToCoordinator`.
+- `PluginInterface2`'s `SendListUnified` and `AllocatePacketUnified`, for a plugin of your own.
+
+`UDPForwarder::StartForwarding` and `StatisticsHistory::GetHistoryForKey` already warned
+through their result types. A class of your own that overrides `TransportInterface::Start`,
+`TCPInterface::SendList` or `CommandParserInterface::GetRegisteredCommand` should repeat
+`[[nodiscard]]`, since an override doesn't inherit it.
+
+**`ConsoleServer::SetTransportProvider` returns `bool`:** the result of the transport's
+`Start`, which it dropped before. A transport that failed to start is still the one in use,
+so calling `SetTransportProvider` again with it stops it and tries again. A null transport
+changes nothing and returns false.
+
+**A non-blocking `TCPInterface::Connect` returns `UNASSIGNED_SYSTEM_ADDRESS` whether or not
+it started**, so its result says nothing. Write `std::ignore = tcp.Connect( …, false );`.
+An attempt that started is reported by `HasCompletedConnectionAttempt` or
+`HasFailedConnectionAttempt`; one that was refused is not reported at all.
+
+Not marked: `CloseConnection` and the `RPC4` `Unregister…` calls, whose false means there
+was nothing left to close or remove; the `Has…` connection-event polls and `Receive`, whose
+empty result means no event is queued; and `CommandParserInterface::OnCommand` and the
+`PluginInterface2` hooks, which RakNet calls on your code.

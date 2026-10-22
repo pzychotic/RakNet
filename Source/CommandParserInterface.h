@@ -84,7 +84,7 @@ public:
     /// \param[in] command The string to find
     /// \param[out] rc Contains the result of this operation
     /// \return True if we found the command, false otherwise
-    virtual bool GetRegisteredCommand( const char* command, RegisteredCommand* rc );
+    [[nodiscard]] virtual bool GetRegisteredCommand( const char* command, RegisteredCommand* rc );
 
     /// \internal
     /// Goes through str, replacing the delineating character with 0's.

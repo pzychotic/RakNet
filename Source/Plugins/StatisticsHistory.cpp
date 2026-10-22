@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <memory>
 #include <numeric>
+#include <tuple>
 #include <utility>
 
 namespace RakNet {
@@ -742,7 +743,8 @@ void StatisticsHistoryPlugin::OnClosedConnection( const SystemAddress& systemAdd
 
     if( removeLostConnections )
     {
-        statistics.RemoveObject( rakNetGUID.g, 0 );
+        // False means the application already removed the object, as it may.
+        std::ignore = statistics.RemoveObject( rakNetGUID.g, 0 );
     }
 }
 
@@ -753,7 +755,8 @@ void StatisticsHistoryPlugin::OnNewConnection( const SystemAddress& systemAddres
 
     if( addNewConnections )
     {
-        statistics.AddObject( StatisticsHistory::TrackedObjectData( rakNetGUID.g, newConnectionsObjectType, 0 ) );
+        // False means the application already added an object under this GUID, which is kept.
+        std::ignore = statistics.AddObject( StatisticsHistory::TrackedObjectData( rakNetGUID.g, newConnectionsObjectType, 0 ) );
     }
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

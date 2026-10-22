@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
+#include <tuple>
 
 /*
 Pins that TCPInterface::Stop waits for every connect attempt, and ends the ones still in
@@ -82,8 +83,9 @@ TEST_CASE( "TCPInterface Stop ends non-blocking connect attempts still in flight
     TCPInterface client;
     REQUIRE( client.Start( 0, 0, kNonBlockingAttemptCount ) );
 
+    // A non-blocking Connect returns UNASSIGNED_SYSTEM_ADDRESS whether or not it started.
     for( int i = 0; i < kNonBlockingAttemptCount; i++ )
-        client.Connect( kUnansweredHost, kUnansweredPort, false );
+        std::ignore = client.Connect( kUnansweredHost, kUnansweredPort, false );
 
     std::this_thread::sleep_for( kSettle );
     if( client.HasFailedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS )

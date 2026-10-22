@@ -47,7 +47,9 @@ public:
     /// \brief Call this with a derivation of TransportInterface so that the console server can send and receive commands
     /// \param[in] transportInterface Your interface to use.
     /// \param[in] port The port to host on.  Telnet uses port 23 by default.  RakNet can use whatever you want.
-    void SetTransportProvider( TransportInterface* transportInterface, unsigned short port );
+    /// \return The result of the transport's Start(), or false for a null \a transportInterface, which changes nothing.
+    /// A transport whose Start() failed is still the one in use, so calling this again with it retries.
+    [[nodiscard]] bool SetTransportProvider( TransportInterface* transportInterface, unsigned short port );
 
     /// \brief Add an implementation of CommandParserInterface to the list of command parsers.
     /// \param[in] commandParserInterface The command parser referred to

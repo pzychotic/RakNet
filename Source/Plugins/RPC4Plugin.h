@@ -93,7 +93,7 @@ public:
     /// \param[in] uniqueID Identifier to be associated with \a functionPointer. If this identifier is already in use, the call will return false.
     /// \param[in] functionPointer C function pointer to be called
     /// \return True if the hash of uniqueID is not in use, false otherwise.
-    bool RegisterFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ) );
+    [[nodiscard]] bool RegisterFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ) );
 
     /// Register a slot, which is a function pointer to one or more implementations that supports this function signature
     /// When a signal occurs, all slots with the same identifier are called.
@@ -103,7 +103,7 @@ public:
     void RegisterSlot( const char* sharedIdentifier, void ( *functionPointer )( BitStream* userData, Packet* packet ), int callPriority );
 
     /// \brief Same as \a RegisterFunction, but is called with CallBlocking() instead of Call() and returns a value to the caller
-    bool RegisterBlockingFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, BitStream* returnData, Packet* packet ) );
+    [[nodiscard]] bool RegisterBlockingFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, BitStream* returnData, Packet* packet ) );
 
     /// \deprecated Use RegisterSlot and invoke on self only when the packet you want arrives
     /// When a RakNet Packet with the specified identifier is returned, execute CallLoopback() on a function previously registered with RegisterFunction()
@@ -158,7 +158,7 @@ public:
     /// \param[in] systemIdentifier See RakPeerInterface::Send()
     /// \param[out] returnData Written to by the function registered with RegisterBlockingFunction.
     /// \return true if successfully called. False on disconnect, function not registered, or not connected to begin with
-    bool CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, BitStream* returnData );
+    [[nodiscard]] bool CallBlocking( const char* uniqueID, BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, BitStream* returnData );
 
     /// Calls zero or more functions identified by sharedIdentifier registered with RegisterSlot()
     /// \param[in] sharedIdentifier parameter of the same name passed to RegisterSlot() on the remote system

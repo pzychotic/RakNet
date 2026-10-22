@@ -73,7 +73,7 @@ public:
     /// \param[in] socketFamily IP version: For IPV4, use AF_INET (default). For IPV6, use AF_INET6. To autoselect, use AF_UNSPEC.
     /// \return false if already started, or if it could not listen on port or start its
     /// thread. In the last two cases it stays stopped, and Start may be called again.
-    bool Start( unsigned short port, unsigned short maxIncomingConnections, unsigned short maxConnections = 0, int _threadPriority = -99999, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
+    [[nodiscard]] bool Start( unsigned short port, unsigned short maxIncomingConnections, unsigned short maxConnections = 0, int _threadPriority = -99999, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
 
     /// Stops the TCP server. Waits for every connect attempt to end, and ends each one still
     /// connecting within about 50 ms. An attempt still resolving its host name is the
@@ -83,11 +83,13 @@ public:
 
     /// Connect to the specified host on the specified port. Refused, with
     /// UNASSIGNED_SYSTEM_ADDRESS and no failed connection attempt reported, if the interface
-    /// is not started or Stop is running, or if host doesn't parse as an address.
+    /// is not started or Stop is running, or if host doesn't parse as an address. With \a block
+    /// false it returns UNASSIGNED_SYSTEM_ADDRESS either way, and an attempt that started is
+    /// reported by HasCompletedConnectionAttempt or HasFailedConnectionAttempt.
     /// \param[in] bindAddress Local address to bind to, or 0 for none. At most
     /// MAXIMUM_BIND_ADDRESS_LENGTH characters: a longer one is rejected with
     /// UNASSIGNED_SYSTEM_ADDRESS rather than truncated.
-    SystemAddress Connect( const char* host, unsigned short remotePort, bool block = true, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
+    [[nodiscard]] SystemAddress Connect( const char* host, unsigned short remotePort, bool block = true, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
     /// Start SSL on an existing connection, notified with HasCompletedConnectionAttempt
@@ -101,7 +103,7 @@ public:
     virtual void Send( const char* data, unsigned int length, const SystemAddress& systemAddress, bool broadcast );
 
     // Sends a concatenated list of byte streams
-    virtual bool SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast );
+    [[nodiscard]] virtual bool SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast );
 
     // Get how many bytes are waiting to be sent. If too many, you may want to skip sending
     unsigned int GetOutgoingDataBufferSize( SystemAddress systemAddress ) const;
@@ -183,7 +185,7 @@ public:
     SystemAddress HasLostConnection( void );
 
     /// Return an allocated but empty packet, for custom use, or 0 if memory ran out
-    Packet* AllocatePacket( unsigned dataSize );
+    [[nodiscard]] Packet* AllocatePacket( unsigned dataSize );
 
     // Push a packet back to the queue
     virtual void PushBackPacket( Packet* packet, bool pushAtHead );

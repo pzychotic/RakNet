@@ -141,7 +141,7 @@ public:
 
     /// Get the filterSetID a system is using.  Returns -1 for none.
     /// \param[in] addressOrGUID The system we are referring to
-    int GetSystemFilterSet( AddressOrGUID addressOrGUID );
+    [[nodiscard]] int GetSystemFilterSet( AddressOrGUID addressOrGUID );
 
     /// Assign a system to a filter set.
     /// Systems are automatically added to filter sets (or not) based on SetAutoAddNewConnectionsToFilter()

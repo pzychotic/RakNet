@@ -150,7 +150,7 @@ public:
     /// You will get ID_NAT_PUNCHTHROUGH_SUCCEEDED on success
     /// You will get ID_NAT_TARGET_NOT_CONNECTED, ID_NAT_TARGET_UNRESPONSIVE, ID_NAT_CONNECTION_TO_TARGET_LOST, ID_NAT_ALREADY_IN_PROGRESS, or ID_NAT_PUNCHTHROUGH_FAILED on failures of various types
     /// However, if you lose connection to the facilitator, you may not necessarily get above
-    bool OpenNAT( RakNetGUID destination, const SystemAddress& facilitator );
+    [[nodiscard]] bool OpenNAT( RakNetGUID destination, const SystemAddress& facilitator );
 
     /// Modify the system configuration if desired
     /// Don't modify the variables in the structure while punchthrough is in progress

@@ -41,27 +41,28 @@ ConsoleServer::~ConsoleServer()
     if( prompt )
         rakFree_Ex( prompt, _FILE_AND_LINE_ );
 }
-void ConsoleServer::SetTransportProvider( TransportInterface* transportInterface, unsigned short port )
+bool ConsoleServer::SetTransportProvider( TransportInterface* transportInterface, unsigned short port )
 {
+    if( transportInterface == 0 )
+        return false;
+
     // Replace the current TransportInterface, stopping the old one, if present, and starting the new one.
-    if( transportInterface )
+    if( transport )
     {
-        if( transport )
-        {
-            RemoveCommandParser( transport->GetCommandParser() );
-            transport->Stop();
-        }
-        transport = transportInterface;
-        transport->Start( port, true );
-
-        for( CommandParserInterface* pCommandParser : commandParserList )
-        {
-            pCommandParser->OnTransportChange( transport );
-        }
-
-        //  The transport itself might have a command parser - for example password for the RakNet transport
-        AddCommandParser( transport->GetCommandParser() );
+        RemoveCommandParser( transport->GetCommandParser() );
+        transport->Stop();
     }
+    transport = transportInterface;
+    const bool started = transport->Start( port, true );
+
+    for( CommandParserInterface* pCommandParser : commandParserList )
+    {
+        pCommandParser->OnTransportChange( transport );
+    }
+
+    //  The transport itself might have a command parser - for example password for the RakNet transport
+    AddCommandParser( transport->GetCommandParser() );
+    return started;
 }
 void ConsoleServer::AddCommandParser( CommandParserInterface* commandParserInterface )
 {

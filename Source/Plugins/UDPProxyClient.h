@@ -171,11 +171,11 @@ public:
     /// may wait about three seconds for pings before it answers, so pass comfortably more than that.
     /// \return true if the request was sent, false if we are not connected to proxyCoordinator, no result handler is set, MAX_OUTSTANDING_REQUESTS are outstanding,
     /// or Send refuses the request, as it does one longer than MAXIMUM_MESSAGE_SIZE. A refused request adds no outstanding request.
-    bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
+    [[nodiscard]] bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
 
     /// Same as above, but specify the target with a GUID, in case you don't know what its address is to the coordinator
     /// If requesting forwarding to a RakNet enabled system, then it is easier to use targetGuid instead of targetAddressAsSeenFromCoordinator
-    bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, RakNetGUID targetGuid, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
+    [[nodiscard]] bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, RakNetGUID targetGuid, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
 
     /// \brief Caps how many proxy servers one request from a Designated coordinator makes this Peer ping.
     /// \details Each request to ping the proxy servers makes a group, which lives until every server

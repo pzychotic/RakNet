@@ -60,9 +60,9 @@ TEST_CASE( "StatisticsHistory sorts an object's keys by the statistic, then by k
     StatisticsHistory history;
     REQUIRE( history.AddObject( StatisticsHistory::TrackedObjectData( 1, 0, nullptr ) ) );
     const Time now = GetTime();
-    history.AddValueByObjectID( 1, "b", 5, now, false );
-    history.AddValueByObjectID( 1, "c", 1, now, false );
-    history.AddValueByObjectID( 1, "a", 5, now, false );
+    REQUIRE( history.AddValueByObjectID( 1, "b", 5, now, false ) );
+    REQUIRE( history.AddValueByObjectID( 1, "c", 1, now, false ) );
+    REQUIRE( history.AddValueByObjectID( 1, "a", 5, now, false ) );
 
     CHECK( SortedKeys( history, 1, StatisticsHistory::SH_SORT_BY_RECENT_SUM_ASCENDING ) == std::vector<std::string>{ "c", "a", "b" } );
     CHECK( SortedKeys( history, 1, StatisticsHistory::SH_SORT_BY_RECENT_SUM_DESCENDING ) == std::vector<std::string>{ "b", "a", "c" } );

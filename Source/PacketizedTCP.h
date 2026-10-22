@@ -44,7 +44,7 @@ public:
     void Send( const char* data, unsigned length, const SystemAddress& systemAddress, bool broadcast ) override;
 
     // Sends a concatenated list of byte streams
-    bool SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast ) override;
+    [[nodiscard]] bool SendList( const char** data, const unsigned int* lengths, const int numParameters, const SystemAddress& systemAddress, bool broadcast ) override;
 
     /// Returns data received
     Packet* Receive( void ) override;

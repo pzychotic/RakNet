@@ -38,8 +38,17 @@ public:
         packet.systemAddress = UNASSIGNED_SYSTEM_ADDRESS;
     }
 
-    bool Start( unsigned short, bool ) override { return true; }
-    void Stop( void ) override {}
+    bool startResult = true;
+    int startCount = 0;
+
+    bool Start( unsigned short, bool ) override
+    {
+        startCount++;
+        return startResult;
+    }
+    int stopCount = 0;
+
+    void Stop( void ) override { stopCount++; }
     void Send( SystemAddress, const char* data, ... ) override
     {
         char buffer[512];
@@ -86,7 +95,7 @@ ConsoleResult RunLine( const char* line )
 
     ConsoleServer console;
     console.SetPrompt( "> " );
-    console.SetTransportProvider( &transport, 0 );
+    REQUIRE( console.SetTransportProvider( &transport, 0 ) );
     console.AddCommandParser( &parser );
     console.Update();
 
@@ -111,4 +120,27 @@ TEST_CASE( "ConsoleServer refuses a parser number that is not a whole listed num
         CHECK( result.sent.find( "Invalid index." ) != std::string::npos );
         CHECK( result.maximumIncomingConnections == 3 );
     }
+}
+
+TEST_CASE( "ConsoleServer reports a transport that fails to start, and starts it again when given it again", "[consoleserver]" )
+{
+    OneLineTransport transport( "" );
+    ConsoleServer console;
+
+    transport.startResult = false;
+    CHECK_FALSE( console.SetTransportProvider( &transport, 0 ) );
+
+    transport.startResult = true;
+    CHECK( console.SetTransportProvider( &transport, 0 ) );
+    CHECK( transport.startCount == 2 );
+}
+
+TEST_CASE( "ConsoleServer refuses a null transport and keeps the one it has", "[consoleserver]" )
+{
+    OneLineTransport transport( "" );
+    ConsoleServer console;
+    REQUIRE( console.SetTransportProvider( &transport, 0 ) );
+
+    CHECK_FALSE( console.SetTransportProvider( nullptr, 0 ) );
+    CHECK( transport.stopCount == 0 );
 }

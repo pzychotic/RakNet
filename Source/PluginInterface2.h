@@ -242,10 +242,10 @@ protected:
     // Send through either rakPeerInterface or tcpInterface, whichever is available
     void SendUnified( const BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
     void SendUnified( const char* data, const int length, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
-    bool SendListUnified( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
+    [[nodiscard]] bool SendListUnified( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast );
 
     // 0 if memory ran out; notifyOutOfMemory has been called
-    Packet* AllocatePacketUnified( unsigned dataSize );
+    [[nodiscard]] Packet* AllocatePacketUnified( unsigned dataSize );
     void PushBackPacketUnified( Packet* packet, bool pushAtHead );
     void DeallocPacketUnified( Packet* packet );
 
