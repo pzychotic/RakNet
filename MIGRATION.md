@@ -31,6 +31,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [`TCPInterface::Start` fails when it can't listen](#tcpinterfacestart-fails-when-it-cant-listen)
 - [Numbers in strings are read whole](#numbers-in-strings-are-read-whole)
 - [`BitStream` reads warn when their result is ignored](#bitstream-reads-warn-when-their-result-is-ignored)
+- [`Startup` and `Connect` results warn when ignored](#startup-and-connect-results-warn-when-ignored)
 
 ## What did *not* change: the core protocol
 
@@ -1252,3 +1253,22 @@ went on with whatever the unread fields held: an uninitialized hash in
 `TwoWayAuthentication`, a port or session ID in the NAT and proxy plugins, the ping times
 `RakPeer` echoes in the connection handshake. A conforming System never sends one.
 `NatPunchthroughClient::OnFailureNotification`, a protected member nothing called, is gone.
+
+## `Startup` and `Connect` results warn when ignored
+
+**`StartupResult`, `ConnectionAttemptResult`, `UDPForwarderResult`, `RNS2BindResult` and
+`StatisticsHistory::SHErrorCode` are `[[nodiscard]]` types.** Each exists only to say whether
+a call worked, so every function that returns one now warns when the result is dropped:
+`RakPeerInterface::Startup`, `Connect` and `ConnectWithSocket`,
+`UDPForwarder::StartForwarding`, `RNS2_Berkley::Bind` and
+`StatisticsHistory::GetHistoryForKey`. A function of your own, or an override, that returns
+one of these types warns the same way. The warning is `-Wunused-result` on GCC and Clang and
+C4834 on MSVC, and a build that makes warnings errors stops. What the calls do is unchanged.
+
+Compare the result with `RAKNET_STARTED` or `CONNECTION_ATTEMPT_STARTED`. A failed `Startup`
+leaves the peer unable to send, and a refused `Connect` sends no request, so nothing arrives
+later to tell you. A loop that retries `Connect` while an earlier attempt may still be in
+flight can be refused with `CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS` or
+`ALREADY_CONNECTED_TO_ENDPOINT`, which mean that attempt is still going or has connected,
+so poll on.
+`INVALID_PARAMETER` and `CANNOT_RESOLVE_DOMAIN_NAME` do not change on a retry.

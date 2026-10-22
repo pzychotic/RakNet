@@ -25,7 +25,7 @@ struct RNS2_BerkleyBindParameters;
 struct RNS2_SendParameters;
 typedef int RNS2Socket;
 
-enum RNS2BindResult
+enum [[nodiscard]] RNS2BindResult
 {
     BR_SUCCESS,
     BR_REQUIRES_RAKNET_SUPPORT_IPV6_DEFINE,

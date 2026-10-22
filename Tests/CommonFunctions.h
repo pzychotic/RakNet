@@ -27,5 +27,8 @@ public:
     ~CommonFunctions( void );
 
     static bool WaitAndConnect( RakPeerInterface* peer, const char* ip, unsigned short int port, int millisecondsToWait );
+    // Whether a polling loop that re-issues Connect goes on after this result: started, or
+    // refused only because an earlier attempt or its connection got there first.
+    static bool ConnectMayStillSucceed( ConnectionAttemptResult result );
     static bool ConnectionStateMatchesOptions( RakPeerInterface* peer, SystemAddress currentSystem, bool isConnected, bool isConnecting = false, bool isPending = false, bool isDisconnecting = false, bool isNotConnected = false, bool isLoopBack = false, bool isSilentlyDisconnecting = false );
 };

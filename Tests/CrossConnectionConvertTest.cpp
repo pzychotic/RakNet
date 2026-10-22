@@ -157,8 +157,11 @@ TEST_CASE( "Two peers connecting to each other at the same instant both get a co
         {
             connectionAttemptTime = 0;
 
-            server->Connect( clientIp, clientPort, 0, 0 );
-            client->Connect( "127.0.0.1", kServerPort, 0, 0 );
+            CHECK( server->Connect( clientIp, clientPort, 0, 0 ) == CONNECTION_ATTEMPT_STARTED );
+            // The server's attempt can connect before this call if the thread is held up
+            // in between.
+            const ConnectionAttemptResult clientAttempt = client->Connect( "127.0.0.1", kServerPort, 0, 0 );
+            CHECK( ( clientAttempt == CONNECTION_ATTEMPT_STARTED || clientAttempt == ALREADY_CONNECTED_TO_ENDPOINT ) );
 
             notificationDeadline = GetTimeMS() + kNotificationBudgetMs;
         }

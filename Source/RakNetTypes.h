@@ -28,7 +28,7 @@ namespace RakNet {
 /// Forward declarations
 struct Packet;
 
-enum StartupResult
+enum [[nodiscard]] StartupResult
 {
     RAKNET_STARTED,
     RAKNET_ALREADY_STARTED,
@@ -45,7 +45,7 @@ enum StartupResult
 };
 
 
-enum ConnectionAttemptResult
+enum [[nodiscard]] ConnectionAttemptResult
 {
     CONNECTION_ATTEMPT_STARTED,
     INVALID_PARAMETER,

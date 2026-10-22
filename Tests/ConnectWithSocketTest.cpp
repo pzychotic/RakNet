@@ -59,7 +59,8 @@ bool ConnectWithSocketAndWait( RakPeerInterface* client, const SystemAddress& se
     {
         if( !CommonFunctions::ConnectionStateMatchesOptions( client, serverAddress, true, true, true, true ) )
         {
-            client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, socket );
+            if( !CommonFunctions::ConnectMayStillSucceed( client->ConnectWithSocket( "127.0.0.1", serverAddress.GetPort(), 0, 0, socket ) ) )
+                return false;
         }
 
         std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );

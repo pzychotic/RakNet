@@ -41,7 +41,7 @@ public:
     // GetInstance() and DestroyInstance(instance*)
     STATIC_FACTORY_DECLARATIONS( StatisticsHistory )
 
-    enum SHErrorCode
+    enum [[nodiscard]] SHErrorCode
     {
         SH_OK,
         SH_UKNOWN_OBJECT,

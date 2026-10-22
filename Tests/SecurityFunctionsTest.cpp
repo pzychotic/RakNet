@@ -78,14 +78,14 @@ constexpr TimeMS kRefusalArrivalBudgetMs = 5000;
 constexpr TimeMS kConnectBudgetMs = 5000;
 
 // The client's state toward the server while an attempt is in flight or its record is
-// still closing, so Connect is not re-issued into ALREADY_CONNECTED_TO_ENDPOINT.
+// still closing. Connect reads the same state, so one issued outside it is started.
 bool AttemptInFlight( RakPeerInterface* client, const SystemAddress& server )
 {
     return CommonFunctions::ConnectionStateMatchesOptions( client, server, true, true, true, true, false, false, true );
 }
 
 // Polls until connected, re-issuing Connect whenever nothing is in flight. Ends on the
-// connection; the budget is a hang guard.
+// connection, or on a Connect that isn't started; the budget is a hang guard.
 bool TryToConnect( RakPeerInterface* client, const SystemAddress& server, const char* password, int passwordLength )
 {
     const TimeMS deadline = GetTimeMS() + kConnectBudgetMs;
@@ -94,7 +94,8 @@ bool TryToConnect( RakPeerInterface* client, const SystemAddress& server, const 
     {
         if( !AttemptInFlight( client, server ) )
         {
-            client->Connect( "127.0.0.1", server.GetPort(), password, passwordLength );
+            if( client->Connect( "127.0.0.1", server.GetPort(), password, passwordLength ) != CONNECTION_ATTEMPT_STARTED )
+                return false;
         }
 
         ConnectionWaits::Drain( client );
@@ -328,7 +329,8 @@ bool ConnectWithin( RakPeerInterface* client, const SystemAddress& server, TimeM
     {
         if( !AttemptInFlight( client, server ) )
         {
-            client->Connect( "127.0.0.1", server.GetPort(), kRightPassword, static_cast<int>( strlen( kRightPassword ) ) );
+            if( client->Connect( "127.0.0.1", server.GetPort(), kRightPassword, static_cast<int>( strlen( kRightPassword ) ) ) != CONNECTION_ATTEMPT_STARTED )
+                return false;
         }
 
         for( Packet* packet = client->Receive(); packet != nullptr; packet = client->Receive() )

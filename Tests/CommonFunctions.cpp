@@ -70,7 +70,8 @@ bool CommonFunctions::WaitAndConnect( RakPeerInterface* peer, const char* ip, un
 
         if( !CommonFunctions::ConnectionStateMatchesOptions( peer, connectToAddress, true, true, true, true ) )
         {
-            peer->Connect( ip, port, 0, 0 );
+            if( !ConnectMayStillSucceed( peer->Connect( ip, port, 0, 0 ) ) )
+                return false;
         }
 
         std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
@@ -82,4 +83,9 @@ bool CommonFunctions::WaitAndConnect( RakPeerInterface* peer, const char* ip, un
     }
 
     return 0;
+}
+
+bool CommonFunctions::ConnectMayStillSucceed( ConnectionAttemptResult result )
+{
+    return result == CONNECTION_ATTEMPT_STARTED || result == CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS || result == ALREADY_CONNECTED_TO_ENDPOINT;
 }

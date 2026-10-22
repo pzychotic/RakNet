@@ -32,7 +32,7 @@
 
 namespace RakNet {
 
-enum UDPForwarderResult
+enum [[nodiscard]] UDPForwarderResult
 {
     UDPFORWARDER_FORWARDING_ALREADY_EXISTS,
     UDPFORWARDER_NO_SOCKETS,
