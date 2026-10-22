@@ -82,7 +82,7 @@ TEST_CASE( "SendList, split packets and PushBackPacket deliver without breaking 
         lengths[i] = kSendListMessageLen;
     }
 
-    client->SendList( (const char**)dataList, lengths, kSendListMessages, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true );
+    REQUIRE( client->SendList( (const char**)dataList, lengths, kSendListMessages, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true ) != 0 );
 
     Packet* packet = ConnectionWaits::ReceiveMessage( server, ID_USER_PACKET_ENUM + 1, 1000 );
 

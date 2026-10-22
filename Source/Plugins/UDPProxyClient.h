@@ -169,7 +169,8 @@ public:
     /// asking again for a target already outstanding with \a proxyCoordinator restarts its timeout and takes no new entry.
     /// A result that arrives after \a timeoutOnNoDataMS is dropped without a callback. With more than one proxy server the coordinator
     /// may wait about three seconds for pings before it answers, so pass comfortably more than that.
-    /// \return true if the request was sent, false if we are not connected to proxyCoordinator, no result handler is set, or MAX_OUTSTANDING_REQUESTS are outstanding
+    /// \return true if the request was sent, false if we are not connected to proxyCoordinator, no result handler is set, MAX_OUTSTANDING_REQUESTS are outstanding,
+    /// or Send refuses the request, as it does one longer than MAXIMUM_MESSAGE_SIZE. A refused request adds no outstanding request.
     bool RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream = 0 );
 
     /// Same as above, but specify the target with a GUID, in case you don't know what its address is to the coordinator
@@ -236,6 +237,8 @@ protected:
     void OnPingServers( Packet* packet );
     bool IsDesignatedCoordinator( const SystemAddress& systemAddress ) const;
     bool AddOutstandingRequest( const OutstandingRequest& request );
+    // Adds request and sends outgoingBs to its coordinator. False, with request not added, if either fails.
+    bool SendOutstandingRequest( const OutstandingRequest& request, const BitStream& outgoingBs );
     std::vector<OutstandingRequest>::iterator FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid );
     void Clear( void );
     UDPProxyClientResultHandler* resultHandler;

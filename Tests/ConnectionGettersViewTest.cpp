@@ -591,7 +591,8 @@ void ReadGettersUntilStopped( RakPeerInterface* server, const SystemAddress& ser
 
         SystemAddress list[kChurnClients];
         unsigned short listSize = kChurnClients;
-        server->GetConnectionList( list, &listSize );
+        if( server->GetConnectionList( list, &listSize ) == false )
+            failures.Add( "GetConnectionList failed on a running Peer" );
         for( unsigned short j = 0; j < listSize; j++ )
             if( isClientAddress( list[j] ) == false )
                 failures.Add( "GetConnectionList returned an address no client has" );

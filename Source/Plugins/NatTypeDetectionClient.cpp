@@ -17,6 +17,7 @@
 #include "RakPeerInterface.h"
 #include "MessageIdentifiers.h"
 
+#include <tuple>
 #include <vector>
 
 namespace RakNet {
@@ -54,7 +55,8 @@ void NatTypeDetectionClient::DetectNATType( SystemAddress _serverAddress )
     bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_REQUEST );
     bs.Write( true ); // IsRequest
     bs.Write( c2->GetBoundAddress().GetPort() );
-    rakPeerInterface->Send( &bs, MEDIUM_PRIORITY, RELIABLE, 0, serverAddress, false );
+    if( rakPeerInterface->Send( &bs, MEDIUM_PRIORITY, RELIABLE, 0, serverAddress, false ) == 0 )
+        OnCompletion( NAT_TYPE_UNKNOWN );
 }
 
 RakNetSocket2* NatTypeDetectionClient::CreateC2Socket( void )
@@ -87,7 +89,8 @@ void NatTypeDetectionClient::OnCompletion( NATTypeDetectionResult result )
         BitStream bs;
         bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_REQUEST );
         bs.Write( false ); // Done
-        rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, serverAddress, false );
+        // Refused only for an unassigned server or a stopped Peer, neither of which has a server to tell.
+        std::ignore = rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, serverAddress, false );
     }
 
     Shutdown();

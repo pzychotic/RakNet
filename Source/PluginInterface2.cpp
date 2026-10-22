@@ -16,6 +16,7 @@
 #include "MTUSize.h"
 #include "TotalListLength.h"
 #include <string.h>
+#include <tuple>
 
 namespace RakNet {
 
@@ -33,7 +34,8 @@ void PluginInterface2::SendUnified( const BitStream* bitStream, PacketPriority p
 {
     if( rakPeerInterface )
     {
-        rakPeerInterface->Send( bitStream, priority, reliability, orderingChannel, systemIdentifier, broadcast );
+        // SendUnified has no result to report a refusal with.
+        std::ignore = rakPeerInterface->Send( bitStream, priority, reliability, orderingChannel, systemIdentifier, broadcast );
         return;
     }
 #if _RAKNET_SUPPORT_PacketizedTCP == 1 && _RAKNET_SUPPORT_TCPInterface == 1
@@ -67,7 +69,8 @@ void PluginInterface2::SendUnified( const char* data, const int length, PacketPr
 {
     if( rakPeerInterface )
     {
-        rakPeerInterface->Send( data, length, priority, reliability, orderingChannel, systemIdentifier, broadcast );
+        // SendUnified has no result to report a refusal with.
+        std::ignore = rakPeerInterface->Send( data, length, priority, reliability, orderingChannel, systemIdentifier, broadcast );
         return;
     }
 #if _RAKNET_SUPPORT_PacketizedTCP == 1 && _RAKNET_SUPPORT_TCPInterface == 1

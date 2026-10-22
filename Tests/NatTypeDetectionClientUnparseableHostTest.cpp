@@ -55,7 +55,7 @@ void SendDetectionRequest( RakPeerInterface* server, const SystemAddress& client
     bs.Write( (MessageID)ID_NAT_TYPE_DETECTION_REQUEST );
     bs.Write( std::string( host ) );
     bs.Write( port );
-    server->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false );
+    REQUIRE( server->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false ) != 0 );
 }
 
 // Whether an answer arrived within millisecondsToWait. Binding sends the socket four zero

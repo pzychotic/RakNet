@@ -14,6 +14,17 @@ clang-format already gate the mechanical rules in the pre-commit hook and CI.
   copy in the banner above them. A diff that changes one copy changes them all, to the
   same wording.
 
+## Failure results
+
+- **`[[nodiscard]]`** goes on a function the user calls whose result says whether the call
+  worked, or whose sentinel (`0`, `-1`, `UNASSIGNED_SYSTEM_ADDRESS`, `nullptr`) means "not
+  found" or "refused". A getter with no failure value is not marked, and neither is a hook
+  RakNet calls on user code (`OnReceive`, `OnAttach`). A new public function, or one whose
+  result gains a failure value, is checked against this. An override repeats the attribute,
+  since it is not inherited.
+- **A caller that can act on the failure does**, the way its function already fails. One
+  that drops the result says why in a comment.
+
 ## Tests
 
 - **Flags** a test sets on seeing a message are named `sawX` or `gotX`

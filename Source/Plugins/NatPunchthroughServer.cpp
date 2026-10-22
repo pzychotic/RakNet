@@ -21,6 +21,7 @@
 #include "GetTime.h"
 
 #include <algorithm>
+#include <tuple>
 
 namespace RakNet {
 
@@ -161,7 +162,8 @@ void NatPunchthroughServer::Update( void )
                         outgoingBs.Write( (MessageID)ID_NAT_TARGET_UNRESPONSIVE );
                         outgoingBs.Write( connectionAttempt->recipient->guid );
                         outgoingBs.Write( connectionAttempt->sessionId );
-                        rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, connectionAttempt->sender->systemAddress, false );
+                        // Send refuses this only once the Peer has stopped, which closes the connection too.
+                        std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, connectionAttempt->sender->systemAddress, false );
 
                         // 05/28/09 Previously only told sender about ID_NAT_CONNECTION_TO_TARGET_LOST
                         // However, recipient may be expecting it due to external code
@@ -170,7 +172,8 @@ void NatPunchthroughServer::Update( void )
                         outgoingBs.Write( (MessageID)ID_NAT_TARGET_UNRESPONSIVE );
                         outgoingBs.Write( connectionAttempt->sender->guid );
                         outgoingBs.Write( connectionAttempt->sessionId );
-                        rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, connectionAttempt->recipient->systemAddress, false );
+                        // Send refuses this only once the Peer has stopped, which closes the connection too.
+                        std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, connectionAttempt->recipient->systemAddress, false );
 
                         connectionAttempt->sender->isReady = true;
                         connectionAttempt->recipient->isReady = true;
@@ -236,7 +239,8 @@ PluginReceiveResult NatPunchthroughServer::OnReceive( Packet* packet )
             outgoingBs.Write( boundAddresses[i] );
         }
 
-        rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+        // Send refuses this only once the Peer has stopped, which closes the connection too.
+        std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
     }
         return RR_STOP_PROCESSING_AND_DEALLOCATE;
     case ID_NAT_PING: {
@@ -256,7 +260,8 @@ PluginReceiveResult NatPunchthroughServer::OnReceive( Packet* packet )
             outgoingBs.Write( externalPort );
             uint16_t externalPort2 = packet->systemAddress.GetPort();
             outgoingBs.Write( externalPort2 );
-            rakPeerInterface->SendOutOfBand( (const char*)packet->systemAddress.ToString( false ), packet->systemAddress.GetPort(), (const char*)outgoingBs.GetData(), outgoingBs.GetNumberOfBytesUsed() );
+            // SendOutOfBand refuses only a stopped Peer or a host that doesn't parse, and this host is an address.
+            std::ignore = rakPeerInterface->SendOutOfBand( (const char*)packet->systemAddress.ToString( false ), packet->systemAddress.GetPort(), (const char*)outgoingBs.GetData(), outgoingBs.GetNumberOfBytesUsed() );
 
             return RR_STOP_PROCESSING_AND_DEALLOCATE;
         }
@@ -292,7 +297,8 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
             outgoingBs.Write( (MessageID)ID_NAT_CONNECTION_TO_TARGET_LOST );
             outgoingBs.Write( rakNetGUID );
             outgoingBs.Write( connectionAttempt->sessionId );
-            rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, otherUser->systemAddress, false );
+            // Send refuses this only once the Peer has stopped, which closes the connection too.
+            std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, otherUser->systemAddress, false );
 
             // 4/22/09 - Bug: was checking inProgress, legacy variable not used elsewhere
             if( connectionAttempt->attemptPhase == ConnectionAttempt::NAT_ATTEMPT_PHASE_GETTING_RECENT_PORTS )
@@ -350,7 +356,8 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
     {
         outgoingBs.Write( (MessageID)ID_NAT_TARGET_NOT_CONNECTED );
         outgoingBs.Write( recipientGuid );
-        rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+        // Send refuses this only once the Peer has stopped, which closes the connection too.
+        std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
         return;
     }
     User* recipient = recipientIt->second.get();
@@ -358,7 +365,8 @@ void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )
     {
         outgoingBs.Write( (MessageID)ID_NAT_ALREADY_IN_PROGRESS );
         outgoingBs.Write( recipientGuid );
-        rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+        // Send refuses this only once the Peer has stopped, which closes the connection too.
+        std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
         return;
     }
 
@@ -457,7 +465,8 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
                     bsOut.Write( rakPeerInterface->GetInternalID( senderSystemAddress, j ) );
                 bsOut.Write( connectionAttempt->sender->guid );
                 bsOut.Write( false );
-                rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, recipientSystemAddress, false );
+                // Send refuses this only once the Peer has stopped, which closes the connection too.
+                std::ignore = rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, recipientSystemAddress, false );
 
 
                 if( natPunchthroughServerDebugInterface )
@@ -481,7 +490,8 @@ void NatPunchthroughServer::OnGetMostRecentPort( Packet* packet )
                     bsOut.Write( rakPeerInterface->GetInternalID( recipientSystemAddress, j ) );
                 bsOut.Write( connectionAttempt->recipient->guid );
                 bsOut.Write( true );
-                rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, senderSystemAddress, false );
+                // Send refuses this only once the Peer has stopped, which closes the connection too.
+                std::ignore = rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE_ORDERED, 0, senderSystemAddress, false );
 
                 connectionAttempt->recipient->DerefConnectionAttempt( connectionAttempt );
                 connectionAttempt->sender->DeleteConnectionAttempt( connectionAttempt );
@@ -550,8 +560,9 @@ void NatPunchthroughServer::StartPunchthroughForUser( User* user )
             outgoingBs.Write( (MessageID)ID_NAT_GET_MOST_RECENT_PORT );
             // 4/29/09 Write sessionID so we don't use returned port for a system we don't want
             outgoingBs.Write( connectionAttempt->sessionId );
-            rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, sender->systemAddress, false );
-            rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, recipient->systemAddress, false );
+            // Send refuses this only once the Peer has stopped, which closes the connection too.
+            std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, sender->systemAddress, false );
+            std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, recipient->systemAddress, false );
 
             // 4/22/09 - BUG: missing break statement here
             break;

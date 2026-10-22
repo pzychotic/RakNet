@@ -84,7 +84,7 @@ public:
     /// Before the coordinator will register the UDPProxyServer, you must login
     /// \pre Must be connected to the coordinator
     /// \pre Coordinator must have set a password with UDPProxyCoordinator::SetRemoteLoginPassword()
-    /// \returns false if already logged in, or logging in. Returns true otherwise
+    /// \returns false if already logged in, logging in, or the request is refused, as it is while the Peer is stopped. Returns true otherwise
     bool LoginToCoordinator( const std::string& password, SystemAddress coordinatorAddress );
 
     /// \brief The server IP reported to the client is the IP address from the server to the coordinator.

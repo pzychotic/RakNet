@@ -43,7 +43,7 @@ void SendPunchthroughRequest( RakPeerInterface* client, RakNetGUID target, const
     BitStream request;
     request.Write( (MessageID)ID_NAT_PUNCHTHROUGH_REQUEST );
     request.Write( target );
-    client->Send( &request, HIGH_PRIORITY, RELIABLE_ORDERED, 0, server, false );
+    REQUIRE( client->Send( &request, HIGH_PRIORITY, RELIABLE_ORDERED, 0, server, false ) != 0 );
 }
 
 // The first NAT message the client receives, or ID_USER_PACKET_ENUM if none arrives in time.

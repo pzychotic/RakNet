@@ -174,7 +174,7 @@ public:
     /// Fills the array remoteSystems with the SystemAddress of all the systems we are connected to
     /// \param[out] remoteSystems An array of SystemAddress structures to be filled with the SystemAddresss of the systems we are connected to. Pass 0 to remoteSystems to only get the number of systems we are connected to
     /// \param[in, out] numberOfSystems As input, the size of remoteSystems array.  As output, the number of elements put into the array
-    virtual bool GetConnectionList( SystemAddress* remoteSystems, unsigned short* numberOfSystems ) const = 0;
+    [[nodiscard]] virtual bool GetConnectionList( SystemAddress* remoteSystems, unsigned short* numberOfSystems ) const = 0;
 
     /// Returns the next uint32_t that Send() will return
     /// \note If using RakPeer from multiple threads, this may not be accurate for your thread. Use IncrementNextSendReceipt() in that case.
@@ -198,7 +198,7 @@ public:
     /// \param[in] broadcast True to send this packet to all connected systems. If true, then systemAddress specifies who not to send the packet to.
     /// \param[in] forceReceipt If 0, will automatically determine the receipt number to return. If non-zero, will return what you give it.
     /// \return 0 on bad input. Otherwise a number that identifies this message. If \a reliability is a type that returns a receipt, on a later call to Receive() you will get ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS with bytes 1-4 inclusive containing this number
-    virtual uint32_t Send( const char* data, const int length, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber = 0 ) = 0;
+    [[nodiscard]] virtual uint32_t Send( const char* data, const int length, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber = 0 ) = 0;
 
     /// "Send" to yourself rather than a remote system. The message will be processed through the plugins and returned to the game as usual
     /// This function works anytime
@@ -217,7 +217,7 @@ public:
     /// \param[in] forceReceipt If 0, will automatically determine the receipt number to return. If non-zero, will return what you give it.
     /// \return 0 on bad input. Otherwise a number that identifies this message. If \a reliability is a type that returns a receipt, on a later call to Receive() you will get ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS with bytes 1-4 inclusive containing this number
     /// \note COMMON MISTAKE: When writing the first byte, bitStream->Write((unsigned char) ID_MY_TYPE) be sure it is casted to a byte, and you are not writing a 4 byte enumeration.
-    virtual uint32_t Send( const BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber = 0 ) = 0;
+    [[nodiscard]] virtual uint32_t Send( const BitStream* bitStream, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber = 0 ) = 0;
 
     /// Sends multiple blocks of data, concatenating them automatically.
     ///
@@ -239,7 +239,7 @@ public:
     /// \param[in] broadcast True to send this packet to all connected systems. If true, then systemAddress specifies who not to send the packet to.
     /// \param[in] forceReceipt If 0, will automatically determine the receipt number to return. If non-zero, will return what you give it.
     /// \return 0 on bad input. Otherwise a number that identifies this message. If \a reliability is a type that returns a receipt, on a later call to Receive() you will get ID_SND_RECEIPT_ACKED or ID_SND_RECEIPT_LOSS with bytes 1-4 inclusive containing this number
-    virtual uint32_t SendList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber = 0 ) = 0;
+    [[nodiscard]] virtual uint32_t SendList( const char** data, const int* lengths, const int numParameters, PacketPriority priority, PacketReliability reliability, char orderingChannel, const AddressOrGUID systemIdentifier, bool broadcast, uint32_t forceReceiptNumber = 0 ) = 0;
 
     /// Gets a message from the incoming message queue.
     /// Use DeallocatePacket() to deallocate the message after you are done with it.
@@ -286,18 +286,18 @@ public:
     /// Given a systemAddress, returns an index from 0 to the maximum number of players allowed - 1.
     /// \param[in] systemAddress The SystemAddress we are referring to
     /// \return The index of this SystemAddress or -1 on system not found.
-    virtual int GetIndexFromSystemAddress( const SystemAddress systemAddress ) const = 0;
+    [[nodiscard]] virtual int GetIndexFromSystemAddress( const SystemAddress systemAddress ) const = 0;
 
     /// This function is only useful for looping through all systems
     /// Given an index, will return a SystemAddress.
     /// \param[in] index Index should range between 0 and the maximum number of players allowed - 1.
     /// \return The SystemAddress
-    virtual SystemAddress GetSystemAddressFromIndex( unsigned int index ) = 0;
+    [[nodiscard]] virtual SystemAddress GetSystemAddressFromIndex( unsigned int index ) = 0;
 
     /// Same as GetSystemAddressFromIndex but returns RakNetGUID
     /// \param[in] index Index should range between 0 and the maximum number of players allowed - 1.
     /// \return The RakNetGUID
-    virtual RakNetGUID GetGUIDFromIndex( unsigned int index ) = 0;
+    [[nodiscard]] virtual RakNetGUID GetGUIDFromIndex( unsigned int index ) = 0;
 
     /// Same as calling GetSystemAddressFromIndex and GetGUIDFromIndex for all systems, but more efficient
     /// Indices match each other, so \a addresses[0] and \a guids[0] refer to the same system
@@ -340,22 +340,22 @@ public:
     /// \param[in] onlyReplyOnAcceptingConnections Only request a reply if the remote system is accepting connections
     /// \param[in] connectionSocketIndex Index into the array of socket descriptors passed to socketDescriptors in RakPeer::Startup() to send on.
     /// \return true on success, false on failure (unknown hostname)
-    virtual bool Ping( const char* host, unsigned short remotePort, bool onlyReplyOnAcceptingConnections, unsigned connectionSocketIndex = 0 ) = 0;
+    [[nodiscard]] virtual bool Ping( const char* host, unsigned short remotePort, bool onlyReplyOnAcceptingConnections, unsigned connectionSocketIndex = 0 ) = 0;
 
     /// Returns the average of all ping times read for the specific system or -1 if none read yet
     /// \param[in] systemAddress Which system we are referring to
     /// \return The ping time for this system, or -1
-    virtual int GetAveragePing( const AddressOrGUID systemIdentifier ) = 0;
+    [[nodiscard]] virtual int GetAveragePing( const AddressOrGUID systemIdentifier ) = 0;
 
     /// Returns the last ping time read for the specific system or -1 if none read yet
     /// \param[in] systemAddress Which system we are referring to
     /// \return The last ping time for this system, or -1
-    virtual int GetLastPing( const AddressOrGUID systemIdentifier ) const = 0;
+    [[nodiscard]] virtual int GetLastPing( const AddressOrGUID systemIdentifier ) const = 0;
 
     /// Returns the lowest ping time read or -1 if none read yet
     /// \param[in] systemAddress Which system we are referring to
     /// \return The lowest ping time for this system, or -1
-    virtual int GetLowestPing( const AddressOrGUID systemIdentifier ) const = 0;
+    [[nodiscard]] virtual int GetLowestPing( const AddressOrGUID systemIdentifier ) const = 0;
 
     /// Ping the remote systems every so often, or not. Can be called anytime.
     /// By default this is true. Recommended to leave on, because congestion control uses it to determine how often to resend lost packets.
@@ -367,7 +367,7 @@ public:
     /// Subtract GetClockDifferential() from a time returned by the remote system to get that time relative to your own system
     /// Returns 0 if the system is unknown
     /// \param[in] systemIdentifier Which system we are referring to
-    virtual RakNet::Time GetClockDifferential( const AddressOrGUID systemIdentifier ) = 0;
+    [[nodiscard]] virtual RakNet::Time GetClockDifferential( const AddressOrGUID systemIdentifier ) = 0;
 
     // --------------------------------------------------------------------------------------------Static Data Functions - Functions dealing with API defined synchronized memory--------------------------------------------------------------------------------------------
     /// Sets the data to send along with a LAN server discovery or offline ping reply.
@@ -388,7 +388,7 @@ public:
     /// \param[in] systemAddress Use UNASSIGNED_SYSTEM_ADDRESS to get your behind-LAN address. Use a connected system to get their behind-LAN address
     /// \param[in] index When you have multiple internal IDs, which index to return? Currently limited to MAXIMUM_NUMBER_OF_INTERNAL_IDS (so the maximum value of this variable is MAXIMUM_NUMBER_OF_INTERNAL_IDS-1)
     /// \return the identifier of your system internally, which may not be how other systems see if you if you are behind a NAT or proxy. UNASSIGNED_SYSTEM_ADDRESS if \a index is out of range.
-    virtual SystemAddress GetInternalID( const SystemAddress systemAddress = UNASSIGNED_SYSTEM_ADDRESS, const int index = 0 ) const = 0;
+    [[nodiscard]] virtual SystemAddress GetInternalID( const SystemAddress systemAddress = UNASSIGNED_SYSTEM_ADDRESS, const int index = 0 ) const = 0;
 
     /// \brief Sets your internal IP address, for platforms that do not support reading it, or to override a value
     /// \details The list ends at its first UNASSIGNED_SYSTEM_ADDRESS, so setting that at \a index hides every address after it. An \a index out of range sets nothing.
@@ -399,7 +399,7 @@ public:
     /// Return the unique address identifier that represents you on the the network and is based on your externalIP / port
     /// (the IP / port the specified player uses to communicate with you)
     /// \param[in] target Which remote system you are referring to for your external ID.  Usually the same for all systems, unless you have two or more network cards.
-    virtual SystemAddress GetExternalID( const SystemAddress target ) const = 0;
+    [[nodiscard]] virtual SystemAddress GetExternalID( const SystemAddress target ) const = 0;
 
     /// Return my own GUID
     virtual const RakNetGUID GetMyGUID( void ) const = 0;
@@ -409,7 +409,7 @@ public:
     /// address) reports loopback, not the wildcard. It is an address to send to yourself on, not the
     /// address the socket is bound to.
     /// \return UNASSIGNED_SYSTEM_ADDRESS if \a socketIndex is outside the bound sockets or the Peer isn't running
-    virtual SystemAddress GetMyBoundAddress( const int socketIndex = 0 ) = 0;
+    [[nodiscard]] virtual SystemAddress GetMyBoundAddress( const int socketIndex = 0 ) = 0;
 
     /// Get a random 64-bit number from the operating system's random number source.
     /// See GLOSSARY.md for what a RakNetGUID promises.
@@ -422,7 +422,7 @@ public:
     ///
     /// \return 0 if the random source could not be read. Callers that cannot tolerate
     /// a zero must check for it - this is the only failure signal available.
-    static uint64_t Get64BitUniqueRandomNumber( void );
+    [[nodiscard]] static uint64_t Get64BitUniqueRandomNumber( void );
 
     /// Given a connected system, give us the unique GUID representing that instance of RakPeer.
     /// This will be the same on all systems connected to that instance of RakPeer, even if the external system addresses are different
@@ -431,14 +431,14 @@ public:
     /// If \a input is UNASSIGNED_SYSTEM_ADDRESS, will return your own GUID
     /// \pre Call Startup() first, or the function will return UNASSIGNED_RAKNET_GUID
     /// \param[in] input The system address of the system we are connected to
-    virtual RakNetGUID GetGuidFromSystemAddress( const SystemAddress input ) const = 0;
+    [[nodiscard]] virtual RakNetGUID GetGuidFromSystemAddress( const SystemAddress input ) const = 0;
 
     /// Given the GUID of a connected system, give us the system address of that system.
     /// The GUID will be the same on all systems connected to that instance of RakPeer, even if the external system addresses are different
     /// Currently O(log(n)), but this may be improved in the future. If you use this frequently, you may want to cache the value as it won't change.
     /// If \a input is UNASSIGNED_RAKNET_GUID, will return UNASSIGNED_SYSTEM_ADDRESS
     /// \param[in] input The RakNetGUID of the system we are checking to see if we are connected to
-    virtual SystemAddress GetSystemAddressFromGuid( const RakNetGUID input ) const = 0;
+    [[nodiscard]] virtual SystemAddress GetSystemAddressFromGuid( const RakNetGUID input ) const = 0;
 
     /// Set the time, in MS, to use before considering ourselves disconnected after not being able to deliver a reliable message.
     /// Default time is 10,000 or 10 seconds in release and 30,000 or 30 seconds in debug.
@@ -463,7 +463,7 @@ public:
     /// Returns an IP address at index 0 to GetNumberOfAddresses-1
     /// \param[in] index index into the list of IP addresses
     /// \return The local IP address at this index, or "" if \a index is out of range. The string belongs to the calling thread, and its next call to GetLocalIP overwrites it.
-    virtual const char* GetLocalIP( unsigned int index ) = 0;
+    [[nodiscard]] virtual const char* GetLocalIP( unsigned int index ) = 0;
 
     /// Is this a local IP?
     /// \param[in] An IP address to check, excluding the port
@@ -484,7 +484,7 @@ public:
     /// \param[in] dataLength length of data in bytes.  Use 0 if no data.
     /// \param[in] connectionSocketIndex Index into the array of socket descriptors passed to socketDescriptors in RakPeer::Startup() to send on.
     /// \return false if IsActive()==false or the host is unresolvable. True otherwise
-    virtual bool AdvertiseSystem( const char* host, unsigned short remotePort, const char* data, int dataLength, unsigned connectionSocketIndex = 0 ) = 0;
+    [[nodiscard]] virtual bool AdvertiseSystem( const char* host, unsigned short remotePort, const char* data, int dataLength, unsigned connectionSocketIndex = 0 ) = 0;
 
     /// Controls how often to return ID_DOWNLOAD_PROGRESS for large message downloads.
     /// ID_DOWNLOAD_PROGRESS is returned to indicate a new partial message chunk, roughly the MTU size, has arrived
@@ -510,7 +510,7 @@ public:
     /// Used for NAT-Punchthrough
     /// \return false, sending nothing, if host doesn't parse as an address. A socket that isn't
     /// a Berkeley socket sends nothing and returns true without parsing host.
-    virtual bool SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex = 0 ) = 0;
+    [[nodiscard]] virtual bool SendTTL( const char* host, unsigned short remotePort, int ttl, unsigned connectionSocketIndex = 0 ) = 0;
 
     // -------------------------------------------------------------------------------------------- Plugin Functions--------------------------------------------------------------------------------------------
     /// \brief Attaches a Plugin interface to an instance of the base class (RakPeer or PacketizedTCP) to run code automatically on message receipt in the Receive call.
@@ -540,13 +540,13 @@ public:
     /// You can add it to the receive buffer with PushBackPacket
     /// \param[in] dataSize How many bytes to allocate for the buffer
     /// \return A packet you can write to, or 0 if memory ran out (notifyOutOfMemory has been called)
-    virtual Packet* AllocatePacket( unsigned dataSize ) = 0;
+    [[nodiscard]] virtual Packet* AllocatePacket( unsigned dataSize ) = 0;
 
     /// Get the socket used with a particular connection
     /// \note Doesn't block. The pointer stays valid until Shutdown, which frees the socket.
     /// \param[in] target Which system, or UNASSIGNED_SYSTEM_ADDRESS for the first bound socket
     /// \return The socket, or 0 if there is no connection to \a target or the Peer isn't running
-    virtual RakNetSocket2* GetSocket( const SystemAddress target ) = 0;
+    [[nodiscard]] virtual RakNetSocket2* GetSocket( const SystemAddress target ) = 0;
 
     /// Get every bound socket, in the order Startup was given their SocketDescriptors
     /// \note Doesn't block. The pointers stay valid until Shutdown, which frees the sockets.
@@ -618,10 +618,10 @@ public:
     /// BLOCKING_QUERY_TIMEOUT_MS, or the peer is shut down, they fail as if the system
     /// weren't connected.
     /// \sa RakNetStatistics.h
-    virtual RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 ) = 0;
+    [[nodiscard]] virtual RakNetStatistics* GetStatistics( const SystemAddress systemAddress, RakNetStatistics* rns = 0 ) = 0;
     /// \brief Returns the network statistics of the system at the given index in the remoteSystemList.
     /// \return True if the index is less than the maximum number of peers allowed and the system is active. False otherwise.
-    virtual bool GetStatistics( const unsigned int index, RakNetStatistics* rns ) = 0;
+    [[nodiscard]] virtual bool GetStatistics( const unsigned int index, RakNetStatistics* rns ) = 0;
     /// \brief Returns the list of systems, and statistics for each of those systems
     /// Each system has one entry in each of the lists, in the same order. All of them come
     /// from one update cycle. The lists are empty on failure.
@@ -653,7 +653,7 @@ public:
     virtual bool RunUpdateCycle( BitStream& updateBitStream ) = 0;
 
     /// \internal
-    virtual bool SendOutOfBand( const char* host, unsigned short remotePort, const char* data, BitSize_t dataLength, unsigned connectionSocketIndex = 0 ) = 0;
+    [[nodiscard]] virtual bool SendOutOfBand( const char* host, unsigned short remotePort, const char* data, BitSize_t dataLength, unsigned connectionSocketIndex = 0 ) = 0;
 };
 
 } // namespace RakNet

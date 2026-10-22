@@ -27,6 +27,7 @@
 #include <cstring>
 #include <string>
 #include <thread>
+#include <tuple>
 
 /*
 Puts one server behind an incoming password and a ban list, then walks a single
@@ -441,7 +442,9 @@ RefusalAttempt RefuseInsideAckDelay( RakPeerInterface* client, RawSystemHarness:
     while( !attempt.sawAck && !ConnectionWaits::Expired( deadline ) )
     {
         RakNetStatistics statistics;
-        client->GetStatistics( serverAddress, &statistics );
+        // Only wakes the client's network thread, which sends the ack. Once the refusal
+        // closes the connection there are no statistics to get.
+        std::ignore = client->GetStatistics( serverAddress, &statistics );
         attempt.sawAck = server.PollForAck( refusalDatagram );
     }
 

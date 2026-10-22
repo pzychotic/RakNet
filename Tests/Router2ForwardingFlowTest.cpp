@@ -102,7 +102,7 @@ void CheckReaches( const std::vector<RakPeerInterface*>& peers, RakPeerInterface
 {
     BitStream bs;
     bs.Write( kUserMessage );
-    from->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, to->GetMyGUID(), false );
+    REQUIRE( from->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, to->GetMyGUID(), false ) != 0 );
     const Received received = PumpUntil( peers, to, kUserMessage );
     CHECK( received.peer == to );
     CHECK( received.guid == from->GetMyGUID() );
@@ -181,7 +181,7 @@ void RequestForwarding( RakPeerInterface* source, RakPeerInterface* router, RakP
     request.Write( (MessageID)ID_ROUTER_2_INTERNAL );
     request.Write( kRequestForwarding );
     request.Write( endpoint->GetMyGUID() );
-    source->Send( &request, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, router->GetMyGUID(), false );
+    REQUIRE( source->Send( &request, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, router->GetMyGUID(), false ) != 0 );
 }
 
 struct ForwardingReply
@@ -198,7 +198,7 @@ ForwardingReply QueryForwarding( const std::vector<RakPeerInterface*>& peers, Ra
     query.Write( (MessageID)ID_ROUTER_2_INTERNAL );
     query.Write( kQueryForwarding );
     query.Write( endpoint->GetMyGUID() );
-    prober->Send( &query, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, router->GetMyGUID(), false );
+    REQUIRE( prober->Send( &query, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, router->GetMyGUID(), false ) != 0 );
 
     const Received received = PumpUntil( peers, [prober]( const Received& each ) {
         return each.peer == prober && each.id == ID_ROUTER_2_INTERNAL && each.data.size() > 1 && each.data[1] == kReplyForwarding;
@@ -741,11 +741,11 @@ TEST_CASE( "Router2 routes after a forwarding reply from a system it did not ask
     reply.Write( kReplyForwarding );
     reply.Write( endpoint->GetMyGUID() );
     reply.Write( false );
-    stray->Send( &reply, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, source->GetMyGUID(), false );
+    REQUIRE( stray->Send( &reply, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, source->GetMyGUID(), false ) != 0 );
     // Ordered behind the reply, so the source has handled the reply once this arrives.
     BitStream marker;
     marker.Write( kUserMessage );
-    stray->Send( &marker, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, source->GetMyGUID(), false );
+    REQUIRE( stray->Send( &marker, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, source->GetMyGUID(), false ) != 0 );
     REQUIRE( PumpUntil( { source, stray }, source, kUserMessage ).peer == source );
 
     const RakNetGUID used = ConnectThroughRoute( peers, source, endpoint );

@@ -14,12 +14,12 @@ std::vector<MessageID> MarkerInjection::Inject( RakPeerInterface* sender, RakPee
     const RakNetGUID targetGuid = target->GetMyGUID();
     for( BitStream* message : messages )
     {
-        sender->Send( message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetGuid, false );
+        REQUIRE( sender->Send( message, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetGuid, false ) != 0 );
     }
 
     BitStream marker;
     marker.Write( kMarker );
-    sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetGuid, false );
+    REQUIRE( sender->Send( &marker, HIGH_PRIORITY, RELIABLE_ORDERED, 0, targetGuid, false ) != 0 );
 
     std::vector<MessageID> received;
     const bool markerCame = ConnectionWaits::WaitUntil(

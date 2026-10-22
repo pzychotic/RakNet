@@ -27,6 +27,7 @@
 #include <cstring>
 #include <random>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 /*
@@ -415,7 +416,7 @@ TEST_CASE( "Ten peers survive ten seconds of random connects, closes, sends and 
             const int peerIndex = static_cast<int>( rng() % kPeerNum );
             const unsigned short port = static_cast<unsigned short>( kBasePort + ( rng() % kPeerNum ) );
 
-            peerList[peerIndex]->Ping( "127.0.0.1", port, ( rng() % 2 ) > 0 );
+            std::ignore = peerList[peerIndex]->Ping( "127.0.0.1", port, ( rng() % 2 ) > 0 );
         }
         else if( nextAction < .21f )
         {

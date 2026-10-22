@@ -16,6 +16,7 @@
 #include <functional>
 #include <string>
 #include <thread>
+#include <tuple>
 
 /*
 Pins that a Message the network thread produces reaches Receive only once the published
@@ -197,8 +198,9 @@ TEST_CASE( "Receive hands out a connection change only once the published view s
         const unsigned char payload = ID_USER_PACKET_ENUM;
         while( pumping.load() )
         {
+            // Off the test thread, so it can't REQUIRE. A refused send only lightens the load.
             for( const SystemAddress& address : clientAddresses )
-                server->Send( (const char*)&payload, 1, HIGH_PRIORITY, UNRELIABLE, 0, address, false );
+                std::ignore = server->Send( (const char*)&payload, 1, HIGH_PRIORITY, UNRELIABLE, 0, address, false );
             std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
         }
     } );

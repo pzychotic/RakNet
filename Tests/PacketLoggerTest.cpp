@@ -18,6 +18,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 /*
@@ -371,7 +372,9 @@ TEST_CASE( "ThreadsafePacketLogger keeps every line logged from the network thre
     std::thread pingLoop( [&] {
         while( !stop.load() )
         {
-            pinger->Ping( "127.0.0.1", loggedPort, false );
+            // Off the test thread, so it can't REQUIRE. The host is a numeric literal, which
+            // Ping always parses.
+            std::ignore = pinger->Ping( "127.0.0.1", loggedPort, false );
             ConnectionWaits::Drain( pinger );
             std::this_thread::yield();
         }
@@ -466,7 +469,7 @@ TEST_CASE( "PacketLogger's setters may be called while the network thread logs",
 
     for( int i = 0; i < 100000 && logger.LineCount() < kLines; ++i )
     {
-        pinger->Ping( "127.0.0.1", loggedPort, false );
+        REQUIRE( pinger->Ping( "127.0.0.1", loggedPort, false ) );
         ConnectionWaits::Drain( pinger );
         logger.SetPrefix( ( i % 2 == 0 ? longPrefix : shortPrefix ).c_str() );
         logger.SetLogDirectMessages( false );
@@ -544,7 +547,7 @@ TEST_CASE( "PacketLogger formats a user ID on the application thread while the n
     size_t misformatted = 0;
     for( int i = 0; i < 100000 && CountLinesWithID( logger, networkID ) < kLines; ++i )
     {
-        sender->Send( message, sizeof( message ), HIGH_PRIORITY, RELIABLE, 0, logged->GetMyGUID(), false );
+        REQUIRE( sender->Send( message, sizeof( message ), HIGH_PRIORITY, RELIABLE, 0, logged->GetMyGUID(), false ) != 0 );
         for( int j = 0; j < 10; ++j )
         {
             char line[1024];
@@ -666,7 +669,7 @@ TEST_CASE( "PacketFileLogger::StartLog may be called while the network thread lo
                 drained, 2,
                 [&] {
                     for( size_t i = 0; i < count; ++i )
-                        pinger->Ping( "127.0.0.1", loggedPort, false );
+                        REQUIRE( pinger->Ping( "127.0.0.1", loggedPort, false ) );
                     return logger.linesLogged >= target;
                 },
                 ConnectionWaits::kSettleBudget ) );
@@ -741,7 +744,7 @@ void FillPastCapThenDrain( CountingThreadsafePacketLogger& logger )
 
     for( int i = 0; i < 10000 && logger.GetLinesRefused() == 0; ++i )
     {
-        pinger->Ping( "127.0.0.1", loggedPort, false );
+        REQUIRE( pinger->Ping( "127.0.0.1", loggedPort, false ) );
         ConnectionWaits::Drain( pinger );
         std::this_thread::yield();
     }

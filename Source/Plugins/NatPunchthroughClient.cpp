@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <tuple>
 
 namespace RakNet {
 
@@ -71,7 +72,8 @@ void NatPunchthroughClient::FindRouterPortStride( const SystemAddress& facilitat
 
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_NAT_REQUEST_BOUND_ADDRESSES );
-    rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, facilitator, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, facilitator, false );
 }
 bool NatPunchthroughClient::OpenNAT( RakNetGUID destination, const SystemAddress& facilitator )
 {
@@ -414,7 +416,8 @@ PluginReceiveResult NatPunchthroughClient::OnReceive( Packet* packet )
                 outgoingBs.Write( (MessageID)ID_NAT_PING );
                 uint16_t externalPort = rakPeerInterface->GetExternalID( packet->systemAddress ).GetPort();
                 outgoingBs.Write( externalPort );
-                rakPeerInterface->SendOutOfBand( (const char*)boundAddresses[i].ToString( false ), boundAddresses[i].GetPort(), (const char*)outgoingBs.GetData(), outgoingBs.GetNumberOfBytesUsed() );
+                // SendOutOfBand refuses only a stopped Peer or a host that doesn't parse, and this host is an address.
+                std::ignore = rakPeerInterface->SendOutOfBand( (const char*)boundAddresses[i].ToString( false ), boundAddresses[i].GetPort(), (const char*)outgoingBs.GetData(), outgoingBs.GetNumberOfBytesUsed() );
                 break;
             }
         }
@@ -700,7 +703,8 @@ void NatPunchthroughClient::SendTTL( const SystemAddress& sa )
     char ipAddressString[32];
     sa.ToString( false, ipAddressString );
     // TTL of 1 doesn't get past the router, 2 might hit the other system on a LAN
-    rakPeerInterface->SendTTL( ipAddressString, sa.GetPort(), 2 );
+    // The datagram only opens the router, and the attempt goes on whether it went out or not.
+    std::ignore = rakPeerInterface->SendTTL( ipAddressString, sa.GetPort(), 2 );
 }
 
 const char* TestModeToString( NatPunchthroughClient::SendPing::TestMode tm )
@@ -749,7 +753,8 @@ void NatPunchthroughClient::SendOutOfBand( SystemAddress sa, MessageID oobId )
         oob.Write( sa.GetPort() );
     char ipAddressString[32];
     sa.ToString( false, ipAddressString );
-    rakPeerInterface->SendOutOfBand( (const char*)ipAddressString, sa.GetPort(), (const char*)oob.GetData(), oob.GetNumberOfBytesUsed() );
+    // SendOutOfBand refuses only a stopped Peer or a host that doesn't parse, and this host is an address.
+    std::ignore = rakPeerInterface->SendOutOfBand( (const char*)ipAddressString, sa.GetPort(), (const char*)oob.GetData(), oob.GetNumberOfBytesUsed() );
 
     if( natPunchthroughDebugInterface )
     {
@@ -837,7 +842,8 @@ void NatPunchthroughClient::OnGetMostRecentPort( Packet* packet )
         portWithStride = mostRecentExternalPort;
     outgoingBs.Write( portWithStride );
 
-    rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
     sp.facilitator = packet->systemAddress;
 }
 
@@ -862,7 +868,8 @@ void NatPunchthroughClient::SendPunchthrough( RakNetGUID destination, const Syst
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_NAT_PUNCHTHROUGH_REQUEST );
     outgoingBs.Write( destination );
-    rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, facilitator, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, facilitator, false );
 
     //  RakAssert(rakPeerInterface->GetSystemAddressFromGuid(destination)==UNASSIGNED_SYSTEM_ADDRESS);
 
@@ -905,7 +912,8 @@ void NatPunchthroughClient::OnReadyForNextPunchthrough( void )
 
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_NAT_CLIENT_READY );
-    rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, sp.facilitator, false );
+    // Refused while no facilitator is set, when there is no one to tell.
+    std::ignore = rakPeerInterface->Send( &outgoingBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, sp.facilitator, false );
 }
 
 void NatPunchthroughClient::PushSuccess( void )

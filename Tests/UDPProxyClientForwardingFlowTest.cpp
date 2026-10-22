@@ -198,7 +198,7 @@ TEST_CASE( "UDPProxyClient's forwarding flow reaches a target that designated it
         CHECK( sourceHandler.proxyPort == targetHandler.proxyPort );
 
         // The proxy forwards: a ping from the source through it is answered by the target.
-        source->Ping( "127.0.0.1", sourceHandler.proxyPort, false );
+        REQUIRE( source->Ping( "127.0.0.1", sourceHandler.proxyPort, false ) );
         CHECK( PongFrom( peers, source, target->GetMyGUID() ) );
     }
 

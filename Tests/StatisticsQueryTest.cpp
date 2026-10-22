@@ -134,7 +134,10 @@ bool SendAndSettle( Peer& from, Peer& to, int count )
     char message[kMessageBytes] = {};
     message[0] = (char)ID_USER_PACKET_ENUM;
     for( int i = 0; i < count; i++ )
-        from->Send( message, kMessageBytes, HIGH_PRIORITY, RELIABLE_ORDERED, 0, to.Address(), false );
+    {
+        if( from->Send( message, kMessageBytes, HIGH_PRIORITY, RELIABLE_ORDERED, 0, to.Address(), false ) == 0 )
+            return false;
+    }
 
     return ConnectionWaits::WaitUntil(
         [&] {

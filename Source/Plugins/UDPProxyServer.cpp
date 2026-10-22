@@ -47,7 +47,8 @@ bool UDPProxyServer::LoginToCoordinator( const std::string& password, SystemAddr
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_LOGIN_REQUEST_FROM_SERVER_TO_COORDINATOR );
     outgoingBs.Write( password );
-    rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, coordinatorAddress, false );
+    if( rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, coordinatorAddress, false ) == 0 )
+        return false;
     loggingInCoordinators.insert( coordinatorAddress );
     return true;
 }
@@ -160,7 +161,8 @@ void UDPProxyServer::OnForwardingRequestFromCoordinatorToServer( Packet* packet 
     outgoingBs.Write( serverPublicIp );
     outgoingBs.Write( (unsigned char)success );
     outgoingBs.Write( forwardingPort );
-    rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
 }
 
 } // namespace RakNet

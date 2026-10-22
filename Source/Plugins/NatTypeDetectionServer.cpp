@@ -19,6 +19,7 @@
 #include "BitStream.h"
 
 #include <algorithm>
+#include <tuple>
 
 // #define NTDS_VERBOSE
 
@@ -127,7 +128,8 @@ void NatTypeDetectionServer::Update( void )
                         bs.Write( (unsigned char)NAT_TYPE_PORT_RESTRICTED );
                     }
 
-                    rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, it->systemAddress, false );
+                    // Send refuses this only once the Peer has stopped, which closes the connection too.
+                    std::ignore = rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, it->systemAddress, false );
 
                     // Done
                     natDetectionAttempts.erase( it );
@@ -227,7 +229,8 @@ void NatTypeDetectionServer::Update( void )
                 bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_REQUEST );
                 bs.Write( s3p4Address );
                 bs.Write( s3p4->GetBoundAddress().GetPort() );
-                rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
+                // Send refuses this only once the Peer has stopped, which closes the connection too.
+                std::ignore = rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
                 break;
             default:
 
@@ -236,7 +239,8 @@ void NatTypeDetectionServer::Update( void )
 #endif
                 bs.Write( (unsigned char)ID_NAT_TYPE_DETECTION_RESULT );
                 bs.Write( (unsigned char)NAT_TYPE_SYMMETRIC );
-                rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
+                // Send refuses this only once the Peer has stopped, which closes the connection too.
+                std::ignore = rakPeerInterface->Send( &bs, HIGH_PRIORITY, RELIABLE, 0, natDetectionAttempts[i].systemAddress, false );
                 natDetectionAttempts.erase( natDetectionAttempts.begin() + i );
                 i--;
                 break;
@@ -289,7 +293,8 @@ void NatTypeDetectionServer::OnDetectionRequest( Packet* packet )
             BitStream bsOut;
             bsOut.Write( (unsigned char)ID_NAT_TYPE_DETECTION_RESULT );
             bsOut.Write( (unsigned char)NAT_TYPE_UNKNOWN );
-            rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, false );
+            // Send refuses this only once the Peer has stopped, which closes the connection too.
+            std::ignore = rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, false );
             return;
         }
 

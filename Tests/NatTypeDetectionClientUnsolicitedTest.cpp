@@ -56,7 +56,7 @@ void SendRequest( RakPeerInterface* sender, const SystemAddress& client, unsigne
     bs.Write( (MessageID)ID_NAT_TYPE_DETECTION_REQUEST );
     bs.Write( std::string( "127.0.0.1" ) );
     bs.Write( s3p4Port );
-    sender->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false );
+    REQUIRE( sender->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false ) != 0 );
 }
 
 void SendResult( RakPeerInterface* sender, const SystemAddress& client, NATTypeDetectionResult result )
@@ -64,14 +64,14 @@ void SendResult( RakPeerInterface* sender, const SystemAddress& client, NATTypeD
     BitStream bs;
     bs.Write( (MessageID)ID_NAT_TYPE_DETECTION_RESULT );
     bs.Write( (unsigned char)result );
-    sender->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false );
+    REQUIRE( sender->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false ) != 0 );
 }
 
 void SendMarker( RakPeerInterface* sender, const SystemAddress& client )
 {
     BitStream bs;
     bs.Write( kMarker );
-    sender->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false );
+    REQUIRE( sender->Send( &bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, client, false ) != 0 );
 }
 
 // Whether an answer arrived within millisecondsToWait. Binding sends the socket four zero

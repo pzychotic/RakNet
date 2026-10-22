@@ -3252,7 +3252,8 @@ void RakPeer::PingInternal( const SystemAddress target, bool performImmediate, P
     if( performImmediate )
         SendImmediate( (char*)bitStream.GetData(), bitStream.GetNumberOfBitsUsed(), IMMEDIATE_PRIORITY, reliability, 0, target, false, false, RakNet::GetTimeUS(), 0 );
     else
-        Send( &bitStream, IMMEDIATE_PRIORITY, reliability, 0, target, false );
+        // Refused only for an undefined target, which has no one to ping.
+        std::ignore = Send( &bitStream, IMMEDIATE_PRIORITY, reliability, 0, target, false );
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::CloseConnectionInternal( const AddressOrGUID& systemIdentifier, bool sendDisconnectionNotification, bool performImmediate, unsigned char orderingChannel, PacketPriority disconnectionNotificationPriority )

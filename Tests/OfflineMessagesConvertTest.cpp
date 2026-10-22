@@ -92,7 +92,7 @@ TEST_CASE( "AdvertiseSystem's payload and SetOfflinePingResponse's data both rea
     // lost, and there is no retry below.
     std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
 
-    advertiser->AdvertiseSystem( "127.0.0.1", kListenerPort, kAdvertisedData, static_cast<int>( strlen( kAdvertisedData ) ) + 1 );
+    REQUIRE( advertiser->AdvertiseSystem( "127.0.0.1", kListenerPort, kAdvertisedData, static_cast<int>( strlen( kAdvertisedData ) ) + 1 ) );
 
     bool gotAdvertisement = false;
     std::string advertisedData;
@@ -117,7 +117,7 @@ TEST_CASE( "AdvertiseSystem's payload and SetOfflinePingResponse's data both rea
 
                 // The advertisement is what tells the listener there is something
                 // at kAdvertiserPort worth pinging.
-                listener->Ping( "127.0.0.1", kAdvertiserPort, false );
+                REQUIRE( listener->Ping( "127.0.0.1", kAdvertiserPort, false ) );
             }
             else if( packet->data[0] == ID_UNCONNECTED_PONG )
             {

@@ -74,7 +74,7 @@ TEST_CASE( "NatPunchthroughClient skips an unassigned bound address and pings th
                 answer.Write( (unsigned char)2 );
                 answer.Write( UNASSIGNED_SYSTEM_ADDRESS );
                 answer.Write( pingedAddress );
-                facilitator->Send( &answer, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+                CHECK( facilitator->Send( &answer, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false ) != 0 );
             }
             facilitator->DeallocatePacket( packet );
         }

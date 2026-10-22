@@ -32,6 +32,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [Numbers in strings are read whole](#numbers-in-strings-are-read-whole)
 - [`BitStream` reads warn when their result is ignored](#bitstream-reads-warn-when-their-result-is-ignored)
 - [`Startup` and `Connect` results warn when ignored](#startup-and-connect-results-warn-when-ignored)
+- [`RakPeerInterface` failure results warn when ignored](#rakpeerinterface-failure-results-warn-when-ignored)
 
 ## What did *not* change: the core protocol
 
@@ -1272,3 +1273,37 @@ flight can be refused with `CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS` or
 `ALREADY_CONNECTED_TO_ENDPOINT`, which mean that attempt is still going or has connected,
 so poll on.
 `INVALID_PARAMETER` and `CANNOT_RESOLVE_DOMAIN_NAME` do not change on a retry.
+
+## `RakPeerInterface` failure results warn when ignored
+
+**Every `RakPeerInterface` function whose result reports a failure is `[[nodiscard]]`,** on
+`RakPeerInterface` and on `RakPeer`. That is `Send` (both), `SendList`, `Ping( host, … )`,
+`AdvertiseSystem`, `SendTTL`, `SendOutOfBand`, `GetConnectionList`, both `GetStatistics`,
+`AllocatePacket`, `GetSocket`, `GetLocalIP`, `Get64BitUniqueRandomNumber`, and the lookups
+that answer a sentinel when the System isn't there: `GetIndexFromSystemAddress`,
+`GetSystemAddressFromIndex`, `GetGUIDFromIndex`, `GetGuidFromSystemAddress`,
+`GetSystemAddressFromGuid`, `GetInternalID`, `GetExternalID`, `GetMyBoundAddress`,
+`GetAveragePing`, `GetLastPing`, `GetLowestPing` and `GetClockDifferential`. Dropping the
+result warns as in the entry above: `-Wunused-result` on GCC and Clang, C4834 on MSVC. What
+the calls do is unchanged.
+
+Most of these are getters nobody calls for nothing. The ones you will meet are `Send` and
+`Ping`. `Send` returns 0 when it refuses the message: an empty or over-`MAXIMUM_MESSAGE_SIZE`
+message, an undefined target without `broadcast`, or a stopped Peer. A refused message goes
+nowhere, and nothing arrives later to say so. Where a refusal can't happen, or doesn't
+matter, write `std::ignore = peer->Send( … );` with a comment saying why. A loop that calls
+`GetStatistics` only to wait for an update cycle does the same.
+
+Three plugin calls that went on after their request was refused now fail instead:
+
+- `UDPProxyClient::RequestForwarding` returns false, and adds no outstanding request.
+- `UDPProxyServer::LoginToCoordinator` returns false, and a later login to that coordinator
+  is not refused as already in progress.
+- `NatTypeDetectionClient::DetectNATType` reports `NAT_TYPE_UNKNOWN` at once, as when its
+  socket fails to bind, rather than never reporting.
+
+`RakNetCommandParser`'s `Ping2` and `AdvertiseSystem` commands now answer with the call's
+result, `true` or `false`, as `Startup` and `IsActive` already did.
+
+`Startup` and `Connect` already warned through their result types, and `Receive`,
+`GetConnectionState`, `IsBanned` and the other getters with no failure value are not marked.

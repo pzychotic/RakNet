@@ -183,8 +183,7 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "Ping2" ) == 0 )
     {
-        peer->Ping( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), ParseArgument<int>( parameterList[2] ) != 0 );
-        ReturnResult( command, transport, systemAddress );
+        ReturnResult( peer->Ping( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), ParseArgument<int>( parameterList[2] ) != 0 ), command, transport, systemAddress );
     }
     else if( strcmp( command, "GetAveragePing" ) == 0 )
     {
@@ -240,8 +239,7 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     }
     else if( strcmp( command, "AdvertiseSystem" ) == 0 )
     {
-        peer->AdvertiseSystem( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), parameterList[2], ParseArgument<int>( parameterList[3] ) );
-        ReturnResult( command, transport, systemAddress );
+        ReturnResult( peer->AdvertiseSystem( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), parameterList[2], ParseArgument<int>( parameterList[3] ) ), command, transport, systemAddress );
     }
     else if( strcmp( command, "SetIncomingPassword" ) == 0 )
     {

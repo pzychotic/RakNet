@@ -47,7 +47,7 @@ TEST_CASE( "An unconnected client's AdvertiseSystem reaches a server as ID_ADVER
     RakPeerInterface* client = peers.Client();
     RakPeerInterface* server = peers.Server( kServerPort );
 
-    client->AdvertiseSystem( "127.0.0.1", kServerPort, 0, 0 );
+    REQUIRE( client->AdvertiseSystem( "127.0.0.1", kServerPort, 0, 0 ) );
 
     CHECK( ConnectionWaits::WaitForMessage( server, ID_ADVERTISE_SYSTEM, 5000 ) );
 }

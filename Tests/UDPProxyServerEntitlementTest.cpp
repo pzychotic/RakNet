@@ -60,7 +60,7 @@ TEST_CASE( "A UDPProxyServer ignores a forwarding request from a system it has n
     request.Write( SystemAddress( "10.0.1.1", 2001 ) );
     request.Write( SystemAddress( "10.0.1.2", 2002 ) );
     request.Write( kForwardingTimeoutMs );
-    stranger->Send( &request, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, SystemAddress( "127.0.0.1", kProxyServerPort ), false );
+    REQUIRE( stranger->Send( &request, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, SystemAddress( "127.0.0.1", kProxyServerPort ), false ) != 0 );
 
     bool replied = false;
     const TimeMS deadline = GetTimeMS() + kSilenceMs;

@@ -214,3 +214,20 @@ TEST_CASE( "NatTypeDetectionClient reports NAT_TYPE_UNKNOWN when c2 fails to bin
 
     peer->DetachPlugin( &client );
 }
+
+TEST_CASE( "NatTypeDetectionClient reports NAT_TYPE_UNKNOWN when its request is refused", "[nattypedetection][network]" )
+{
+    ExposedClient client;
+
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Client();
+    peer->AttachPlugin( &client );
+
+    // Send refuses a request to an unassigned address.
+    client.DetectNATType( UNASSIGNED_SYSTEM_ADDRESS );
+
+    CHECK( WaitForDetectionResult( peer, 0 ) == NAT_TYPE_UNKNOWN );
+    CHECK( client.C2() == 0 );
+
+    peer->DetachPlugin( &client );
+}

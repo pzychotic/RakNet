@@ -163,7 +163,7 @@ TEST_CASE( "A server times out clients that close silently, and never holds two 
         for( int i = 0; i < kNumberOfClients; i++ )
         {
             unsigned short connections = 0;
-            clients[i]->GetConnectionList( 0, &connections );
+            REQUIRE( clients[i]->GetConnectionList( 0, &connections ) );
 
             if( connections != 0 )
             {
@@ -193,7 +193,7 @@ TEST_CASE( "A server times out clients that close silently, and never holds two 
             dropRounds++;
 
             unsigned short serverConnections = 0;
-            server->GetConnectionList( 0, &serverConnections );
+            REQUIRE( server->GetConnectionList( 0, &serverConnections ) );
 
             const unsigned short clientsConnected = connectedClientCount();
 

@@ -162,6 +162,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorEntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorPingOrderTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyCoordinatorRemovalTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyRefusedRequestTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UDPProxyServerEntitlementTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WSAStartupSingletonTest.cpp
 )

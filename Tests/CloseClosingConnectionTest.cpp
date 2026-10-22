@@ -100,7 +100,7 @@ void DrainCountingWhileQuiet( RakPeerInterface* peer, const SystemAddress& syste
 void Wake( RakPeerInterface* peer, const SystemAddress& system )
 {
     const unsigned char probe = ID_USER_PACKET_ENUM;
-    peer->Send( reinterpret_cast<const char*>( &probe ), 1, IMMEDIATE_PRIORITY, RELIABLE_ORDERED, 0, system, false );
+    REQUIRE( peer->Send( reinterpret_cast<const char*>( &probe ), 1, IMMEDIATE_PRIORITY, RELIABLE_ORDERED, 0, system, false ) != 0 );
 }
 
 // Connects A to B and lets the connect's traffic, its pings and their acks, die down.

@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <string>
+#include <tuple>
 
 namespace RakNet {
 
@@ -74,6 +75,18 @@ bool UDPProxyClient::AddOutstandingRequest( const OutstandingRequest& request )
     outstandingRequests.push_back( request );
     return true;
 }
+bool UDPProxyClient::SendOutstandingRequest( const OutstandingRequest& request, const BitStream& outgoingBs )
+{
+    const size_t requestCount = outstandingRequests.size();
+    if( !AddOutstandingRequest( request ) )
+        return false;
+    if( rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, request.coordinatorAddress, false ) != 0 )
+        return true;
+    // A repeat added nothing, and the request it repeats is still in flight.
+    if( outstandingRequests.size() > requestCount )
+        outstandingRequests.pop_back();
+    return false;
+}
 std::vector<UDPProxyClient::OutstandingRequest>::iterator UDPProxyClient::FindOutstandingRequest( const SystemAddress& coordinatorAddress, const SystemAddress& targetAddress, RakNetGUID targetGuid )
 {
     return std::find_if( outstandingRequests.begin(), outstandingRequests.end(), [&]( const OutstandingRequest& request ) {
@@ -101,8 +114,6 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
     request.targetGuid = targetGuid;
     request.requestTime = RakNet::GetTimeMS();
     request.timeoutOnNoDataMS = timeoutOnNoDataMS;
-    if( !AddOutstandingRequest( request ) )
-        return false;
 
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
@@ -120,9 +131,7 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
     {
         outgoingBs.Write( false );
     }
-    rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, proxyCoordinator, false );
-
-    return true;
+    return SendOutstandingRequest( request, outgoingBs );
 }
 bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAddress sourceAddress, SystemAddress targetAddressAsSeenFromCoordinator, RakNet::TimeMS timeoutOnNoDataMS, BitStream* serverSelectionBitstream )
 {
@@ -143,8 +152,6 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
     request.targetGuid = UNASSIGNED_RAKNET_GUID;
     request.requestTime = RakNet::GetTimeMS();
     request.timeoutOnNoDataMS = timeoutOnNoDataMS;
-    if( !AddOutstandingRequest( request ) )
-        return false;
 
     BitStream outgoingBs;
     outgoingBs.Write( (MessageID)ID_UDP_PROXY_GENERAL );
@@ -162,9 +169,7 @@ bool UDPProxyClient::RequestForwarding( SystemAddress proxyCoordinator, SystemAd
     {
         outgoingBs.Write( false );
     }
-    rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, proxyCoordinator, false );
-
-    return true;
+    return SendOutstandingRequest( request, outgoingBs );
 }
 void UDPProxyClient::Update( void )
 {
@@ -293,7 +298,8 @@ PluginReceiveResult UDPProxyClient::OnReceive( Packet* packet )
                     // Send a datagram to the proxy, so if we are behind a router, that router adds an entry to the routing table.
                     // Otherwise the router would block the incoming datagrams from source
                     // It doesn't matter if the message actually arrives as long as it goes through the router
-                    rakPeerInterface->Ping( serverIP.c_str(), forwardingPort, false );
+                    // So a refused ping is no failure either.
+                    std::ignore = rakPeerInterface->Ping( serverIP.c_str(), forwardingPort, false );
 
                     if( resultHandler )
                         resultHandler->OnForwardingNotification( serverIP.c_str(), forwardingPort, packet->systemAddress, senderAddress, targetAddress, targetGuid, this );
@@ -417,7 +423,8 @@ void UDPProxyClient::OnPingServers( Packet* packet )
     {
         psg->serversToPing.emplace_back( ServerWithPing{ DEFAULT_UNRESPONSIVE_PING_TIME_COORDINATOR, server } );
         server.ToString( false, ipStr );
-        rakPeerInterface->Ping( ipStr, server.GetPort(), false, 0 );
+        // A server whose ping is refused stays unresponsive, like one that never answers.
+        std::ignore = rakPeerInterface->Ping( ipStr, server.GetPort(), false, 0 );
     }
     pingServerGroups.push_back( std::move( psg ) );
 }
@@ -441,7 +448,8 @@ void UDPProxyClient::PingServerGroup::SendPingedServersToCoordinator( RakPeerInt
         outgoingBs.Write( rServer.serverAddress );
         outgoingBs.Write( rServer.ping );
     }
-    rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, coordinatorAddressForPings, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &outgoingBs, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, coordinatorAddressForPings, false );
 }
 void UDPProxyClient::Clear( void )
 {

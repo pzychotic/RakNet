@@ -87,7 +87,7 @@ TEST_CASE( "NatPunchthroughClient sends each queued OpenNAT once and in order", 
                 BitStream answer;
                 answer.Write( (MessageID)ID_NAT_RESPOND_BOUND_ADDRESSES );
                 answer.Write( (unsigned char)0 );
-                facilitator->Send( &answer, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false );
+                CHECK( facilitator->Send( &answer, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false ) != 0 );
             }
             else if( packet->data[0] == ID_NAT_PUNCHTHROUGH_REQUEST )
             {

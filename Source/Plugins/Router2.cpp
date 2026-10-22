@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <tuple>
 
 namespace RakNet {
 
@@ -318,7 +319,8 @@ PluginReceiveResult Router2::OnReceive( Packet* packet )
             BitStream bsOut;
             bsOut.Write( (MessageID)ID_ROUTER_2_INTERNAL );
             bsOut.Write( (unsigned char)ID_ROUTER_2_INCREASE_TIMEOUT );
-            rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE, 0, packet->guid, false );
+            // Send refuses this only once the Peer has stopped, which closes the connection too.
+            std::ignore = rakPeerInterface->Send( &bsOut, HIGH_PRIORITY, RELIABLE, 0, packet->guid, false );
 
             if( debugInterface )
             {
@@ -614,7 +616,8 @@ void Router2::RequestForwarding( ConnnectRequest* connectionRequest )
     bsOut.Write( (MessageID)ID_ROUTER_2_INTERNAL );
     bsOut.Write( (unsigned char)ID_ROUTER_2_REQUEST_FORWARDING );
     bsOut.Write( connectionRequest->endpointGuid );
-    rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, connectionRequest->lastRequestedForwardingSystem, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, connectionRequest->lastRequestedForwardingSystem, false );
 
     if( debugInterface )
     {
@@ -632,7 +635,8 @@ void Router2::SendFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endp
     bsOut.Write( (unsigned char)ID_ROUTER_2_REPLY_FORWARDING );
     bsOut.Write( endpointGuid );
     bsOut.Write( false );
-    rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, sourceGuid, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, sourceGuid, false );
 }
 
 int Router2::ReturnFailureOnCannotForward( RakNetGUID sourceGuid, RakNetGUID endpointGuid )
@@ -704,7 +708,8 @@ void Router2::OnQueryForwarding( Packet* packet )
     bsOut.Write( true );
     bsOut.Write( (unsigned short)pingToEndpoint );
     bsOut.Write( (unsigned short)udpForwarder->GetUsedForwardEntries() );
-    rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->guid, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, packet->guid, false );
 
     if( debugInterface )
     {
@@ -775,7 +780,8 @@ void Router2::SendForwardingSuccess( MessageID messageId, RakNetGUID sourceGuid,
     bsOut.Write( messageId );
     bsOut.Write( endpointGuid );
     bsOut.Write( sourceToDstPort );
-    rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, sourceGuid, false );
+    // Send refuses this only once the Peer has stopped, which closes the connection too.
+    std::ignore = rakPeerInterface->Send( &bsOut, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, sourceGuid, false );
 
     if( debugInterface )
     {
@@ -797,7 +803,8 @@ void Router2::SendOOBFromRakNetPort( OutOfBandIdentifiers oob, BitStream* extraD
     }
     char ipAddressString[32];
     sa.ToString( false, ipAddressString );
-    rakPeerInterface->SendOutOfBand( (const char*)ipAddressString, sa.GetPort(), (const char*)oobBs.GetData(), oobBs.GetNumberOfBytesUsed() );
+    // SendOutOfBand refuses only a stopped Peer or a host that doesn't parse, and this host is an address.
+    std::ignore = rakPeerInterface->SendOutOfBand( (const char*)ipAddressString, sa.GetPort(), (const char*)oobBs.GetData(), oobBs.GetNumberOfBytesUsed() );
 }
 
 void Router2::SendOOBFromSpecifiedSocket( OutOfBandIdentifiers oob, SystemAddress sa, __UDPSOCKET__ socket )

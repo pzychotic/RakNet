@@ -94,7 +94,7 @@ void Login( RakPeerInterface* coordinator, RakPeerInterface* server )
     login.Write( (MessageID)ID_UDP_PROXY_GENERAL );
     login.Write( (MessageID)ID_UDP_PROXY_LOGIN_REQUEST_FROM_SERVER_TO_COORDINATOR );
     login.Write( std::string( kPassword ) );
-    server->Send( &login, HIGH_PRIORITY, RELIABLE_ORDERED, 0, kCoordinatorAddress, false );
+    REQUIRE( server->Send( &login, HIGH_PRIORITY, RELIABLE_ORDERED, 0, kCoordinatorAddress, false ) != 0 );
 
     BitStream reply;
     REQUIRE( AwaitProxyMessage( coordinator, server, ID_UDP_PROXY_LOGIN_SUCCESS_FROM_COORDINATOR_TO_SERVER, reply ) );

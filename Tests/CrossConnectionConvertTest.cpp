@@ -143,7 +143,7 @@ TEST_CASE( "Two peers connecting to each other at the same instant both get a co
         }
     };
 
-    client->Ping( "127.0.0.1", kServerPort, false );
+    REQUIRE( client->Ping( "127.0.0.1", kServerPort, false ) );
 
     int roundsChecked = 0;
 
@@ -189,7 +189,7 @@ TEST_CASE( "Two peers connecting to each other at the same instant both get a co
         if( nextRoundStartTime != 0 && Expired( nextRoundStartTime ) )
         {
             nextRoundStartTime = 0;
-            client->Ping( "127.0.0.1", kServerPort, false );
+            REQUIRE( client->Ping( "127.0.0.1", kServerPort, false ) );
         }
 
         // A yield, not a pause, and kept at zero deliberately: the handshake this

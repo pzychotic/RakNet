@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <tuple>
 #include "LinuxStrings.h"
 
 namespace RakNet {
@@ -65,7 +66,8 @@ void RakNetTransport2::Send( SystemAddress systemAddress, const char* data, ... 
     str.Write( (MessageID)ID_TRANSPORT_STRING );
     str.Write( text, (int)strlen( text ) );
     str.Write( (unsigned char)0 ); // Null terminate the string
-    rakPeerInterface->Send( &str, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, ( systemAddress == UNASSIGNED_SYSTEM_ADDRESS ) != 0 );
+    // TransportInterface::Send has no result, and Send refuses this only once the Peer has stopped.
+    std::ignore = rakPeerInterface->Send( &str, MEDIUM_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, ( systemAddress == UNASSIGNED_SYSTEM_ADDRESS ) != 0 );
 }
 void RakNetTransport2::CloseConnection( SystemAddress systemAddress )
 {
