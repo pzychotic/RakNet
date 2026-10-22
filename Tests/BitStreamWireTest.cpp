@@ -1,11 +1,13 @@
 #include "BitStream.h"
 #include "RakMemoryOverride.h"
+#include "StringCompressorScope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <vector>
 
 /*
@@ -250,4 +252,156 @@ TEST_CASE( "WriteOrthMatrix takes a negative trace sum as zero", "[bitstream]" )
     CHECK( WrittenOrthMatrix( -1.0f, -1.0f, 1.0f ) == std::vector<int>{ 0x00, 0x00, 0x00, 0x00, 0x0F, 0xFF, 0xF0 } );
     // w's sum is -2, taken as 0; x's, y's and z's are 2.
     CHECK( WrittenOrthMatrix( -1.0f, -1.0f, -1.0f ) == std::vector<int>{ 0x0B, 0x50, 0x4B, 0x50, 0x4B, 0x50, 0x40 } );
+}
+
+TEST_CASE( "Types with their own encoding write fixed bytes", "[bitstream]" )
+{
+    const SystemAddress address( "10.0.0.1", 0x1234 );
+    const RakNetGUID guid( 0x0102030405060708 );
+    // The IP version, the address inverted bit by bit, then the port, all in network order.
+    const std::vector<int> addressBytes{ 0x04, 0xF5, 0xFF, 0xFF, 0xFE, 0x12, 0x34 };
+    const std::vector<int> guidBytes{ 1, 2, 3, 4, 5, 6, 7, 8 };
+    // A uint24_t is byte-aligned and little-endian.
+    const std::vector<int> uint24Bytes{ 0x56, 0x34, 0x12 };
+
+    SECTION( "Write" )
+    {
+        CHECK( Written( true ) == std::vector<int>{ 0x80 } );
+        CHECK( Written( false ) == std::vector<int>{ 0x00 } );
+        CHECK( Written( address ) == addressBytes );
+        CHECK( Written( uint24_t( 0x123456 ) ) == uint24Bytes );
+        CHECK( Written( guid ) == guidBytes );
+        CHECK( Written( std::string( "ab" ) ) == std::vector<int>{ 0x00, 0x02, 0x61, 0x62 } );
+
+        BitStream bs;
+        bs.Write( true );
+        bs.Write( uint24_t( 0x123456 ) );
+        CHECK( Bytes( bs ) == std::vector<int>{ 0x80, 0x56, 0x34, 0x12 } );
+    }
+
+    SECTION( "WriteCompressed" )
+    {
+        CHECK( WrittenCompressed( true ) == std::vector<int>{ 0x80 } );
+        CHECK( WrittenCompressed( address ) == addressBytes );
+        CHECK( WrittenCompressed( uint24_t( 0x123456 ) ) == uint24Bytes );
+        CHECK( WrittenCompressed( guid ) == guidBytes );
+        CHECK( WrittenCompressed( 0.5f ) == std::vector<int>{ 0xBF, 0xFF } );
+        CHECK( WrittenCompressed( 0.5 ) == std::vector<int>{ 0xC0, 0x00, 0x00, 0x00 } );
+
+        StringCompressorScope compressor;
+        CHECK( WrittenCompressed( std::string( "ab" ) ) == std::vector<int>{ 0x00, 0x00, 0x00, 0x08, 0x31, 0xEA, 0x80 } );
+    }
+
+    SECTION( "A bool delta is the bool alone" )
+    {
+        BitStream delta;
+        delta.WriteDelta( true, true );
+        CHECK( Bytes( delta ) == std::vector<int>{ 0x80 } );
+
+        BitStream compressedDelta;
+        compressedDelta.WriteCompressedDelta( true, true );
+        CHECK( Bytes( compressedDelta ) == std::vector<int>{ 0x80 } );
+
+        BitStream compressedDeltaNoLast;
+        compressedDeltaNoLast.WriteCompressedDelta( false );
+        CHECK( Bytes( compressedDeltaNoLast ) == std::vector<int>{ 0x00 } );
+    }
+}
+
+TEST_CASE( "Types with their own encoding read fixed bytes", "[bitstream]" )
+{
+    unsigned char trueWire[] = { 0x80 };
+    unsigned char addressWire[] = { 0x04, 0xF5, 0xFF, 0xFF, 0xFE, 0x12, 0x34 };
+    // A bit before the uint24_t, which the read skips to the byte boundary.
+    unsigned char uint24Wire[] = { 0x80, 0x56, 0x34, 0x12 };
+    unsigned char guidWire[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    unsigned char stringWire[] = { 0x00, 0x02, 0x61, 0x62 };
+    unsigned char compressedStringWire[] = { 0x00, 0x00, 0x00, 0x08, 0x31, 0xEA, 0x80 };
+    unsigned char floatWire[] = { 0xBF, 0xFF };
+    unsigned char doubleWire[] = { 0xC0, 0x00, 0x00, 0x00 };
+
+    SECTION( "Read" )
+    {
+        BitStream boolStream( trueWire, sizeof( trueWire ), false );
+        bool b = false;
+        REQUIRE( boolStream.Read( b ) );
+        CHECK( b );
+
+        BitStream addressStream( addressWire, sizeof( addressWire ), false );
+        SystemAddress address;
+        REQUIRE( addressStream.Read( address ) );
+        CHECK( address == SystemAddress( "10.0.0.1", 0x1234 ) );
+        CHECK( address.GetPort() == 0x1234 );
+
+        BitStream uint24Stream( uint24Wire, sizeof( uint24Wire ), false );
+        REQUIRE( uint24Stream.Read( b ) );
+        uint24_t u24;
+        REQUIRE( uint24Stream.Read( u24 ) );
+        CHECK( u24.val == 0x123456 );
+
+        BitStream guidStream( guidWire, sizeof( guidWire ), false );
+        RakNetGUID guid;
+        REQUIRE( guidStream.Read( guid ) );
+        CHECK( guid.g == 0x0102030405060708 );
+
+        BitStream stringStream( stringWire, sizeof( stringWire ), false );
+        std::string s;
+        REQUIRE( stringStream.Read( s ) );
+        CHECK( s == "ab" );
+    }
+
+    SECTION( "ReadCompressed" )
+    {
+        BitStream boolStream( trueWire, sizeof( trueWire ), false );
+        bool b = false;
+        REQUIRE( boolStream.ReadCompressed( b ) );
+        CHECK( b );
+
+        BitStream addressStream( addressWire, sizeof( addressWire ), false );
+        SystemAddress address;
+        REQUIRE( addressStream.ReadCompressed( address ) );
+        CHECK( address == SystemAddress( "10.0.0.1", 0x1234 ) );
+
+        BitStream uint24Stream( uint24Wire, sizeof( uint24Wire ), false );
+        REQUIRE( uint24Stream.Read( b ) );
+        uint24_t u24;
+        REQUIRE( uint24Stream.ReadCompressed( u24 ) );
+        CHECK( u24.val == 0x123456 );
+
+        BitStream guidStream( guidWire, sizeof( guidWire ), false );
+        RakNetGUID guid;
+        REQUIRE( guidStream.ReadCompressed( guid ) );
+        CHECK( guid.g == 0x0102030405060708 );
+
+        BitStream floatStream( floatWire, sizeof( floatWire ), false );
+        float f = 0;
+        REQUIRE( floatStream.ReadCompressed( f ) );
+        CHECK( f == 0xBFFF / 32767.5f - 1.0f );
+
+        BitStream doubleStream( doubleWire, sizeof( doubleWire ), false );
+        double d = 0;
+        REQUIRE( doubleStream.ReadCompressed( d ) );
+        CHECK( d == 0.5 );
+
+        StringCompressorScope compressor;
+        BitStream stringStream( compressedStringWire, sizeof( compressedStringWire ), false );
+        std::string s;
+        REQUIRE( stringStream.ReadCompressed( s ) );
+        CHECK( s == "ab" );
+    }
+
+    SECTION( "A bool delta is the bool alone" )
+    {
+        BitStream deltaStream( trueWire, sizeof( trueWire ), false );
+        bool b = false;
+        REQUIRE( deltaStream.ReadDelta( b ) );
+        CHECK( b );
+        CHECK( deltaStream.GetNumberOfUnreadBits() == 7 );
+
+        BitStream compressedDeltaStream( trueWire, sizeof( trueWire ), false );
+        b = false;
+        REQUIRE( compressedDeltaStream.ReadCompressedDelta( b ) );
+        CHECK( b );
+        CHECK( compressedDeltaStream.GetNumberOfUnreadBits() == 7 );
+    }
 }

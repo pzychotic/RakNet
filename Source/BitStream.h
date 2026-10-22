@@ -20,6 +20,7 @@
 #include <cfloat>
 #include <cstddef>
 #include <string>
+#include <type_traits>
 #include "RakMemoryOverride.h"
 #include "RakNetDefines.h"
 #include "Export.h"
@@ -212,6 +213,10 @@ public:
     /// \brief Write any integral type to a bitstream.
     /// \details Undefine __BITSTREAM_NATIVE_END if you need endian swapping.
     /// \param[in] inTemplateVar The value to write
+    /// \note A bool is one bit. A SystemAddress is its IP version, then an IPv4 address inverted bit by
+    /// bit and its port, or the raw IPv6 sockaddr; none of it is endian swapped. A uint24_t is
+    /// three bytes, byte-aligned and little-endian. A RakNetGUID is its uint64_t. A std::string
+    /// is Serialize( const std::string& ).
     template<class templateType>
     void Write( const templateType& inTemplateVar );
 
@@ -288,6 +293,7 @@ public:
     /// the current value will be written.  Otherwise, a single bit will be written
     /// \param[in] currentValue The current value to write
     /// \param[in] lastValue The last value to compare against
+    /// \note A bool is written as Write( bool ) alone, with no changed bit.
     template<class templateType>
     void WriteDelta( const templateType& currentValue, const templateType& lastValue );
 
@@ -302,6 +308,8 @@ public:
     /// For floating point, this is lossy, using 2 bytes for a float and 4 for a double.  The range must be between -1 and +1.
     /// For non-floating point, this is lossless, but only has benefit if you use less than half the bits of the type
     /// \param[in] inTemplateVar The value to write
+    /// \note A bool, SystemAddress, uint24_t or RakNetGUID is written as Write() writes it. A float or
+    /// double in [-1, 1] is a uint16_t or uint32_t. A std::string is SerializeCompressed().
     template<class templateType>
     void WriteCompressed( const templateType& inTemplateVar );
 
@@ -350,10 +358,12 @@ public:
     /// If you are not using __BITSTREAM_NATIVE_END the opposite is true for types larger than 1 byte
     /// \param[in] currentValue The current value to write
     /// \param[in] lastValue The last value to compare against
+    /// \note A bool is written as Write( bool ) alone, with no changed bit.
     template<class templateType>
     void WriteCompressedDelta( const templateType& currentValue, const templateType& lastValue );
 
     /// \brief Save as WriteCompressedDelta(const templateType &currentValue, const templateType &lastValue) when we have an unknown second parameter
+    /// \note A bool is written as Write( bool ) alone, with no changed bit.
     template<class templateType>
     void WriteCompressedDelta( const templateType& currentValue );
 
@@ -361,6 +371,7 @@ public:
     /// \details Define __BITSTREAM_NATIVE_END if you need endian swapping.
     /// \param[in] outTemplateVar The value to read
     /// \return true on success, false on failure.
+    /// \note Reads a bool, SystemAddress, uint24_t, RakNetGUID or std::string in the form Write() gives it.
     template<class templateType>
     [[nodiscard]] bool Read( templateType& outTemplateVar );
 
@@ -408,6 +419,7 @@ public:
     /// ReadDelta is only valid from a previous call to WriteDelta
     /// \param[in] outTemplateVar The value to read
     /// \return true on success, false on failure.
+    /// \note A bool is read as Read( bool ) alone, with no changed bit.
     template<class templateType>
     [[nodiscard]] bool ReadDelta( templateType& outTemplateVar );
 
@@ -418,6 +430,8 @@ public:
     /// If you are not using __BITSTREAM_NATIVE_END the opposite is true for types larger than 1 byte
     /// \param[in] outTemplateVar The value to read
     /// \return true on success, false on failure.
+    /// \note Reads a bool, SystemAddress, uint24_t, RakNetGUID, float, double or std::string in the form
+    /// WriteCompressed() gives it.
     template<class templateType>
     [[nodiscard]] bool ReadCompressed( templateType& outTemplateVar );
 
@@ -452,6 +466,7 @@ public:
     /// ReadCompressedDelta is only valid from a previous call to WriteDelta
     /// \param[in] outTemplateVar The value to read
     /// \return true on success, false on failure.
+    /// \note A bool is read as Read( bool ) alone, with no changed bit.
     template<class templateType>
     [[nodiscard]] bool ReadCompressedDelta( templateType& outTemplateVar );
 
@@ -822,6 +837,10 @@ public:
     static void ReverseBytesInPlace( unsigned char* inOutData, const unsigned int length );
 
 private:
+    /// The types WriteCompressed() and ReadCompressed() encode exactly as Write() and Read() do.
+    template<class templateType>
+    static constexpr bool COMPRESSES_AS_WRITTEN = std::is_same_v<templateType, bool> || std::is_same_v<templateType, SystemAddress> || std::is_same_v<templateType, uint24_t> || std::is_same_v<templateType, RakNetGUID>;
+
     BitStream( const BitStream& invalid )
     {
         (void)invalid;
@@ -1012,7 +1031,59 @@ inline bool BitStream::SerializeBits( bool writeToBitstream, unsigned char* inOu
 template<class templateType>
 inline void BitStream::Write( const templateType& inTemplateVar )
 {
-    if constexpr( sizeof( templateType ) == 1 )
+    if constexpr( std::is_same_v<templateType, bool> )
+    {
+        if( inTemplateVar )
+            Write1();
+        else
+            Write0();
+    }
+    else if constexpr( std::is_same_v<templateType, SystemAddress> )
+    {
+        Write( inTemplateVar.GetIPVersion() );
+        if( inTemplateVar.GetIPVersion() == 4 )
+        {
+            // Hide the address so routers don't modify it
+            SystemAddress var2 = inTemplateVar;
+            uint32_t binaryAddress = ~inTemplateVar.address.addr4.sin_addr.s_addr;
+            // Don't endian swap the address or port
+            WriteBits( (unsigned char*)&binaryAddress, sizeof( binaryAddress ) * 8, true );
+            unsigned short p = var2.GetPortNetworkOrder();
+            WriteBits( (unsigned char*)&p, sizeof( unsigned short ) * 8, true );
+        }
+        else
+        {
+#if RAKNET_SUPPORT_IPV6 == 1
+            // Don't endian swap
+            WriteBits( (const unsigned char*)&inTemplateVar.address.addr6, sizeof( inTemplateVar.address.addr6 ) * 8, true );
+#endif
+        }
+    }
+    else if constexpr( std::is_same_v<templateType, uint24_t> )
+    {
+        AlignWriteToByteBoundary();
+        AddBitsAndReallocate( 3 * 8 );
+
+        if( IsBigEndian() == false )
+        {
+            data[( numberOfBitsUsed >> 3 ) + 0] = ( (unsigned char*)&inTemplateVar.val )[0];
+            data[( numberOfBitsUsed >> 3 ) + 1] = ( (unsigned char*)&inTemplateVar.val )[1];
+            data[( numberOfBitsUsed >> 3 ) + 2] = ( (unsigned char*)&inTemplateVar.val )[2];
+        }
+        else
+        {
+            data[( numberOfBitsUsed >> 3 ) + 0] = ( (unsigned char*)&inTemplateVar.val )[3];
+            data[( numberOfBitsUsed >> 3 ) + 1] = ( (unsigned char*)&inTemplateVar.val )[2];
+            data[( numberOfBitsUsed >> 3 ) + 2] = ( (unsigned char*)&inTemplateVar.val )[1];
+        }
+
+        numberOfBitsUsed += 3 * 8;
+    }
+    else if constexpr( std::is_same_v<templateType, RakNetGUID> )
+        Write( inTemplateVar.g );
+    else if constexpr( std::is_same_v<templateType, std::string> )
+        Serialize( inTemplateVar );
+    else if constexpr( sizeof( templateType ) == 1 )
         WriteBits( (unsigned char*)&inTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1049,78 +1120,6 @@ inline void BitStream::WritePtr( templateType* inTemplateVar )
     }
 }
 
-/// \brief Write a bool to a bitstream.
-/// \param[in] inTemplateVar The value to write
-template<>
-inline void BitStream::Write( const bool& inTemplateVar )
-{
-    if( inTemplateVar )
-        Write1();
-    else
-        Write0();
-}
-
-
-/// \brief Write a systemAddress to a bitstream.
-/// \param[in] inTemplateVar The value to write
-template<>
-inline void BitStream::Write( const SystemAddress& inTemplateVar )
-{
-    Write( inTemplateVar.GetIPVersion() );
-    if( inTemplateVar.GetIPVersion() == 4 )
-    {
-        // Hide the address so routers don't modify it
-        SystemAddress var2 = inTemplateVar;
-        uint32_t binaryAddress = ~inTemplateVar.address.addr4.sin_addr.s_addr;
-        // Don't endian swap the address or port
-        WriteBits( (unsigned char*)&binaryAddress, sizeof( binaryAddress ) * 8, true );
-        unsigned short p = var2.GetPortNetworkOrder();
-        WriteBits( (unsigned char*)&p, sizeof( unsigned short ) * 8, true );
-    }
-    else
-    {
-#if RAKNET_SUPPORT_IPV6 == 1
-        // Don't endian swap
-        WriteBits( (const unsigned char*)&inTemplateVar.address.addr6, sizeof( inTemplateVar.address.addr6 ) * 8, true );
-#endif
-    }
-}
-
-template<>
-inline void BitStream::Write( const uint24_t& inTemplateVar )
-{
-    AlignWriteToByteBoundary();
-    AddBitsAndReallocate( 3 * 8 );
-
-    if( IsBigEndian() == false )
-    {
-        data[( numberOfBitsUsed >> 3 ) + 0] = ( (unsigned char*)&inTemplateVar.val )[0];
-        data[( numberOfBitsUsed >> 3 ) + 1] = ( (unsigned char*)&inTemplateVar.val )[1];
-        data[( numberOfBitsUsed >> 3 ) + 2] = ( (unsigned char*)&inTemplateVar.val )[2];
-    }
-    else
-    {
-        data[( numberOfBitsUsed >> 3 ) + 0] = ( (unsigned char*)&inTemplateVar.val )[3];
-        data[( numberOfBitsUsed >> 3 ) + 1] = ( (unsigned char*)&inTemplateVar.val )[2];
-        data[( numberOfBitsUsed >> 3 ) + 2] = ( (unsigned char*)&inTemplateVar.val )[1];
-    }
-
-    numberOfBitsUsed += 3 * 8;
-}
-
-template<>
-inline void BitStream::Write( const RakNetGUID& inTemplateVar )
-{
-    Write( inTemplateVar.g );
-}
-
-// Write a string to a bitstream.
-template<>
-inline void BitStream::Write( const std::string& inTemplateVar )
-{
-    Serialize( inTemplateVar );
-}
-
 /// \brief Write any integral type to a bitstream.
 /// \details If the current value is different from the last value
 /// the current value will be written.  Otherwise, a single bit will be written
@@ -1129,7 +1128,13 @@ inline void BitStream::Write( const std::string& inTemplateVar )
 template<class templateType>
 inline void BitStream::WriteDelta( const templateType& currentValue, const templateType& lastValue )
 {
-    if( currentValue == lastValue )
+    if constexpr( std::is_same_v<templateType, bool> )
+    {
+        (void)lastValue;
+
+        Write( currentValue );
+    }
+    else if( currentValue == lastValue )
     {
         Write( false );
     }
@@ -1138,17 +1143,6 @@ inline void BitStream::WriteDelta( const templateType& currentValue, const templ
         Write( true );
         Write( currentValue );
     }
-}
-
-/// \brief Write a bool delta. Same thing as just calling Write
-/// \param[in] currentValue The current value to write
-/// \param[in] lastValue The last value to compare against
-template<>
-inline void BitStream::WriteDelta( const bool& currentValue, const bool& lastValue )
-{
-    (void)lastValue;
-
-    Write( currentValue );
 }
 
 /// \brief WriteDelta when you don't know what the last value is, or there is no last value.
@@ -1169,7 +1163,23 @@ inline void BitStream::WriteDelta( const templateType& currentValue )
 template<class templateType>
 inline void BitStream::WriteCompressed( const templateType& inTemplateVar )
 {
-    if constexpr( sizeof( templateType ) == 1 )
+    if constexpr( COMPRESSES_AS_WRITTEN<templateType> )
+        Write( inTemplateVar );
+    else if constexpr( std::is_same_v<templateType, float> )
+    {
+        RakAssert( inTemplateVar > -1.01f && inTemplateVar < 1.01f );
+        const float varCopy = std::clamp( inTemplateVar, -1.0f, 1.0f );
+        Write( (unsigned short)( ( varCopy + 1.0f ) * 32767.5f ) );
+    }
+    else if constexpr( std::is_same_v<templateType, double> )
+    {
+        RakAssert( inTemplateVar > -1.01 && inTemplateVar < 1.01 );
+        const double varCopy = std::clamp( inTemplateVar, -1.0, 1.0 );
+        Write( (uint32_t)( ( varCopy + 1.0 ) * 2147483648.0 ) );
+    }
+    else if constexpr( std::is_same_v<templateType, std::string> )
+        SerializeCompressed( inTemplateVar );
+    else if constexpr( sizeof( templateType ) == 1 )
         WriteCompressed( (unsigned char*)&inTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1186,55 +1196,6 @@ inline void BitStream::WriteCompressed( const templateType& inTemplateVar )
     }
 }
 
-template<>
-inline void BitStream::WriteCompressed( const SystemAddress& inTemplateVar )
-{
-    Write( inTemplateVar );
-}
-
-template<>
-inline void BitStream::WriteCompressed( const RakNetGUID& inTemplateVar )
-{
-    Write( inTemplateVar );
-}
-
-template<>
-inline void BitStream::WriteCompressed( const uint24_t& var )
-{
-    Write( var );
-}
-
-template<>
-inline void BitStream::WriteCompressed( const bool& inTemplateVar )
-{
-    Write( inTemplateVar );
-}
-
-/// For values between -1 and 1
-template<>
-inline void BitStream::WriteCompressed( const float& inTemplateVar )
-{
-    RakAssert( inTemplateVar > -1.01f && inTemplateVar < 1.01f );
-    const float varCopy = std::clamp( inTemplateVar, -1.0f, 1.0f );
-    Write( (unsigned short)( ( varCopy + 1.0f ) * 32767.5f ) );
-}
-
-/// For values between -1 and 1
-template<>
-inline void BitStream::WriteCompressed( const double& inTemplateVar )
-{
-    RakAssert( inTemplateVar > -1.01 && inTemplateVar < 1.01 );
-    const double varCopy = std::clamp( inTemplateVar, -1.0, 1.0 );
-    Write( (uint32_t)( ( varCopy + 1.0 ) * 2147483648.0 ) );
-}
-
-// Compress the string
-template<>
-inline void BitStream::WriteCompressed( const std::string& inTemplateVar )
-{
-    SerializeCompressed( inTemplateVar );
-}
-
 /// \brief Write any integral type to a bitstream.
 /// \details If the current value is different from the last value
 /// the current value will be written.  Otherwise, a single bit will be written
@@ -1246,7 +1207,13 @@ inline void BitStream::WriteCompressed( const std::string& inTemplateVar )
 template<class templateType>
 inline void BitStream::WriteCompressedDelta( const templateType& currentValue, const templateType& lastValue )
 {
-    if( currentValue == lastValue )
+    if constexpr( std::is_same_v<templateType, bool> )
+    {
+        (void)lastValue;
+
+        Write( currentValue );
+    }
+    else if( currentValue == lastValue )
     {
         Write( false );
     }
@@ -1257,32 +1224,18 @@ inline void BitStream::WriteCompressedDelta( const templateType& currentValue, c
     }
 }
 
-/// \brief Write a bool delta.  Same thing as just calling Write
-/// \param[in] currentValue The current value to write
-/// \param[in] lastValue The last value to compare against
-template<>
-inline void BitStream::WriteCompressedDelta( const bool& currentValue, const bool& lastValue )
-{
-    (void)lastValue;
-
-    Write( currentValue );
-}
-
 /// \brief Save as WriteCompressedDelta(const templateType &currentValue, const templateType &lastValue)
 /// when we have an unknown second parameter
 template<class templateType>
 inline void BitStream::WriteCompressedDelta( const templateType& currentValue )
 {
-    Write( true );
-    WriteCompressed( currentValue );
-}
-
-/// \brief Save as WriteCompressedDelta(bool currentValue, const templateType &lastValue)
-/// when we have an unknown second bool
-template<>
-inline void BitStream::WriteCompressedDelta( const bool& currentValue )
-{
-    Write( currentValue );
+    if constexpr( std::is_same_v<templateType, bool> )
+        Write( currentValue );
+    else
+    {
+        Write( true );
+        WriteCompressed( currentValue );
+    }
 }
 
 /// \brief Read any integral type from a bitstream.  Define __BITSTREAM_NATIVE_END if you need endian swapping.
@@ -1290,7 +1243,81 @@ inline void BitStream::WriteCompressedDelta( const bool& currentValue )
 template<class templateType>
 inline bool BitStream::Read( templateType& outTemplateVar )
 {
-    if constexpr( sizeof( templateType ) == 1 )
+    if constexpr( std::is_same_v<templateType, bool> )
+    {
+        if( readOffset + 1 > numberOfBitsUsed )
+            return false;
+
+        if( data[readOffset >> 3] & ( 0x80 >> ( readOffset & 7 ) ) ) // Is it faster to just write it out here?
+            outTemplateVar = true;
+        else
+            outTemplateVar = false;
+
+        // Has to be on a different line for Mac
+        readOffset++;
+
+        return true;
+    }
+    else if constexpr( std::is_same_v<templateType, SystemAddress> )
+    {
+        unsigned char ipVersion;
+        if( !Read( ipVersion ) )
+            return false;
+        if( ipVersion == 4 )
+        {
+            outTemplateVar.address.addr4.sin_family = AF_INET;
+            // Read(var.binaryAddress);
+            // Don't endian swap the address or port
+            uint32_t binaryAddress;
+            if( !ReadBits( (unsigned char*)&binaryAddress, sizeof( binaryAddress ) * 8, true ) )
+                return false;
+            // Unhide the IP address, done to prevent routers from changing it
+            outTemplateVar.address.addr4.sin_addr.s_addr = ~binaryAddress;
+            bool b = ReadBits( (unsigned char*)&outTemplateVar.address.addr4.sin_port, sizeof( outTemplateVar.address.addr4.sin_port ) * 8, true );
+            outTemplateVar.debugPort = ntohs( outTemplateVar.address.addr4.sin_port );
+            return b;
+        }
+        else
+        {
+#if RAKNET_SUPPORT_IPV6 == 1
+            bool b = ReadBits( (unsigned char*)&outTemplateVar.address.addr6, sizeof( outTemplateVar.address.addr6 ) * 8, true );
+            outTemplateVar.debugPort = ntohs( outTemplateVar.address.addr6.sin6_port );
+            return b;
+#else
+            return false;
+#endif
+        }
+    }
+    else if constexpr( std::is_same_v<templateType, uint24_t> )
+    {
+        AlignReadToByteBoundary();
+        if( readOffset + 3 * 8 > numberOfBitsUsed )
+            return false;
+
+        if( IsBigEndian() == false )
+        {
+            ( (unsigned char*)&outTemplateVar.val )[0] = data[( readOffset >> 3 ) + 0];
+            ( (unsigned char*)&outTemplateVar.val )[1] = data[( readOffset >> 3 ) + 1];
+            ( (unsigned char*)&outTemplateVar.val )[2] = data[( readOffset >> 3 ) + 2];
+            ( (unsigned char*)&outTemplateVar.val )[3] = 0;
+        }
+        else
+        {
+
+            ( (unsigned char*)&outTemplateVar.val )[3] = data[( readOffset >> 3 ) + 0];
+            ( (unsigned char*)&outTemplateVar.val )[2] = data[( readOffset >> 3 ) + 1];
+            ( (unsigned char*)&outTemplateVar.val )[1] = data[( readOffset >> 3 ) + 2];
+            ( (unsigned char*)&outTemplateVar.val )[0] = 0;
+        }
+
+        readOffset += 3 * 8;
+        return true;
+    }
+    else if constexpr( std::is_same_v<templateType, RakNetGUID> )
+        return Read( outTemplateVar.g );
+    else if constexpr( std::is_same_v<templateType, std::string> )
+        return Deserialize( outTemplateVar );
+    else if constexpr( sizeof( templateType ) == 1 )
         return ReadBits( (unsigned char*)&outTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1311,98 +1338,6 @@ inline bool BitStream::Read( templateType& outTemplateVar )
     }
 }
 
-/// \brief Read a bool from a bitstream.
-/// \param[in] outTemplateVar The value to read
-template<>
-[[nodiscard]] inline bool BitStream::Read( bool& outTemplateVar )
-{
-    if( readOffset + 1 > numberOfBitsUsed )
-        return false;
-
-    if( data[readOffset >> 3] & ( 0x80 >> ( readOffset & 7 ) ) ) // Is it faster to just write it out here?
-        outTemplateVar = true;
-    else
-        outTemplateVar = false;
-
-    // Has to be on a different line for Mac
-    readOffset++;
-
-    return true;
-}
-
-/// \brief Read a systemAddress from a bitstream.
-/// \param[in] outTemplateVar The value to read
-template<>
-[[nodiscard]] inline bool BitStream::Read( SystemAddress& outTemplateVar )
-{
-    unsigned char ipVersion;
-    if( !Read( ipVersion ) )
-        return false;
-    if( ipVersion == 4 )
-    {
-        outTemplateVar.address.addr4.sin_family = AF_INET;
-        // Read(var.binaryAddress);
-        // Don't endian swap the address or port
-        uint32_t binaryAddress;
-        if( !ReadBits( (unsigned char*)&binaryAddress, sizeof( binaryAddress ) * 8, true ) )
-            return false;
-        // Unhide the IP address, done to prevent routers from changing it
-        outTemplateVar.address.addr4.sin_addr.s_addr = ~binaryAddress;
-        bool b = ReadBits( (unsigned char*)&outTemplateVar.address.addr4.sin_port, sizeof( outTemplateVar.address.addr4.sin_port ) * 8, true );
-        outTemplateVar.debugPort = ntohs( outTemplateVar.address.addr4.sin_port );
-        return b;
-    }
-    else
-    {
-#if RAKNET_SUPPORT_IPV6 == 1
-        bool b = ReadBits( (unsigned char*)&outTemplateVar.address.addr6, sizeof( outTemplateVar.address.addr6 ) * 8, true );
-        outTemplateVar.debugPort = ntohs( outTemplateVar.address.addr6.sin6_port );
-        return b;
-#else
-        return false;
-#endif
-    }
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::Read( uint24_t& outTemplateVar )
-{
-    AlignReadToByteBoundary();
-    if( readOffset + 3 * 8 > numberOfBitsUsed )
-        return false;
-
-    if( IsBigEndian() == false )
-    {
-        ( (unsigned char*)&outTemplateVar.val )[0] = data[( readOffset >> 3 ) + 0];
-        ( (unsigned char*)&outTemplateVar.val )[1] = data[( readOffset >> 3 ) + 1];
-        ( (unsigned char*)&outTemplateVar.val )[2] = data[( readOffset >> 3 ) + 2];
-        ( (unsigned char*)&outTemplateVar.val )[3] = 0;
-    }
-    else
-    {
-
-        ( (unsigned char*)&outTemplateVar.val )[3] = data[( readOffset >> 3 ) + 0];
-        ( (unsigned char*)&outTemplateVar.val )[2] = data[( readOffset >> 3 ) + 1];
-        ( (unsigned char*)&outTemplateVar.val )[1] = data[( readOffset >> 3 ) + 2];
-        ( (unsigned char*)&outTemplateVar.val )[0] = 0;
-    }
-
-    readOffset += 3 * 8;
-    return true;
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::Read( RakNetGUID& outTemplateVar )
-{
-    return Read( outTemplateVar.g );
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::Read( std::string& outTemplateVar )
-{
-    return Deserialize( outTemplateVar );
-}
-
 /// \brief Read any integral type from a bitstream.
 /// \details If the written value differed from the value compared against in the write function,
 /// var will be updated.  Otherwise it will retain the current value.
@@ -1411,20 +1346,17 @@ template<>
 template<class templateType>
 inline bool BitStream::ReadDelta( templateType& outTemplateVar )
 {
-    bool dataWritten;
-    bool success;
-    success = Read( dataWritten );
-    if( dataWritten )
-        success = Read( outTemplateVar );
-    return success;
-}
-
-/// \brief Read a bool from a bitstream.
-/// \param[in] outTemplateVar The value to read
-template<>
-[[nodiscard]] inline bool BitStream::ReadDelta( bool& outTemplateVar )
-{
-    return Read( outTemplateVar );
+    if constexpr( std::is_same_v<templateType, bool> )
+        return Read( outTemplateVar );
+    else
+    {
+        bool dataWritten;
+        bool success;
+        success = Read( dataWritten );
+        if( dataWritten )
+            success = Read( outTemplateVar );
+        return success;
+    }
 }
 
 /// \brief Read any integral type from a bitstream.
@@ -1436,7 +1368,31 @@ template<>
 template<class templateType>
 inline bool BitStream::ReadCompressed( templateType& outTemplateVar )
 {
-    if constexpr( sizeof( templateType ) == 1 )
+    if constexpr( COMPRESSES_AS_WRITTEN<templateType> )
+        return Read( outTemplateVar );
+    else if constexpr( std::is_same_v<templateType, float> )
+    {
+        unsigned short compressedFloat;
+        if( Read( compressedFloat ) )
+        {
+            outTemplateVar = ( (float)compressedFloat / 32767.5f - 1.0f );
+            return true;
+        }
+        return false;
+    }
+    else if constexpr( std::is_same_v<templateType, double> )
+    {
+        uint32_t compressedFloat;
+        if( Read( compressedFloat ) )
+        {
+            outTemplateVar = ( (double)compressedFloat / 2147483648.0 - 1.0 );
+            return true;
+        }
+        return false;
+    }
+    else if constexpr( std::is_same_v<templateType, std::string> )
+        return DeserializeCompressed( outTemplateVar );
+    else if constexpr( sizeof( templateType ) == 1 )
         return ReadCompressed( (unsigned char*)&outTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1457,62 +1413,6 @@ inline bool BitStream::ReadCompressed( templateType& outTemplateVar )
     }
 }
 
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( SystemAddress& outTemplateVar )
-{
-    return Read( outTemplateVar );
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( uint24_t& outTemplateVar )
-{
-    return Read( outTemplateVar );
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( RakNetGUID& outTemplateVar )
-{
-    return Read( outTemplateVar );
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( bool& outTemplateVar )
-{
-    return Read( outTemplateVar );
-}
-
-/// For values between -1 and 1
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( float& outTemplateVar )
-{
-    unsigned short compressedFloat;
-    if( Read( compressedFloat ) )
-    {
-        outTemplateVar = ( (float)compressedFloat / 32767.5f - 1.0f );
-        return true;
-    }
-    return false;
-}
-
-/// For values between -1 and 1
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( double& outTemplateVar )
-{
-    uint32_t compressedFloat;
-    if( Read( compressedFloat ) )
-    {
-        outTemplateVar = ( (double)compressedFloat / 2147483648.0 - 1.0 );
-        return true;
-    }
-    return false;
-}
-
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressed( std::string& outTemplateVar )
-{
-    return DeserializeCompressed( outTemplateVar );
-}
-
 /// \brief Read any integral type from a bitstream.
 /// \details If the written value differed from the value compared against in the write function,
 /// var will be updated.  Otherwise it will retain the current value.
@@ -1525,20 +1425,17 @@ template<>
 template<class templateType>
 inline bool BitStream::ReadCompressedDelta( templateType& outTemplateVar )
 {
-    bool dataWritten;
-    bool success;
-    success = Read( dataWritten );
-    if( dataWritten )
-        success = ReadCompressed( outTemplateVar );
-    return success;
-}
-
-/// \brief Read a bool from a bitstream.
-/// \param[in] outTemplateVar The value to read
-template<>
-[[nodiscard]] inline bool BitStream::ReadCompressedDelta( bool& outTemplateVar )
-{
-    return Read( outTemplateVar );
+    if constexpr( std::is_same_v<templateType, bool> )
+        return Read( outTemplateVar );
+    else
+    {
+        bool dataWritten;
+        bool success;
+        success = Read( dataWritten );
+        if( dataWritten )
+            success = ReadCompressed( outTemplateVar );
+        return success;
+    }
 }
 
 template<class destinationType, class sourceType>
