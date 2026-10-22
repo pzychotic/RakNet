@@ -1012,7 +1012,7 @@ inline bool BitStream::SerializeBits( bool writeToBitstream, unsigned char* inOu
 template<class templateType>
 inline void BitStream::Write( const templateType& inTemplateVar )
 {
-    if( sizeof( inTemplateVar ) == 1 )
+    if constexpr( sizeof( templateType ) == 1 )
         WriteBits( (unsigned char*)&inTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1032,7 +1032,7 @@ inline void BitStream::Write( const templateType& inTemplateVar )
 template<class templateType>
 inline void BitStream::WritePtr( templateType* inTemplateVar )
 {
-    if( sizeof( templateType ) == 1 )
+    if constexpr( sizeof( templateType ) == 1 )
         WriteBits( (unsigned char*)inTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1169,7 +1169,7 @@ inline void BitStream::WriteDelta( const templateType& currentValue )
 template<class templateType>
 inline void BitStream::WriteCompressed( const templateType& inTemplateVar )
 {
-    if( sizeof( inTemplateVar ) == 1 )
+    if constexpr( sizeof( templateType ) == 1 )
         WriteCompressed( (unsigned char*)&inTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1290,7 +1290,7 @@ inline void BitStream::WriteCompressedDelta( const bool& currentValue )
 template<class templateType>
 inline bool BitStream::Read( templateType& outTemplateVar )
 {
-    if( sizeof( outTemplateVar ) == 1 )
+    if constexpr( sizeof( templateType ) == 1 )
         return ReadBits( (unsigned char*)&outTemplateVar, sizeof( templateType ) * 8, true );
     else
     {
@@ -1436,7 +1436,7 @@ template<>
 template<class templateType>
 inline bool BitStream::ReadCompressed( templateType& outTemplateVar )
 {
-    if( sizeof( outTemplateVar ) == 1 )
+    if constexpr( sizeof( templateType ) == 1 )
         return ReadCompressed( (unsigned char*)&outTemplateVar, sizeof( templateType ) * 8, true );
     else
     {

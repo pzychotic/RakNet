@@ -2,9 +2,11 @@
 #include "StringCompressorScope.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -294,6 +296,65 @@ TEST_CASE( "empty std::string round trips through WriteCompressed at every start
     std::string str = "value from a previous read";
     REQUIRE( rt.Reader().ReadCompressed( str ) );
     CHECK( str.empty() );
+
+    rt.CheckSentinel();
+}
+
+TEMPLATE_TEST_CASE( "1-, 2-, 4- and 8-byte integers round trip through Write, WritePtr and WriteCompressed at every starting offset",
+                    "[bitstream]", uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t )
+{
+    // Zero and one have every high byte clear, which is what WriteCompressed elides;
+    // max, and min where it is not zero, have no high byte clear, so it writes them in full.
+    const TestType value = GENERATE( TestType( 0 ), TestType( 1 ), ( std::numeric_limits<TestType>::min )(),
+                                     ( std::numeric_limits<TestType>::max )() );
+    const int pad = GENERATE( 0, 1, 2, 3, 4, 5, 6, 7 );
+    CAPTURE( value, pad );
+
+    RoundTrip rt;
+    rt.Pad( pad );
+    rt.Writer().Write( value );
+    rt.Writer().WritePtr( &value );
+    rt.Writer().WriteCompressed( value );
+    rt.WriteSentinel();
+
+    rt.Reader();
+    rt.ReadPad( pad );
+
+    TestType written = TestType( 0x5A );
+    TestType writtenPtr = TestType( 0x5A );
+    TestType compressed = TestType( 0x5A );
+    REQUIRE( rt.Reader().Read( written ) );
+    REQUIRE( rt.Reader().Read( writtenPtr ) );
+    REQUIRE( rt.Reader().ReadCompressed( compressed ) );
+    CHECK( written == value );
+    CHECK( writtenPtr == value );
+    CHECK( compressed == value );
+
+    rt.CheckSentinel();
+}
+
+TEMPLATE_TEST_CASE( "4- and 8-byte floating point values round trip through Write and WritePtr at every starting offset",
+                    "[bitstream]", float, double )
+{
+    const TestType value = GENERATE( TestType( 0 ), TestType( -2.5 ), ( std::numeric_limits<TestType>::max )() );
+    const int pad = GENERATE( 0, 1, 2, 3, 4, 5, 6, 7 );
+    CAPTURE( value, pad );
+
+    RoundTrip rt;
+    rt.Pad( pad );
+    rt.Writer().Write( value );
+    rt.Writer().WritePtr( &value );
+    rt.WriteSentinel();
+
+    rt.Reader();
+    rt.ReadPad( pad );
+
+    TestType written = TestType( 1 );
+    TestType writtenPtr = TestType( 1 );
+    REQUIRE( rt.Reader().Read( written ) );
+    REQUIRE( rt.Reader().Read( writtenPtr ) );
+    CHECK( written == value );
+    CHECK( writtenPtr == value );
 
     rt.CheckSentinel();
 }
