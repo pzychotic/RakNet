@@ -20,7 +20,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <tuple>
 #include <utility>
 
 namespace RakNet {
@@ -203,8 +202,7 @@ PluginReceiveResult RelayPlugin::OnReceive( Packet* packet )
             if( !bsIn.ReadCompressed( key ) )
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
             BitStream bsData;
-            // Copies whatever is left, so it cannot fail.
-            std::ignore = bsIn.Read( &bsData );
+            bsIn.Read( &bsData );
             auto itStrAndGuid = strToGuidHash.find( key );
             auto itStrAndGuidSender = guidToStrHash.find( packet->guid );
             if( itStrAndGuid != strToGuidHash.end() && itStrAndGuidSender != guidToStrHash.end() )
@@ -433,8 +431,7 @@ void RelayPlugin::OnGroupMessageFromClient( Packet* packet )
     if( !ReadSendParameters( bsIn, priority, reliability, orderingChannel ) )
         return;
     BitStream bsData;
-    // Copies whatever is left, so it cannot fail.
-    std::ignore = bsIn.Read( &bsData );
+    bsIn.Read( &bsData );
 
     if( auto it = guidToStrHash.find( packet->guid ); it != guidToStrHash.end() )
     {

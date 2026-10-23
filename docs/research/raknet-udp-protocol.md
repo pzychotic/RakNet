@@ -1051,7 +1051,7 @@ header differently and does not interoperate.
 | `MAXIMUM_MTU_SIZE` | 1492 | [MTUSize.h:32](Source/MTUSize.h:32) |
 | `MINIMUM_MTU_SIZE` | 400 | [MTUSize.h:33](Source/MTUSize.h:33) (declared, not used in the probe) |
 | `mtuSizes[]` | `{1492, 1200, 576}` | [RakPeer.cpp:115](Source/RakPeer.cpp:115) |
-| `UDP_HEADER_SIZE` | 28 | [CCRakNetSlidingWindow.h:51](Source/CCRakNetSlidingWindow.h:51) |
+| `UDP_HEADER_SIZE` | 28 | [MTUSize.h:46](Source/MTUSize.h:46) |
 | `defaultMTUSize` | 576 (`mtuSizes[NUM_MTU_SIZES-1]`) | [RakPeer.cpp:197](Source/RakPeer.cpp:197) |
 
 Discovery, in full:

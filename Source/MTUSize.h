@@ -42,6 +42,9 @@ namespace RakNet {
 /// which is a floor on what the code tolerates rather than a value it ever selects.
 inline constexpr int MINIMUM_NEGOTIATED_MTU_SIZE = 576;
 
+/// Sizeof an UDP header in byte
+inline constexpr int UDP_HEADER_SIZE = 28;
+
 /// The largest message RakPeer::Send, Send( BitStream* ) and SendList accept, in bytes.
 ///
 /// Derived, not chosen. It is MAXIMUM_SPLIT_PACKET_COUNT - the receive-side cap in
@@ -49,7 +52,7 @@ inline constexpr int MINIMUM_NEGOTIATED_MTU_SIZE = 576;
 /// smallest MTU a connection can negotiate:
 ///
 ///     MINIMUM_NEGOTIATED_MTU_SIZE
-///       - UDP_HEADER_SIZE                                    (28, CCRakNetSlidingWindow.h)
+///       - UDP_HEADER_SIZE                                    (28, above)
 ///       - DatagramHeaderFormat::GetDataHeaderByteLength()     (9, ReliabilityLayer.cpp)
 ///       - BitsToBytes( GetMaxMessageHeaderLengthBits() )     (23, ReliabilityLayer.cpp)
 ///
@@ -61,12 +64,13 @@ inline constexpr int MINIMUM_NEGOTIATED_MTU_SIZE = 576;
 /// A connection at MTU 1492 could carry nearly three times as much, but sizing to that would
 /// mean Send succeeding or failing on the outcome of a handshake the caller never saw.
 ///
-/// The four numbers above cannot be named here: DatagramHeaderFormat is local to
-/// ReliabilityLayer.cpp and the MTU list is local to RakPeer.cpp. A static_assert in each of
+/// The cap and the two header lengths cannot be named here: DatagramHeaderFormat is local to
+/// ReliabilityLayer.cpp, and ReliabilityLayer.h includes this header. Nor can the MTU list
+/// behind MINIMUM_NEGOTIATED_MTU_SIZE, which is local to RakPeer.cpp. A static_assert in each of
 /// those two translation units checks this arithmetic against the real definitions, so
 /// changing a header layout or the MTU list breaks the build instead of silently letting the
 /// send and receive limits drift apart.
 inline constexpr unsigned int MAXIMUM_MESSAGE_SIZE =
-    65536u * ( MINIMUM_NEGOTIATED_MTU_SIZE - 28u - 9u - 23u );
+    65536u * ( MINIMUM_NEGOTIATED_MTU_SIZE - UDP_HEADER_SIZE - 9u - 23u );
 
 } // namespace RakNet

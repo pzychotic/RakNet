@@ -475,9 +475,13 @@ public:
     /// \param bitStream the bitstream to read into from
     /// \return true on success, false on failure.
     [[nodiscard]] bool Read( BitStream* bitStream, BitSize_t numberOfBits );
-    [[nodiscard]] bool Read( BitStream* bitStream );
     [[nodiscard]] bool Read( BitStream& bitStream, BitSize_t numberOfBits );
-    [[nodiscard]] bool Read( BitStream& bitStream );
+
+    /// \brief Read whatever is left of this bitstream into another.
+    /// \param bitStream the bitstream to read into
+    /// \return true; copying what is left cannot fail.
+    bool Read( BitStream* bitStream );
+    bool Read( BitStream& bitStream );
 
     /// \brief Write an array or casted stream or raw data.  This does NOT do endian swapping.
     /// \param[in] inputByteArray a byte buffer

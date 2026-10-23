@@ -37,6 +37,7 @@ else use congestion avoidance
 
 #pragma once
 
+#include "MTUSize.h"
 #include "RakNetDefines.h"
 #include "RakNetTime.h"
 #include "RakNetTypes.h"
@@ -44,9 +45,6 @@ else use congestion avoidance
 #include <stdint.h>
 
 namespace RakNet {
-
-/// Sizeof an UDP header in byte
-inline constexpr int UDP_HEADER_SIZE = 28;
 
 #define CC_DEBUG_PRINTF_1( x )
 #define CC_DEBUG_PRINTF_2( x, y )

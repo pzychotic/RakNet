@@ -322,7 +322,6 @@ void NatPunchthroughServer::OnClosedConnection( const SystemAddress& systemAddre
 
 void NatPunchthroughServer::OnNewConnection( const SystemAddress& systemAddress, RakNetGUID rakNetGUID, bool isIncoming )
 {
-    (void)systemAddress;
     (void)isIncoming;
 
     // A guid already listed keeps its User.

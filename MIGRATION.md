@@ -18,6 +18,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [Breaks to the core API](#breaks-to-the-core-api)
 - [Also removed](#also-removed)
 - [`RakAssert` follows `NDEBUG`](#rakassert-follows-ndebug)
+- [Fixed numeric constants are `RakNet::` constants](#fixed-numeric-constants-are-raknet-constants)
 - [Exceptions and out-of-memory](#exceptions-and-out-of-memory)
 - [Limits that stock did not have](#limits-that-stock-did-not-have)
 - [Plugins that act only on Solicited or Designated messages](#plugins-that-act-only-on-solicited-or-designated-messages)
@@ -590,7 +591,8 @@ These were macros, all but `MINIMUM_NEGOTIATED_MTU_SIZE` already in stock. They 
 | Constant | Header | Type |
 |----------|--------|------|
 | `MINIMUM_NEGOTIATED_MTU_SIZE` | `MTUSize.h` | `int` |
-| `UDP_HEADER_SIZE` | `CCRakNetSlidingWindow.h` | `int` |
+| `UDP_HEADER_SIZE` | `MTUSize.h` | `int` |
+| `CC_TIME_TYPE_BYTES` | `CCRakNetSlidingWindow.h` | `size_t` |
 | `NUMBER_OF_ORDERED_STREAMS` | `ReliabilityLayer.h` | `unsigned char` |
 | `RESEND_TREE_ORDER` | `ReliabilityLayer.h` | `int` |
 | `REMOTE_MAX_TEXT_INPUT` | `TransportInterface.h` | `int` |
@@ -1274,11 +1276,11 @@ Stock read `"1x Command"` as parser 1.
 
 ## `BitStream` reads warn when their result is ignored
 
-**Every `BitStream` member that reads and returns `bool` is `[[nodiscard]]`.** That covers
+**Every `BitStream` member that reads and can fail is `[[nodiscard]]`.** That covers
 `Read`, `ReadCompressed`, `ReadDelta`, `ReadCompressedDelta`, `ReadBits`, `ReadBit`,
 `ReadAligned*`, `ReadCasted`, `ReadBitsFromIntegerRange`, `ReadFloat16`, the vector, quaternion
-and matrix reads, and every `Serialize*`, including the shipped specializations for `bool`,
-`SystemAddress`, `uint24_t`, `RakNetGUID`, `std::string`, `float` and `double`. A short or
+and matrix reads, and every `Serialize*`, for every type, including `bool`, `SystemAddress`,
+`uint24_t`, `RakNetGUID`, `std::string`, `float` and `double`. A short or
 malformed stream is reported only by that `false`, and an ignored one leaves the output
 unwritten. Code that drops the result now gets a warning (`-Wunused-result` on GCC and Clang,
 C4834 on MSVC), and a build that makes warnings errors stops. What `BitStream` reads is
@@ -1286,7 +1288,8 @@ unchanged.
 
 Check the result and give up on the message when it is false. Where the default left in the
 output really is the right answer, write `std::ignore = bs.Read( x );` with a comment saying
-why. `Read( BitStream* )` and `Read( BitStream& )` copy whatever is left and never fail.
+why. `Read( BitStream* )` and `Read( BitStream& )` copy whatever is left and never fail, so
+they are not marked.
 
 **The plugins and `RakPeer` drop a message that is too short for what they read.** Stock
 went on with whatever the unread fields held: an uninitialized hash in

@@ -32,7 +32,7 @@ namespace RakNet {
 // #endif
 
 
-static const CCTimeType MAX_TIME_BETWEEN_PACKETS = 350 * CC_TIME_TICKS_PER_MS;
+constexpr CCTimeType MAX_TIME_BETWEEN_PACKETS = 350 * CC_TIME_TICKS_PER_MS;
 static const int DEFAULT_HAS_RECEIVED_PACKET_QUEUE_SIZE = 512;
 static const CCTimeType STARTING_TIME_BETWEEN_PACKETS = MAX_TIME_BETWEEN_PACKETS;
 
@@ -184,8 +184,6 @@ struct DatagramHeaderFormat
 // serialization logic into the header, which is not worth the coupling.
 static_assert( DatagramHeaderFormat::GetDataHeaderByteLength() == 9,
                "MAXIMUM_MESSAGE_SIZE subtracts 9 bytes for the datagram header" );
-static_assert( UDP_HEADER_SIZE == 28,
-               "MAXIMUM_MESSAGE_SIZE subtracts 28 bytes for the UDP header" );
 static_assert( MAXIMUM_SPLIT_PACKET_COUNT == 65536,
                "MAXIMUM_MESSAGE_SIZE is 65536 datagrams' worth of payload; it and the "
                "receive-side cap must come from the same number" );

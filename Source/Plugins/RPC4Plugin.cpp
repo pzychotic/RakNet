@@ -469,8 +469,7 @@ PluginReceiveResult RPC4::OnReceive( Packet* packet )
                 return RR_STOP_PROCESSING_AND_DEALLOCATE;
             BitStream serializedParameters;
             bsIn.AlignReadToByteBoundary();
-            // Copies whatever is left, so it cannot fail.
-            std::ignore = bsIn.Read( &serializedParameters );
+            bsIn.Read( &serializedParameters );
             if( auto it = localSlots.find( sharedIdentifier ); it != localSlots.end() )
             {
                 InvokeSignal( it->second.get(), &serializedParameters, packet );

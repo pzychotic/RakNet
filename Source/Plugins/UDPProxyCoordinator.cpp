@@ -280,8 +280,7 @@ void UDPProxyCoordinator::OnForwardingRequestFromClientToCoordinator( Packet* pa
     fw->timeoutAfterSuccess = 0;
     fw->timeoutOnNoDataMS = timeoutOnNoDataMS;
     if( hasServerSelectionBitstream )
-        // Copies whatever is left, so it cannot fail.
-        std::ignore = incomingBs.Read( &( fw->serverSelectionBitstream ) );
+        incomingBs.Read( &( fw->serverSelectionBitstream ) );
     fw->sata = sata;
     fw->requestingAddress = packet->systemAddress;
 

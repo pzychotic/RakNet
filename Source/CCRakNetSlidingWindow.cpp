@@ -23,7 +23,7 @@ namespace RakNet {
 static const double UNSET_TIME_US = -1;
 
 // After an ack datagram goes out, the next waits this long.
-static const CCTimeType ACK_GAP = 1 * CC_TIME_TICKS_PER_MS;
+constexpr CCTimeType ACK_GAP = 1 * CC_TIME_TICKS_PER_MS;
 
 // cwnd stops at RESEND_BUFFER_ARRAY_LENGTH full datagrams. The resend buffer holds that many
 // reliable messages, each at most a datagram, so reliable data never has more in flight;

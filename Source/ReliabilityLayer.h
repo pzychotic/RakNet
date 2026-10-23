@@ -64,7 +64,7 @@ typedef uint64_t reliabilityHeapWeightType;
 /// Preallocate below touches every page of the array it allocates, so a single
 /// 14-byte message can ask for 16 GiB and a single 1492-byte datagram carrying 105 of
 /// them can ask for over a terabyte.
-constexpr SplitPacketIndexType MAXIMUM_SPLIT_PACKET_COUNT = 65536;
+inline constexpr SplitPacketIndexType MAXIMUM_SPLIT_PACKET_COUNT = 65536;
 
 class SortedSplittedPackets
 {
