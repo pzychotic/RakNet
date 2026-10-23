@@ -46,6 +46,7 @@ set( RAKNET_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/AckDelayTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AddressAndGuidFromStringTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AddressStringTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamCopyTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamPrintHexTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamRoundTripTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/BitStreamWireTest.cpp

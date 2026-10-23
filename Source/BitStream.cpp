@@ -159,20 +159,25 @@ void BitStream::Write( BitStream* bitStream )
 }
 void BitStream::Write( BitStream* bitStream, BitSize_t numberOfBits )
 {
+    // Copies no more than the source has unread
+    const BitSize_t unreadBits = bitStream->readOffset < bitStream->numberOfBitsUsed ? bitStream->numberOfBitsUsed - bitStream->readOffset : 0;
+    if( numberOfBits > unreadBits )
+        numberOfBits = unreadBits;
+
     AddBitsAndReallocate( numberOfBits );
     BitSize_t numberOfBitsMod8;
 
-    if( ( bitStream->GetReadOffset() & 7 ) == 0 && ( numberOfBitsUsed & 7 ) == 0 )
+    // From a byte-aligned read offset, whole bytes are copied a byte at a time, shifted into
+    // place when the destination is not byte-aligned
+    if( ( bitStream->readOffset & 7 ) == 0 )
     {
-        int readOffsetBytes = bitStream->GetReadOffset() / 8;
-        int numBytes = numberOfBits / 8;
-        memcpy( data + ( numberOfBitsUsed >> 3 ), bitStream->GetData() + readOffsetBytes, numBytes );
-        numberOfBits -= BytesToBits( numBytes );
-        bitStream->SetReadOffset( BytesToBits( numBytes + readOffsetBytes ) );
-        numberOfBitsUsed += BytesToBits( numBytes );
+        const BitSize_t wholeByteBits = numberOfBits & ~(BitSize_t)7;
+        WriteBits( bitStream->data + ( bitStream->readOffset >> 3 ), wholeByteBits, false );
+        bitStream->readOffset += wholeByteBits;
+        numberOfBits -= wholeByteBits;
     }
 
-    while( numberOfBits-- > 0 && bitStream->readOffset + 1 <= bitStream->numberOfBitsUsed )
+    while( numberOfBits-- > 0 )
     {
         numberOfBitsMod8 = numberOfBitsUsed & 7;
         if( numberOfBitsMod8 == 0 )
