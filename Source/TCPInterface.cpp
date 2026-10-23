@@ -257,7 +257,7 @@ void TCPInterface::Stop( void )
 {
     const bool wasStarted = isStarted > 0;
 
-    // Set before the plugins hear of the shutdown, so a Connect from one is refused too.
+    // Set before the plugins hear of the shutdown, so a Connect from one is turned down too.
     if( wasStarted )
     {
         std::lock_guard<std::mutex> guard( connectAttemptMutex );
@@ -340,7 +340,7 @@ void TCPInterface::Stop( void )
     activeSSLConnections.clear();
 #endif
 
-    // Connect is still refused from here on: the update thread is gone.
+    // Connect is still turned down from here on: the update thread is gone.
     std::lock_guard<std::mutex> guard( connectAttemptMutex );
     isStopping = false;
 }
@@ -535,7 +535,7 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         return UNASSIGNED_SYSTEM_ADDRESS;
 
     // A host that doesn't parse is the caller's error rather than a failed attempt, so it is
-    // refused before an attempt is counted in or a slot reserved.
+    // turned down before an attempt is counted in or a slot reserved.
     SystemAddress systemAddress;
     if( systemAddress.FromStringExplicitPort( host, remotePort ) == false )
         return UNASSIGNED_SYSTEM_ADDRESS;
@@ -600,9 +600,10 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
     }
     else
     {
+        systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
+
         std::unique_ptr<ThisPtrPlusSysAddr> s = std::make_unique<ThisPtrPlusSysAddr>();
         s->systemAddress = systemAddress;
-        s->systemAddress.systemIndex = (SystemIndex)newRemoteClientIndex;
         // Bounded by the length check at the top of Connect.
         if( bindAddress )
             strcpy( s->bindAddress, bindAddress );
@@ -626,7 +627,6 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
         }
         else
         {
-            SystemAddress failedSystemAddress = s->systemAddress;
             s.reset();
 
             // No thread was started, so nothing else will ever clear the slot. Released
@@ -635,12 +635,14 @@ SystemAddress TCPInterface::Connect( const char* host, unsigned short remotePort
             ReleaseRemoteClient( newRemoteClientIndex );
 
             failedConnectionAttemptMutex.lock();
-            failedConnectionAttempts.push_back( failedSystemAddress );
+            failedConnectionAttempts.push_back( systemAddress );
             failedConnectionAttemptMutex.unlock();
 
             EndConnectAttempt();
         }
-        return UNASSIGNED_SYSTEM_ADDRESS;
+
+        // Accepted either way, so the address its attempt is reported under.
+        return systemAddress;
     }
 }
 #if OPEN_SSL_CLIENT_SUPPORT == 1

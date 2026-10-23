@@ -7,7 +7,6 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
-#include <tuple>
 
 /*
 Pins that TCPInterface::Stop waits for every connect attempt, and ends the ones still in
@@ -32,7 +31,7 @@ constexpr unsigned short kUnansweredPort = 80;
 
 // TCP, so it shares no space with the UDP ports the rest of the suite hardcodes, and
 // distinct from the other TCPInterface tests' ports.
-constexpr unsigned short kRefusalListenPort = 31048;
+constexpr unsigned short kTurnDownPort = 31048;
 
 constexpr int kNonBlockingAttemptCount = 4;
 
@@ -64,7 +63,7 @@ public:
             return;
         hasRun = true;
 
-        result = tcpInterface.Connect( "127.0.0.1", kRefusalListenPort, true );
+        result = tcpInterface.Connect( "127.0.0.1", kTurnDownPort, true );
         connectionCount = tcpInterface.GetConnectionCount();
         failedAttempt = tcpInterface.HasFailedConnectionAttempt();
     }
@@ -83,9 +82,8 @@ TEST_CASE( "TCPInterface Stop ends non-blocking connect attempts still in flight
     TCPInterface client;
     REQUIRE( client.Start( 0, 0, kNonBlockingAttemptCount ) );
 
-    // A non-blocking Connect returns UNASSIGNED_SYSTEM_ADDRESS whether or not it started.
     for( int i = 0; i < kNonBlockingAttemptCount; i++ )
-        std::ignore = client.Connect( kUnansweredHost, kUnansweredPort, false );
+        REQUIRE( client.Connect( kUnansweredHost, kUnansweredPort, false ) != UNASSIGNED_SYSTEM_ADDRESS );
 
     std::this_thread::sleep_for( kSettle );
     if( client.HasFailedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS )
@@ -121,10 +119,10 @@ TEST_CASE( "TCPInterface Stop ends a blocking connect attempt on another thread"
     CHECK( result == UNASSIGNED_SYSTEM_ADDRESS );
 }
 
-TEST_CASE( "TCPInterface Connect called while Stop runs is refused", "[tcpinterface][network]" )
+TEST_CASE( "TCPInterface Connect called while Stop runs is turned down", "[tcpinterface][network]" )
 {
     TCPInterface server;
-    REQUIRE( server.Start( kRefusalListenPort, 4 ) );
+    REQUIRE( server.Start( kTurnDownPort, 4 ) );
 
     TCPInterface client;
     ConnectOnShutdown connectOnShutdown( client );
@@ -136,9 +134,23 @@ TEST_CASE( "TCPInterface Connect called while Stop runs is refused", "[tcpinterf
 
     REQUIRE( connectOnShutdown.hasRun );
     CHECK( connectOnShutdown.result == UNASSIGNED_SYSTEM_ADDRESS );
-    // Refused rather than failed, and no connection record was claimed for it.
+    // Turned down rather than failed, and no connection record was claimed for it.
     CHECK( connectOnShutdown.connectionCount == 0 );
     CHECK( connectOnShutdown.failedAttempt == UNASSIGNED_SYSTEM_ADDRESS );
 
     server.Stop();
+}
+
+// Not started is the same turn-down as Stop running, reached without a plugin.
+TEST_CASE( "TCPInterface non-blocking Connect before Start is turned down", "[tcpinterface]" )
+{
+    TCPInterface client;
+
+    CHECK( client.Connect( "127.0.0.1", kTurnDownPort, false ) == UNASSIGNED_SYSTEM_ADDRESS );
+
+    // Nothing was accepted, so nothing is ever reported. The wait gives a connect thread,
+    // had one been started, time to report.
+    std::this_thread::sleep_for( kSettle );
+    CHECK( client.HasCompletedConnectionAttempt() == UNASSIGNED_SYSTEM_ADDRESS );
+    CHECK( client.HasFailedConnectionAttempt() == UNASSIGNED_SYSTEM_ADDRESS );
 }

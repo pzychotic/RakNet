@@ -30,6 +30,7 @@ behaviour, mostly at runtime, and each says when it can also stop a build.
 - [`ConnectWithSocket` refuses a host it can't resolve](#connectwithsocket-refuses-a-host-it-cant-resolve)
 - [Calls given a host that doesn't parse send nothing](#calls-given-a-host-that-doesnt-parse-send-nothing)
 - [`TCPInterface::Start` fails when it can't listen](#tcpinterfacestart-fails-when-it-cant-listen)
+- [A non-blocking `TCPInterface::Connect` returns the address it is connecting to](#a-non-blocking-tcpinterfaceconnect-returns-the-address-it-is-connecting-to)
 - [Numbers in strings are read whole](#numbers-in-strings-are-read-whole)
 - [`BitStream` reads warn when their result is ignored](#bitstream-reads-warn-when-their-result-is-ignored)
 - [`Startup` and `Connect` results warn when ignored](#startup-and-connect-results-warn-when-ignored)
@@ -1162,10 +1163,9 @@ parse**, in both the blocking and the non-blocking branch, and queues no failed 
 attempt. Stock connected to whatever address the failed parse left: `0.0.0.0` when
 blocking, which on Linux reaches the local machine, and `UNASSIGNED_SYSTEM_ADDRESS` when
 not, reported later through `HasFailedConnectionAttempt`. Treat `UNASSIGNED_SYSTEM_ADDRESS`
-from a blocking `Connect` as failure, as before. From a non-blocking one it still means
-"started" too, so check the host string before calling if you need to tell the two apart.
-The blocking branch now refuses `"1.2.3.4|80"`, as the non-blocking one did. Stock took it
-there and ignored the port, using `remotePort`.
+from a blocking `Connect` as failure, as before. The blocking branch now turns down
+`"1.2.3.4|80"`, as the non-blocking one did. Stock took it there and ignored the port,
+using `remotePort`.
 
 **`RakPeerInterface::SendTTL` returns `bool`.** It returns false and sends nothing when
 `host` doesn't parse, and true otherwise. Stock returned `void` and sent the datagram to
@@ -1186,6 +1186,20 @@ refused. A failed `Start` leaves the interface stopped, and `Start` may be calle
 connections there are still closing, in `TIME_WAIT` or `LAST_ACK`, now listens instead of
 failing. A port another socket is listening on still fails. Windows is unchanged: it binds
 there anyway, and its `SO_REUSEADDR` would let a second socket take the port.
+
+## A non-blocking `TCPInterface::Connect` returns the address it is connecting to
+
+**`Connect( host, port, false, … )` returns the target address once it accepts the attempt**,
+the same address `HasCompletedConnectionAttempt` or `HasFailedConnectionAttempt` later
+reports it under. Stock returned `UNASSIGNED_SYSTEM_ADDRESS` from every non-blocking call.
+Now `UNASSIGNED_SYSTEM_ADDRESS` means the call was turned down: `bindAddress` too long, a
+host that doesn't parse, the interface not started or stopping, or no free connection
+record. A turned-down call is never reported, so don't wait on the queues for it. The
+report of an accepted one may already be queued when `Connect` returns.
+
+A caller that took a result other than `UNASSIGNED_SYSTEM_ADDRESS` from a non-blocking call
+to mean "connected" now sees it before the connection is open. Wait for
+`HasCompletedConnectionAttempt` instead.
 
 ## Numbers in strings are read whole
 
@@ -1380,10 +1394,9 @@ through their result types. A class of your own that overrides `TransportInterfa
 so calling `SetTransportProvider` again with it stops it and tries again. A null transport
 changes nothing and returns false.
 
-**A non-blocking `TCPInterface::Connect` returns `UNASSIGNED_SYSTEM_ADDRESS` whether or not
-it started**, so its result says nothing. Write `std::ignore = tcp.Connect( …, false );`.
-An attempt that started is reported by `HasCompletedConnectionAttempt` or
-`HasFailedConnectionAttempt`; one that was refused is not reported at all.
+**Check the result of a non-blocking `TCPInterface::Connect` too:** `UNASSIGNED_SYSTEM_ADDRESS`
+means it was turned down and nothing will be reported. See
+[A non-blocking `TCPInterface::Connect` returns the address it is connecting to](#a-non-blocking-tcpinterfaceconnect-returns-the-address-it-is-connecting-to).
 
 Not marked: `CloseConnection` and the `RPC4` `Unregister…` calls, whose false means there
 was nothing left to close or remove; the `Has…` connection-event polls and `Receive`, whose

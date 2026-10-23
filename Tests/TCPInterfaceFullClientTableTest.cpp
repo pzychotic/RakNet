@@ -54,7 +54,7 @@ constexpr std::chrono::milliseconds kQuietPeriod( 500 );
 
 } // namespace
 
-TEST_CASE( "Connect refuses a full client table, blocking", "[tcpinterface][network]" )
+TEST_CASE( "Connect turns down a full client table, blocking", "[tcpinterface][network]" )
 {
     TCPInterface server;
     REQUIRE( server.Start( kBlockingListenPort, 4 ) );
@@ -78,7 +78,7 @@ TEST_CASE( "Connect refuses a full client table, blocking", "[tcpinterface][netw
     server.Stop();
 }
 
-TEST_CASE( "Connect refuses a full client table, non-blocking", "[tcpinterface][network]" )
+TEST_CASE( "Connect turns down a full client table, non-blocking", "[tcpinterface][network]" )
 {
     TCPInterface server;
     REQUIRE( server.Start( kNonBlockingListenPort, 4 ) );
@@ -91,17 +91,17 @@ TEST_CASE( "Connect refuses a full client table, non-blocking", "[tcpinterface][
 
     // The blocking arm queues its success as a completed attempt as well as returning it.
     // Take that one off the queue here, so the queue being empty below says something about
-    // the refused call rather than about this one.
+    // the turned-down call rather than about this one.
     REQUIRE( client.HasCompletedConnectionAttempt() != UNASSIGNED_SYSTEM_ADDRESS );
 
-    // The non-blocking arm returns UNASSIGNED_SYSTEM_ADDRESS whether it took the call or
-    // refused it, so this line cannot tell the fix from the defect on its own.
+    // A non-blocking Connect returns the address it is connecting to once it accepts the
+    // call, so UNASSIGNED_SYSTEM_ADDRESS says it was turned down.
     CHECK( client.Connect( "127.0.0.1", kNonBlockingListenPort, false, AF_INET ) == UNASSIGNED_SYSTEM_ADDRESS );
 
-    // This can. The unfixed code stashes remoteClientsLength in the address's systemIndex
-    // and hands it to a connect thread, which does the same out-of-bounds write off the
-    // update thread's timeline and then reports the attempt one way or the other. A refusal
-    // spawns no thread, so nothing is ever reported.
+    // The unfixed code stashes remoteClientsLength in the address's systemIndex and hands
+    // it to a connect thread, which does the same out-of-bounds write off the update
+    // thread's timeline and then reports the attempt one way or the other. A turned-down
+    // call spawns no thread, so nothing is ever reported.
     std::this_thread::sleep_for( kQuietPeriod );
     CHECK( client.HasCompletedConnectionAttempt() == UNASSIGNED_SYSTEM_ADDRESS );
     CHECK( client.HasFailedConnectionAttempt() == UNASSIGNED_SYSTEM_ADDRESS );

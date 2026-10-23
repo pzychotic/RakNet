@@ -29,9 +29,8 @@ keep working through both arms - the non-blocking one because that is where the 
 live, the blocking one because it never copied and so must be unaffected either way.
 
 The 64-character rejection needs no peer: it happens before any network call. The two
-acceptance cases connect to a loopback listener, because acceptance is not otherwise
-observable - the non-blocking arm returns UNASSIGNED_SYSTEM_ADDRESS whether it accepted the
-argument or not, so a completed connection attempt is the only proof it got that far.
+acceptance cases connect to a loopback listener, because only a completed connection attempt
+proves the string reached the connect intact.
 */
 
 using namespace RakNet;
@@ -79,10 +78,9 @@ TEST_CASE( "Connect rejects a bindAddress that does not fit and claims no slot",
     // is ever looked at.
     CHECK( client.Connect( "127.0.0.1", kListenPort, false, AF_INET, kFirstRejected.c_str() ) == UNASSIGNED_SYSTEM_ADDRESS );
 
-    // The load-bearing assertion. The non-blocking arm returns UNASSIGNED_SYSTEM_ADDRESS on
-    // success too, so the return value above cannot tell the fix from the defect; the slot
-    // the unfixed code claims - before spawning the thread that would have used it - can.
+    // No slot claimed and nothing queued: the call was turned down, not accepted and failed.
     CHECK( client.GetConnectionCount() == 0 );
+    CHECK( client.HasFailedConnectionAttempt() == UNASSIGNED_SYSTEM_ADDRESS );
 
     // The blocking arm shares the check, and there the return value is the whole signal.
     CHECK( client.Connect( "127.0.0.1", kListenPort, true, AF_INET, kFirstRejected.c_str() ) == UNASSIGNED_SYSTEM_ADDRESS );
@@ -122,9 +120,11 @@ TEST_CASE( "Connect accepts the longest bindAddress that fits, non-blocking", "[
     // on the connect thread. A bound written one byte short would truncate this address, and
     // a bound written one byte long would still overrun; reaching a completed attempt says
     // the string survived both copies at the largest size they have to carry.
-    CHECK( client.Connect( "127.0.0.1", kListenPort, false, AF_INET, kLongestAccepted.c_str() ) == UNASSIGNED_SYSTEM_ADDRESS );
+    const SystemAddress accepted = client.Connect( "127.0.0.1", kListenPort, false, AF_INET, kLongestAccepted.c_str() );
+    CHECK( accepted != UNASSIGNED_SYSTEM_ADDRESS );
 
-    CHECK( WaitForCompletedConnectionAttempt( client ) != UNASSIGNED_SYSTEM_ADDRESS );
+    // The address a non-blocking Connect returns is the one its attempt is reported under.
+    CHECK( WaitForCompletedConnectionAttempt( client ) == accepted );
 
     client.Stop();
     server.Stop();

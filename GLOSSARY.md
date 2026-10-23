@@ -33,8 +33,10 @@ _Avoid_: Slot, remote system entry, remote client
 **Connect attempt**:
 A request to open a connection, from the moment it is accepted until it ends exactly once,
 completed or failed. While it runs it holds a connection record that is not yet open.
-Stopping waits for every connect attempt to end, and asks each to end early.
-_Avoid_: Pending connection, connection thread
+Stopping waits for every connect attempt to end, and asks each to end early. A request
+turned down before it is accepted is not a connect attempt: it holds no connection record
+and never ends, so nothing reports it.
+_Avoid_: Pending connection, connection thread, refused connect
 
 **Closing connection record**:
 A connection record whose connection is ending. Either this Peer asked to close it and is

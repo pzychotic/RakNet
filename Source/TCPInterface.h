@@ -81,14 +81,21 @@ public:
     /// timeout.
     void Stop( void );
 
-    /// Connect to the specified host on the specified port. Refused, with
-    /// UNASSIGNED_SYSTEM_ADDRESS and no failed connection attempt reported, if the interface
-    /// is not started or Stop is running, or if host doesn't parse as an address. With \a block
-    /// false it returns UNASSIGNED_SYSTEM_ADDRESS either way, and an attempt that started is
-    /// reported by HasCompletedConnectionAttempt or HasFailedConnectionAttempt.
+    /// Connect to the specified host on the specified port.
+    ///
+    /// Turned down, returning UNASSIGNED_SYSTEM_ADDRESS and reporting nothing, if bindAddress
+    /// is too long, host doesn't parse as an address, the interface is not started or Stop
+    /// is running, or every connection record is in use. Otherwise the attempt is accepted,
+    /// and it is reported exactly once, by HasCompletedConnectionAttempt or
+    /// HasFailedConnectionAttempt, in either arm.
+    ///
+    /// With \a block true it returns the connected address, or UNASSIGNED_SYSTEM_ADDRESS if
+    /// turned down or failed. With \a block false it returns the address the attempt will be
+    /// reported under, or UNASSIGNED_SYSTEM_ADDRESS if turned down. The report may already be
+    /// queued by the time a non-blocking Connect returns.
     /// \param[in] bindAddress Local address to bind to, or 0 for none. At most
-    /// MAXIMUM_BIND_ADDRESS_LENGTH characters: a longer one is rejected with
-    /// UNASSIGNED_SYSTEM_ADDRESS rather than truncated.
+    /// MAXIMUM_BIND_ADDRESS_LENGTH characters: a longer one is turned down rather than
+    /// truncated.
     [[nodiscard]] SystemAddress Connect( const char* host, unsigned short remotePort, bool block = true, unsigned short socketFamily = AF_INET, const char* bindAddress = 0 );
 
 #if OPEN_SSL_CLIENT_SUPPORT == 1
@@ -243,7 +250,7 @@ protected:
     std::mutex connectAttemptMutex;
     std::condition_variable connectAttemptEnded;
 
-    /// Set for the length of Stop. Connect refuses, and connects in flight give up.
+    /// Set for the length of Stop. Connect turns requests down, and connects in flight give up.
     bool isStopping;
 
     /// Connect attempts begun and not yet ended. Stop frees nothing until it is zero.
@@ -285,7 +292,7 @@ protected:
         ConnectAttempt( const ConnectAttempt& ) = delete;
         ConnectAttempt& operator=( const ConnectAttempt& ) = delete;
 
-        /// Whether the attempt was counted in. False means Connect is refused.
+        /// Whether the attempt was counted in. False means Connect is turned down.
         bool IsBegun( void ) const;
 
         /// Hands the count on: whoever it was handed to calls EndConnectAttempt.
