@@ -17,7 +17,7 @@
 #include "RakAssert.h"
 #include "ParseWholeNumber.h"
 #include <stdio.h>
-#include <string.h>
+#include <string_view>
 
 namespace RakNet {
 
@@ -28,7 +28,7 @@ namespace {
 // Reads the whole of text as a T. Anything else, including a value outside T's range,
 // reads as 0.
 template<typename T>
-T ParseArgument( const char* text )
+T ParseArgument( std::string_view text )
 {
     T value = 0;
     ParseWholeNumber( text, value );
@@ -88,34 +88,35 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
     if( peer == 0 )
         return false;
 
-    if( strcmp( command, "Startup" ) == 0 )
+    const std::string_view name = command;
+    if( name == "Startup" )
     {
         SocketDescriptor socketDescriptor( ParseArgument<unsigned short>( parameterList[1] ), parameterList[2] );
         ReturnResult( peer->Startup( ParseArgument<unsigned int>( parameterList[0] ), &socketDescriptor, 1 ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "SetMaximumIncomingConnections" ) == 0 )
+    else if( name == "SetMaximumIncomingConnections" )
     {
         peer->SetMaximumIncomingConnections( ParseArgument<unsigned short>( parameterList[0] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetMaximumIncomingConnections" ) == 0 )
+    else if( name == "GetMaximumIncomingConnections" )
     {
         ReturnResult( (int)peer->GetMaximumIncomingConnections(), command, transport, systemAddress );
     }
-    else if( strcmp( command, "Connect" ) == 0 )
+    else if( name == "Connect" )
     {
         ReturnResult( peer->Connect( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), parameterList[2], ParseArgument<int>( parameterList[3] ) ) == CONNECTION_ATTEMPT_STARTED, command, transport, systemAddress );
     }
-    else if( strcmp( command, "Disconnect" ) == 0 )
+    else if( name == "Disconnect" )
     {
         peer->Shutdown( ParseArgument<unsigned int>( parameterList[0] ), ParseArgument<unsigned char>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "IsActive" ) == 0 )
+    else if( name == "IsActive" )
     {
         ReturnResult( peer->IsActive(), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetConnectionList" ) == 0 )
+    else if( name == "GetConnectionList" )
     {
         SystemAddress remoteSystems[32];
         unsigned short count = 32;
@@ -140,113 +141,113 @@ bool RakNetCommandParser::OnCommand( const char* command, unsigned numParameters
         else
             transport->Send( systemAddress, "GetConnectionList() returned false.\r\n" );
     }
-    else if( strcmp( command, "CloseConnection" ) == 0 )
+    else if( name == "CloseConnection" )
     {
         peer->CloseConnection( SystemAddress( parameterList[0] ), ParseArgument<int>( parameterList[1] ) != 0, ParseArgument<unsigned char>( parameterList[2] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetConnectionState" ) == 0 )
+    else if( name == "GetConnectionState" )
     {
         ReturnResult( (int)peer->GetConnectionState( SystemAddress( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetIndexFromSystemAddress" ) == 0 )
+    else if( name == "GetIndexFromSystemAddress" )
     {
         ReturnResult( peer->GetIndexFromSystemAddress( SystemAddress( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetSystemAddressFromIndex" ) == 0 )
+    else if( name == "GetSystemAddressFromIndex" )
     {
         ReturnResult( peer->GetSystemAddressFromIndex( ParseArgument<unsigned int>( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "AddToBanList" ) == 0 )
+    else if( name == "AddToBanList" )
     {
         peer->AddToBanList( parameterList[0], ParseArgument<TimeMS>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "RemoveFromBanList" ) == 0 )
+    else if( name == "RemoveFromBanList" )
     {
         peer->RemoveFromBanList( parameterList[0] );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "ClearBanList" ) == 0 )
+    else if( name == "ClearBanList" )
     {
         peer->ClearBanList();
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "IsBanned" ) == 0 )
+    else if( name == "IsBanned" )
     {
         ReturnResult( peer->IsBanned( parameterList[0] ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "Ping1" ) == 0 )
+    else if( name == "Ping1" )
     {
         peer->Ping( SystemAddress( parameterList[0] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "Ping2" ) == 0 )
+    else if( name == "Ping2" )
     {
         ReturnResult( peer->Ping( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), ParseArgument<int>( parameterList[2] ) != 0 ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetAveragePing" ) == 0 )
+    else if( name == "GetAveragePing" )
     {
         ReturnResult( peer->GetAveragePing( SystemAddress( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetLastPing" ) == 0 )
+    else if( name == "GetLastPing" )
     {
         ReturnResult( peer->GetLastPing( SystemAddress( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetLowestPing" ) == 0 )
+    else if( name == "GetLowestPing" )
     {
         ReturnResult( peer->GetLowestPing( SystemAddress( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "SetOccasionalPing" ) == 0 )
+    else if( name == "SetOccasionalPing" )
     {
         peer->SetOccasionalPing( ParseArgument<int>( parameterList[0] ) != 0 );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "SetOfflinePingResponse" ) == 0 )
+    else if( name == "SetOfflinePingResponse" )
     {
         peer->SetOfflinePingResponse( parameterList[0], ParseArgument<unsigned int>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetInternalID" ) == 0 )
+    else if( name == "GetInternalID" )
     {
         ReturnResult( peer->GetInternalID(), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetExternalID" ) == 0 )
+    else if( name == "GetExternalID" )
     {
         ReturnResult( peer->GetExternalID( SystemAddress( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "SetTimeoutTime" ) == 0 )
+    else if( name == "SetTimeoutTime" )
     {
         peer->SetTimeoutTime( ParseArgument<TimeMS>( parameterList[0] ), SystemAddress( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetMTUSize" ) == 0 )
+    else if( name == "GetMTUSize" )
     {
         ReturnResult( peer->GetMTUSize( UNASSIGNED_SYSTEM_ADDRESS ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetNumberOfAddresses" ) == 0 )
+    else if( name == "GetNumberOfAddresses" )
     {
         ReturnResult( (int)peer->GetNumberOfAddresses(), command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetLocalIP" ) == 0 )
+    else if( name == "GetLocalIP" )
     {
         ReturnResult( (char*)peer->GetLocalIP( ParseArgument<unsigned int>( parameterList[0] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "AllowConnectionResponseIPMigration" ) == 0 )
+    else if( name == "AllowConnectionResponseIPMigration" )
     {
         peer->AllowConnectionResponseIPMigration( ParseArgument<int>( parameterList[0] ) != 0 );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "AdvertiseSystem" ) == 0 )
+    else if( name == "AdvertiseSystem" )
     {
         ReturnResult( peer->AdvertiseSystem( parameterList[0], ParseArgument<unsigned short>( parameterList[1] ), parameterList[2], ParseArgument<int>( parameterList[3] ) ), command, transport, systemAddress );
     }
-    else if( strcmp( command, "SetIncomingPassword" ) == 0 )
+    else if( name == "SetIncomingPassword" )
     {
         peer->SetIncomingPassword( parameterList[0], ParseArgument<int>( parameterList[1] ) );
         ReturnResult( command, transport, systemAddress );
     }
-    else if( strcmp( command, "GetIncomingPassword" ) == 0 )
+    else if( name == "GetIncomingPassword" )
     {
         char password[256];
         int passwordLength;

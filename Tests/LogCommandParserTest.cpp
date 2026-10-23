@@ -86,3 +86,44 @@ TEST_CASE( "LogCommandParser sends a log only to the users subscribed to its cha
     parser.WriteLog( "BETA", "to beta" );
     CHECK( transport.sent == "to beta\r\n" );
 }
+
+TEST_CASE( "LogCommandParser unsubscribes a user from a channel named without regard to case", "[logcommandparser]" )
+{
+    LogCommandParser parser;
+    parser.AddChannel( "Alpha" );
+    parser.AddChannel( "Beta" );
+
+    RecordingTransport transport;
+    parser.OnTransportChange( &transport );
+    const SystemAddress user( "127.0.0.1", 1 );
+    SubscribeTo( parser, transport, user, "Alpha" );
+    SubscribeTo( parser, transport, user, "Beta" );
+
+    transport.sent.clear();
+    char channelName[] = "bEtA";
+    char* parameterList[] = { channelName };
+    parser.OnCommand( "Unsubscribe", 1, parameterList, &transport, user, "" );
+    CHECK( transport.sent == "You are now unsubscribed from channel Beta.\r\n" );
+
+    transport.sent.clear();
+    parser.WriteLog( "Beta", "to beta" );
+    parser.WriteLog( "Alpha", "to alpha" );
+    CHECK( transport.sent == "to alpha\r\n" );
+}
+
+TEST_CASE( "LogCommandParser subscribes a user to every channel with no channel named", "[logcommandparser]" )
+{
+    LogCommandParser parser;
+    parser.AddChannel( "Alpha" );
+    parser.AddChannel( "Beta" );
+
+    RecordingTransport transport;
+    parser.OnTransportChange( &transport );
+    parser.OnCommand( "Subscribe", 0, nullptr, &transport, SystemAddress( "127.0.0.1", 1 ), "" );
+    CHECK( transport.sent == "Subscribed to all channels.\r\n" );
+
+    transport.sent.clear();
+    parser.WriteLog( "Alpha", "to alpha" );
+    parser.WriteLog( "Beta", "to beta" );
+    CHECK( transport.sent == "to alpha\r\nto beta\r\n" );
+}

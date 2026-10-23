@@ -89,6 +89,7 @@ set( CURRENT_SOURCE
 set( INTERNAL_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/AddrInfo.h
     ${CMAKE_CURRENT_SOURCE_DIR}/AddressString.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/EqualsIgnoringAsciiCase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/ParseWholeNumber.h
     ${CMAKE_CURRENT_SOURCE_DIR}/TotalListLength.h
 )

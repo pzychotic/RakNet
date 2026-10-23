@@ -15,16 +15,16 @@
 #include "TransportInterface.h"
 #include "CommandParserInterface.h"
 #include "RakAssert.h"
+#include "EqualsIgnoringAsciiCase.h"
 #include "ParseWholeNumber.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <string_view>
 
 #define COMMAND_DELINATOR ' '
 #define COMMAND_DELINATOR_TOGGLE '"'
-
-#include "LinuxStrings.h"
 
 namespace RakNet {
 
@@ -71,7 +71,7 @@ void ConsoleServer::AddCommandParser( CommandParserInterface* commandParserInter
 
     // Non-duplicate insertion
     auto match = std::find_if( commandParserList.begin(), commandParserList.end(), [&]( CommandParserInterface* pCommandParser ) {
-        return pCommandParser == commandParserInterface || _stricmp( pCommandParser->GetName(), commandParserInterface->GetName() ) == 0;
+        return pCommandParser == commandParserInterface || EqualsIgnoringAsciiCase( pCommandParser->GetName(), commandParserInterface->GetName() );
     } );
     if( match != commandParserList.end() )
     {
@@ -143,7 +143,8 @@ void ConsoleServer::Update( void )
             p = transport->Receive();
             continue;
         }
-        if( _stricmp( *parameterList, "help" ) == 0 && numParameters <= 2 )
+        const std::string_view first = parameterList[0];
+        if( EqualsIgnoringAsciiCase( first, "help" ) && numParameters <= 2 )
         {
             // Find the parser specified and display help for it
             if( numParameters == 1 )
@@ -165,9 +166,10 @@ void ConsoleServer::Update( void )
             }
             else // numParameters == 2, including the help tag
             {
+                const std::string_view topic = parameterList[1];
                 for( CommandParserInterface* pCommandParser : commandParserList )
                 {
-                    if( _stricmp( parameterList[1], pCommandParser->GetName() ) == 0 )
+                    if( EqualsIgnoringAsciiCase( topic, pCommandParser->GetName() ) )
                     {
                         commandParsed = true;
                         pCommandParser->SendHelp( transport, p->systemAddress );
@@ -204,7 +206,7 @@ void ConsoleServer::Update( void )
                 //ShowPrompt(p->systemAddress);
             }
         }
-        else if( _stricmp( *parameterList, "quit" ) == 0 && numParameters == 1 )
+        else if( EqualsIgnoringAsciiCase( first, "quit" ) && numParameters == 1 )
         {
             transport->Send( p->systemAddress, "Goodbye!\r\n" );
             transport->CloseConnection( p->systemAddress );
@@ -218,11 +220,11 @@ void ConsoleServer::Update( void )
             {
                 uint32_t commandParserIndex = ~0u;
                 // Prefixing with numbers directs to a particular parser
-                if( **parameterList >= '0' && **parameterList <= '9' )
+                if( !first.empty() && first.front() >= '0' && first.front() <= '9' )
                 {
                     // Parsers are listed from 1, and 0 or anything but a whole number is no parser.
                     uint32_t parserNumber = 0;
-                    ParseWholeNumber( *parameterList, parserNumber );
+                    ParseWholeNumber( first, parserNumber );
                     commandParserIndex = parserNumber - 1;
                     if( commandParserIndex >= commandParserList.size() )
                     {
@@ -236,7 +238,7 @@ void ConsoleServer::Update( void )
                     uint32_t uParserIndex = 0u;
                     for( CommandParserInterface* pCommandParser : commandParserList )
                     {
-                        if( _stricmp( parameterList[0], pCommandParser->GetName() ) == 0 )
+                        if( EqualsIgnoringAsciiCase( first, pCommandParser->GetName() ) )
                         {
                             commandParserIndex = uParserIndex; // Matches parser at index uParserIndex
                             break;

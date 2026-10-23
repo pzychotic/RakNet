@@ -58,7 +58,9 @@ public:
         va_end( args );
         sent += buffer;
     }
-    void CloseConnection( SystemAddress ) override {}
+    int closeCount = 0;
+
+    void CloseConnection( SystemAddress ) override { closeCount++; }
     Packet* Receive( void ) override
     {
         if( delivered )
@@ -81,6 +83,7 @@ struct ConsoleResult
 {
     std::string sent;
     unsigned int maximumIncomingConnections;
+    bool closed;
 };
 
 ConsoleResult RunLine( const char* line )
@@ -99,7 +102,7 @@ ConsoleResult RunLine( const char* line )
     console.AddCommandParser( &parser );
     console.Update();
 
-    return { transport.sent, peer->GetMaximumIncomingConnections() };
+    return { transport.sent, peer->GetMaximumIncomingConnections(), transport.closeCount > 0 };
 }
 
 } // namespace
@@ -143,4 +146,41 @@ TEST_CASE( "ConsoleServer refuses a null transport and keeps the one it has", "[
 
     CHECK_FALSE( console.SetTransportProvider( nullptr, 0 ) );
     CHECK( transport.stopCount == 0 );
+}
+
+TEST_CASE( "ConsoleServer answers help without regard to case", "[consoleserver]" )
+{
+    for( const char* line : { "help", "HeLp" } )
+    {
+        CAPTURE( line );
+        CHECK( RunLine( line ).sent.find( "INSTRUCTIONS:" ) != std::string::npos );
+    }
+}
+
+TEST_CASE( "ConsoleServer answers help on a parser or a command named without regard to case", "[consoleserver]" )
+{
+    const ConsoleResult parserHelp = RunLine( "help rAkNeT" );
+    CHECK( parserHelp.sent.find( "The RakNet parser provides mirror functions" ) != std::string::npos );
+    CHECK( parserHelp.sent.find( "COMMAND LIST:" ) != std::string::npos );
+
+    CHECK( RunLine( "help setmaximumincomingconnections" ).sent.find( "(1 parms): SetMaximumIncomingConnections" ) != std::string::npos );
+    CHECK( RunLine( "help Nothing" ).sent.find( "Unknown help topic: Nothing." ) != std::string::npos );
+}
+
+TEST_CASE( "ConsoleServer closes the connection on quit alone, without regard to case", "[consoleserver]" )
+{
+    const ConsoleResult quit = RunLine( "QuIt" );
+    CHECK( quit.sent.find( "Goodbye!" ) != std::string::npos );
+    CHECK( quit.closed );
+
+    const ConsoleResult quitWithParameter = RunLine( "quit now" );
+    CHECK( quitWithParameter.sent.find( "Goodbye!" ) == std::string::npos );
+    CHECK_FALSE( quitWithParameter.closed );
+}
+
+TEST_CASE( "ConsoleServer directs a command to the parser named first on the line, without regard to case", "[consoleserver]" )
+{
+    const ConsoleResult result = RunLine( "rAkNeT SetMaximumIncomingConnections 7" );
+    CHECK( result.sent.find( "Unknown command" ) == std::string::npos );
+    CHECK( result.maximumIncomingConnections == 7 );
 }

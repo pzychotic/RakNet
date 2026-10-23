@@ -12,6 +12,7 @@
 #if _RAKNET_SUPPORT_LogCommandParser == 1
 
 #include "LogCommandParser.h"
+#include "EqualsIgnoringAsciiCase.h"
 #include "RakAssert.h"
 #include "TransportInterface.h"
 
@@ -22,6 +23,7 @@
 #include <stdarg.h>
 #include <algorithm>
 #include <iterator>
+#include <string_view>
 
 #include "LinuxStrings.h"
 
@@ -42,7 +44,8 @@ bool LogCommandParser::OnCommand( const char* command, unsigned numParameters, c
 {
     (void)originalString;
 
-    if( strcmp( command, "Subscribe" ) == 0 )
+    const std::string_view name = command;
+    if( name == "Subscribe" )
     {
         unsigned channelIndex = ~0u;
         if( numParameters == 0 )
@@ -67,7 +70,7 @@ bool LogCommandParser::OnCommand( const char* command, unsigned numParameters, c
             transport->Send( systemAddress, "Subscribe takes either 0 or 1 parameters.\r\n" );
         }
     }
-    else if( strcmp( command, "Unsubscribe" ) == 0 )
+    else if( name == "Unsubscribe" )
     {
         unsigned channelIndex = ~0u;
         if( numParameters == 0 )
@@ -251,7 +254,7 @@ unsigned LogCommandParser::Subscribe( const SystemAddress& systemAddress, const 
 unsigned LogCommandParser::GetChannelIndexFromName( const char* channelName )
 {
     const char** addedEnd = std::find( std::begin( channelNames ), std::end( channelNames ), nullptr );
-    const char** match = std::find_if( std::begin( channelNames ), addedEnd, [&]( const char* name ) { return _stricmp( name, channelName ) == 0; } );
+    const char** match = std::find_if( std::begin( channelNames ), addedEnd, [&]( const char* name ) { return EqualsIgnoringAsciiCase( name, channelName ); } );
     if( match == addedEnd )
         return ~0u;
     return (unsigned)( match - std::begin( channelNames ) );
