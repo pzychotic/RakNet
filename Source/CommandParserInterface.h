@@ -102,7 +102,7 @@ public:
     /// \param[in] systemAddress The player to write to
     virtual void SendCommandList( TransportInterface* transport, const SystemAddress& systemAddress );
 
-    static const unsigned char VARIABLE_NUMBER_OF_PARAMETERS;
+    static constexpr unsigned char VARIABLE_NUMBER_OF_PARAMETERS = 255;
 
     // Currently only takes static strings - doesn't make a copy of what you pass.
     // parameterCount is the number of parameters that the sender has to include with the command.

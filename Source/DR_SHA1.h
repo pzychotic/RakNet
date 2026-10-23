@@ -113,7 +113,6 @@
 #include <string.h> // Needed for strcat and strcpy
 #include "Export.h"
 //#define MAX_FILE_READ_BUFFER 8000
-#define SHA1_LENGTH 20
 
 
 #if !defined( SHA1_UTILITY_FUNCTIONS ) && !defined( SHA1_NO_UTILITY_FUNCTIONS )
@@ -188,6 +187,8 @@
 #endif
 
 namespace RakNet {
+
+inline constexpr unsigned int SHA1_LENGTH = 20;
 
 ///////////////////////////////////////////////////////////////////////////
 // Define variable types

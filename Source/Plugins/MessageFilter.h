@@ -27,10 +27,10 @@
 #include <string>
 #include <unordered_map>
 
-/// MessageIdentifier (ID_*) values shoudln't go higher than this.  Change it if you do.
-#define MESSAGE_FILTER_MAX_MESSAGE_ID 256
-
 namespace RakNet {
+
+/// MessageIdentifier (ID_*) values shouldn't go higher than this.  Change it if you do.
+inline constexpr unsigned short MESSAGE_FILTER_MAX_MESSAGE_ID = 256;
 
 /// Forward declarations
 class RakPeerInterface;

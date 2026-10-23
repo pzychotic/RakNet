@@ -32,7 +32,7 @@ namespace RakNet {
 
 // Type used to track values. If needed, change to double and recompile
 typedef double SHValueType;
-#define SH_TYPE_MAX DBL_MAX
+inline constexpr SHValueType SH_TYPE_MAX = DBL_MAX;
 
 /// \brief Input numerical values over time. Get sum, average, highest, lowest, standard deviation on recent or all-time values
 class RAK_DLL_EXPORT StatisticsHistory

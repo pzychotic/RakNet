@@ -46,7 +46,7 @@ else use congestion avoidance
 namespace RakNet {
 
 /// Sizeof an UDP header in byte
-#define UDP_HEADER_SIZE 28
+inline constexpr int UDP_HEADER_SIZE = 28;
 
 #define CC_DEBUG_PRINTF_1( x )
 #define CC_DEBUG_PRINTF_2( x, y )

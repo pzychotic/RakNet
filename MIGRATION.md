@@ -582,6 +582,44 @@ was on. Now the default is `assert( x )` with no condition, so it is on exactly 
 - **A `RakAssert` of your own needs its semicolon.** Stock's macro supplied one, so
   `RakAssert( x )` without a `;` compiled in a `_DEBUG` build. Now it doesn't; add the `;`.
 
+## Fixed numeric constants are `RakNet::` constants
+
+These were macros, all but `MINIMUM_NEGOTIATED_MTU_SIZE` already in stock. They are now
+`inline constexpr` variables in `namespace RakNet`, with the same names and values:
+
+| Constant | Header | Type |
+|----------|--------|------|
+| `MINIMUM_NEGOTIATED_MTU_SIZE` | `MTUSize.h` | `int` |
+| `UDP_HEADER_SIZE` | `CCRakNetSlidingWindow.h` | `int` |
+| `NUMBER_OF_ORDERED_STREAMS` | `ReliabilityLayer.h` | `unsigned char` |
+| `RESEND_TREE_ORDER` | `ReliabilityLayer.h` | `int` |
+| `REMOTE_MAX_TEXT_INPUT` | `TransportInterface.h` | `int` |
+| `SHA1_LENGTH` | `DR_SHA1.h` | `unsigned int` |
+| `MESSAGE_FILTER_MAX_MESSAGE_ID` | `Plugins/MessageFilter.h` | `unsigned short` |
+| `NONCE_TIMEOUT_MS` | `Plugins/TwoWayAuthentication.h` | `RakNet::Time` |
+| `TWO_WAY_AUTHENTICATION_NONCE_LENGTH` | `Plugins/TwoWayAuthentication.h` | `unsigned int` |
+| `HASHED_NONCE_AND_PW_LENGTH` | `Plugins/TwoWayAuthentication.h` | `unsigned int` |
+| `UDP_FORWARDER_MAXIMUM_TIMEOUT` | `Plugins/UDPProxyCommon.h` | `RakNet::TimeMS` |
+| `SH_TYPE_MAX` | `Plugins/StatisticsHistory.h` | `SHValueType` |
+
+`CHALLENGE_MINIMUM_TIMEOUT` is gone from `TwoWayAuthentication.h`; only the plugin's own
+source uses it. `CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS` is now
+`static constexpr`, so it works in a constant expression.
+
+The settings you can override stay macros: everything in `RakNetDefines.h`, and
+`MAXIMUM_MTU_SIZE` and `MINIMUM_MTU_SIZE` in `MTUSize.h`. So do the version macros in
+`RakNetVersion.h`.
+
+#### What to do
+
+- **Code outside `namespace RakNet`** writes `RakNet::UDP_HEADER_SIZE`, or adds a `using`
+  for it, as for any other RakNet name.
+- **A preprocessor test of one of them**, such as `#if NUMBER_OF_ORDERED_STREAMS > 16` or
+  `#ifdef SHA1_LENGTH`, no longer works. `#ifdef` is now false, and `#if` treats the name as
+  0. Use `if constexpr` or `static_assert` instead.
+- **A macro of your own with one of these names** now breaks the build at the declaration.
+  Rename it.
+
 ## Exceptions and out-of-memory
 
 No signature changed here, but where you hook out-of-memory did. RakNet is

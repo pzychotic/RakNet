@@ -51,8 +51,6 @@ Algorithm:
 11. When the user connects the endpoint and sender, then the sender will get ID_CONNECTION_REQUEST_ACCEPTED. The sender will look up the endpoint in the forwardedConnectionList, and send ID_ROUTER_2_INCREASE_TIMEOUT to the endpoint. This message will call SetTimeoutTime() on the endpoint, so that if the router disconnects, enough time is available for the reroute to complete.
 */
 
-#define MIN_MINIPUNCH_TIMEOUT 5000
-
 void Router2DebugInterface::ShowFailure( const char* message )
 {
     printf( "%s", message );

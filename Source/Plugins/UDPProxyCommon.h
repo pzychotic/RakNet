@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "RakNetTime.h"
+
 namespace RakNet {
 
 // System flow:
@@ -63,6 +65,6 @@ enum UDPProxyMessages
 };
 
 
-#define UDP_FORWARDER_MAXIMUM_TIMEOUT ( 60000 * 10 )
+inline constexpr TimeMS UDP_FORWARDER_MAXIMUM_TIMEOUT = 60000 * 10;
 
 } // namespace RakNet

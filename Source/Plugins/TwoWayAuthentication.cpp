@@ -24,6 +24,13 @@
 
 namespace RakNet {
 
+namespace {
+
+// How often to check for ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, and the minimum timeout time. Maximum is double this value.
+constexpr Time CHALLENGE_MINIMUM_TIMEOUT = 3000;
+
+} // namespace
+
 enum NegotiationIdentifiers
 {
     ID_NONCE_REQUEST,

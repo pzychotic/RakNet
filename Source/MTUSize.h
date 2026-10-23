@@ -34,13 +34,13 @@
 
 #endif
 
+namespace RakNet {
+
 /// The lowest MTU a connection can end up using. RakPeer offers { MAXIMUM_MTU_SIZE, 1200,
 /// 576 } in descending order during the handshake and there is no API to set an MTU
 /// directly, so no connection settles below this. Note this is *not* MINIMUM_MTU_SIZE,
 /// which is a floor on what the code tolerates rather than a value it ever selects.
-#define MINIMUM_NEGOTIATED_MTU_SIZE 576
-
-namespace RakNet {
+inline constexpr int MINIMUM_NEGOTIATED_MTU_SIZE = 576;
 
 /// The largest message RakPeer::Send, Send( BitStream* ) and SendList accept, in bytes.
 ///
@@ -66,7 +66,7 @@ namespace RakNet {
 /// those two translation units checks this arithmetic against the real definitions, so
 /// changing a header layout or the MTU list breaks the build instead of silently letting the
 /// send and receive limits drift apart.
-constexpr unsigned int MAXIMUM_MESSAGE_SIZE =
+inline constexpr unsigned int MAXIMUM_MESSAGE_SIZE =
     65536u * ( MINIMUM_NEGOTIATED_MTU_SIZE - 28u - 9u - 23u );
 
 } // namespace RakNet

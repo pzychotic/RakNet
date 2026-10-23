@@ -21,15 +21,7 @@
 #include "NativeFeatureIncludes.h"
 #if _RAKNET_SUPPORT_TwoWayAuthentication == 1
 
-// How long a nonce this Peer handed out stays valid. Update frees every older one.
-#define NONCE_TIMEOUT_MS 10000
-// How often to check for ID_TWO_WAY_AUTHENTICATION_OUTGOING_CHALLENGE_TIMEOUT, and the minimum timeout time. Maximum is double this value.
-#define CHALLENGE_MINIMUM_TIMEOUT 3000
-
 #include "DR_SHA1.h"
-#define TWO_WAY_AUTHENTICATION_NONCE_LENGTH 20
-#define HASHED_NONCE_AND_PW_LENGTH SHA1_LENGTH
-
 #include "PluginInterface2.h"
 #include "RakMemoryOverride.h"
 
@@ -41,6 +33,12 @@
 #include <vector>
 
 namespace RakNet {
+
+// How long a nonce this Peer handed out stays valid. Update frees every older one.
+inline constexpr Time NONCE_TIMEOUT_MS = 10000;
+
+inline constexpr unsigned int TWO_WAY_AUTHENTICATION_NONCE_LENGTH = 20;
+inline constexpr unsigned int HASHED_NONCE_AND_PW_LENGTH = SHA1_LENGTH;
 
 /// \brief Implements two way authentication
 /// \details Given two systems, each of whom knows a common password / identifier pair, one checks that

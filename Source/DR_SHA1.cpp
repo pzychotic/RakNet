@@ -14,7 +14,11 @@
 
 namespace RakNet {
 
-#define SHA1_MAX_FILE_BUFFER ( 32 * 20 * 820 )
+namespace {
+
+constexpr size_t SHA1_MAX_FILE_BUFFER = 32 * 20 * 820;
+
+} // namespace
 
 // Rotate p_val32 by p_nBits bits to the left
 #ifndef ROL32

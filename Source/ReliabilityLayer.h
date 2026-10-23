@@ -36,12 +36,12 @@
 #include <random>
 #include <vector>
 
-/// Number of ordered streams available. You can use up to 32 ordered streams
-#define NUMBER_OF_ORDERED_STREAMS 32 // 2^5
-
-#define RESEND_TREE_ORDER 32
-
 namespace RakNet {
+
+/// Number of ordered streams available. You can use up to 32 ordered streams
+inline constexpr unsigned char NUMBER_OF_ORDERED_STREAMS = 32; // 2^5
+
+inline constexpr int RESEND_TREE_ORDER = 32;
 
 /// Forward declarations
 class PluginInterface2;

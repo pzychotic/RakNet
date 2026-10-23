@@ -18,9 +18,9 @@
 #include "Export.h"
 #include "RakMemoryOverride.h"
 
-#define REMOTE_MAX_TEXT_INPUT 2048
-
 namespace RakNet {
+
+inline constexpr int REMOTE_MAX_TEXT_INPUT = 2048;
 
 class CommandParserInterface;
 

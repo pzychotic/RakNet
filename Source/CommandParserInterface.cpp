@@ -29,8 +29,6 @@
 
 namespace RakNet {
 
-const unsigned char CommandParserInterface::VARIABLE_NUMBER_OF_PARAMETERS = 255;
-
 bool CommandParserInterface::CommandNameLess::operator()( const char* lhs, const char* rhs ) const
 {
     return _stricmp( lhs, rhs ) < 0;
