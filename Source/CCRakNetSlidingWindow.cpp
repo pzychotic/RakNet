@@ -23,11 +23,7 @@ namespace RakNet {
 static const double UNSET_TIME_US = -1;
 
 // After an ack datagram goes out, the next waits this long.
-#if CC_TIME_TYPE_BYTES == 4
-static const CCTimeType ACK_GAP = 1;
-#else
-static const CCTimeType ACK_GAP = 1000;
-#endif
+static const CCTimeType ACK_GAP = 1 * CC_TIME_TICKS_PER_MS;
 
 // cwnd stops at RESEND_BUFFER_ARRAY_LENGTH full datagrams. The resend buffer holds that many
 // reliable messages, each at most a datagram, so reliable data never has more in flight;
@@ -286,15 +282,9 @@ CCTimeType CCRakNetSlidingWindow::GetRTOForRetransmission( unsigned char timesSe
 {
     (void)timesSent;
 
-#if CC_TIME_TYPE_BYTES == 4
-    const CCTimeType maxThreshold = 2000;
-    //const CCTimeType minThreshold=100;
-    const CCTimeType additionalVariance = 30;
-#else
-    const CCTimeType maxThreshold = 2000000;
-    //const CCTimeType minThreshold=100000;
-    const CCTimeType additionalVariance = 30000;
-#endif
+    const CCTimeType maxThreshold = 2000 * CC_TIME_TICKS_PER_MS;
+    //const CCTimeType minThreshold=100 * CC_TIME_TICKS_PER_MS;
+    const CCTimeType additionalVariance = 30 * CC_TIME_TICKS_PER_MS;
 
 
     if( estimatedRTT == UNSET_TIME_US )

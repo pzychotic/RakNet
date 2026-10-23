@@ -32,13 +32,7 @@ namespace RakNet {
 // #endif
 
 
-#if CC_TIME_TYPE_BYTES == 4
-static const CCTimeType MAX_TIME_BETWEEN_PACKETS = 350;  // 350 milliseconds
-static const CCTimeType HISTOGRAM_RESTART_CYCLE = 10000; // Every 10 seconds reset the histogram
-#else
-static const CCTimeType MAX_TIME_BETWEEN_PACKETS = 350000; // 350 milliseconds
-                                                           //static const CCTimeType HISTOGRAM_RESTART_CYCLE=10000000; // Every 10 seconds reset the histogram
-#endif
+static const CCTimeType MAX_TIME_BETWEEN_PACKETS = 350 * CC_TIME_TICKS_PER_MS;
 static const int DEFAULT_HAS_RECEIVED_PACKET_QUEUE_SIZE = 512;
 static const CCTimeType STARTING_TIME_BETWEEN_PACKETS = MAX_TIME_BETWEEN_PACKETS;
 
@@ -69,13 +63,7 @@ uint64_t BPSTracker::GetTotal1( void ) const { return total1; }
 
 void BPSTracker::ClearExpired1( CCTimeType time )
 {
-    while( !dataQueue.empty() &&
-#if CC_TIME_TYPE_BYTES == 8
-           dataQueue.front().time + 1000000 < time
-#else
-           dataQueue.front().time + 1000 < time
-#endif
-    )
+    while( !dataQueue.empty() && dataQueue.front().time + 1000 * CC_TIME_TICKS_PER_MS < time )
     {
         lastSec1 -= dataQueue.front().value1;
         dataQueue.pop_front();
@@ -468,9 +456,8 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
 {
     RakAssert( !( buffer == 0 ) );
 
-#if CC_TIME_TYPE_BYTES == 4
-    timeRead /= 1000;
-#endif
+    if constexpr( CC_TIME_TYPE_BYTES == 4 )
+        timeRead /= 1000;
 
 
     bpsMetrics[(int)ACTUAL_BYTES_RECEIVED].Push1( timeRead, length );
@@ -682,11 +669,7 @@ bool ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer(
         {
             for( PluginInterface2* pPlugin : messageHandlerList )
             {
-#if CC_TIME_TYPE_BYTES == 4
-                pPlugin->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, timeRead, false );
-#else
-                pPlugin->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, ( RakNet::TimeMS )( timeRead / (CCTimeType)1000 ), false );
-#endif
+                pPlugin->OnInternalPacket( internalPacket, receivePacketCount, systemAddress, (RakNet::TimeMS)( timeRead / CC_TIME_TICKS_PER_MS ), false );
             }
 
             {
@@ -1205,9 +1188,8 @@ bool ReliabilityLayer::Send( char* data, BitSize_t numberOfBitsToSend, PacketPri
     RakAssert( !( orderingChannel >= NUMBER_OF_ORDERED_STREAMS ) );
     RakAssert( numberOfBitsToSend > 0 );
 
-#if CC_TIME_TYPE_BYTES == 4
-    currentTime /= 1000;
-#endif
+    if constexpr( CC_TIME_TYPE_BYTES == 4 )
+        currentTime /= 1000;
 
     (void)MTUSize;
 
@@ -1336,13 +1318,9 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 {
     (void)MTUSize;
 
-    RakNet::TimeMS timeMs;
-#if CC_TIME_TYPE_BYTES == 4
-    time /= 1000;
-    timeMs = time;
-#else
-    timeMs = ( RakNet::TimeMS )( time / (CCTimeType)1000 );
-#endif
+    if constexpr( CC_TIME_TYPE_BYTES == 4 )
+        time /= 1000;
+    const RakNet::TimeMS timeMs = (RakNet::TimeMS)( time / CC_TIME_TICKS_PER_MS );
 
 #ifdef _DEBUG
     while( !delayList.empty() )
@@ -1375,11 +1353,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
     CCTimeType timeSinceLastTick = time - lastUpdateTime;
     lastUpdateTime = time;
-#if CC_TIME_TYPE_BYTES == 4
-    timeSinceLastTick = std::min<CCTimeType>( timeSinceLastTick, 100 );
-#else
-    timeSinceLastTick = std::min<CCTimeType>( timeSinceLastTick, 100000 );
-#endif
+    timeSinceLastTick = std::min<CCTimeType>( timeSinceLastTick, 100 * CC_TIME_TICKS_PER_MS );
 
     if( unreliableTimeout > 0 )
     {
@@ -1467,11 +1441,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
     // Due to thread vagarities and the way I store the time to avoid slow calls to RakNet::GetTime
     // time may be less than lastAck
-#if CC_TIME_TYPE_BYTES == 4
-    if( statistics.messagesInResendBuffer != 0 && AckTimeout( time ) )
-#else
-    if( statistics.messagesInResendBuffer != 0 && AckTimeout( RakNet::TimeMS( time / (CCTimeType)1000 ) ) )
-#endif
+    if( statistics.messagesInResendBuffer != 0 && AckTimeout( RakNet::TimeMS( time / CC_TIME_TICKS_PER_MS ) ) )
     {
         // SHOW - dead connection
         // We've waited a very long time for a reliable packet to get an ack and it never has
@@ -1508,13 +1478,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
     statistics.BPSLimitByOutgoingBandwidthLimit = BitsToBytes( bitsPerSecondLimit );
     statistics.BPSLimitByCongestionControl = congestionManager.GetBytesPerSecondLimitByCongestionControl();
 
-    if( time > lastBpsClear +
-#if CC_TIME_TYPE_BYTES == 4
-                   100
-#else
-                   100000
-#endif
-    )
+    if( time > lastBpsClear + 100 * CC_TIME_TICKS_PER_MS )
     {
         for( int i = 0; i < RNS_PER_SECOND_METRICS_COUNT; i++ )
         {
@@ -1605,11 +1569,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
                         for( PluginInterface2* pPlugin : messageHandlerList )
                         {
-#if CC_TIME_TYPE_BYTES == 4
-                            pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)time, true );
-#else
-                            pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ), true );
-#endif
+                            pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)( time / CC_TIME_TICKS_PER_MS ), true );
                         }
 
                         // Put the packet back into the resend list at the correct spot
@@ -1707,11 +1667,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
                         internalPacket->reliableMessageNumber = sendReliableMessageNumberIndex;
                         internalPacket->retransmissionTime = congestionManager.GetRTOForRetransmission( internalPacket->timesSent + 1 );
                         internalPacket->nextActionTime = internalPacket->retransmissionTime + time;
-#if CC_TIME_TYPE_BYTES == 4
-                        const CCTimeType threshhold = 10000;
-#else
-                        const CCTimeType threshhold = 10000000;
-#endif
+                        const CCTimeType threshhold = 10000 * CC_TIME_TICKS_PER_MS;
                         if( internalPacket->nextActionTime - time > threshhold )
                         {
                             //                              int a=5;
@@ -1755,11 +1711,7 @@ void ReliabilityLayer::Update( RakNetSocket2* s, SystemAddress& systemAddress, i
 
                     for( PluginInterface2* pPlugin : messageHandlerList )
                     {
-#if CC_TIME_TYPE_BYTES == 4
-                        pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)time, true );
-#else
-                        pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ), true );
-#endif
+                        pPlugin->OnInternalPacket( internalPacket, static_cast<uint32_t>( packetsToSendThisUpdateDatagramBoundaries.size() ) + congestionManager.GetNextDatagramSequenceNumber(), systemAddress, (RakNet::TimeMS)( time / CC_TIME_TICKS_PER_MS ), true );
                     }
                     pushedAnything = true;
 
@@ -1971,11 +1923,7 @@ void ReliabilityLayer::SetSplitMessageProgressInterval( int interval )
 //-------------------------------------------------------------------------------------------------------
 void ReliabilityLayer::SetUnreliableTimeout( RakNet::TimeMS timeoutMS )
 {
-#if CC_TIME_TYPE_BYTES == 4
-    unreliableTimeout = timeoutMS;
-#else
-    unreliableTimeout = (CCTimeType)timeoutMS * (CCTimeType)1000;
-#endif
+    unreliableTimeout = (CCTimeType)timeoutMS * CC_TIME_TICKS_PER_MS;
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -2015,11 +1963,7 @@ unsigned ReliabilityLayer::RemovePacketFromResendListAndDeleteOlderReliableSeque
 
     for( PluginInterface2* pPlugin : messageHandlerList )
     {
-#if CC_TIME_TYPE_BYTES == 4
-        pPlugin->OnAck( messageNumber, systemAddress, time );
-#else
-        pPlugin->OnAck( messageNumber, systemAddress, ( RakNet::TimeMS )( time / (CCTimeType)1000 ) );
-#endif
+        pPlugin->OnAck( messageNumber, systemAddress, (RakNet::TimeMS)( time / CC_TIME_TICKS_PER_MS ) );
     }
 
     // Testing1
@@ -2626,14 +2570,8 @@ CCTimeType ReliabilityLayer::GetSplitPacketChannelStallTime( void ) const
     // Half the connection timeout with no progress. Update sweeps at this same interval,
     // so a stalled channel is freed within timeoutTime of its last chunk; that pairing is
     // the reason for the half, and the reason both halves read this one function.
-    //
-    // timeoutTime is milliseconds. time and lastUpdateTime are milliseconds when
-    // CC_TIME_TYPE_BYTES is 4 and microseconds when it is 8.
-#if CC_TIME_TYPE_BYTES == 4
-    return (CCTimeType)timeoutTime / 2;
-#else
-    return (CCTimeType)timeoutTime * (CCTimeType)1000 / 2;
-#endif
+    // timeoutTime is milliseconds.
+    return (CCTimeType)timeoutTime * CC_TIME_TICKS_PER_MS / 2;
 }
 
 //-------------------------------------------------------------------------------------------------------

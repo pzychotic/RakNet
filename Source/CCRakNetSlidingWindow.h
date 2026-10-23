@@ -59,14 +59,12 @@ namespace RakNet {
 //#define CC_DEBUG_PRINTF_4(x,y,z,a) printf(x,y,z,a)
 //#define CC_DEBUG_PRINTF_5(x,y,z,a,b) printf(x,y,z,a,b)
 
-/// Set to 4 if you are using the iPod Touch TG. See http://www.jenkinssoftware.com/forum/index.php?topic=2717.0
-#define CC_TIME_TYPE_BYTES 8
-
-#if CC_TIME_TYPE_BYTES == 8
-typedef RakNet::TimeUS CCTimeType;
-#else
-typedef RakNet::TimeMS CCTimeType;
-#endif
+/// Time in the reliability layer and congestion control. An 8-byte CCTimeType counts
+/// microseconds and a 4-byte one milliseconds.
+using CCTimeType = RakNet::TimeUS;
+inline constexpr size_t CC_TIME_TYPE_BYTES = sizeof( CCTimeType );
+/// CCTimeType ticks in one millisecond.
+inline constexpr CCTimeType CC_TIME_TICKS_PER_MS = CC_TIME_TYPE_BYTES == 8 ? 1000 : 1;
 
 typedef RakNet::uint24_t DatagramSequenceNumberType;
 typedef double BytesPerMicrosecond;
