@@ -347,9 +347,9 @@ void PacketizedTCP::CountConnection( const SystemAddress& sa, int delta )
 
     // One entry per address, so a reconnect from the same address shares the entry of the
     // connection it replaces rather than failing to insert its own.
-    auto it = connections.find( sa );
-    if( it == connections.end() )
-        it = connections.insert( std::make_pair( sa, std::make_unique<Connection>() ) ).first;
+    const auto [it, inserted] = connections.try_emplace( sa );
+    if( inserted )
+        it->second = std::make_unique<Connection>();
 
     Connection* connection = it->second.get();
     if( delta > 0 )

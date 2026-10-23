@@ -82,19 +82,15 @@ bool StatisticsHistory::AddValueByObjectID( uint64_t objectId, const std::string
 
 void StatisticsHistory::AddValueByIndex( unsigned int index, const std::string& key, SHValueType val, Time curTime, bool combineEqualTimes )
 {
-    TimeAndValueQueue* queue = nullptr;
     TrackedObject* to = objects[index].get();
-    auto it = to->dataQueues.find( key );
-    if( it == to->dataQueues.end() )
+    const auto [it, inserted] = to->dataQueues.try_emplace( key );
+    if( inserted )
     {
-        queue = to->dataQueues.emplace( key, std::make_unique<TimeAndValueQueue>() ).first->second.get();
-        queue->key = key;
-        queue->timeToTrackValues = timeToTrack;
+        it->second = std::make_unique<TimeAndValueQueue>();
+        it->second->key = key;
+        it->second->timeToTrackValues = timeToTrack;
     }
-    else
-    {
-        queue = it->second.get();
-    }
+    TimeAndValueQueue* queue = it->second.get();
 
     TimeAndValue tav;
     if( combineEqualTimes == true && !queue->values.empty() && queue->values.back().time == curTime )

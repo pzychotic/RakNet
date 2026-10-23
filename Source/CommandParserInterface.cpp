@@ -105,7 +105,7 @@ void CommandParserInterface::RegisterCommand( unsigned char parameterCount, cons
     rc.commandHelp = commandHelp;
     rc.parameterCount = parameterCount;
     // A name registered twice, in any case, keeps its first registration.
-    const bool inserted = commandList.emplace( command, rc ).second;
+    const bool inserted = commandList.try_emplace( command, rc ).second;
     RakAssert( inserted );
     (void)inserted;
 }

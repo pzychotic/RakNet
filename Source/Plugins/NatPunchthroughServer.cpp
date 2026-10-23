@@ -325,13 +325,17 @@ void NatPunchthroughServer::OnNewConnection( const SystemAddress& systemAddress,
     (void)systemAddress;
     (void)isIncoming;
 
+    // A guid already listed keeps its User.
+    const auto [it, inserted] = users.try_emplace( rakNetGUID );
+    if( !inserted )
+        return;
+
     auto user = std::make_unique<User>();
     user->guid = rakNetGUID;
     user->mostRecentPort = 0;
     user->systemAddress = systemAddress;
     user->isReady = true;
-    // A guid already listed keeps its User.
-    users.emplace( rakNetGUID, std::move( user ) );
+    it->second = std::move( user );
 }
 
 void NatPunchthroughServer::OnNATPunchthroughRequest( Packet* packet )

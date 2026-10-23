@@ -150,3 +150,13 @@ TEST_CASE( "TwoWayAuthentication sends no nonce it could not draw", "[twowayauth
 
     server->DetachPlugin( &auth );
 }
+
+TEST_CASE( "TwoWayAuthentication refuses a password for an identifier already in use", "[twowayauth]" )
+{
+    TwoWayAuthentication auth;
+
+    CHECK( auth.AddPassword( "identifier", "password" ) );
+    CHECK_FALSE( auth.AddPassword( "identifier", "password" ) );
+    CHECK_FALSE( auth.AddPassword( "identifier", "other password" ) );
+    CHECK( auth.AddPassword( "other identifier", "password" ) );
+}

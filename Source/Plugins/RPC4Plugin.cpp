@@ -83,37 +83,22 @@ RPC4::~RPC4() = default;
 
 bool RPC4::RegisterFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, Packet* packet ) )
 {
-    if( registeredNonblockingFunctions.find( uniqueID ) != registeredNonblockingFunctions.end() )
-        return false;
-
-    registeredNonblockingFunctions.insert( std::make_pair( uniqueID, functionPointer ) );
-    return true;
+    return registeredNonblockingFunctions.try_emplace( uniqueID, functionPointer ).second;
 }
 
 void RPC4::RegisterSlot( const char* sharedIdentifier, void ( *functionPointer )( BitStream* userData, Packet* packet ), int callPriority )
 {
-    LocalSlot* localSlot = nullptr;
-    auto it = localSlots.find( sharedIdentifier );
-    if( it == localSlots.end() )
-    {
-        localSlot = localSlots.emplace( sharedIdentifier, std::make_unique<LocalSlot>() ).first->second.get();
-    }
-    else
-    {
-        localSlot = it->second.get();
-    }
+    const auto [it, inserted] = localSlots.try_emplace( sharedIdentifier );
+    if( inserted )
+        it->second = std::make_unique<LocalSlot>();
 
     LocalSlotObject lso( nextSlotRegistrationCount++, callPriority, functionPointer );
-    localSlot->slotObjects.insert( lso );
+    it->second->slotObjects.insert( lso );
 }
 
 bool RPC4::RegisterBlockingFunction( const char* uniqueID, void ( *functionPointer )( BitStream* userData, BitStream* returnData, Packet* packet ) )
 {
-    if( registeredBlockingFunctions.find( uniqueID ) != registeredBlockingFunctions.end() )
-        return false;
-
-    registeredBlockingFunctions.insert( std::make_pair( uniqueID, functionPointer ) );
-    return true;
+    return registeredBlockingFunctions.try_emplace( uniqueID, functionPointer ).second;
 }
 
 void RPC4::RegisterLocalCallback( const char* uniqueID, MessageID messageId )

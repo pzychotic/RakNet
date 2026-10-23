@@ -158,11 +158,8 @@ bool TwoWayAuthentication::AddPassword( const std::string& identifier, const std
     if( password.empty() || identifier.empty() || password == identifier /* insecure */ )
         return false;
 
-    if( passwords.find( identifier ) != passwords.end() )
-        return false; // identifier already in use
-
-    passwords.insert( std::make_pair( identifier, password ) );
-    return true;
+    // An identifier already in use keeps its password.
+    return passwords.try_emplace( identifier, password ).second;
 }
 
 bool TwoWayAuthentication::Challenge( const std::string& identifier, AddressOrGUID remoteSystem )

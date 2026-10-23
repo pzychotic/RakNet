@@ -97,3 +97,49 @@ TEST_CASE( "RPC4 calls a signal's slots by priority, highest first, then in regi
 
     peer->DetachPlugin( &rpc4 );
 }
+
+namespace {
+
+std::vector<char> g_functionCalls;
+
+void FunctionA( BitStream*, Packet* ) { g_functionCalls.push_back( 'A' ); }
+void FunctionB( BitStream*, Packet* ) { g_functionCalls.push_back( 'B' ); }
+
+void BlockingFunctionA( BitStream*, BitStream*, Packet* ) {}
+void BlockingFunctionB( BitStream*, BitStream*, Packet* ) {}
+
+} // namespace
+
+TEST_CASE( "RPC4 refuses a function name already registered and keeps the first function", "[rpc4]" )
+{
+    RPC4 rpc4;
+
+    PeerScope peers;
+    RakPeerInterface* peer = peers.Client();
+    peer->AttachPlugin( &rpc4 );
+
+    CHECK( rpc4.RegisterFunction( "function", FunctionA ) );
+    CHECK_FALSE( rpc4.RegisterFunction( "function", FunctionB ) );
+
+    g_functionCalls.clear();
+    rpc4.CallLoopback( "function", nullptr );
+    // The plugin runs the function as Receive passes the loopback packet to it.
+    Packet* packet = peer->Receive();
+    if( packet != nullptr )
+        peer->DeallocatePacket( packet );
+
+    CHECK( g_functionCalls == std::vector<char>{ 'A' } );
+
+    peer->DetachPlugin( &rpc4 );
+}
+
+TEST_CASE( "RPC4 refuses a blocking function name already registered until it is unregistered", "[rpc4]" )
+{
+    RPC4 rpc4;
+
+    CHECK( rpc4.RegisterBlockingFunction( "function", BlockingFunctionA ) );
+    CHECK_FALSE( rpc4.RegisterBlockingFunction( "function", BlockingFunctionB ) );
+
+    CHECK( rpc4.UnregisterBlockingFunction( "function" ) );
+    CHECK( rpc4.RegisterBlockingFunction( "function", BlockingFunctionB ) );
+}

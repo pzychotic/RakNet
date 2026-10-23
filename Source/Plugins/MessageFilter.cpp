@@ -117,7 +117,7 @@ void MessageFilter::SetSystemFilterSet( AddressOrGUID addressOrGUID, int filterS
         if( filterSetID < 0 )
             return;
 
-        systemList.insert( std::make_pair( addressOrGUID, FilteredSystem{ GetFilterSetByID( filterSetID ), RakNet::GetTimeMS() } ) );
+        systemList.emplace( addressOrGUID, FilteredSystem{ GetFilterSetByID( filterSetID ), RakNet::GetTimeMS() } );
     }
     else
     {
@@ -194,15 +194,13 @@ void MessageFilter::Clear( void )
 FilterSet* MessageFilter::GetFilterSetByID( int filterSetID )
 {
     RakAssert( filterSetID >= 0 );
-    const auto filterIt = filterList.find( filterSetID );
-    if( filterIt != filterList.end() )
-        return filterIt->second.get();
-    else
+    const auto [filterIt, inserted] = filterList.try_emplace( filterSetID );
+    if( inserted )
     {
-        FilterSet* newFilterSet = filterList.emplace( filterSetID, std::make_unique<FilterSet>() ).first->second.get();
-        newFilterSet->filterSetID = filterSetID;
-        return newFilterSet;
+        filterIt->second = std::make_unique<FilterSet>();
+        filterIt->second->filterSetID = filterSetID;
     }
+    return filterIt->second.get();
 }
 
 void MessageFilter::OnInvalidMessage( FilterSet* filterSet, AddressOrGUID systemAddress, unsigned char messageID )
