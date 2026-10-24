@@ -62,6 +62,11 @@ public:
     void SendAll( const char* data, size_t length );
     void SendAll( const std::string& text ) { SendAll( text.data(), text.size() ); }
 
+    // Exactly length bytes, looping over partial receives. FAILs, saying how many
+    // arrived, if they have not all arrived within kWaitBudget or the connection
+    // closes first.
+    std::string ReceiveExactly( size_t length );
+
     // Closes abortively now. Once closed, a second call does nothing.
     void Abort();
 

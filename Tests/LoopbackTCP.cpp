@@ -1,5 +1,7 @@
 #include "LoopbackTCP.h"
 
+#include "ConnectionWaits.h"
+#include "GetTime.h"
 #include "SocketDefines.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -7,6 +9,9 @@
 #include <cstring>
 
 namespace {
+
+// How long ReceiveExactly's select waits before it checks its deadline again.
+constexpr int kReceivePollMs = 10;
 
 sockaddr_in LoopbackAddress( unsigned short port )
 {
@@ -85,6 +90,37 @@ void LoopbackTCP::Client::SendAll( const char* data, size_t length )
         data += sent;
         length -= (size_t)sent;
     }
+}
+
+std::string LoopbackTCP::Client::ReceiveExactly( size_t length )
+{
+    std::string received;
+    const RakNet::TimeMS deadline = RakNet::GetTimeMS() + kWaitBudget;
+    while( received.size() < length )
+    {
+        if( ConnectionWaits::Expired( deadline ) )
+            FAIL( "Timed out with " << received.size() << " of " << length << " bytes received" );
+
+        // A short poll, so the deadline is checked between waits.
+        timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = kReceivePollMs * 1000;
+        fd_set readable;
+        FD_ZERO( &readable );
+        FD_SET( descriptor, &readable );
+        if( select__( (int)descriptor + 1, &readable, 0, 0, &timeout ) <= 0 )
+            continue;
+
+        char chunk[4096];
+        size_t wanted = length - received.size();
+        if( wanted > sizeof( chunk ) )
+            wanted = sizeof( chunk );
+        const int got = recv__( descriptor, chunk, (int)wanted, 0 );
+        if( got <= 0 )
+            FAIL( "The connection closed with " << received.size() << " of " << length << " bytes received" );
+        received.append( chunk, (size_t)got );
+    }
+    return received;
 }
 
 void LoopbackTCP::Client::Abort()

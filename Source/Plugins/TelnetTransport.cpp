@@ -20,7 +20,10 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <iterator>
 #include <memory>
+#include <string>
+#include <tuple>
 #include <utility>
 
 // #define _PRINTF_DEBUG
@@ -31,18 +34,10 @@ namespace RakNet {
 
 STATIC_FACTORY_DEFINITIONS( TelnetTransport, TelnetTransport );
 
-TelnetTransport::TelnetTransport()
-{
-    sendSuffix = 0;
-    sendPrefix = 0;
-}
+TelnetTransport::TelnetTransport() = default;
 TelnetTransport::~TelnetTransport()
 {
     Stop();
-    if( sendSuffix )
-        rakFree_Ex( sendSuffix, _FILE_AND_LINE_ );
-    if( sendPrefix )
-        rakFree_Ex( sendPrefix, _FILE_AND_LINE_ );
 }
 bool TelnetTransport::Start( unsigned short port, bool serverMode )
 {
@@ -71,33 +66,20 @@ void TelnetTransport::Send( SystemAddress systemAddress, const char* data, ... )
     if( data == 0 || data[0] == 0 )
         return;
 
+    // Only the formatted text is bounded. The prefix and suffix go out as parts of their own,
+    // whole at any length.
     char text[REMOTE_MAX_TEXT_INPUT];
-    size_t prefixLength;
-    if( sendPrefix )
-    {
-        strcpy( text, sendPrefix );
-        prefixLength = strlen( sendPrefix );
-    }
-    else
-    {
-        text[0] = 0;
-        prefixLength = 0;
-    }
     va_list ap;
     va_start( ap, data );
-    const int formatted = std::vsnprintf( text + prefixLength, REMOTE_MAX_TEXT_INPUT - prefixLength, data, ap );
+    const int formatted = std::vsnprintf( text, REMOTE_MAX_TEXT_INPUT, data, ap );
     va_end( ap );
     if( formatted < 0 )
         return;
 
-    if( sendSuffix )
-    {
-        size_t length = strlen( text );
-        size_t availableChars = REMOTE_MAX_TEXT_INPUT - length - 1;
-        strncat( text, sendSuffix, availableChars );
-    }
-
-    tcpInterface->Send( text, (unsigned int)strlen( text ), systemAddress, false );
+    const char* parts[] = { sendPrefix.c_str(), text, sendSuffix.c_str() };
+    const unsigned int lengths[] = { (unsigned int)sendPrefix.size(), (unsigned int)strlen( text ), (unsigned int)sendSuffix.size() };
+    // Send has no result, as TCPInterface::Send has none.
+    std::ignore = tcpInterface->SendList( parts, lengths, (int)std::size( parts ), systemAddress, false );
 }
 void TelnetTransport::CloseConnection( SystemAddress systemAddress )
 {
@@ -318,29 +300,11 @@ CommandParserInterface* TelnetTransport::GetCommandParser( void )
 }
 void TelnetTransport::SetSendSuffix( const char* suffix )
 {
-    if( sendSuffix )
-    {
-        rakFree_Ex( sendSuffix, _FILE_AND_LINE_ );
-        sendSuffix = 0;
-    }
-    if( suffix )
-    {
-        sendSuffix = (char*)rakMalloc_Ex( strlen( suffix ) + 1, _FILE_AND_LINE_ );
-        strcpy( sendSuffix, suffix );
-    }
+    sendSuffix = suffix ? suffix : "";
 }
 void TelnetTransport::SetSendPrefix( const char* prefix )
 {
-    if( sendPrefix )
-    {
-        rakFree_Ex( sendPrefix, _FILE_AND_LINE_ );
-        sendPrefix = 0;
-    }
-    if( prefix )
-    {
-        sendPrefix = (char*)rakMalloc_Ex( strlen( prefix ) + 1, _FILE_AND_LINE_ );
-        strcpy( sendPrefix, prefix );
-    }
+    sendPrefix = prefix ? prefix : "";
 }
 void TelnetTransport::AutoAllocate( void )
 {

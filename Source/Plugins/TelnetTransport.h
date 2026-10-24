@@ -22,6 +22,7 @@
 
 #include <deque>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace RakNet {
@@ -92,7 +93,8 @@ protected:
     // needs a character and a terminator.
     std::deque<Packet*> pendingLines;
 
-    char *sendSuffix, *sendPrefix;
+    // Sent before and after each Send's formatted text. Empty for none.
+    std::string sendSuffix, sendPrefix;
 };
 
 } // namespace RakNet
