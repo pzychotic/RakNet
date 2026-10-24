@@ -19,6 +19,7 @@
 #include "Export.h"
 
 #include <map>
+#include <string_view>
 
 namespace RakNet {
 
@@ -134,14 +135,14 @@ public:
     virtual void ReturnResult( const char* command, TransportInterface* transport, const SystemAddress& systemAddress );
 
 protected:
-    /// Orders command names without regard to case
+    /// Orders command names without regard to ASCII case
     struct RAK_DLL_EXPORT CommandNameLess
     {
-        bool operator()( const char* lhs, const char* rhs ) const;
+        bool operator()( std::string_view lhs, std::string_view rhs ) const;
     };
 
     /// List of commands registered with RegisterCommand()
-    std::map<const char*, RegisteredCommand, CommandNameLess> commandList;
+    std::map<std::string_view, RegisteredCommand, CommandNameLess> commandList;
 };
 
 } // namespace RakNet

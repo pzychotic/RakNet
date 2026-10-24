@@ -153,3 +153,28 @@ TEST_CASE( "An IPv6 socket bound to ::127.0.0.2 reports that address", "[socket]
     SKIP( "RAKNET_SUPPORT_IPV6 is 0, so this build cannot bind an AF_INET6 socket." );
 #endif
 }
+
+TEST_CASE( "An IPv6 socket bound to UNASSIGNED_SYSTEM_ADDRESS in any ASCII case binds the wildcard", "[socket]" )
+{
+#if RAKNET_SUPPORT_IPV6 == 1
+    WinsockScope winsock;
+
+    {
+        RNS2_Berkley probe;
+        char wildcard[] = "::";
+        if( BindIPv6( probe, wildcard ) != BR_SUCCESS )
+            SKIP( "No IPv6 available on this host." );
+    }
+
+    // The resolver has no answer for the name itself, so only the wildcard shortcut binds.
+    RNS2_Berkley berkleySocket;
+    char hostAddress[] = "unassigned_system_address";
+    REQUIRE( BindIPv6( berkleySocket, hostAddress ) == BR_SUCCESS );
+
+    const SystemAddress boundAddress = berkleySocket.GetBoundAddress();
+    CHECK( boundAddress.GetIPVersion() == 6 );
+    CHECK( HoldsIPv6Address( boundAddress, "::1" ) );
+#else
+    SKIP( "RAKNET_SUPPORT_IPV6 is 0, so this build cannot bind an AF_INET6 socket." );
+#endif
+}

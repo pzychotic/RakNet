@@ -457,7 +457,7 @@ the standard interface (`find`, `emplace`, `erase`, iteration) instead of
 
 | Member | Now |
 |--------|-----|
-| `CommandParserInterface::commandList` | `std::map<const char*, RegisteredCommand, CommandNameLess>`, ordered by `_stricmp` as before |
+| `CommandParserInterface::commandList` | `std::map<std::string_view, RegisteredCommand, CommandNameLess>`, ordered ignoring ASCII case |
 | `MessageFilter::filterList` | `std::map<int, FilterSet*>` |
 | `FilterSet::allowedRPC4` | `std::set<std::string>` |
 | `NatPunchthroughServer::users` | `std::map<RakNetGUID, User*>` |
@@ -490,6 +490,11 @@ user left, and `_DISABLE_MEMORY_POOL` is no longer read.
 
 **Console platform headers:** `PS3Includes.h`, `PS4Includes.h`, `VitaIncludes.h`,
 `XBox360Includes.h`.
+
+**`LinuxStrings.h`.** Gone. On Linux it gave the MSVC names `_stricmp`, `_strnicmp` and
+`_vsnprintf`; code that called them through it calls `strcasecmp`, `strncasecmp` or
+`vsnprintf`. Where RakNet used them, command names, the host `localhost` and the bind host
+`UNASSIGNED_SYSTEM_ADDRESS` now match ignoring ASCII case only, whatever the locale.
 
 **Bindings:** the SWIG C# bindings (`Swig/`) are gone. They were never regenerated against
 this fork's API and would not have compiled against it. If you need C#, generate your own

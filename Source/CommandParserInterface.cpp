@@ -25,13 +25,13 @@
 #include <arpa/inet.h>
 #endif
 
-#include "LinuxStrings.h"
+#include "EqualsIgnoringAsciiCase.h"
 
 namespace RakNet {
 
-bool CommandParserInterface::CommandNameLess::operator()( const char* lhs, const char* rhs ) const
+bool CommandParserInterface::CommandNameLess::operator()( std::string_view lhs, std::string_view rhs ) const
 {
-    return _stricmp( lhs, rhs ) < 0;
+    return LessIgnoringAsciiCase( lhs, rhs );
 }
 
 CommandParserInterface::CommandParserInterface() {}

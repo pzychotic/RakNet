@@ -19,8 +19,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <cstdio>
 #include <tuple>
-#include "LinuxStrings.h"
 
 namespace RakNet {
 
@@ -58,9 +58,10 @@ void RakNetTransport2::Send( SystemAddress systemAddress, const char* data, ... 
     char text[REMOTE_MAX_TEXT_INPUT];
     va_list ap;
     va_start( ap, data );
-    _vsnprintf( text, REMOTE_MAX_TEXT_INPUT, data, ap );
+    const int formatted = std::vsnprintf( text, REMOTE_MAX_TEXT_INPUT, data, ap );
     va_end( ap );
-    text[REMOTE_MAX_TEXT_INPUT - 1] = 0;
+    if( formatted < 0 )
+        return;
 
     BitStream str;
     str.Write( (MessageID)ID_TRANSPORT_STRING );

@@ -80,3 +80,29 @@ TEST_CASE( "CommandParserInterface lists its commands in case-insensitive name o
 
     CHECK( transport.sent == "alpha, Beta, gamma\r\n" );
 }
+
+TEST_CASE( "CommandParserInterface finds a command in any ASCII case", "[commandparser]" )
+{
+    TestParser parser;
+    parser.RegisterCommand( 0, "Foo", "" );
+
+    RegisteredCommand rc;
+    REQUIRE( parser.GetRegisteredCommand( "foo", &rc ) );
+    CHECK( std::string( rc.command ) == "Foo" );
+    REQUIRE( parser.GetRegisteredCommand( "FOO", &rc ) );
+    CHECK( std::string( rc.command ) == "Foo" );
+}
+
+TEST_CASE( "CommandParserInterface lists a name with _ before the same name with a letter there", "[commandparser]" )
+{
+    // '_' sorts before every lower-case letter.
+    TestParser parser;
+    parser.RegisterCommand( 0, "aC", "" );
+    parser.RegisterCommand( 0, "AB", "" );
+    parser.RegisterCommand( 0, "a_b", "" );
+
+    RecordingTransport transport;
+    parser.SendCommandList( &transport, UNASSIGNED_SYSTEM_ADDRESS );
+
+    CHECK( transport.sent == "a_b, AB, aC\r\n" );
+}

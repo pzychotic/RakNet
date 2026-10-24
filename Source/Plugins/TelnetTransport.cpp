@@ -17,9 +17,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include "LinuxStrings.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <memory>
 #include <utility>
 
@@ -85,9 +85,10 @@ void TelnetTransport::Send( SystemAddress systemAddress, const char* data, ... )
     }
     va_list ap;
     va_start( ap, data );
-    _vsnprintf( text + prefixLength, REMOTE_MAX_TEXT_INPUT - prefixLength, data, ap );
+    const int formatted = std::vsnprintf( text + prefixLength, REMOTE_MAX_TEXT_INPUT - prefixLength, data, ap );
     va_end( ap );
-    text[REMOTE_MAX_TEXT_INPUT - 1] = 0;
+    if( formatted < 0 )
+        return;
 
     if( sendSuffix )
     {

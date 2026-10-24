@@ -20,7 +20,7 @@
 #include "WSAStartupSingleton.h"
 #include "SocketDefines.h"
 #include "AddrInfo.h"
-#include "LinuxStrings.h"
+#include "EqualsIgnoringAsciiCase.h"
 
 
 #if defined( _WIN32 )
@@ -464,7 +464,7 @@ bool SystemAddress::SetBinaryAddress( const char* str, char portDelineator )
         break;
     }
     case HostKind::HostName: {
-        if( hostLength == 9 && _strnicmp( str, "localhost", 9 ) == 0 )
+        if( EqualsIgnoringAsciiCase( std::string_view( str, hostLength ), "localhost" ) )
         {
             ip.emplace();
             ip->s_addr = inet_addr__( "127.0.0.1" );

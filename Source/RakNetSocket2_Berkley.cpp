@@ -14,6 +14,7 @@
 #define RAKNETSOCKET2_BERKLEY_CPP
 
 #include "AddrInfo.h"
+#include "EqualsIgnoringAsciiCase.h"
 
 #include <algorithm>
 #include <charconv>
@@ -21,7 +22,6 @@
 #ifndef _WIN32
 #include <poll.h>
 #include <netdb.h>
-#include "LinuxStrings.h"
 #endif
 
 namespace RakNet {
@@ -449,7 +449,7 @@ RNS2BindResult RNS2_Berkley::BindSharedIPV4And6( RNS2_BerkleyBindParameters* bin
 
     // On Ubuntu, "" returns "No address associated with hostname" while 0 works.
     const char* node = bindParameters->hostAddress;
-    if( node && ( _stricmp( node, "UNASSIGNED_SYSTEM_ADDRESS" ) == 0 || node[0] == 0 ) )
+    if( node && ( EqualsIgnoringAsciiCase( node, "UNASSIGNED_SYSTEM_ADDRESS" ) || node[0] == 0 ) )
         node = 0;
     AddrInfoPtr servinfo = ResolveAddrInfo( node, portStr, hints );
 

@@ -124,6 +124,33 @@ TEST_CASE( "SystemAddress::SetBinaryAddress reads the port after localhost", "[a
     CHECK( rejected.GetPort() == 1234 );
 }
 
+TEST_CASE( "SystemAddress reads localhost in any ASCII case as 127.0.0.1", "[address]" )
+{
+    WinsockScope winsock;
+
+    for( const char* host : { "LocalHost", "LOCALHOST" } )
+    {
+        CAPTURE( host );
+        SystemAddress binary( "192.168.1.5", 1234 );
+        REQUIRE( binary.SetBinaryAddress( host ) );
+        CHECK( IpOf( binary ) == "127.0.0.1" );
+
+        SystemAddress parsed( "192.168.1.5", 1234 );
+        REQUIRE( parsed.FromString( host, '|', 4 ) );
+        CHECK( IpOf( parsed ) == "127.0.0.1" );
+    }
+}
+
+TEST_CASE( "SystemAddress::SetBinaryAddress takes only the whole name localhost as loopback", "[address]" )
+{
+    WinsockScope winsock;
+
+    // localhostx goes to the resolver, which has no loopback answer for it.
+    SystemAddress address( "192.168.1.5", 1234 );
+    const bool resolved = address.SetBinaryAddress( "localhostx" );
+    CHECK_FALSE( ( resolved && IpOf( address ) == "127.0.0.1" ) );
+}
+
 TEST_CASE( "SystemAddress::SetBinaryAddress rejects a host of digits alone", "[address]" )
 {
     WinsockScope winsock;

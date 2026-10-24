@@ -28,7 +28,7 @@ public:
     void Stop( void ) override {}
     void Send( SystemAddress, const char* data, ... ) override
     {
-        char buffer[256];
+        char buffer[REMOTE_MAX_TEXT_INPUT * 2];
         va_list args;
         va_start( args, data );
         vsnprintf( buffer, sizeof( buffer ), data, args );
@@ -126,4 +126,21 @@ TEST_CASE( "LogCommandParser subscribes a user to every channel with no channel 
     parser.WriteLog( "Alpha", "to alpha" );
     parser.WriteLog( "Beta", "to beta" );
     CHECK( transport.sent == "to alpha\r\nto beta\r\n" );
+}
+
+TEST_CASE( "LogCommandParser truncates a log longer than REMOTE_MAX_TEXT_INPUT", "[logcommandparser]" )
+{
+    LogCommandParser parser;
+    parser.AddChannel( "Alpha" );
+
+    RecordingTransport transport;
+    parser.OnTransportChange( &transport );
+    SubscribeTo( parser, transport, SystemAddress( "127.0.0.1", 1 ), "Alpha" );
+
+    transport.sent.clear();
+    const std::string longLog( REMOTE_MAX_TEXT_INPUT + 100, 'x' );
+    parser.WriteLog( "Alpha", "%s", longLog.c_str() );
+
+    // The end of the buffer makes room for the line ending and the terminator.
+    CHECK( transport.sent == std::string( REMOTE_MAX_TEXT_INPUT - 4, 'x' ) + "\r\n" );
 }

@@ -13,7 +13,6 @@ set( CURRENT_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTree.h
     ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTreeNode.h
     ${CMAKE_CURRENT_SOURCE_DIR}/InternalPacket.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/LinuxStrings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/LogCommandParser.h
     ${CMAKE_CURRENT_SOURCE_DIR}/MTUSize.h
     ${CMAKE_CURRENT_SOURCE_DIR}/MessageIdentifiers.h
@@ -61,7 +60,6 @@ set( CURRENT_SOURCE
     ${CMAKE_CURRENT_SOURCE_DIR}/DR_SHA1.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GetTime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HuffmanEncodingTree.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/LinuxStrings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LogCommandParser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PacketizedTCP.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PlatformRandom.cpp

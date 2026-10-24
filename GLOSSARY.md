@@ -198,5 +198,6 @@ _Avoid_: IP address string, numeric string, IP literal
 
 **Host name**:
 Any other non-empty host, handed to the resolver to turn into an address. Its letters
-alone never make it numeric: `cafe.de` is a host name.
+alone never make it numeric: `cafe.de` is a host name. ASCII letter case never tells two
+host names apart: `LocalHost` is `localhost`.
 _Avoid_: Domain, non-numeric host

@@ -22,10 +22,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <algorithm>
+#include <cstdio>
 #include <iterator>
 #include <string_view>
-
-#include "LinuxStrings.h"
 
 namespace RakNet {
 
@@ -140,9 +139,10 @@ void LogCommandParser::WriteLog( const char* channelName, const char* format, ..
     char text[REMOTE_MAX_TEXT_INPUT];
     va_list ap;
     va_start( ap, format );
-    _vsnprintf( text, REMOTE_MAX_TEXT_INPUT, format, ap );
+    const int formatted = std::vsnprintf( text, REMOTE_MAX_TEXT_INPUT, format, ap );
     va_end( ap );
-    text[REMOTE_MAX_TEXT_INPUT - 1] = 0;
+    if( formatted < 0 )
+        return;
 
     // Make sure that text ends in \r\n
     int textLen;
